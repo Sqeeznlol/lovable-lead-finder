@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ExternalLink, Trash2, Edit, MapPin, Home } from 'lucide-react';
+import { ExternalLink, Trash2, Edit, MapPin, Home, CheckCircle2, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { useProperties, useUpdateProperty, useDeleteProperty, type Property } from '@/hooks/use-properties';
+import { useProperties, useGemeinden, useUpdateProperty, useDeleteProperty, type Property } from '@/hooks/use-properties';
 import { useToast } from '@/hooks/use-toast';
 
 const STATUSES = ['Alle', 'Neu', 'Eigentümer ermittelt', 'Kontaktiert', 'Interesse', 'Kein Interesse', 'Abgeschlossen'];
@@ -28,35 +28,38 @@ function statusColor(s: string) {
 export function PropertyList() {
   const [filter, setFilter] = useState('Alle');
   const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [gemeindeFilter, setGemeindeFilter] = useState('Alle');
   const [editProp, setEditProp] = useState<Property | null>(null);
   const [page, setPage] = useState(0);
   const pageSize = 50;
-  const { data: properties, isLoading } = useProperties(filter);
+
+  const { data: result, isLoading } = useProperties({
+    statusFilter: filter,
+    gemeindeFilter,
+    search,
+    page,
+    pageSize,
+  });
+  const { data: gemeinden } = useGemeinden();
   const updateProp = useUpdateProperty();
   const deleteProp = useDeleteProperty();
   const { toast } = useToast();
 
-  const gemeinden = [...new Set((properties || []).map(p => p.gemeinde).filter(Boolean))].sort() as string[];
-
-  const filtered = (properties || []).filter(p => {
-    if (gemeindeFilter !== 'Alle' && p.gemeinde !== gemeindeFilter) return false;
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return p.address.toLowerCase().includes(q) ||
-      p.egrid?.toLowerCase().includes(q) ||
-      p.owner_name?.toLowerCase().includes(q) ||
-      p.gemeinde?.toLowerCase().includes(q) ||
-      p.strassenname?.toLowerCase().includes(q);
-  });
-
-  const paged = filtered.slice(page * pageSize, (page + 1) * pageSize);
-  const totalPages = Math.ceil(filtered.length / pageSize);
+  const properties = result?.data || [];
+  const totalCount = result?.count || 0;
+  const totalPages = Math.ceil(totalCount / pageSize);
 
   const portalLink = (p: Property) => {
     if (!p.egrid) return null;
-    const bfs = p.bfs_nr || '0';
-    return `https://portal.objektwesen.zh.ch/aks/detail?egrid=${p.egrid}&bfsNr=${bfs}`;
+    return `https://portal.objektwesen.zh.ch/aks/detail?egrid=${p.egrid}&bfsNr=${p.bfs_nr || '0'}`;
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      setSearch(searchInput);
+      setPage(0);
+    }
   };
 
   return (
@@ -64,15 +67,21 @@ export function PropertyList() {
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Liegenschaften</h2>
-          <p className="text-muted-foreground mt-1">{filtered.length} von {(properties || []).length} Einträgen</p>
+          <p className="text-muted-foreground mt-1">{totalCount.toLocaleString()} Einträge (sortiert nach HNF ↓)</p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <Input placeholder="Suchen..." value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} className="w-52" />
+          <Input
+            placeholder="Suchen... (Enter)"
+            value={searchInput}
+            onChange={e => setSearchInput(e.target.value)}
+            onKeyDown={handleSearchKeyDown}
+            className="w-52"
+          />
           <Select value={gemeindeFilter} onValueChange={v => { setGemeindeFilter(v); setPage(0); }}>
             <SelectTrigger className="w-44"><SelectValue placeholder="Gemeinde" /></SelectTrigger>
             <SelectContent className="max-h-64">
               <SelectItem value="Alle">Alle Gemeinden</SelectItem>
-              {gemeinden.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+              {(gemeinden || []).map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={filter} onValueChange={v => { setFilter(v); setPage(0); }}>
@@ -93,9 +102,10 @@ export function PropertyList() {
                 <TableHead>PLZ/Ort</TableHead>
                 <TableHead>Gemeinde</TableHead>
                 <TableHead>EGRID</TableHead>
+                <TableHead>HNF</TableHead>
                 <TableHead>Fläche</TableHead>
-                <TableHead>Kategorie</TableHead>
                 <TableHead>Baujahr</TableHead>
+                <TableHead>Abgefragt</TableHead>
                 <TableHead>Eigentümer</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Links</TableHead>
@@ -104,22 +114,38 @@ export function PropertyList() {
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={11} className="text-center py-12 text-muted-foreground">Laden...</TableCell></TableRow>
-              ) : paged.length === 0 ? (
-                <TableRow><TableCell colSpan={11} className="text-center py-12 text-muted-foreground">Keine Liegenschaften gefunden</TableCell></TableRow>
-              ) : paged.map(p => (
+                <TableRow><TableCell colSpan={12} className="text-center py-12 text-muted-foreground">Laden...</TableCell></TableRow>
+              ) : properties.length === 0 ? (
+                <TableRow><TableCell colSpan={12} className="text-center py-12 text-muted-foreground">Keine Liegenschaften gefunden</TableCell></TableRow>
+              ) : properties.map(p => (
                 <TableRow key={p.id} className="group">
                   <TableCell className="font-medium max-w-[180px] truncate">{p.address}</TableCell>
                   <TableCell className="text-xs whitespace-nowrap">{p.plz_ort || '–'}</TableCell>
                   <TableCell className="text-xs">{p.gemeinde || '–'}</TableCell>
                   <TableCell className="font-mono text-xs">{p.egrid || '–'}</TableCell>
-                  <TableCell className="text-xs whitespace-nowrap">
-                    {p.area ? `${Math.round(p.area)} m²` : '–'}
-                    {p.gebaeudeflaeche ? <span className="text-muted-foreground ml-1">({Math.round(p.gebaeudeflaeche)})</span> : ''}
+                  <TableCell className="text-xs font-semibold whitespace-nowrap">
+                    {p.gebaeudeflaeche ? `${Math.round(Number(p.gebaeudeflaeche))} m²` : '–'}
                   </TableCell>
-                  <TableCell className="text-xs max-w-[120px] truncate">{p.kategorie || '–'}</TableCell>
+                  <TableCell className="text-xs whitespace-nowrap">
+                    {p.area ? `${Math.round(Number(p.area))} m²` : '–'}
+                  </TableCell>
                   <TableCell className="text-xs">{p.baujahr || '–'}</TableCell>
-                  <TableCell>{p.owner_name || <span className="text-muted-foreground italic text-xs">Unbekannt</span>}</TableCell>
+                  <TableCell>
+                    {p.is_queried ? (
+                      <CheckCircle2 className="h-4 w-4 text-primary" />
+                    ) : (
+                      <XCircle className="h-4 w-4 text-muted-foreground/40" />
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {p.owner_name ? (
+                      <span className="text-sm">{p.owner_name}</span>
+                    ) : p.is_queried ? (
+                      <span className="text-muted-foreground italic text-xs">Kein Ergebnis</span>
+                    ) : (
+                      <span className="text-muted-foreground italic text-xs">Unbekannt</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Badge variant="secondary" className={`text-xs ${statusColor(p.status)}`}>{p.status}</Badge>
                   </TableCell>
@@ -157,7 +183,9 @@ export function PropertyList() {
         </div>
         {totalPages > 1 && (
           <div className="flex items-center justify-between px-4 py-3 border-t bg-muted/30">
-            <p className="text-sm text-muted-foreground">Seite {page + 1} von {totalPages}</p>
+            <p className="text-sm text-muted-foreground">
+              Seite {page + 1} von {totalPages.toLocaleString()} · {totalCount.toLocaleString()} Einträge
+            </p>
             <div className="flex gap-2">
               <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage(p => p - 1)}>Zurück</Button>
               <Button size="sm" variant="outline" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}>Weiter</Button>
@@ -212,10 +240,10 @@ function EditDialog({ property, onClose, onSave }: {
               {property.egrid && <span>EGRID: <span className="font-mono">{property.egrid}</span></span>}
               {property.kategorie && <span>Typ: {property.kategorie}</span>}
               {property.baujahr && <span>Baujahr: {property.baujahr}</span>}
-              {property.area && <span>Grundstück: {Math.round(property.area)} m²</span>}
-              {property.gebaeudeflaeche && <span>Gebäude: {Math.round(property.gebaeudeflaeche)} m²</span>}
-              {property.geschosse && <span>Geschosse: {property.geschosse}</span>}
-              {property.wohnungen && <span>Wohnungen: {property.wohnungen}</span>}
+              {property.area && <span>Grundstück: {Math.round(Number(property.area))} m²</span>}
+              {property.gebaeudeflaeche && <span>HNF: {Math.round(Number(property.gebaeudeflaeche))} m²</span>}
+              {property.geschosse && <span>Geschosse: {Number(property.geschosse)}</span>}
+              {property.wohnungen && <span>Wohnungen: {Number(property.wohnungen)}</span>}
             </div>
             {portalUrl && (
               <a href={portalUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-xs inline-flex items-center gap-1 mt-2">
