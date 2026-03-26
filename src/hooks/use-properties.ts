@@ -8,7 +8,7 @@ export function useProperties(statusFilter?: string) {
   return useQuery({
     queryKey: ['properties', statusFilter],
     queryFn: async () => {
-      let query = supabase.from('properties').select('*').order('created_at', { ascending: false });
+      let query = supabase.from('properties').select('*').order('created_at', { ascending: false }).limit(500);
       if (statusFilter && statusFilter !== 'Alle') {
         query = query.eq('status', statusFilter);
       }
@@ -39,8 +39,12 @@ export function useInsertProperties() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (properties: TablesInsert<'properties'>[]) => {
-      const { error } = await supabase.from('properties').insert(properties);
-      if (error) throw error;
+      // Insert in batches of 500
+      for (let i = 0; i < properties.length; i += 500) {
+        const batch = properties.slice(i, i + 500);
+        const { error } = await supabase.from('properties').insert(batch);
+        if (error) throw error;
+      }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['properties'] }),
   });
@@ -72,14 +76,18 @@ export function usePropertyStats() {
   return useQuery({
     queryKey: ['properties', 'stats'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('properties').select('status, is_queried, owner_name');
+      const { data, error } = await supabase.from('properties').select('status, is_queried, owner_name, gemeinde');
       if (error) throw error;
       const total = data.length;
       const queried = data.filter(p => p.is_queried).length;
       const withOwner = data.filter(p => p.owner_name).length;
       const statuses: Record<string, number> = {};
-      data.forEach(p => { statuses[p.status] = (statuses[p.status] || 0) + 1; });
-      return { total, queried, withOwner, pending: total - queried, statuses };
+      const gemeinden: Record<string, number> = {};
+      data.forEach(p => {
+        statuses[p.status] = (statuses[p.status] || 0) + 1;
+        if (p.gemeinde) gemeinden[p.gemeinde] = (gemeinden[p.gemeinde] || 0) + 1;
+      });
+      return { total, queried, withOwner, pending: total - queried, statuses, gemeinden };
     },
   });
 }
