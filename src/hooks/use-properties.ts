@@ -67,6 +67,7 @@ export function useUnqueriedProperties(limit: number) {
         .from('properties')
         .select('*')
         .eq('is_queried', false)
+        .not('zone', 'in', '("I","G","L")')
         .order('gebaeudeflaeche', { ascending: false, nullsFirst: false })
         .order('area', { ascending: false, nullsFirst: false })
         .limit(limit);
