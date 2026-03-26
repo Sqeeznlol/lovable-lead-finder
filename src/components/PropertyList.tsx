@@ -51,8 +51,13 @@ export function PropertyList() {
   const totalPages = Math.ceil(totalCount / pageSize);
 
   const portalLink = (p: Property) => {
-    if (!p.egrid) return null;
-    return `https://maps.zh.ch/?topic=EigentuemerPar&search=${p.egrid}`;
+    if (p.parzelle && p.bfs_nr) {
+      return `https://maps.zh.ch/?locate=parz&locations=${p.bfs_nr},${p.parzelle}&topic=OerebKatasterZH`;
+    }
+    if (p.egrid) {
+      return `https://maps.zh.ch/?topic=EigentuemerPar&search=${p.egrid}`;
+    }
+    return null;
   };
 
   const handleSearchKeyDown = (e: React.KeyboardEvent) => {
@@ -222,9 +227,11 @@ function EditDialog({ property, onClose, onSave }: {
     notes: property.notes || '',
   });
 
-  const portalUrl = property.egrid
-    ? `https://maps.zh.ch/?topic=EigentuemerPar&search=${property.egrid}`
-    : null;
+  const portalUrl = property.parzelle && property.bfs_nr
+    ? `https://maps.zh.ch/?locate=parz&locations=${property.bfs_nr},${property.parzelle}&topic=OerebKatasterZH`
+    : property.egrid
+      ? `https://maps.zh.ch/?topic=EigentuemerPar&search=${property.egrid}`
+      : null;
 
   return (
     <Dialog open onOpenChange={onClose}>

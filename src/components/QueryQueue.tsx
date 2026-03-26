@@ -57,9 +57,11 @@ export function QueryQueue() {
         {(queue || []).map((prop, idx) => {
           const phoneIdx = Math.floor(idx / 5);
           const assignedPhone = availablePhones[phoneIdx];
-          const portalUrl = prop.egrid
-            ? `https://maps.zh.ch/?topic=EigentuemerPar&search=${prop.egrid}`
-            : null;
+          const portalUrl = prop.parzelle && prop.bfs_nr
+            ? `https://maps.zh.ch/?locate=parz&locations=${prop.bfs_nr},${prop.parzelle}&topic=OerebKatasterZH`
+            : prop.egrid
+              ? `https://maps.zh.ch/?topic=EigentuemerPar&search=${prop.egrid}`
+              : null;
 
           return (
             <Card key={prop.id} className="border-none shadow-sm">
