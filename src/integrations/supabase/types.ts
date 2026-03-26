@@ -14,7 +14,93 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      phone_numbers: {
+        Row: {
+          created_at: string
+          daily_queries_used: number
+          id: string
+          label: string | null
+          last_query_date: string | null
+          number: string
+        }
+        Insert: {
+          created_at?: string
+          daily_queries_used?: number
+          id?: string
+          label?: string | null
+          last_query_date?: string | null
+          number: string
+        }
+        Update: {
+          created_at?: string
+          daily_queries_used?: number
+          id?: string
+          label?: string | null
+          last_query_date?: string | null
+          number?: string
+        }
+        Relationships: []
+      }
+      properties: {
+        Row: {
+          address: string
+          area: number | null
+          bfs_nr: string | null
+          created_at: string
+          egrid: string | null
+          id: string
+          is_queried: boolean
+          notes: string | null
+          owner_address: string | null
+          owner_name: string | null
+          owner_phone: string | null
+          plot_number: string | null
+          queried_at: string | null
+          queried_by_phone: string | null
+          status: string
+          streetview_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          address: string
+          area?: number | null
+          bfs_nr?: string | null
+          created_at?: string
+          egrid?: string | null
+          id?: string
+          is_queried?: boolean
+          notes?: string | null
+          owner_address?: string | null
+          owner_name?: string | null
+          owner_phone?: string | null
+          plot_number?: string | null
+          queried_at?: string | null
+          queried_by_phone?: string | null
+          status?: string
+          streetview_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string
+          area?: number | null
+          bfs_nr?: string | null
+          created_at?: string
+          egrid?: string | null
+          id?: string
+          is_queried?: boolean
+          notes?: string | null
+          owner_address?: string | null
+          owner_name?: string | null
+          owner_phone?: string | null
+          plot_number?: string | null
+          queried_at?: string | null
+          queried_by_phone?: string | null
+          status?: string
+          streetview_url?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
