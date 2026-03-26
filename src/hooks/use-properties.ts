@@ -30,6 +30,8 @@ export function useProperties(options: UsePropertiesOptions = {}) {
       if (gemeindeFilter && gemeindeFilter !== 'Alle') {
         query = query.eq('gemeinde', gemeindeFilter);
       }
+      // Exclude Industrie, Gewerbe, Landwirtschaft zones
+      query = query.not('zone', 'in', '("I","G","L")');
       if (search) {
         query = query.or(`address.ilike.%${search}%,egrid.ilike.%${search}%,owner_name.ilike.%${search}%,gemeinde.ilike.%${search}%,strassenname.ilike.%${search}%`);
       }
