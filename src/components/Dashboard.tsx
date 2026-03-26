@@ -1,4 +1,4 @@
-import { Building2, Users, Search, Clock } from 'lucide-react';
+import { Building2, Users, Search, Clock, MapPin, Home } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { usePropertyStats } from '@/hooks/use-properties';
 
@@ -6,10 +6,10 @@ export function Dashboard() {
   const { data: stats } = usePropertyStats();
 
   const cards = [
-    { label: 'Liegenschaften', value: stats?.total ?? 0, icon: Building2, color: 'text-primary' },
-    { label: 'Eigentümer ermittelt', value: stats?.withOwner ?? 0, icon: Users, color: 'text-accent' },
-    { label: 'Abgefragt', value: stats?.queried ?? 0, icon: Search, color: 'hsl(var(--warning))' },
-    { label: 'Ausstehend', value: stats?.pending ?? 0, icon: Clock, color: 'text-muted-foreground' },
+    { label: 'Liegenschaften', value: stats?.total?.toLocaleString('de-CH') ?? '0', icon: Building2, color: 'text-primary' },
+    { label: 'Eigentümer ermittelt', value: stats?.withOwner?.toLocaleString('de-CH') ?? '0', icon: Users, color: 'text-accent' },
+    { label: 'Abgefragt', value: stats?.queried?.toLocaleString('de-CH') ?? '0', icon: Search, color: 'text-primary' },
+    { label: 'Ausstehend', value: stats?.pending?.toLocaleString('de-CH') ?? '0', icon: Clock, color: 'text-muted-foreground' },
   ];
 
   return (
@@ -41,9 +41,27 @@ export function Dashboard() {
               {Object.entries(stats.statuses).map(([status, count]) => (
                 <div key={status} className="bg-muted rounded-lg px-4 py-2">
                   <span className="font-medium">{status}</span>
-                  <span className="ml-2 text-muted-foreground">{count}</span>
+                  <span className="ml-2 text-muted-foreground">{(count as number).toLocaleString('de-CH')}</span>
                 </div>
               ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      {stats?.gemeinden && Object.keys(stats.gemeinden).length > 0 && (
+        <Card className="border-none shadow-md">
+          <CardContent className="p-6">
+            <h3 className="font-semibold mb-4">Top Gemeinden</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+              {Object.entries(stats.gemeinden)
+                .sort(([, a], [, b]) => (b as number) - (a as number))
+                .slice(0, 15)
+                .map(([name, count]) => (
+                  <div key={name} className="bg-muted rounded-lg px-3 py-2 text-sm">
+                    <span className="font-medium truncate block">{name}</span>
+                    <span className="text-muted-foreground">{(count as number).toLocaleString('de-CH')}</span>
+                  </div>
+                ))}
             </div>
           </CardContent>
         </Card>
