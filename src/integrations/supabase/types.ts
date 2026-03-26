@@ -45,59 +45,116 @@ export type Database = {
         Row: {
           address: string
           area: number | null
+          baujahr: number | null
+          bezirk: string | null
           bfs_nr: string | null
           created_at: string
           egrid: string | null
+          geb_status: string | null
+          gebaeudeart: string | null
+          gebaeudeflaeche: number | null
+          gemeinde: string | null
+          geschosse: number | null
+          google_maps_url: string | null
+          gvz_nr: string | null
+          gwr_egid: string | null
+          hausnummer: string | null
           id: string
           is_queried: boolean
+          kategorie: string | null
           notes: string | null
+          ortschaftsname: string | null
           owner_address: string | null
           owner_name: string | null
           owner_phone: string | null
+          parzelle: string | null
           plot_number: string | null
+          plz: string | null
+          plz_ort: string | null
           queried_at: string | null
           queried_by_phone: string | null
           status: string
+          strassenname: string | null
           streetview_url: string | null
           updated_at: string
+          wohnungen: number | null
+          zone: string | null
         }
         Insert: {
           address: string
           area?: number | null
+          baujahr?: number | null
+          bezirk?: string | null
           bfs_nr?: string | null
           created_at?: string
           egrid?: string | null
+          geb_status?: string | null
+          gebaeudeart?: string | null
+          gebaeudeflaeche?: number | null
+          gemeinde?: string | null
+          geschosse?: number | null
+          google_maps_url?: string | null
+          gvz_nr?: string | null
+          gwr_egid?: string | null
+          hausnummer?: string | null
           id?: string
           is_queried?: boolean
+          kategorie?: string | null
           notes?: string | null
+          ortschaftsname?: string | null
           owner_address?: string | null
           owner_name?: string | null
           owner_phone?: string | null
+          parzelle?: string | null
           plot_number?: string | null
+          plz?: string | null
+          plz_ort?: string | null
           queried_at?: string | null
           queried_by_phone?: string | null
           status?: string
+          strassenname?: string | null
           streetview_url?: string | null
           updated_at?: string
+          wohnungen?: number | null
+          zone?: string | null
         }
         Update: {
           address?: string
           area?: number | null
+          baujahr?: number | null
+          bezirk?: string | null
           bfs_nr?: string | null
           created_at?: string
           egrid?: string | null
+          geb_status?: string | null
+          gebaeudeart?: string | null
+          gebaeudeflaeche?: number | null
+          gemeinde?: string | null
+          geschosse?: number | null
+          google_maps_url?: string | null
+          gvz_nr?: string | null
+          gwr_egid?: string | null
+          hausnummer?: string | null
           id?: string
           is_queried?: boolean
+          kategorie?: string | null
           notes?: string | null
+          ortschaftsname?: string | null
           owner_address?: string | null
           owner_name?: string | null
           owner_phone?: string | null
+          parzelle?: string | null
           plot_number?: string | null
+          plz?: string | null
+          plz_ort?: string | null
           queried_at?: string | null
           queried_by_phone?: string | null
           status?: string
+          strassenname?: string | null
           streetview_url?: string | null
           updated_at?: string
+          wohnungen?: number | null
+          zone?: string | null
         }
         Relationships: []
       }
