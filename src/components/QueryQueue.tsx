@@ -58,7 +58,7 @@ export function QueryQueue() {
           const phoneIdx = Math.floor(idx / 5);
           const assignedPhone = availablePhones[phoneIdx];
           const portalUrl = prop.egrid
-            ? `https://portal.objektwesen.zh.ch/aks/detail?egrid=${prop.egrid}&bfsNr=${prop.bfs_nr || '0'}`
+            ? `https://maps.zh.ch/?topic=EigentuemerPar&search=${prop.egrid}`
             : null;
 
           return (

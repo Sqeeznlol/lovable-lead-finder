@@ -223,7 +223,7 @@ function EditDialog({ property, onClose, onSave }: {
   });
 
   const portalUrl = property.egrid
-    ? `https://portal.objektwesen.zh.ch/aks/detail?egrid=${property.egrid}&bfsNr=${property.bfs_nr || '0'}`
+    ? `https://maps.zh.ch/?topic=EigentuemerPar&search=${property.egrid}`
     : null;
 
   return (
