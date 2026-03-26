@@ -1,16 +1,73 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState } from 'react';
+import { Building2, LayoutDashboard, Upload, ListTodo, Phone, Menu, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Dashboard } from '@/components/Dashboard';
+import { PropertyList } from '@/components/PropertyList';
+import { CsvImport } from '@/components/CsvImport';
+import { QueryQueue } from '@/components/QueryQueue';
+import { PhoneManager } from '@/components/PhoneManager';
 
-// IMPORTANT: Fully REPLACE this with your own code
-const PlaceholderIndex = () => {
-  // PLACEHOLDER: Replace this entire return statement with the user's app.
-  // The inline background color is intentionally not part of the design system.
+type Tab = 'dashboard' | 'properties' | 'import' | 'queue' | 'phones';
+
+const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'properties', label: 'Liegenschaften', icon: Building2 },
+  { id: 'import', label: 'CSV Import', icon: Upload },
+  { id: 'queue', label: 'Abfrage-Queue', icon: ListTodo },
+  { id: 'phones', label: 'Telefone', icon: Phone },
+];
+
+export default function Index() {
+  const [active, setActive] = useState<Tab>('dashboard');
+  const [mobileOpen, setMobileOpen] = useState(false);
+
   return (
-    <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: '#fcfbf8' }}>
-      <img data-lovable-blank-page-placeholder="REMOVE_THIS" src="/placeholder.svg" alt="Your app will live here!" />
+    <div className="flex min-h-screen">
+      {/* Sidebar */}
+      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-card border-r transform transition-transform lg:translate-x-0 lg:static ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="p-6 border-b">
+          <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+            Sqeeztraum
+          </h1>
+          <p className="text-xs text-muted-foreground mt-1">Immobilien-Akquise CRM</p>
+        </div>
+        <nav className="p-3 space-y-1">
+          {tabs.map(t => (
+            <button
+              key={t.id}
+              onClick={() => { setActive(t.id); setMobileOpen(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors
+                ${active === t.id
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                }`}
+            >
+              <t.icon className="h-4 w-4" />
+              {t.label}
+            </button>
+          ))}
+        </nav>
+      </aside>
+
+      {/* Mobile overlay */}
+      {mobileOpen && <div className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm lg:hidden" onClick={() => setMobileOpen(false)} />}
+
+      {/* Main */}
+      <main className="flex-1 min-w-0">
+        <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-sm border-b px-6 py-3 flex items-center gap-4 lg:hidden">
+          <Button size="icon" variant="ghost" onClick={() => setMobileOpen(!mobileOpen)}>
+            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </Button>
+          <h1 className="font-bold text-lg bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Sqeeztraum</h1>
+        </header>
+        <div className="p-6 lg:p-10 max-w-7xl">
+          {active === 'dashboard' && <Dashboard />}
+          {active === 'properties' && <PropertyList />}
+          {active === 'import' && <CsvImport />}
+          {active === 'queue' && <QueryQueue />}
+          {active === 'phones' && <PhoneManager />}
+        </div>
+      </main>
     </div>
   );
-};
-
-const Index = PlaceholderIndex;
-
-export default Index;
+}
