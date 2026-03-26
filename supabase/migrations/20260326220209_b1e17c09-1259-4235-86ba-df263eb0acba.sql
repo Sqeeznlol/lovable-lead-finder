@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS idx_properties_gebaeudeflaeche_area ON public.properties(gebaeudeflaeche DESC NULLS LAST, area DESC NULLS LAST);

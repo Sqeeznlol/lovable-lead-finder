@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ExternalLink, Check, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +11,8 @@ import { useToast } from '@/hooks/use-toast';
 
 export function QueryQueue() {
   const { data: phones } = usePhoneNumbers();
-  const totalSlots = (phones || []).reduce((acc, p) => acc + Math.max(0, 5 - p.daily_queries_used), 0);
+  const availablePhones = (phones || []).filter(p => p.daily_queries_used < 5);
+  const totalSlots = availablePhones.reduce((acc, p) => acc + (5 - p.daily_queries_used), 0);
   const { data: queue } = useUnqueriedProperties(totalSlots || 5);
   const updateProp = useUpdateProperty();
   const incrementPhone = useIncrementPhoneQuery();
@@ -34,14 +35,12 @@ export function QueryQueue() {
     });
   };
 
-  const availablePhones = (phones || []).filter(p => p.daily_queries_used < 5);
-
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold tracking-tight">Abfrage-Warteschlange</h2>
         <p className="text-muted-foreground mt-1">
-          {totalSlots} Abfragen verfügbar heute ({availablePhones.length} Nummern × 5)
+          {totalSlots} Abfragen verfügbar heute ({availablePhones.length} Nummern × max 5) · Sortiert nach HNF ↓
         </p>
       </div>
 
@@ -74,9 +73,21 @@ export function QueryQueue() {
                           <Phone className="h-3 w-3 mr-1" />{assignedPhone.label || assignedPhone.number}
                         </Badge>
                       )}
+                      {prop.gebaeudeflaeche && (
+                        <Badge className="text-xs bg-primary/20 text-primary">
+                          HNF: {Math.round(Number(prop.gebaeudeflaeche))} m²
+                        </Badge>
+                      )}
+                      {prop.area && (
+                        <Badge variant="outline" className="text-xs">
+                          Fläche: {Math.round(Number(prop.area))} m²
+                        </Badge>
+                      )}
                     </div>
                     <p className="font-medium truncate">{prop.address}</p>
-                    <p className="text-xs text-muted-foreground font-mono mt-0.5">EGRID: {prop.egrid || '–'}</p>
+                    <p className="text-xs text-muted-foreground font-mono mt-0.5">
+                      EGRID: {prop.egrid || '–'} · {prop.gemeinde || ''}
+                    </p>
                   </div>
 
                   <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-end w-full lg:w-auto">
