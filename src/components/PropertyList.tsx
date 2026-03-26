@@ -227,9 +227,11 @@ function EditDialog({ property, onClose, onSave }: {
     notes: property.notes || '',
   });
 
-  const portalUrl = property.egrid
-    ? `https://maps.zh.ch/?topic=EigentuemerPar&search=${property.egrid}`
-    : null;
+  const portalUrl = property.parzelle && property.bfs_nr
+    ? `https://maps.zh.ch/?locate=parz&locations=${property.bfs_nr},${property.parzelle}&topic=OerebKatasterZH`
+    : property.egrid
+      ? `https://maps.zh.ch/?topic=EigentuemerPar&search=${property.egrid}`
+      : null;
 
   return (
     <Dialog open onOpenChange={onClose}>
