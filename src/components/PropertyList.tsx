@@ -52,7 +52,7 @@ export function PropertyList() {
 
   const portalLink = (p: Property) => {
     if (!p.egrid) return null;
-    return `https://portal.objektwesen.zh.ch/aks/detail?egrid=${p.egrid}&bfsNr=${p.bfs_nr || '0'}`;
+    return `https://maps.zh.ch/?topic=EigentuemerPar&search=${p.egrid}`;
   };
 
   const handleSearchKeyDown = (e: React.KeyboardEvent) => {
