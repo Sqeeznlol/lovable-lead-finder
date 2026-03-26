@@ -51,8 +51,13 @@ export function PropertyList() {
   const totalPages = Math.ceil(totalCount / pageSize);
 
   const portalLink = (p: Property) => {
-    if (!p.egrid) return null;
-    return `https://maps.zh.ch/?topic=EigentuemerPar&search=${p.egrid}`;
+    if (p.parzelle && p.bfs_nr) {
+      return `https://maps.zh.ch/?locate=parz&locations=${p.bfs_nr},${p.parzelle}&topic=OerebKatasterZH`;
+    }
+    if (p.egrid) {
+      return `https://maps.zh.ch/?topic=EigentuemerPar&search=${p.egrid}`;
+    }
+    return null;
   };
 
   const handleSearchKeyDown = (e: React.KeyboardEvent) => {
