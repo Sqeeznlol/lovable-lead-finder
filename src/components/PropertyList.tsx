@@ -8,10 +8,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { useProperties, useGemeinden, useUpdateProperty, useDeleteProperty, type Property } from '@/hooks/use-properties';
+import { useProperties, useGemeinden, useZones, useUpdateProperty, useDeleteProperty, type Property } from '@/hooks/use-properties';
 import { useToast } from '@/hooks/use-toast';
 
 const STATUSES = ['Alle', 'Neu', 'Eigentümer ermittelt', 'Kontaktiert', 'Interesse', 'Kein Interesse', 'Abgeschlossen'];
+
+const ZONE_LABELS: Record<string, string> = {
+  'W': 'Wohnzone',
+  'W2': 'Wohnzone W2',
+  'W3': 'Wohnzone W3',
+  'W4': 'Wohnzone W4',
+  'K': 'Kernzone',
+  'Q': 'Quartiererhaltung',
+  'Z': 'Zentrumszone',
+  'O': 'Andere',
+};
 
 function statusColor(s: string) {
   switch (s) {
@@ -30,6 +41,7 @@ export function PropertyList() {
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [gemeindeFilter, setGemeindeFilter] = useState('Alle');
+  const [zoneFilter, setZoneFilter] = useState('Alle');
   const [editProp, setEditProp] = useState<Property | null>(null);
   const [page, setPage] = useState(0);
   const pageSize = 50;
@@ -37,11 +49,13 @@ export function PropertyList() {
   const { data: result, isLoading } = useProperties({
     statusFilter: filter,
     gemeindeFilter,
+    zoneFilter,
     search,
     page,
     pageSize,
   });
   const { data: gemeinden } = useGemeinden();
+  const { data: zones } = useZones();
   const updateProp = useUpdateProperty();
   const deleteProp = useDeleteProperty();
   const { toast } = useToast();
@@ -55,7 +69,7 @@ export function PropertyList() {
       return `https://maps.zh.ch/?locate=parz&locations=${p.bfs_nr},${p.parzelle}&topic=OerebKatasterZH`;
     }
     if (p.egrid) {
-      return `https://maps.zh.ch/?topic=EigentuemerPar&search=${p.egrid}`;
+      return `https://maps.zh.ch/?topic=OerebKatasterZH&search=${p.egrid}`;
     }
     return null;
   };
@@ -72,7 +86,7 @@ export function PropertyList() {
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Liegenschaften</h2>
-          <p className="text-muted-foreground mt-1">{totalCount.toLocaleString()} Einträge (sortiert nach HNF ↓)</p>
+          <p className="text-muted-foreground mt-1">{totalCount.toLocaleString()} Einträge · Baujahr ≤ 1980 · sortiert nach HNF ↓</p>
         </div>
         <div className="flex flex-wrap gap-3">
           <Input
@@ -87,6 +101,13 @@ export function PropertyList() {
             <SelectContent className="max-h-64">
               <SelectItem value="Alle">Alle Gemeinden</SelectItem>
               {(gemeinden || []).map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={zoneFilter} onValueChange={v => { setZoneFilter(v); setPage(0); }}>
+            <SelectTrigger className="w-44"><SelectValue placeholder="Zone" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Alle">Alle Zonen</SelectItem>
+              {(zones || []).map(z => <SelectItem key={z} value={z}>{ZONE_LABELS[z] || z}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={filter} onValueChange={v => { setFilter(v); setPage(0); }}>
@@ -106,6 +127,7 @@ export function PropertyList() {
                 <TableHead>Adresse</TableHead>
                 <TableHead>PLZ/Ort</TableHead>
                 <TableHead>Gemeinde</TableHead>
+                <TableHead>Zone</TableHead>
                 <TableHead>EGRID</TableHead>
                 <TableHead>HNF</TableHead>
                 <TableHead>Fläche</TableHead>
@@ -119,14 +141,17 @@ export function PropertyList() {
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={12} className="text-center py-12 text-muted-foreground">Laden...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={13} className="text-center py-12 text-muted-foreground">Laden...</TableCell></TableRow>
               ) : properties.length === 0 ? (
-                <TableRow><TableCell colSpan={12} className="text-center py-12 text-muted-foreground">Keine Liegenschaften gefunden</TableCell></TableRow>
+                <TableRow><TableCell colSpan={13} className="text-center py-12 text-muted-foreground">Keine Liegenschaften gefunden</TableCell></TableRow>
               ) : properties.map(p => (
                 <TableRow key={p.id} className="group">
                   <TableCell className="font-medium max-w-[180px] truncate">{p.address}</TableCell>
                   <TableCell className="text-xs whitespace-nowrap">{p.plz_ort || '–'}</TableCell>
                   <TableCell className="text-xs">{p.gemeinde || '–'}</TableCell>
+                  <TableCell className="text-xs">
+                    <Badge variant="outline" className="text-xs">{p.zone || '–'}</Badge>
+                  </TableCell>
                   <TableCell className="font-mono text-xs">{p.egrid || '–'}</TableCell>
                   <TableCell className="text-xs font-semibold whitespace-nowrap">
                     {p.gebaeudeflaeche ? `${Math.round(Number(p.gebaeudeflaeche))} m²` : '–'}
@@ -230,7 +255,7 @@ function EditDialog({ property, onClose, onSave }: {
   const portalUrl = property.parzelle && property.bfs_nr
     ? `https://maps.zh.ch/?locate=parz&locations=${property.bfs_nr},${property.parzelle}&topic=OerebKatasterZH`
     : property.egrid
-      ? `https://maps.zh.ch/?topic=EigentuemerPar&search=${property.egrid}`
+      ? `https://maps.zh.ch/?topic=OerebKatasterZH&search=${property.egrid}`
       : null;
 
   return (
@@ -245,6 +270,7 @@ function EditDialog({ property, onClose, onSave }: {
             <p className="text-muted-foreground">{property.plz_ort} · {property.gemeinde}</p>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground mt-2">
               {property.egrid && <span>EGRID: <span className="font-mono">{property.egrid}</span></span>}
+              {property.zone && <span>Zone: {property.zone}</span>}
               {property.kategorie && <span>Typ: {property.kategorie}</span>}
               {property.baujahr && <span>Baujahr: {property.baujahr}</span>}
               {property.area && <span>Grundstück: {Math.round(Number(property.area))} m²</span>}
