@@ -7,15 +7,16 @@ export type Property = Tables<'properties'>;
 interface UsePropertiesOptions {
   statusFilter?: string;
   gemeindeFilter?: string;
+  zoneFilter?: string;
   search?: string;
   page?: number;
   pageSize?: number;
 }
 
 export function useProperties(options: UsePropertiesOptions = {}) {
-  const { statusFilter, gemeindeFilter, search, page = 0, pageSize = 50 } = options;
+  const { statusFilter, gemeindeFilter, zoneFilter, search, page = 0, pageSize = 50 } = options;
   return useQuery({
-    queryKey: ['properties', statusFilter, gemeindeFilter, search, page, pageSize],
+    queryKey: ['properties', statusFilter, gemeindeFilter, zoneFilter, search, page, pageSize],
     queryFn: async () => {
       let query = supabase
         .from('properties')
@@ -24,14 +25,20 @@ export function useProperties(options: UsePropertiesOptions = {}) {
         .order('area', { ascending: false, nullsFirst: false })
         .range(page * pageSize, (page + 1) * pageSize - 1);
 
+      // Exclude post-1980 buildings
+      query = query.or('baujahr.lte.1980,baujahr.is.null');
+      // Exclude Industrie, Gewerbe, Landwirtschaft zones
+      query = query.not('zone', 'in', '("I","G","L")');
+
       if (statusFilter && statusFilter !== 'Alle') {
         query = query.eq('status', statusFilter);
       }
       if (gemeindeFilter && gemeindeFilter !== 'Alle') {
         query = query.eq('gemeinde', gemeindeFilter);
       }
-      // Exclude Industrie, Gewerbe, Landwirtschaft zones
-      query = query.not('zone', 'in', '("I","G","L")');
+      if (zoneFilter && zoneFilter !== 'Alle') {
+        query = query.eq('zone', zoneFilter);
+      }
       if (search) {
         query = query.or(`address.ilike.%${search}%,egrid.ilike.%${search}%,owner_name.ilike.%${search}%,gemeinde.ilike.%${search}%,strassenname.ilike.%${search}%`);
       }
@@ -59,6 +66,23 @@ export function useGemeinden() {
   });
 }
 
+export function useZones() {
+  return useQuery({
+    queryKey: ['zones'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('properties')
+        .select('zone')
+        .not('zone', 'is', null)
+        .not('zone', 'in', '("I","G","L")');
+      if (error) throw error;
+      const unique = [...new Set(data.map(d => d.zone).filter(Boolean))].sort() as string[];
+      return unique;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export function useUnqueriedProperties(limit: number) {
   return useQuery({
     queryKey: ['properties', 'unqueried', limit],
@@ -68,6 +92,7 @@ export function useUnqueriedProperties(limit: number) {
         .select('*')
         .eq('is_queried', false)
         .not('zone', 'in', '("I","G","L")')
+        .or('baujahr.lte.1980,baujahr.is.null')
         .order('gebaeudeflaeche', { ascending: false, nullsFirst: false })
         .order('area', { ascending: false, nullsFirst: false })
         .limit(limit);
@@ -117,7 +142,6 @@ export function usePropertyStats() {
   return useQuery({
     queryKey: ['properties', 'stats'],
     queryFn: async () => {
-      // Fetch all in pages of 1000 to bypass limit
       let allData: { status: string; is_queried: boolean; owner_name: string | null; gemeinde: string | null }[] = [];
       let from = 0;
       const batchSize = 1000;
@@ -125,6 +149,8 @@ export function usePropertyStats() {
         const { data, error } = await supabase
           .from('properties')
           .select('status, is_queried, owner_name, gemeinde')
+          .or('baujahr.lte.1980,baujahr.is.null')
+          .not('zone', 'in', '("I","G","L")')
           .range(from, from + batchSize - 1);
         if (error) throw error;
         allData = allData.concat(data);
