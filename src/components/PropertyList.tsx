@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useProperties, useGemeinden, useZones, useUpdateProperty, useDeleteProperty, type Property } from '@/hooks/use-properties';
 import { useToast } from '@/hooks/use-toast';
 
-const STATUSES = ['Alle', 'Neu', 'Eigentümer ermittelt', 'Kontaktiert', 'Interesse', 'Kein Interesse', 'Abgeschlossen'];
+const STATUSES = ['Alle', 'Neu', 'Eigentümer ermittelt', 'Kontaktiert', 'Interesse', 'Kein Interesse', 'Abgeschlossen', 'Ausgeblendet'];
 
 const ZONE_LABELS: Record<string, string> = {
   'W': 'Wohnzone W',
