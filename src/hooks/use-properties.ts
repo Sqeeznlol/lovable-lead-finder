@@ -52,6 +52,15 @@ export function useProperties(options: UsePropertiesOptions = {}) {
       if (search) {
         query = query.or(`address.ilike.%${search}%,egrid.ilike.%${search}%,owner_name.ilike.%${search}%,gemeinde.ilike.%${search}%,strassenname.ilike.%${search}%`);
       }
+      if (baujahrVon) query = query.gte('baujahr', baujahrVon);
+      if (baujahrBis) query = query.lte('baujahr', baujahrBis);
+      if (flaecheMin) query = query.gte('gebaeudeflaeche', flaecheMin);
+      if (flaecheMax) query = query.lte('gebaeudeflaeche', flaecheMax);
+      if (areaMin) query = query.gte('area', areaMin);
+      if (areaMax) query = query.lte('area', areaMax);
+      if (geschosseMin) query = query.gte('geschosse', geschosseMin);
+      if (ownerFilter === 'mit') query = query.not('owner_name', 'is', null);
+      if (ownerFilter === 'ohne') query = query.is('owner_name', null);
 
       const { data, error, count } = await query;
       if (error) throw error;
