@@ -31,6 +31,7 @@ function statusColor(s: string) {
     case 'Interesse': return 'bg-accent text-accent-foreground';
     case 'Kein Interesse': return 'bg-destructive/20 text-destructive';
     case 'Abgeschlossen': return 'bg-primary text-primary-foreground';
+    case 'Ausgeblendet': return 'bg-muted text-muted-foreground line-through';
     default: return 'bg-muted text-muted-foreground';
   }
 }
