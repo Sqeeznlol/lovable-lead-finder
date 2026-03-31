@@ -74,7 +74,7 @@ export function useZones() {
         .from('properties')
         .select('zone')
         .not('zone', 'is', null)
-        .not('zone', 'in', '("I","G","L")');
+        .like('zone', 'W%');
       if (error) throw error;
       const unique = [...new Set(data.map(d => d.zone).filter(Boolean))].sort() as string[];
       return unique;
