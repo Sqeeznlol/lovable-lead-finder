@@ -27,8 +27,8 @@ export function useProperties(options: UsePropertiesOptions = {}) {
 
       // Exclude post-1980 buildings
       query = query.or('baujahr.lte.1980,baujahr.is.null');
-      // Exclude Industrie, Gewerbe, Landwirtschaft zones
-      query = query.not('zone', 'in', '("I","G","L")');
+      // Only include Wohnzonen (zones starting with W)
+      query = query.like('zone', 'W%');
 
       if (statusFilter && statusFilter !== 'Alle') {
         query = query.eq('status', statusFilter);
