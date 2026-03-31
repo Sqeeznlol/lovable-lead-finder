@@ -91,7 +91,7 @@ export function useUnqueriedProperties(limit: number) {
         .from('properties')
         .select('*')
         .eq('is_queried', false)
-        .not('zone', 'in', '("I","G","L")')
+        .like('zone', 'W%')
         .or('baujahr.lte.1980,baujahr.is.null')
         .order('gebaeudeflaeche', { ascending: false, nullsFirst: false })
         .order('area', { ascending: false, nullsFirst: false })
