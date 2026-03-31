@@ -11,12 +11,22 @@ interface UsePropertiesOptions {
   search?: string;
   page?: number;
   pageSize?: number;
+  baujahrVon?: number;
+  baujahrBis?: number;
+  flaecheMin?: number;
+  flaecheMax?: number;
+  areaMin?: number;
+  areaMax?: number;
+  geschosseMin?: number;
+  ownerFilter?: string;
 }
 
 export function useProperties(options: UsePropertiesOptions = {}) {
-  const { statusFilter, gemeindeFilter, zoneFilter, search, page = 0, pageSize = 50 } = options;
+  const { statusFilter, gemeindeFilter, zoneFilter, search, page = 0, pageSize = 50,
+    baujahrVon, baujahrBis, flaecheMin, flaecheMax, areaMin, areaMax, geschosseMin, ownerFilter } = options;
   return useQuery({
-    queryKey: ['properties', statusFilter, gemeindeFilter, zoneFilter, search, page, pageSize],
+    queryKey: ['properties', statusFilter, gemeindeFilter, zoneFilter, search, page, pageSize,
+      baujahrVon, baujahrBis, flaecheMin, flaecheMax, areaMin, areaMax, geschosseMin, ownerFilter],
     queryFn: async () => {
       let query = supabase
         .from('properties')
@@ -42,6 +52,15 @@ export function useProperties(options: UsePropertiesOptions = {}) {
       if (search) {
         query = query.or(`address.ilike.%${search}%,egrid.ilike.%${search}%,owner_name.ilike.%${search}%,gemeinde.ilike.%${search}%,strassenname.ilike.%${search}%`);
       }
+      if (baujahrVon) query = query.gte('baujahr', baujahrVon);
+      if (baujahrBis) query = query.lte('baujahr', baujahrBis);
+      if (flaecheMin) query = query.gte('gebaeudeflaeche', flaecheMin);
+      if (flaecheMax) query = query.lte('gebaeudeflaeche', flaecheMax);
+      if (areaMin) query = query.gte('area', areaMin);
+      if (areaMax) query = query.lte('area', areaMax);
+      if (geschosseMin) query = query.gte('geschosse', geschosseMin);
+      if (ownerFilter === 'mit') query = query.not('owner_name', 'is', null);
+      if (ownerFilter === 'ohne') query = query.is('owner_name', null);
 
       const { data, error, count } = await query;
       if (error) throw error;
