@@ -27,8 +27,8 @@ export function useProperties(options: UsePropertiesOptions = {}) {
 
       // Exclude post-1980 buildings
       query = query.or('baujahr.lte.1980,baujahr.is.null');
-      // Exclude Industrie, Gewerbe, Landwirtschaft zones
-      query = query.not('zone', 'in', '("I","G","L")');
+      // Only include Wohnzonen (zones starting with W)
+      query = query.like('zone', 'W%');
 
       if (statusFilter && statusFilter !== 'Alle') {
         query = query.eq('status', statusFilter);
@@ -74,7 +74,7 @@ export function useZones() {
         .from('properties')
         .select('zone')
         .not('zone', 'is', null)
-        .not('zone', 'in', '("I","G","L")');
+        .like('zone', 'W%');
       if (error) throw error;
       const unique = [...new Set(data.map(d => d.zone).filter(Boolean))].sort() as string[];
       return unique;
@@ -91,7 +91,7 @@ export function useUnqueriedProperties(limit: number) {
         .from('properties')
         .select('*')
         .eq('is_queried', false)
-        .not('zone', 'in', '("I","G","L")')
+        .like('zone', 'W%')
         .or('baujahr.lte.1980,baujahr.is.null')
         .order('gebaeudeflaeche', { ascending: false, nullsFirst: false })
         .order('area', { ascending: false, nullsFirst: false })
@@ -150,7 +150,7 @@ export function usePropertyStats() {
           .from('properties')
           .select('status, is_queried, owner_name, gemeinde')
           .or('baujahr.lte.1980,baujahr.is.null')
-          .not('zone', 'in', '("I","G","L")')
+          .like('zone', 'W%')
           .range(from, from + batchSize - 1);
         if (error) throw error;
         allData = allData.concat(data);
