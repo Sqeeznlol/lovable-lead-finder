@@ -22,9 +22,11 @@ interface UsePropertiesOptions {
 }
 
 export function useProperties(options: UsePropertiesOptions = {}) {
-  const { statusFilter, gemeindeFilter, zoneFilter, search, page = 0, pageSize = 50 } = options;
+  const { statusFilter, gemeindeFilter, zoneFilter, search, page = 0, pageSize = 50,
+    baujahrVon, baujahrBis, flaecheMin, flaecheMax, areaMin, areaMax, geschosseMin, ownerFilter } = options;
   return useQuery({
-    queryKey: ['properties', statusFilter, gemeindeFilter, zoneFilter, search, page, pageSize],
+    queryKey: ['properties', statusFilter, gemeindeFilter, zoneFilter, search, page, pageSize,
+      baujahrVon, baujahrBis, flaecheMin, flaecheMax, areaMin, areaMax, geschosseMin, ownerFilter],
     queryFn: async () => {
       let query = supabase
         .from('properties')
