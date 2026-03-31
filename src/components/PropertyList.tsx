@@ -309,6 +309,9 @@ export function PropertyList() {
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button size="icon" variant="ghost" className="h-7 w-7" title="Ausblenden" onClick={() => {
+                        updateProp.mutate({ id: p.id, status: 'Ausgeblendet' }, { onSuccess: () => toast({ title: 'Ausgeblendet' }) });
+                      }}><EyeOff className="h-3.5 w-3.5 text-muted-foreground" /></Button>
                       <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditProp(p)}><Edit className="h-3.5 w-3.5" /></Button>
                       <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => {
                         deleteProp.mutate(p.id, { onSuccess: () => toast({ title: 'Gelöscht' }) });
