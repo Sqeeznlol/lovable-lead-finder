@@ -39,6 +39,8 @@ export function useProperties(options: UsePropertiesOptions = {}) {
       query = query.or('baujahr.lte.1980,baujahr.is.null');
       // Only include Wohnzonen (zones starting with W)
       query = query.like('zone', 'W%');
+      // Only include existing buildings (exclude projektiert, bewilligt, im Bau)
+      query = query.eq('geb_status', 'Bestehend');
 
       if (statusFilter && statusFilter !== 'Alle') {
         query = query.eq('status', statusFilter);
