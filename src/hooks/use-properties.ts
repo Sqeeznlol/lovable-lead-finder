@@ -11,6 +11,14 @@ interface UsePropertiesOptions {
   search?: string;
   page?: number;
   pageSize?: number;
+  baujahrVon?: number;
+  baujahrBis?: number;
+  flaecheMin?: number;
+  flaecheMax?: number;
+  areaMin?: number;
+  areaMax?: number;
+  geschosseMin?: number;
+  ownerFilter?: string;
 }
 
 export function useProperties(options: UsePropertiesOptions = {}) {
