@@ -39,6 +39,8 @@ export function useProperties(options: UsePropertiesOptions = {}) {
       query = query.or('baujahr.lte.1980,baujahr.is.null');
       // Only include Wohnzonen (zones starting with W)
       query = query.like('zone', 'W%');
+      // Only include existing buildings (exclude projektiert, bewilligt, im Bau)
+      query = query.eq('geb_status', 'Bestehend');
 
       if (statusFilter && statusFilter !== 'Alle') {
         query = query.eq('status', statusFilter);
@@ -112,6 +114,7 @@ export function useUnqueriedProperties(limit: number) {
         .eq('is_queried', false)
         .like('zone', 'W%')
         .or('baujahr.lte.1980,baujahr.is.null')
+        .eq('geb_status', 'Bestehend')
         .order('gebaeudeflaeche', { ascending: false, nullsFirst: false })
         .order('area', { ascending: false, nullsFirst: false })
         .limit(limit);
@@ -170,6 +173,7 @@ export function usePropertyStats() {
           .select('status, is_queried, owner_name, gemeinde')
           .or('baujahr.lte.1980,baujahr.is.null')
           .like('zone', 'W%')
+          .eq('geb_status', 'Bestehend')
           .range(from, from + batchSize - 1);
         if (error) throw error;
         allData = allData.concat(data);
