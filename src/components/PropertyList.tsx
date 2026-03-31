@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ExternalLink, Trash2, Edit, MapPin, Home, CheckCircle2, XCircle, SlidersHorizontal } from 'lucide-react';
+import { ExternalLink, Trash2, Edit, MapPin, Home, CheckCircle2, XCircle, SlidersHorizontal, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useProperties, useGemeinden, useZones, useUpdateProperty, useDeleteProperty, type Property } from '@/hooks/use-properties';
 import { useToast } from '@/hooks/use-toast';
 
-const STATUSES = ['Alle', 'Neu', 'Eigentümer ermittelt', 'Kontaktiert', 'Interesse', 'Kein Interesse', 'Abgeschlossen'];
+const STATUSES = ['Alle', 'Neu', 'Eigentümer ermittelt', 'Kontaktiert', 'Interesse', 'Kein Interesse', 'Abgeschlossen', 'Ausgeblendet'];
 
 const ZONE_LABELS: Record<string, string> = {
   'W': 'Wohnzone W',
@@ -31,6 +31,7 @@ function statusColor(s: string) {
     case 'Interesse': return 'bg-accent text-accent-foreground';
     case 'Kein Interesse': return 'bg-destructive/20 text-destructive';
     case 'Abgeschlossen': return 'bg-primary text-primary-foreground';
+    case 'Ausgeblendet': return 'bg-muted text-muted-foreground line-through';
     default: return 'bg-muted text-muted-foreground';
   }
 }
@@ -308,6 +309,9 @@ export function PropertyList() {
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button size="icon" variant="ghost" className="h-7 w-7" title="Ausblenden" onClick={() => {
+                        updateProp.mutate({ id: p.id, status: 'Ausgeblendet' }, { onSuccess: () => toast({ title: 'Ausgeblendet' }) });
+                      }}><EyeOff className="h-3.5 w-3.5 text-muted-foreground" /></Button>
                       <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditProp(p)}><Edit className="h-3.5 w-3.5" /></Button>
                       <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => {
                         deleteProp.mutate(p.id, { onSuccess: () => toast({ title: 'Gelöscht' }) });
@@ -411,7 +415,7 @@ function EditDialog({ property, onClose, onSave }: {
               <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {['Neu', 'Eigentümer ermittelt', 'Kontaktiert', 'Interesse', 'Kein Interesse', 'Abgeschlossen'].map(s =>
+                  {['Neu', 'Eigentümer ermittelt', 'Kontaktiert', 'Interesse', 'Kein Interesse', 'Abgeschlossen', 'Ausgeblendet'].map(s =>
                     <SelectItem key={s} value={s}>{s}</SelectItem>
                   )}
                 </SelectContent>
