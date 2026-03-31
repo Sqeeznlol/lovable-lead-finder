@@ -415,7 +415,7 @@ function EditDialog({ property, onClose, onSave }: {
               <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {['Neu', 'Eigentümer ermittelt', 'Kontaktiert', 'Interesse', 'Kein Interesse', 'Abgeschlossen'].map(s =>
+                  {['Neu', 'Eigentümer ermittelt', 'Kontaktiert', 'Interesse', 'Kein Interesse', 'Abgeschlossen', 'Ausgeblendet'].map(s =>
                     <SelectItem key={s} value={s}>{s}</SelectItem>
                   )}
                 </SelectContent>
