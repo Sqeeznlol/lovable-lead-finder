@@ -14,14 +14,13 @@ import { useToast } from '@/hooks/use-toast';
 const STATUSES = ['Alle', 'Neu', 'Eigentümer ermittelt', 'Kontaktiert', 'Interesse', 'Kein Interesse', 'Abgeschlossen'];
 
 const ZONE_LABELS: Record<string, string> = {
-  'W': 'Wohnzone',
+  'W': 'Wohnzone W',
   'W2': 'Wohnzone W2',
   'W3': 'Wohnzone W3',
   'W4': 'Wohnzone W4',
-  'K': 'Kernzone',
-  'Q': 'Quartiererhaltung',
-  'Z': 'Zentrumszone',
-  'O': 'Andere',
+  'WG': 'Wohn-/Gewerbezone',
+  'WG2': 'Wohn-/Gewerbezone WG2',
+  'WG3': 'Wohn-/Gewerbezone WG3',
 };
 
 function statusColor(s: string) {
