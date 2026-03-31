@@ -173,6 +173,7 @@ export function usePropertyStats() {
           .select('status, is_queried, owner_name, gemeinde')
           .or('baujahr.lte.1980,baujahr.is.null')
           .like('zone', 'W%')
+          .eq('geb_status', 'Bestehend')
           .range(from, from + batchSize - 1);
         if (error) throw error;
         allData = allData.concat(data);
