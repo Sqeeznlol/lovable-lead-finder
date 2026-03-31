@@ -97,12 +97,20 @@ export function PropertyList() {
     }
   };
 
+  const resetAdvanced = () => {
+    setBaujahrVon(''); setBaujahrBis(''); setFlaecheMin(''); setFlaecheMax('');
+    setAreaMin(''); setAreaMax(''); setGeschosseMin(''); setOwnerFilter('Alle');
+    setPage(0);
+  };
+
+  const hasAdvancedFilters = !!(baujahrVon || baujahrBis || flaecheMin || flaecheMax || areaMin || areaMax || geschosseMin || ownerFilter !== 'Alle');
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Liegenschaften</h2>
-          <p className="text-muted-foreground mt-1">{totalCount.toLocaleString()} Einträge · Baujahr ≤ 1980 · sortiert nach HNF ↓</p>
+          <p className="text-muted-foreground mt-1">{totalCount.toLocaleString()} Einträge · Wohnzonen · sortiert nach HNF ↓</p>
         </div>
         <div className="flex flex-wrap gap-3">
           <Input
@@ -132,8 +140,92 @@ export function PropertyList() {
               {STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
             </SelectContent>
           </Select>
+          <Button
+            variant={hasAdvancedFilters ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="gap-1"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            Filter
+            {hasAdvancedFilters && <Badge variant="secondary" className="ml-1 text-xs px-1.5">aktiv</Badge>}
+          </Button>
         </div>
       </div>
+
+      {showAdvanced && (
+        <div className="rounded-lg border bg-card p-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-foreground">Erweiterte Filter</h3>
+            {hasAdvancedFilters && (
+              <Button variant="ghost" size="sm" onClick={resetAdvanced} className="text-xs text-muted-foreground">
+                Alle zurücksetzen
+              </Button>
+            )}
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Baujahr von</label>
+              <Input
+                type="number" placeholder="z.B. 1900" value={baujahrVon}
+                onChange={e => { setBaujahrVon(e.target.value); setPage(0); }}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Baujahr bis</label>
+              <Input
+                type="number" placeholder="z.B. 1960" value={baujahrBis}
+                onChange={e => { setBaujahrBis(e.target.value); setPage(0); }}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">HNF min (m²)</label>
+              <Input
+                type="number" placeholder="z.B. 200" value={flaecheMin}
+                onChange={e => { setFlaecheMin(e.target.value); setPage(0); }}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">HNF max (m²)</label>
+              <Input
+                type="number" placeholder="z.B. 1000" value={flaecheMax}
+                onChange={e => { setFlaecheMax(e.target.value); setPage(0); }}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Grundstück min (m²)</label>
+              <Input
+                type="number" placeholder="z.B. 500" value={areaMin}
+                onChange={e => { setAreaMin(e.target.value); setPage(0); }}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Geschosse min</label>
+              <Input
+                type="number" placeholder="z.B. 2" value={geschosseMin}
+                onChange={e => { setGeschosseMin(e.target.value); setPage(0); }}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Eigentümer</label>
+              <Select value={ownerFilter} onValueChange={v => { setOwnerFilter(v); setPage(0); }}>
+                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Alle">Alle</SelectItem>
+                  <SelectItem value="mit">Mit Eigentümer</SelectItem>
+                  <SelectItem value="ohne">Ohne Eigentümer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
