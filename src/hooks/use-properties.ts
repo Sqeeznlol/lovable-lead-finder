@@ -114,6 +114,7 @@ export function useUnqueriedProperties(limit: number) {
         .eq('is_queried', false)
         .like('zone', 'W%')
         .or('baujahr.lte.1980,baujahr.is.null')
+        .eq('geb_status', 'Bestehend')
         .order('gebaeudeflaeche', { ascending: false, nullsFirst: false })
         .order('area', { ascending: false, nullsFirst: false })
         .limit(limit);
