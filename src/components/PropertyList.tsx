@@ -43,6 +43,15 @@ export function PropertyList() {
   const [zoneFilter, setZoneFilter] = useState('Alle');
   const [editProp, setEditProp] = useState<Property | null>(null);
   const [page, setPage] = useState(0);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [baujahrVon, setBaujahrVon] = useState('');
+  const [baujahrBis, setBaujahrBis] = useState('');
+  const [flaecheMin, setFlaecheMin] = useState('');
+  const [flaecheMax, setFlaecheMax] = useState('');
+  const [areaMin, setAreaMin] = useState('');
+  const [areaMax, setAreaMax] = useState('');
+  const [geschosseMin, setGeschosseMin] = useState('');
+  const [ownerFilter, setOwnerFilter] = useState('Alle');
   const pageSize = 50;
 
   const { data: result, isLoading } = useProperties({
@@ -52,6 +61,14 @@ export function PropertyList() {
     search,
     page,
     pageSize,
+    baujahrVon: baujahrVon ? Number(baujahrVon) : undefined,
+    baujahrBis: baujahrBis ? Number(baujahrBis) : undefined,
+    flaecheMin: flaecheMin ? Number(flaecheMin) : undefined,
+    flaecheMax: flaecheMax ? Number(flaecheMax) : undefined,
+    areaMin: areaMin ? Number(areaMin) : undefined,
+    areaMax: areaMax ? Number(areaMax) : undefined,
+    geschosseMin: geschosseMin ? Number(geschosseMin) : undefined,
+    ownerFilter,
   });
   const { data: gemeinden } = useGemeinden();
   const { data: zones } = useZones();
