@@ -44,6 +44,9 @@ export function useProperties(options: UsePropertiesOptions = {}) {
 
       if (statusFilter && statusFilter !== 'Alle') {
         query = query.eq('status', statusFilter);
+      } else {
+        // By default hide "Ausgeblendet" properties
+        query = query.neq('status', 'Ausgeblendet');
       }
       if (gemeindeFilter && gemeindeFilter !== 'Alle') {
         query = query.eq('gemeinde', gemeindeFilter);
