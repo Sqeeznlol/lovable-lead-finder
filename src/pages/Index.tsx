@@ -1,16 +1,18 @@
 import { useState } from 'react';
-import { Building2, LayoutDashboard, Upload, ListTodo, Phone, Menu, X } from 'lucide-react';
+import { Building2, LayoutDashboard, Upload, ListTodo, Phone, Menu, X, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dashboard } from '@/components/Dashboard';
 import { PropertyList } from '@/components/PropertyList';
 import { CsvImport } from '@/components/CsvImport';
 import { QueryQueue } from '@/components/QueryQueue';
 import { PhoneManager } from '@/components/PhoneManager';
+import { AkquiseMode } from '@/components/AkquiseMode';
 
-type Tab = 'dashboard' | 'properties' | 'import' | 'queue' | 'phones';
+type Tab = 'dashboard' | 'akquise' | 'properties' | 'import' | 'queue' | 'phones';
 
 const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'akquise', label: 'Akquise-Modus', icon: Zap },
   { id: 'properties', label: 'Liegenschaften', icon: Building2 },
   { id: 'import', label: 'CSV Import', icon: Upload },
   { id: 'queue', label: 'Abfrage-Queue', icon: ListTodo },
@@ -62,6 +64,7 @@ export default function Index() {
         </header>
         <div className="p-6 lg:p-10 max-w-7xl">
           {active === 'dashboard' && <Dashboard />}
+          {active === 'akquise' && <AkquiseMode />}
           {active === 'properties' && <PropertyList />}
           {active === 'import' && <CsvImport />}
           {active === 'queue' && <QueryQueue />}

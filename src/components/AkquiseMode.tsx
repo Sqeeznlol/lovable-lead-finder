@@ -1,0 +1,333 @@
+import { useState, useEffect } from 'react';
+import { ExternalLink, Check, SkipForward, EyeOff, ArrowRight, Phone, Zap, MapPin, Calendar, Layers, Home, Ruler } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useUnqueriedProperties, useUpdateProperty } from '@/hooks/use-properties';
+import { usePhoneNumbers, useIncrementPhoneQuery } from '@/hooks/use-phones';
+import { useToast } from '@/hooks/use-toast';
+import { calculateDealScore, scoreColor, scoreBg } from '@/lib/deal-score';
+
+export function AkquiseMode() {
+  const { data: phones } = usePhoneNumbers();
+  const allPhones = phones || [];
+  const [selectedPhoneId, setSelectedPhoneId] = useState<string>('');
+  const selectedPhone = allPhones.find(p => p.id === selectedPhoneId);
+  const remaining = selectedPhone ? Math.max(0, 5 - selectedPhone.daily_queries_used) : 0;
+
+  const { data: queue, refetch } = useUnqueriedProperties(100);
+  const updateProp = useUpdateProperty();
+  const incrementPhone = useIncrementPhoneQuery();
+  const { toast } = useToast();
+
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [ownerName, setOwnerName] = useState('');
+  const [ownerPhone, setOwnerPhone] = useState('');
+  const [processing, setProcessing] = useState(false);
+
+  // Sort queue by deal score
+  const items = (queue || [])
+    .map(p => ({ ...p, _score: calculateDealScore(p) }))
+    .sort((a, b) => b._score - a._score);
+
+  const current = items[currentIndex];
+  const score = current?._score ?? 0;
+
+  // Auto-select first phone
+  useEffect(() => {
+    if (!selectedPhoneId && allPhones.length > 0) {
+      const available = allPhones.find(p => p.daily_queries_used < 5);
+      if (available) setSelectedPhoneId(available.id);
+    }
+  }, [allPhones, selectedPhoneId]);
+
+  // Reset form on property change
+  useEffect(() => {
+    setOwnerName('');
+    setOwnerPhone('');
+  }, [currentIndex]);
+
+  const portalUrl = current?.parzelle && current?.bfs_nr
+    ? `https://maps.zh.ch/?locate=parz&locations=${current.bfs_nr},${current.parzelle}&topic=OerebKatasterZH`
+    : current?.egrid
+      ? `https://maps.zh.ch/?topic=OerebKatasterZH&search=${current.egrid}`
+      : null;
+
+  const moveToNext = () => {
+    if (currentIndex < items.length - 1) {
+      setCurrentIndex(i => i + 1);
+    } else {
+      refetch();
+      setCurrentIndex(0);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!current || !selectedPhone) return;
+    setProcessing(true);
+    try {
+      await incrementPhone.mutateAsync(selectedPhone.id);
+      await updateProp.mutateAsync({
+        id: current.id,
+        is_queried: true,
+        queried_at: new Date().toISOString(),
+        queried_by_phone: selectedPhone.number,
+        owner_name: ownerName || null,
+        owner_phone: ownerPhone || null,
+        status: ownerName ? 'Eigentümer ermittelt' : 'Kein Ergebnis',
+      });
+      toast({ title: ownerName ? '✅ Eigentümer gespeichert' : '✅ Kein Ergebnis – weiter' });
+      moveToNext();
+    } catch {
+      toast({ title: 'Fehler', variant: 'destructive' });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleSkip = () => {
+    moveToNext();
+  };
+
+  const handleHide = async () => {
+    if (!current) return;
+    setProcessing(true);
+    try {
+      await updateProp.mutateAsync({ id: current.id, status: 'Ausgeblendet' });
+      toast({ title: 'Ausgeblendet' });
+      moveToNext();
+    } catch {
+      toast({ title: 'Fehler', variant: 'destructive' });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  // Progress
+  const completedToday = allPhones.reduce((acc, p) => acc + p.daily_queries_used, 0);
+  const totalCapacity = allPhones.length * 5;
+  const progressPercent = totalCapacity > 0 ? (completedToday / totalCapacity) * 100 : 0;
+
+  if (allPhones.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Card className="border-none shadow-lg max-w-md w-full">
+          <CardContent className="p-12 text-center space-y-4">
+            <Phone className="h-16 w-16 mx-auto text-muted-foreground/30" />
+            <h3 className="text-xl font-bold">Keine Telefonnummer</h3>
+            <p className="text-muted-foreground">Füge zuerst eine Telefonnummer unter "Telefone" hinzu.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!current) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Card className="border-none shadow-lg max-w-md w-full">
+          <CardContent className="p-12 text-center space-y-4">
+            <Zap className="h-16 w-16 mx-auto text-accent" />
+            <h3 className="text-xl font-bold">Alles abgearbeitet! 🎉</h3>
+            <p className="text-muted-foreground">Keine weiteren Liegenschaften in der Queue.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto space-y-6">
+      {/* Top bar: Phone selector + progress */}
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Select value={selectedPhoneId} onValueChange={setSelectedPhoneId}>
+            <SelectTrigger className="w-56">
+              <SelectValue placeholder="Telefon wählen" />
+            </SelectTrigger>
+            <SelectContent>
+              {allPhones.map(p => (
+                <SelectItem key={p.id} value={p.id}>
+                  <span className="flex items-center gap-2">
+                    <Phone className="h-3 w-3" />
+                    {p.label || p.number}
+                    <Badge variant={p.daily_queries_used >= 5 ? 'destructive' : 'secondary'} className="text-xs ml-1">
+                      {p.daily_queries_used}/5
+                    </Badge>
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {selectedPhone && (
+            <span className="text-sm text-muted-foreground">{remaining} Abfragen übrig</span>
+          )}
+        </div>
+        <div className="text-sm text-muted-foreground">
+          {completedToday}/{totalCapacity} heute
+        </div>
+      </div>
+
+      <Progress value={progressPercent} className="h-1.5" />
+
+      {/* Main Card */}
+      <Card className="border-none shadow-xl overflow-hidden">
+        <CardContent className="p-0">
+          {/* Score + Address Header */}
+          <div className="p-8 pb-6 bg-gradient-to-br from-card to-muted/30">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-3 flex-wrap">
+                  <Badge variant="outline" className="text-xs">#{currentIndex + 1} / {items.length}</Badge>
+                  {current.zone && <Badge className="bg-primary/10 text-primary border-primary/20">{current.zone}</Badge>}
+                  {current.geb_status && <Badge variant="outline" className="text-xs">{current.geb_status}</Badge>}
+                </div>
+                <h2 className="text-2xl sm:text-3xl font-bold tracking-tight leading-tight">{current.address}</h2>
+                <p className="text-muted-foreground mt-1">{current.plz_ort || current.gemeinde || ''}</p>
+              </div>
+              {/* Deal Score */}
+              <div className={`flex-shrink-0 w-20 h-20 rounded-2xl border-2 flex flex-col items-center justify-center ${scoreBg(score)}`}>
+                <span className={`text-2xl font-black ${scoreColor(score)}`}>{score}</span>
+                <span className="text-[10px] text-muted-foreground font-medium">SCORE</span>
+              </div>
+            </div>
+
+            {/* Property details grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
+              {current.gebaeudeflaeche && (
+                <div className="flex items-center gap-2 bg-background/60 rounded-lg px-3 py-2">
+                  <Home className="h-4 w-4 text-primary flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">HNF</p>
+                    <p className="font-semibold text-sm">{Math.round(Number(current.gebaeudeflaeche))} m²</p>
+                  </div>
+                </div>
+              )}
+              {current.area && (
+                <div className="flex items-center gap-2 bg-background/60 rounded-lg px-3 py-2">
+                  <Ruler className="h-4 w-4 text-primary flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Grundstück</p>
+                    <p className="font-semibold text-sm">{Math.round(Number(current.area))} m²</p>
+                  </div>
+                </div>
+              )}
+              {current.baujahr && (
+                <div className="flex items-center gap-2 bg-background/60 rounded-lg px-3 py-2">
+                  <Calendar className="h-4 w-4 text-primary flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Baujahr</p>
+                    <p className="font-semibold text-sm">{current.baujahr}</p>
+                  </div>
+                </div>
+              )}
+              {current.geschosse && (
+                <div className="flex items-center gap-2 bg-background/60 rounded-lg px-3 py-2">
+                  <Layers className="h-4 w-4 text-primary flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Geschosse</p>
+                    <p className="font-semibold text-sm">{Number(current.geschosse)}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* GIS Button */}
+          <div className="px-8 py-4 border-t border-b">
+            <Button
+              onClick={() => portalUrl && window.open(portalUrl, '_blank')}
+              disabled={!portalUrl}
+              className="w-full h-12 text-base gap-2"
+              variant="outline"
+            >
+              <MapPin className="h-5 w-5" />
+              GIS-Kataster öffnen
+              <ExternalLink className="h-4 w-4 ml-auto" />
+            </Button>
+          </div>
+
+          {/* Owner input */}
+          <div className="px-8 py-6 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Eigentümer Name</Label>
+                <Input
+                  placeholder="z.B. Hans Müller"
+                  value={ownerName}
+                  onChange={e => setOwnerName(e.target.value)}
+                  className="h-11"
+                  autoFocus
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Telefonnummer</Label>
+                <Input
+                  placeholder="z.B. +41 79 123 45 67"
+                  value={ownerPhone}
+                  onChange={e => setOwnerPhone(e.target.value)}
+                  className="h-11"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Action buttons */}
+          <div className="px-8 py-5 bg-muted/30 border-t flex flex-col sm:flex-row gap-3">
+            <Button
+              variant="ghost"
+              onClick={handleHide}
+              disabled={processing}
+              className="text-muted-foreground"
+            >
+              <EyeOff className="h-4 w-4 mr-2" />
+              Ausblenden
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleSkip}
+              disabled={processing}
+            >
+              <SkipForward className="h-4 w-4 mr-2" />
+              Überspringen
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={processing || !selectedPhone || remaining <= 0}
+              className="sm:ml-auto h-12 px-8 text-base"
+              size="lg"
+            >
+              <Check className="h-5 w-5 mr-2" />
+              {ownerName ? 'Speichern & Nächstes' : 'Kein Ergebnis & Nächstes'}
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Next 3 in queue */}
+      {items.length > 1 && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Nächste in der Queue</p>
+          {items.slice(currentIndex + 1, currentIndex + 4).map((p, i) => {
+            const s = p._score;
+            return (
+              <div key={p.id} className="flex items-center gap-3 bg-card rounded-xl px-4 py-3 shadow-sm border">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold border ${scoreBg(s)}`}>
+                  <span className={scoreColor(s)}>{s}</span>
+                </div>
+                <span className="truncate flex-1 text-sm font-medium">{p.address}</span>
+                <span className="text-xs text-muted-foreground">{p.gemeinde}</span>
+                {p.zone && <Badge variant="outline" className="text-xs">{p.zone}</Badge>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
