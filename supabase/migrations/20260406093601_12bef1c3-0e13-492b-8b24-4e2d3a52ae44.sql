@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX IF NOT EXISTS idx_properties_egrid_unique ON properties (egrid) WHERE egrid IS NOT NULL;
