@@ -55,10 +55,12 @@ export function AkquiseMode() {
   const [gisOpened, setGisOpened] = useState(false);
 
   const portalUrl = current?.parzelle && current?.bfs_nr
-    ? `https://maps.zh.ch/?locate=parz&locations=${current.bfs_nr},${current.parzelle}&topic=OerebKatasterZH&scale=500`
+    ? `https://maps.zh.ch/?locate=parz&locations=${current.bfs_nr},${current.parzelle}&topic=EigAuskunftZH&scale=500`
     : current?.egrid
-      ? `https://maps.zh.ch/?topic=OerebKatasterZH&search=${current.egrid}&scale=500`
-      : null;
+      ? `https://maps.zh.ch/?topic=EigAuskunftZH&search=${current.egrid}&scale=500`
+      : current?.address
+        ? `https://maps.zh.ch/?topic=EigAuskunftZH&search=${encodeURIComponent(current.address + (current.plz_ort ? ' ' + current.plz_ort : ''))}&scale=500`
+        : null;
 
   const googleMapsUrl = current?.address
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(current.address + (current.plz_ort ? ', ' + current.plz_ort : ''))}`
@@ -250,10 +252,11 @@ export function AkquiseMode() {
             <div className="rounded-lg bg-primary/5 border border-primary/20 px-4 py-3 space-y-1">
               <p className="text-xs font-semibold text-primary uppercase tracking-wider">Anleitung Eigentumsauskunft</p>
               <ol className="text-sm text-muted-foreground space-y-0.5 list-decimal list-inside">
-                <li>Klicke auf die <span className="font-medium text-foreground">Parzelle</span> (sie ist bereits markiert)</li>
-                <li>Wähle links <span className="font-medium text-foreground">"Eigentumsauskunft"</span></li>
-                <li>SMS-Code eingeben</li>
+                <li>Klicke auf die <span className="font-medium text-foreground">Parzelle</span> in der Karte</li>
+                <li>Klicke links auf <span className="font-medium text-foreground">"Eigentumsauskunft bestellen"</span></li>
+                <li>SMS-Code eingeben und bestätigen</li>
               </ol>
+              <p className="text-xs text-muted-foreground mt-1">💡 Das Thema "Eigentumsauskunft" wird automatisch geöffnet.</p>
             </div>
 
             {/* Buttons */}
