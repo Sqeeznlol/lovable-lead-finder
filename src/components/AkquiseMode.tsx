@@ -51,11 +51,17 @@ export function AkquiseMode() {
     setOwnerPhone('');
   }, [currentIndex]);
 
+  const [gisOpened, setGisOpened] = useState(false);
+
   const portalUrl = current?.parzelle && current?.bfs_nr
-    ? `https://maps.zh.ch/?locate=parz&locations=${current.bfs_nr},${current.parzelle}&topic=OerebKatasterZH`
+    ? `https://maps.zh.ch/?locate=parz&locations=${current.bfs_nr},${current.parzelle}&topic=OerebKatasterZH&scale=500`
     : current?.egrid
-      ? `https://maps.zh.ch/?topic=OerebKatasterZH&search=${current.egrid}`
+      ? `https://maps.zh.ch/?topic=OerebKatasterZH&search=${current.egrid}&scale=500`
       : null;
+
+  const googleMapsUrl = current?.address
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(current.address + (current.plz_ort ? ', ' + current.plz_ort : ''))}`
+    : null;
 
   const moveToNext = () => {
     if (currentIndex < items.length - 1) {
