@@ -49,6 +49,7 @@ export function AkquiseMode() {
   useEffect(() => {
     setOwnerName('');
     setOwnerPhone('');
+    setGisOpened(false);
   }, [currentIndex]);
 
   const [gisOpened, setGisOpened] = useState(false);
@@ -243,18 +244,52 @@ export function AkquiseMode() {
             </div>
           </div>
 
-          {/* GIS Button */}
-          <div className="px-8 py-4 border-t border-b">
-            <Button
-              onClick={() => portalUrl && window.open(portalUrl, '_blank')}
-              disabled={!portalUrl}
-              className="w-full h-12 text-base gap-2"
-              variant="outline"
-            >
-              <MapPin className="h-5 w-5" />
-              GIS-Kataster öffnen
-              <ExternalLink className="h-4 w-4 ml-auto" />
-            </Button>
+          {/* GIS Section */}
+          <div className="px-8 py-5 border-t border-b space-y-3">
+            {/* Step instructions */}
+            <div className="rounded-lg bg-primary/5 border border-primary/20 px-4 py-3 space-y-1">
+              <p className="text-xs font-semibold text-primary uppercase tracking-wider">Anleitung Eigentumsauskunft</p>
+              <ol className="text-sm text-muted-foreground space-y-0.5 list-decimal list-inside">
+                <li>Klicke auf die <span className="font-medium text-foreground">Parzelle</span> (sie ist bereits markiert)</li>
+                <li>Wähle links <span className="font-medium text-foreground">"Eigentumsauskunft"</span></li>
+                <li>SMS-Code eingeben</li>
+              </ol>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex gap-3">
+              <Button
+                onClick={() => {
+                  if (portalUrl) {
+                    window.open(portalUrl, '_blank');
+                    setGisOpened(true);
+                  }
+                }}
+                disabled={!portalUrl}
+                className="flex-1 h-12 text-base gap-2"
+              >
+                <MapPin className="h-5 w-5" />
+                GIS-Kataster öffnen
+                <ExternalLink className="h-4 w-4 ml-auto" />
+              </Button>
+              <Button
+                onClick={() => googleMapsUrl && window.open(googleMapsUrl, '_blank')}
+                disabled={!googleMapsUrl}
+                variant="outline"
+                className="h-12 gap-2"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Google Maps
+              </Button>
+            </div>
+
+            {/* Feedback after click */}
+            {gisOpened && (
+              <p className="text-sm text-primary font-medium flex items-center gap-2">
+                <Check className="h-4 w-4" />
+                GIS geöffnet – bitte Parzelle auswählen und Eigentumsauskunft abrufen
+              </p>
+            )}
           </div>
 
           {/* Owner input */}
