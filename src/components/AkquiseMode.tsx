@@ -54,12 +54,14 @@ export function AkquiseMode() {
 
   const [gisOpened, setGisOpened] = useState(false);
 
-  const portalUrl = current?.parzelle && current?.bfs_nr
-    ? `https://maps.zh.ch/?locate=parz&locations=${current.bfs_nr},${current.parzelle}&topic=EigAuskunftZH&scale=500`
-    : current?.egrid
-      ? `https://maps.zh.ch/?topic=EigAuskunftZH&search=${current.egrid}&scale=500`
+  // Primary: use EGRID (CH number) with locate=parz — works without login
+  // Fallback: BFS+Parzelle, then address search
+  const portalUrl = current?.egrid
+    ? `https://maps.zh.ch/?locate=parz&locations=${current.egrid}&topic=OerebKatasterZH&scale=500`
+    : current?.parzelle && current?.bfs_nr
+      ? `https://maps.zh.ch/?locate=parz&locations=${current.bfs_nr},${current.parzelle}&topic=OerebKatasterZH&scale=500`
       : current?.address
-        ? `https://maps.zh.ch/?topic=EigAuskunftZH&search=${encodeURIComponent(current.address + (current.plz_ort ? ' ' + current.plz_ort : ''))}&scale=500`
+        ? `https://maps.zh.ch/?topic=OerebKatasterZH&search=${encodeURIComponent(current.address + (current.plz_ort ? ' ' + current.plz_ort : ''))}&scale=500`
         : null;
 
   const googleMapsUrl = current?.address
@@ -193,6 +195,8 @@ export function AkquiseMode() {
                 <div className="flex items-center gap-2 mb-3 flex-wrap">
                   <Badge variant="outline" className="text-xs">#{currentIndex + 1} / {items.length}</Badge>
                   {current.zone && <Badge className="bg-primary/10 text-primary border-primary/20">{current.zone}</Badge>}
+                  {current.gwr_egid && <Badge variant="outline" className="text-xs font-mono">EGID: {current.gwr_egid}</Badge>}
+                  {current.egrid && <Badge variant="outline" className="text-xs font-mono">EGRID: {current.egrid}</Badge>}
                   {current.geb_status && <Badge variant="outline" className="text-xs">{current.geb_status}</Badge>}
                 </div>
                 <h2 className="text-2xl sm:text-3xl font-bold tracking-tight leading-tight">{current.address}</h2>
@@ -252,11 +256,11 @@ export function AkquiseMode() {
             <div className="rounded-lg bg-primary/5 border border-primary/20 px-4 py-3 space-y-1">
               <p className="text-xs font-semibold text-primary uppercase tracking-wider">Anleitung Eigentumsauskunft</p>
               <ol className="text-sm text-muted-foreground space-y-0.5 list-decimal list-inside">
-                <li>Klicke auf die <span className="font-medium text-foreground">Parzelle</span> in der Karte</li>
-                <li>Klicke links auf <span className="font-medium text-foreground">"Eigentumsauskunft bestellen"</span></li>
+                <li>Klicke auf die <span className="font-medium text-foreground">markierte Parzelle</span> in der Karte</li>
+                <li>Wähle im linken Panel <span className="font-medium text-foreground">"Eigentumsauskunft"</span></li>
                 <li>SMS-Code eingeben und bestätigen</li>
               </ol>
-              <p className="text-xs text-muted-foreground mt-1">💡 Das Thema "Eigentumsauskunft" wird automatisch geöffnet.</p>
+              <p className="text-xs text-muted-foreground mt-1">💡 Öffnet ÖREB-Kataster (kein Login nötig) – Parzelle wird via EGRID automatisch lokalisiert.</p>
             </div>
 
             {/* Buttons */}
