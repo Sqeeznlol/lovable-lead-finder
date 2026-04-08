@@ -7,7 +7,7 @@ const corsHeaders = {
 
 const PIPEDRIVE_BASE = 'https://api.pipedrive.com/v1';
 
-// Pipedrive custom field keys (Deal fields)
+// Pipedrive custom field keys (shared between Deals & Leads)
 const FIELD_ZONE = '6283f1bd5f9e2220c96dfebf3904e789c9850773';
 const FIELD_BAUJAHR = 'd8e495e217d7f56099b33cf339612f0bb58bb2b7';
 const FIELD_HNF = '7773ad912df15700b104f5057012a28cbc6b220a';
@@ -60,36 +60,6 @@ async function pipedrivePost(path: string, token: string, body: unknown) {
     body: JSON.stringify(body),
   });
   return res.json();
-}
-
-// --- Pipeline Management ---
-
-async function ensurePipeline(token: string): Promise<{ pipelineId: number; stageId: number }> {
-  const pipelinesRes = await pipedriveGet('/pipelines', token);
-  const pipelines: { id: number; name: string }[] = pipelinesRes?.data || [];
-
-  let pipelineId: number;
-  const existing = pipelines.find(p => p.name === 'Neue Leads');
-  if (existing) {
-    pipelineId = existing.id;
-  } else {
-    const created = await pipedrivePost('/pipelines', token, { name: 'Neue Leads', active: true });
-    pipelineId = created?.data?.id;
-  }
-
-  const stagesRes = await pipedriveGet('/stages', token, { pipeline_id: String(pipelineId) });
-  const stages: { id: number; name: string }[] = stagesRes?.data || [];
-
-  let stageId: number;
-  const existingStage = stages.find(s => s.name === 'Importiert');
-  if (existingStage) {
-    stageId = existingStage.id;
-  } else {
-    const created = await pipedrivePost('/stages', token, { name: 'Importiert', pipeline_id: pipelineId, order_nr: 1 });
-    stageId = created?.data?.id;
-  }
-
-  return { pipelineId, stageId };
 }
 
 // --- Name Parsing ---
@@ -184,12 +154,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Ensure pipeline exists
-    const pipeline = await ensurePipeline(PIPEDRIVE_API_TOKEN);
-
     // Batch dedup
     const exportedAddresses = new Set<string>();
-    const results: { propertyId: string; dealId?: number; personId?: number; orgId?: number; skipped?: boolean; error?: string }[] = [];
+    const results: { propertyId: string; leadId?: string; personId?: number; orgId?: number; skipped?: boolean; error?: string }[] = [];
 
     for (const prop of parsed.data.properties) {
       try {
@@ -204,7 +171,7 @@ Deno.serve(async (req) => {
           prop.gebaeudeflaeche ? `${Math.round(prop.gebaeudeflaeche)}m²` : '',
           prop.gemeinde || prop.plz_ort || '',
         ].filter(Boolean);
-        const dealTitle = titleParts.join(' · ') || prop.address;
+        const leadTitle = titleParts.join(' · ') || prop.address;
 
         // 1. Duplicate check via org
         const existingOrgId = await findExistingOrg(PIPEDRIVE_API_TOKEN, prop.address);
@@ -273,36 +240,33 @@ Deno.serve(async (req) => {
           }
         }
 
-        // 5. Create Deal with custom fields
-        const dealData: Record<string, unknown> = {
-          title: dealTitle,
+        // 5. Create Lead with custom fields (Leads share Deal custom fields)
+        const leadData: Record<string, unknown> = {
+          title: leadTitle,
           person_id: personId,
-          org_id: orgId,
-          pipeline_id: pipeline.pipelineId,
-          stage_id: pipeline.stageId,
-          status: 'open',
+          organization_id: orgId,
         };
 
         // Custom fields
-        if (prop.zone) dealData[FIELD_ZONE] = prop.zone;
-        if (prop.baujahr) dealData[FIELD_BAUJAHR] = prop.baujahr;
-        if (prop.gebaeudeflaeche) dealData[FIELD_HNF] = Math.round(prop.gebaeudeflaeche);
-        if (prop.area) dealData[FIELD_GRUNDSTUECK] = Math.round(prop.area);
-        if (prop.geschosse) dealData[FIELD_GESCHOSSE] = prop.geschosse;
-        if (prop.egrid) dealData[FIELD_EGRID] = prop.egrid;
-        if (prop.gwr_egid) dealData[FIELD_EGID] = prop.gwr_egid;
-        if (prop.gemeinde) dealData[FIELD_GEMEINDE] = prop.gemeinde;
+        if (prop.zone) leadData[FIELD_ZONE] = prop.zone;
+        if (prop.baujahr) leadData[FIELD_BAUJAHR] = prop.baujahr;
+        if (prop.gebaeudeflaeche) leadData[FIELD_HNF] = Math.round(prop.gebaeudeflaeche);
+        if (prop.area) leadData[FIELD_GRUNDSTUECK] = Math.round(prop.area);
+        if (prop.geschosse) leadData[FIELD_GESCHOSSE] = prop.geschosse;
+        if (prop.egrid) leadData[FIELD_EGRID] = prop.egrid;
+        if (prop.gwr_egid) leadData[FIELD_EGID] = prop.gwr_egid;
+        if (prop.gemeinde) leadData[FIELD_GEMEINDE] = prop.gemeinde;
 
-        const dealRes = await pipedrivePost('/deals', PIPEDRIVE_API_TOKEN, dealData);
-        const dealId = dealRes?.data?.id;
+        const leadRes = await pipedrivePost('/leads', PIPEDRIVE_API_TOKEN, leadData);
+        const leadId = leadRes?.data?.id;
 
-        if (!dealId) {
-          console.error('Deal creation failed:', JSON.stringify(dealRes));
-          results.push({ propertyId: prop.id, error: `Deal creation failed: ${JSON.stringify(dealRes)}` });
+        if (!leadId) {
+          console.error('Lead creation failed:', JSON.stringify(leadRes));
+          results.push({ propertyId: prop.id, error: `Lead creation failed: ${JSON.stringify(leadRes)}` });
           continue;
         }
 
-        // 6. Add note with additional details
+        // 6. Add note via Notes API (with address, maps link, user notes)
         const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(prop.address + (prop.plz_ort ? ', ' + prop.plz_ort : ''))}`;
         const noteLines: string[] = [];
         noteLines.push(`<b>Adresse:</b> ${prop.address}${prop.plz_ort ? ', ' + prop.plz_ort : ''}`);
@@ -310,12 +274,12 @@ Deno.serve(async (req) => {
         if (prop.notes) noteLines.push(`<br/><b>Notizen:</b> ${prop.notes}`);
 
         await pipedrivePost('/notes', PIPEDRIVE_API_TOKEN, {
-          deal_id: dealId,
+          lead_id: leadId,
           content: noteLines.join('<br/>'),
         });
 
         exportedAddresses.add(prop.address);
-        results.push({ propertyId: prop.id, dealId, personId, orgId: orgId || undefined });
+        results.push({ propertyId: prop.id, leadId, personId, orgId: orgId || undefined });
       } catch (err) {
         results.push({ propertyId: prop.id, error: String(err) });
       }
