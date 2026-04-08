@@ -484,9 +484,11 @@ export function AkquiseMode() {
                         Eigentümer einfügen (Name, Adresse, etc. – wird automatisch getrennt)
                       </Label>
                       <Input
+                        ref={idx === 0 ? ownerInputRef : undefined}
                         placeholder="z.B. Meier, Michael, Habsburgstrasse 9, 8057 Zürich, Schweiz, Alleineigentum"
                         value={owner.raw}
                         onChange={e => updateOwnerRaw(idx, e.target.value)}
+                        onPaste={e => handlePaste(idx, e)}
                         className="h-10 font-mono text-xs"
                         autoFocus={idx === 0}
                       />
