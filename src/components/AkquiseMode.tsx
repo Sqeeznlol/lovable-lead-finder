@@ -130,30 +130,6 @@ export function AkquiseMode() {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'SELECT') return;
 
-      // Prescreen phase shortcuts
-      if (prescreen) {
-        // Enter or Ctrl+Enter → Interessant (proceed)
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          setPrescreen(false);
-          setTimeout(() => ownerInputRef.current?.focus(), 100);
-          return;
-        }
-        // ArrowRight or Ctrl+→ → Skip
-        if (e.key === 'ArrowRight') {
-          e.preventDefault();
-          handleSkip();
-          return;
-        }
-        // Ctrl+H or just H → Hide
-        if (e.key === 'h' || e.key === 'H') {
-          e.preventDefault();
-          handleHide();
-          return;
-        }
-        return;
-      }
-
       // Akquise phase shortcuts
       if ((e.ctrlKey || e.metaKey) && (e.key === 'Enter' || e.key === 's')) {
         e.preventDefault();
@@ -419,57 +395,8 @@ export function AkquiseMode() {
             </div>
           </div>
 
-          {prescreen ? (
-            /* ─── VORAUSWAHL: Map preview + quick decision ─── */
-            <>
-              {/* Embedded Google Maps */}
-              <div className="border-t">
-                {mapsEmbedUrl ? (
-                  <iframe
-                    src={mapsEmbedUrl}
-                    className="w-full h-72 sm:h-80"
-                    style={{ border: 0 }}
-                    loading="lazy"
-                    referrerPolicy="no-referrer-when-downgrade"
-                    allowFullScreen
-                    title="Google Maps Vorschau"
-                  />
-                ) : (
-                  <div className="w-full h-72 sm:h-80 flex items-center justify-center bg-muted/30">
-                    <p className="text-muted-foreground text-sm">Keine Kartenvorschau verfügbar</p>
-                  </div>
-                )}
-              </div>
 
-              {/* Quick decision buttons */}
-              <div className="px-8 py-5 bg-muted/30 border-t space-y-3">
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <Button variant="ghost" onClick={handleHide} disabled={processing} className="text-muted-foreground gap-2">
-                    <EyeOff className="h-4 w-4" /> Ausblenden
-                  </Button>
-                  <Button variant="outline" onClick={handleSkip} disabled={processing} className="gap-2">
-                    <SkipForward className="h-4 w-4" /> Überspringen
-                  </Button>
-                  <Button
-                    onClick={() => { setPrescreen(false); setTimeout(() => ownerInputRef.current?.focus(), 100); }}
-                    className="sm:ml-auto h-12 px-8 text-base gap-2"
-                    size="lg"
-                  >
-                    <ThumbsUp className="h-5 w-5" />
-                    Interessant – Weiter zur Akquise
-                    <ArrowRight className="h-4 w-4" />
-                  </Button>
-                </div>
-                <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
-                  <Keyboard className="h-3 w-3" />
-                  <span><kbd className="bg-muted px-1 rounded font-mono">Enter</kbd> Interessant</span>
-                  <span><kbd className="bg-muted px-1 rounded font-mono">→</kbd> Skip</span>
-                  <span><kbd className="bg-muted px-1 rounded font-mono">H</kbd> Ausblenden</span>
-                </div>
-              </div>
-            </>
-          ) : (
-            /* ─── AKQUISE: GIS + Owner inputs ─── */
+            {/* ─── AKQUISE: GIS + Owner inputs ─── */}
             <>
               {/* GIS Section */}
               <div className="px-8 py-5 border-t border-b space-y-3">
