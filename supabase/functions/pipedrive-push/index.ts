@@ -287,10 +287,8 @@ Deno.serve(async (req) => {
           pipeline_id: pipeline.pipelineId,
           stage_id: pipeline.stageId,
           status: 'open',
-          // Custom fields
-          [FIELD_ADRESSE]: fullAddress,
-          [FIELD_MAPS]: mapsUrl,
         };
+        // Custom fields - only add if key is valid
         if (prop.zone) dealData[FIELD_ZONE] = prop.zone;
         if (prop.baujahr) dealData[FIELD_BAUJAHR] = prop.baujahr;
         if (prop.gebaeudeflaeche) dealData[FIELD_HNF] = Math.round(prop.gebaeudeflaeche);
