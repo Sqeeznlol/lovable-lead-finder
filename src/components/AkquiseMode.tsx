@@ -31,6 +31,7 @@ export function AkquiseMode() {
   const remaining = selectedPhone ? Math.max(0, 5 - selectedPhone.daily_queries_used) : 0;
 
   const [zoneFilter, setZoneFilter] = useState<string>('Alle');
+  const [baujahrBis, setBaujahrBis] = useState<string>('1980');
   const { data: zones } = useZones();
 
   const { data: queue, refetch } = useUnqueriedProperties(100);
@@ -68,8 +69,10 @@ export function AkquiseMode() {
   }, []);
 
   // Sort queue by deal score, apply zone filter
+  const baujahrMax = baujahrBis ? parseInt(baujahrBis, 10) : null;
   const items = (queue || [])
     .filter(p => zoneFilter === 'Alle' || p.zone === zoneFilter)
+    .filter(p => !baujahrMax || !p.baujahr || p.baujahr <= baujahrMax)
     .map(p => ({ ...p, _score: calculateDealScore(p) }))
     .sort((a, b) => b._score - a._score);
 
@@ -243,6 +246,17 @@ export function AkquiseMode() {
               {(zones || []).map(z => <SelectItem key={z} value={z}>{z}</SelectItem>)}
             </SelectContent>
           </Select>
+          <div className="flex items-center gap-1.5">
+            <Label htmlFor="baujahr-bis" className="text-xs text-muted-foreground whitespace-nowrap">Bj. bis</Label>
+            <Input
+              id="baujahr-bis"
+              type="number"
+              value={baujahrBis}
+              onChange={e => { setBaujahrBis(e.target.value); setCurrentIndex(0); }}
+              placeholder="z.B. 1980"
+              className="w-24 h-9"
+            />
+          </div>
           {selectedPhone && (
             <span className="text-sm text-muted-foreground">{remaining} übrig</span>
           )}
