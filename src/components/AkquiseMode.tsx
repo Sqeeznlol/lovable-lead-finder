@@ -279,6 +279,7 @@ export function AkquiseMode() {
             <div className="rounded-lg bg-primary/5 border border-primary/20 px-4 py-3 space-y-1">
               <p className="text-xs font-semibold text-primary uppercase tracking-wider">Anleitung Eigentumsauskunft</p>
               <ol className="text-sm text-muted-foreground space-y-0.5 list-decimal list-inside">
+                <li>Wechsle oben rechts das Thema auf <span className="font-medium text-foreground">"Eigentumsauskunft"</span></li>
                 <li>Klicke auf die <span className="font-medium text-foreground">markierte Parzelle</span> in der Karte</li>
                 <li>Wähle <span className="font-medium text-foreground">"Eigentumsauskunft bestellen"</span></li>
                 <li>SMS-Code eingeben und Eigentümer ablesen</li>
