@@ -289,12 +289,11 @@ Deno.serve(async (req) => {
         if (prop.gwr_egid) noteLines.push(`EGID: ${prop.gwr_egid}`);
         if (prop.notes) noteLines.push(`\n📝 Notizen: ${prop.notes}`);
 
-        // 6. Create Lead
+        // 6. Create Lead (without note - deprecated field)
         const leadData: Record<string, unknown> = {
           title: leadTitle,
           person_id: personId,
           organization_id: orgId,
-          note: noteLines.join('\n'),
         };
         if (labelId) {
           leadData.label_ids = [labelId];
@@ -306,6 +305,14 @@ Deno.serve(async (req) => {
         if (!leadId) {
           results.push({ propertyId: prop.id, error: `Lead creation failed: ${JSON.stringify(leadRes)}` });
           continue;
+        }
+
+        // 7. Add note via Notes API (lead notes require lead_id)
+        if (noteLines.length > 0) {
+          await pipedrivePost('/notes', PIPEDRIVE_API_TOKEN, {
+            lead_id: leadId,
+            content: noteLines.join('<br>'),
+          });
         }
 
         results.push({ propertyId: prop.id, leadId, personId, orgId: orgId || undefined });
