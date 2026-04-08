@@ -79,15 +79,10 @@ export function AkquiseMode() {
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(current.address + (current.plz_ort ? ', ' + current.plz_ort : ''))}`
     : null;
 
-  // Tel.search link
-  const telSearchUrl = (name: string, address?: string) => {
-    const q = [name, address].filter(Boolean).join(' ');
-    return `https://tel.search.ch/?was=${encodeURIComponent(q)}`;
-  };
-
-  const opendiUrl = (name: string) => {
-    return `https://www.opendi.ch/q?q=${encodeURIComponent(name)}`;
-  };
+  // Smart name parsing for search links
+  const parsed1 = parseOwnerString(ownerName);
+  const parsed2 = parseOwnerString(ownerName2);
+  const ownerOrt = current?.plz_ort || current?.gemeinde || '';
 
   const moveToNext = () => {
     if (currentIndex < items.length - 1) {
