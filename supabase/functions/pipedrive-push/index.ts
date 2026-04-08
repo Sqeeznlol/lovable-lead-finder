@@ -137,22 +137,17 @@ async function upsertPerson(
   token: string,
   ownerName: string,
   ownerPhone: string | null | undefined,
-  ownerAddress: string | null | undefined,
   orgId: number | undefined,
 ): Promise<number | undefined> {
   const { firstName, lastName } = parseOwnerForPipedrive(ownerName);
   const displayName = firstName ? `${firstName} ${lastName}` : lastName;
   const cleanPhone = cleanPhoneNumber(ownerPhone);
-  const ownerStreet = extractStreetFromAddress(ownerName);
-  const personAddress = ownerAddress || ownerStreet;
 
   const existingPerson = await findExistingPerson(token, displayName);
   if (existingPerson) {
-    // Update existing person with phone, address, org
     const updatePayload: Record<string, unknown> = {};
     if (orgId) updatePayload.org_id = orgId;
     if (cleanPhone) updatePayload.phone = [{ value: cleanPhone, primary: true }];
-    if (personAddress) updatePayload.address = personAddress;
     if (Object.keys(updatePayload).length > 0) {
       await fetch(`${PIPEDRIVE_BASE}/persons/${existingPerson}?api_token=${token}`, {
         method: 'PUT',
@@ -163,7 +158,7 @@ async function upsertPerson(
     return existingPerson;
   }
 
-  // Create new person
+  // Create new person (no address field – Pipedrive v1 rejects it)
   const personData: Record<string, unknown> = {
     name: displayName,
     first_name: firstName,
@@ -171,11 +166,8 @@ async function upsertPerson(
   };
   if (orgId) personData.org_id = orgId;
   if (cleanPhone) personData.phone = [{ value: cleanPhone, primary: true }];
-  if (personAddress) personData.address = personAddress;
 
-  console.log('Creating person:', JSON.stringify(personData));
   const personRes = await pipedrivePost('/persons', token, personData);
-  console.log('Person full response:', JSON.stringify(personRes));
   return personRes?.data?.id;
 }
 
