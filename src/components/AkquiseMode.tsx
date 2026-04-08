@@ -66,13 +66,13 @@ export function AkquiseMode() {
   // Reset index when zone filter changes
   useEffect(() => { setCurrentIndex(0); }, [zoneFilter]);
 
-  // GIS URL — AVfarbigZH (Amtliche Vermessung) mit Eigentumsauskunft
+  // GIS URL — DLGOWfarbigZH = Eigentumsauskunft (Amtliche Vermessung)
   const portalUrl = current?.egrid
-    ? `https://maps.zh.ch/?locate=parz&locations=${current.egrid}&topic=AVfarbigZH&scale=500`
+    ? `https://maps.zh.ch/?locate=parz&locations=${current.egrid}&topic=DLGOWfarbigZH&scale=500`
     : current?.parzelle && current?.bfs_nr
-      ? `https://maps.zh.ch/?locate=parz&locations=${current.bfs_nr},${current.parzelle}&topic=AVfarbigZH&scale=500`
+      ? `https://maps.zh.ch/?locate=parz&locations=${current.bfs_nr},${current.parzelle}&topic=DLGOWfarbigZH&scale=500`
       : current?.address
-        ? `https://maps.zh.ch/?topic=AVfarbigZH&search=${encodeURIComponent(current.address + (current.plz_ort ? ' ' + current.plz_ort : ''))}&scale=500`
+        ? `https://maps.zh.ch/?topic=DLGOWfarbigZH&search=${encodeURIComponent(current.address + (current.plz_ort ? ' ' + current.plz_ort : ''))}&scale=500`
         : null;
 
   const googleMapsUrl = current?.address
