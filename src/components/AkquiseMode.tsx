@@ -169,10 +169,6 @@ export function AkquiseMode() {
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(current.address + (current.plz_ort ? ', ' + current.plz_ort : ''))}`
     : null;
 
-  // Embeddable Google Maps URL for prescreen
-  const mapsEmbedUrl = current?.address
-    ? `https://maps.google.com/maps?q=${encodeURIComponent(current.address + (current.plz_ort ? ', ' + current.plz_ort : ''))}&t=k&z=18&output=embed`
-    : null;
 
   const ownerOrt = current?.plz_ort || current?.gemeinde || '';
   const firstOwnerName = owners[0]?.raw || '';
