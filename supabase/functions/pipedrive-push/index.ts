@@ -288,20 +288,11 @@ Deno.serve(async (req) => {
         // 4. Get or create zone label
         const labelId = await ensureZoneLabel(PIPEDRIVE_API_TOKEN, prop.zone || '', labelCache);
 
-        // 5. Build lead note with property details
-        const noteLines: string[] = [];
-        noteLines.push(`📍 Adresse: ${prop.address}${prop.plz_ort ? ', ' + prop.plz_ort : ''}`);
-        if (prop.area) noteLines.push(`📐 Grundstück: ${Math.round(prop.area)} m²`);
-        if (prop.gebaeudeflaeche) noteLines.push(`🏠 Gebäudefläche: ${Math.round(prop.gebaeudeflaeche)} m²`);
-        if (prop.baujahr) noteLines.push(`📅 Baujahr: ${prop.baujahr}`);
-        if (prop.geschosse) noteLines.push(`🏗 Geschosse: ${prop.geschosse}`);
-        if (prop.zone) noteLines.push(`🗺 Zone: ${prop.zone}`);
-        if (prop.gemeinde) noteLines.push(`🏘 Gemeinde: ${prop.gemeinde}`);
-        if (prop.egrid) noteLines.push(`EGRID: ${prop.egrid}`);
-        if (prop.gwr_egid) noteLines.push(`EGID: ${prop.gwr_egid}`);
-        if (prop.notes) noteLines.push(`\n📝 Notizen: ${prop.notes}`);
+        // 5. Build Google Maps URL
+        const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(prop.address + (prop.plz_ort ? ', ' + prop.plz_ort : ''))}`;
+        const fullAddress = prop.address + (prop.plz_ort ? ', ' + prop.plz_ort : '');
 
-        // 6. Create Lead (without note - deprecated field)
+        // 6. Create Lead with custom fields
         const leadData: Record<string, unknown> = {
           title: leadTitle,
           person_id: personId,
@@ -319,11 +310,33 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // 7. Add note via Notes API (lead notes require lead_id)
-        if (noteLines.length > 0) {
+        // 7. Convert lead to deal to set custom fields, then back? 
+        // Actually: Leads inherit deal custom fields. We need to PATCH the lead with custom fields.
+        const leadPatchData: Record<string, unknown> = {};
+        if (prop.zone) leadPatchData[FIELD_ZONE] = prop.zone;
+        if (prop.baujahr) leadPatchData[FIELD_BAUJAHR] = prop.baujahr;
+        if (prop.gebaeudeflaeche) leadPatchData[FIELD_HNF] = Math.round(prop.gebaeudeflaeche);
+        if (prop.area) leadPatchData[FIELD_GRUNDSTUECK] = Math.round(prop.area);
+        if (prop.geschosse) leadPatchData[FIELD_GESCHOSSE] = prop.geschosse;
+        if (prop.egrid) leadPatchData[FIELD_EGRID] = prop.egrid;
+        if (prop.gwr_egid) leadPatchData[FIELD_EGID] = prop.gwr_egid;
+        if (prop.gemeinde) leadPatchData[FIELD_GEMEINDE] = prop.gemeinde;
+        leadPatchData[FIELD_ADRESSE] = fullAddress;
+        leadPatchData[FIELD_MAPS] = mapsUrl;
+
+        if (Object.keys(leadPatchData).length > 0) {
+          await fetch(`${PIPEDRIVE_BASE}/leads/${leadId}?api_token=${PIPEDRIVE_API_TOKEN}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(leadPatchData),
+          });
+        }
+
+        // 8. Add note if we have notes
+        if (prop.notes) {
           await pipedrivePost('/notes', PIPEDRIVE_API_TOKEN, {
             lead_id: leadId,
-            content: noteLines.join('<br>'),
+            content: prop.notes,
           });
         }
 
