@@ -275,9 +275,6 @@ Deno.serve(async (req) => {
         }
 
         // 5. Create Deal with all custom fields
-        const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(prop.address + (prop.plz_ort ? ', ' + prop.plz_ort : ''))}`;
-        const fullAddress = prop.address + (prop.plz_ort ? ', ' + prop.plz_ort : '');
-
         const dealData: Record<string, unknown> = {
           title: dealTitle,
           person_id: personId,
@@ -295,8 +292,7 @@ Deno.serve(async (req) => {
         if (prop.egrid) dealData[FIELD_EGRID] = prop.egrid;
         if (prop.gwr_egid) dealData[FIELD_EGID] = prop.gwr_egid;
         if (prop.gemeinde) dealData[FIELD_GEMEINDE] = prop.gemeinde;
-        dealData[FIELD_ADRESSE] = fullAddress;
-        dealData[FIELD_MAPS] = mapsUrl;
+
 
         const dealRes = await pipedrivePost('/deals', PIPEDRIVE_API_TOKEN, dealData);
         const dealId = dealRes?.data?.id;
