@@ -246,7 +246,16 @@ export function PipedriveExport() {
                 </p>
               )}
               {pushResult.errors > 0 && (
-                <p className="text-xs text-destructive">{pushResult.errors} Fehler</p>
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold text-destructive">{pushResult.errors} Fehler:</p>
+                  <div className="max-h-40 overflow-y-auto space-y-1">
+                    {pushResult.errorDetails.map((e, i) => (
+                      <p key={i} className="text-xs text-destructive bg-destructive/10 rounded px-2 py-1">
+                        <span className="font-medium">{e.address}:</span> {e.error}
+                      </p>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           )}
