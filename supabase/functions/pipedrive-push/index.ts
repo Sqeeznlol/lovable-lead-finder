@@ -260,10 +260,7 @@ Deno.serve(async (req) => {
           organization_id: orgId,
         };
 
-        // Add note with all property details
         const noteContent = buildLeadNote(prop);
-        leadData.note = noteContent;
-
         const leadRes = await pipedrivePost('/leads', PIPEDRIVE_API_TOKEN, leadData);
         const leadId = leadRes?.data?.id;
 
@@ -272,6 +269,11 @@ Deno.serve(async (req) => {
           results.push({ propertyId: prop.id, error: `Lead creation failed: ${JSON.stringify(leadRes)}` });
           continue;
         }
+
+        await pipedrivePost('/notes', PIPEDRIVE_API_TOKEN, {
+          lead_id: leadId,
+          content: noteContent,
+        });
 
         exportedAddresses.add(prop.address);
         results.push({ propertyId: prop.id, leadId, personId, orgId: orgId || undefined });
