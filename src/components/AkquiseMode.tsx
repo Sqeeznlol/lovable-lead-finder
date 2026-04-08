@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ExternalLink, Check, SkipForward, EyeOff, ArrowRight, Phone, Zap, MapPin, Calendar, Layers, Home, Ruler } from 'lucide-react';
+import { ExternalLink, Check, SkipForward, EyeOff, ArrowRight, Phone, Zap, MapPin, Calendar, Layers, Home, Ruler, Search, Plus, Minus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useUnqueriedProperties, useUpdateProperty } from '@/hooks/use-properties';
+import { useUnqueriedProperties, useUpdateProperty, useZones } from '@/hooks/use-properties';
 import { usePhoneNumbers, useIncrementPhoneQuery } from '@/hooks/use-phones';
 import { useToast } from '@/hooks/use-toast';
 import { calculateDealScore, scoreColor, scoreBg } from '@/lib/deal-score';
@@ -19,6 +19,9 @@ export function AkquiseMode() {
   const selectedPhone = allPhones.find(p => p.id === selectedPhoneId);
   const remaining = selectedPhone ? Math.max(0, 5 - selectedPhone.daily_queries_used) : 0;
 
+  const [zoneFilter, setZoneFilter] = useState<string>('Alle');
+  const { data: zones } = useZones();
+
   const { data: queue, refetch } = useUnqueriedProperties(100);
   const updateProp = useUpdateProperty();
   const incrementPhone = useIncrementPhoneQuery();
@@ -26,11 +29,18 @@ export function AkquiseMode() {
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [ownerName, setOwnerName] = useState('');
+  const [ownerAddress, setOwnerAddress] = useState('');
   const [ownerPhone, setOwnerPhone] = useState('');
+  const [ownerName2, setOwnerName2] = useState('');
+  const [ownerAddress2, setOwnerAddress2] = useState('');
+  const [ownerPhone2, setOwnerPhone2] = useState('');
+  const [showOwner2, setShowOwner2] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [gisOpened, setGisOpened] = useState(false);
 
-  // Sort queue by deal score
+  // Sort queue by deal score, apply zone filter
   const items = (queue || [])
+    .filter(p => zoneFilter === 'Alle' || p.zone === zoneFilter)
     .map(p => ({ ...p, _score: calculateDealScore(p) }))
     .sort((a, b) => b._score - a._score);
 
@@ -47,26 +57,36 @@ export function AkquiseMode() {
 
   // Reset form on property change
   useEffect(() => {
-    setOwnerName('');
-    setOwnerPhone('');
-    setGisOpened(false);
+    setOwnerName(''); setOwnerAddress(''); setOwnerPhone('');
+    setOwnerName2(''); setOwnerAddress2(''); setOwnerPhone2('');
+    setShowOwner2(false); setGisOpened(false);
   }, [currentIndex]);
 
-  const [gisOpened, setGisOpened] = useState(false);
+  // Reset index when zone filter changes
+  useEffect(() => { setCurrentIndex(0); }, [zoneFilter]);
 
-  // Primary: use EGRID (CH number) with locate=parz — works without login
-  // Fallback: BFS+Parzelle, then address search
+  // GIS URL — OerebKatasterZH (public, no login)
   const portalUrl = current?.egrid
-    ? `https://maps.zh.ch/?locate=parz&locations=${current.egrid}&topic=OerebKatasterZH&scale=500`
+    ? `https://maps.zh.ch/?locate=parz&locations=${current.egrid}&topic=EigAuskunftZH&scale=500`
     : current?.parzelle && current?.bfs_nr
-      ? `https://maps.zh.ch/?locate=parz&locations=${current.bfs_nr},${current.parzelle}&topic=OerebKatasterZH&scale=500`
+      ? `https://maps.zh.ch/?locate=parz&locations=${current.bfs_nr},${current.parzelle}&topic=EigAuskunftZH&scale=500`
       : current?.address
-        ? `https://maps.zh.ch/?topic=OerebKatasterZH&search=${encodeURIComponent(current.address + (current.plz_ort ? ' ' + current.plz_ort : ''))}&scale=500`
+        ? `https://maps.zh.ch/?topic=EigAuskunftZH&search=${encodeURIComponent(current.address + (current.plz_ort ? ' ' + current.plz_ort : ''))}&scale=500`
         : null;
 
   const googleMapsUrl = current?.address
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(current.address + (current.plz_ort ? ', ' + current.plz_ort : ''))}`
     : null;
+
+  // Tel.search link
+  const telSearchUrl = (name: string, address?: string) => {
+    const q = [name, address].filter(Boolean).join(' ');
+    return `https://tel.search.ch/?was=${encodeURIComponent(q)}`;
+  };
+
+  const opendiUrl = (name: string) => {
+    return `https://www.opendi.ch/q?q=${encodeURIComponent(name)}`;
+  };
 
   const moveToNext = () => {
     if (currentIndex < items.length - 1) {
@@ -88,7 +108,11 @@ export function AkquiseMode() {
         queried_at: new Date().toISOString(),
         queried_by_phone: selectedPhone.number,
         owner_name: ownerName || null,
+        owner_address: ownerAddress || null,
         owner_phone: ownerPhone || null,
+        owner_name_2: ownerName2 || null,
+        owner_address_2: ownerAddress2 || null,
+        owner_phone_2: ownerPhone2 || null,
         status: ownerName ? 'Eigentümer ermittelt' : 'Kein Ergebnis',
       });
       toast({ title: ownerName ? '✅ Eigentümer gespeichert' : '✅ Kein Ergebnis – weiter' });
@@ -100,9 +124,7 @@ export function AkquiseMode() {
     }
   };
 
-  const handleSkip = () => {
-    moveToNext();
-  };
+  const handleSkip = () => moveToNext();
 
   const handleHide = async () => {
     if (!current) return;
@@ -118,7 +140,6 @@ export function AkquiseMode() {
     }
   };
 
-  // Progress
   const completedToday = allPhones.reduce((acc, p) => acc + p.daily_queries_used, 0);
   const totalCapacity = allPhones.length * 5;
   const progressPercent = totalCapacity > 0 ? (completedToday / totalCapacity) * 100 : 0;
@@ -144,7 +165,7 @@ export function AkquiseMode() {
           <CardContent className="p-12 text-center space-y-4">
             <Zap className="h-16 w-16 mx-auto text-accent" />
             <h3 className="text-xl font-bold">Alles abgearbeitet! 🎉</h3>
-            <p className="text-muted-foreground">Keine weiteren Liegenschaften in der Queue.</p>
+            <p className="text-muted-foreground">Keine weiteren Liegenschaften {zoneFilter !== 'Alle' ? `in Zone ${zoneFilter}` : 'in der Queue'}.</p>
           </CardContent>
         </Card>
       </div>
@@ -153,11 +174,11 @@ export function AkquiseMode() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      {/* Top bar: Phone selector + progress */}
+      {/* Top bar: Phone + Zone filter + progress */}
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <Select value={selectedPhoneId} onValueChange={setSelectedPhoneId}>
-            <SelectTrigger className="w-56">
+            <SelectTrigger className="w-52">
               <SelectValue placeholder="Telefon wählen" />
             </SelectTrigger>
             <SelectContent>
@@ -174,12 +195,21 @@ export function AkquiseMode() {
               ))}
             </SelectContent>
           </Select>
+          <Select value={zoneFilter} onValueChange={setZoneFilter}>
+            <SelectTrigger className="w-36">
+              <SelectValue placeholder="Zone" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Alle">Alle Zonen</SelectItem>
+              {(zones || []).map(z => <SelectItem key={z} value={z}>{z}</SelectItem>)}
+            </SelectContent>
+          </Select>
           {selectedPhone && (
-            <span className="text-sm text-muted-foreground">{remaining} Abfragen übrig</span>
+            <span className="text-sm text-muted-foreground">{remaining} übrig</span>
           )}
         </div>
         <div className="text-sm text-muted-foreground">
-          {completedToday}/{totalCapacity} heute
+          {completedToday}/{totalCapacity} heute · {items.length} in Queue
         </div>
       </div>
 
@@ -197,19 +227,16 @@ export function AkquiseMode() {
                   {current.zone && <Badge className="bg-primary/10 text-primary border-primary/20">{current.zone}</Badge>}
                   {current.gwr_egid && <Badge variant="outline" className="text-xs font-mono">EGID: {current.gwr_egid}</Badge>}
                   {current.egrid && <Badge variant="outline" className="text-xs font-mono">EGRID: {current.egrid}</Badge>}
-                  {current.geb_status && <Badge variant="outline" className="text-xs">{current.geb_status}</Badge>}
                 </div>
                 <h2 className="text-2xl sm:text-3xl font-bold tracking-tight leading-tight">{current.address}</h2>
                 <p className="text-muted-foreground mt-1">{current.plz_ort || current.gemeinde || ''}</p>
               </div>
-              {/* Deal Score */}
               <div className={`flex-shrink-0 w-20 h-20 rounded-2xl border-2 flex flex-col items-center justify-center ${scoreBg(score)}`}>
                 <span className={`text-2xl font-black ${scoreColor(score)}`}>{score}</span>
                 <span className="text-[10px] text-muted-foreground font-medium">SCORE</span>
               </div>
             </div>
 
-            {/* Property details grid */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
               {current.gebaeudeflaeche && (
                 <div className="flex items-center gap-2 bg-background/60 rounded-lg px-3 py-2">
@@ -252,31 +279,25 @@ export function AkquiseMode() {
 
           {/* GIS Section */}
           <div className="px-8 py-5 border-t border-b space-y-3">
-            {/* Step instructions */}
             <div className="rounded-lg bg-primary/5 border border-primary/20 px-4 py-3 space-y-1">
               <p className="text-xs font-semibold text-primary uppercase tracking-wider">Anleitung Eigentumsauskunft</p>
               <ol className="text-sm text-muted-foreground space-y-0.5 list-decimal list-inside">
                 <li>Klicke auf die <span className="font-medium text-foreground">markierte Parzelle</span> in der Karte</li>
-                <li>Wähle im linken Panel <span className="font-medium text-foreground">"Eigentumsauskunft"</span></li>
-                <li>SMS-Code eingeben und bestätigen</li>
+                <li>Wähle <span className="font-medium text-foreground">"Eigentumsauskunft bestellen"</span></li>
+                <li>SMS-Code eingeben und Eigentümer ablesen</li>
               </ol>
-              <p className="text-xs text-muted-foreground mt-1">💡 Öffnet ÖREB-Kataster (kein Login nötig) – Parzelle wird via EGRID automatisch lokalisiert.</p>
             </div>
 
-            {/* Buttons */}
             <div className="flex gap-3">
               <Button
                 onClick={() => {
-                  if (portalUrl) {
-                    window.open(portalUrl, '_blank');
-                    setGisOpened(true);
-                  }
+                  if (portalUrl) { window.open(portalUrl, '_blank'); setGisOpened(true); }
                 }}
                 disabled={!portalUrl}
                 className="flex-1 h-12 text-base gap-2"
               >
                 <MapPin className="h-5 w-5" />
-                GIS-Kataster öffnen
+                GIS Eigentumsauskunft
                 <ExternalLink className="h-4 w-4 ml-auto" />
               </Button>
               <Button
@@ -290,58 +311,98 @@ export function AkquiseMode() {
               </Button>
             </div>
 
-            {/* Feedback after click */}
             {gisOpened && (
               <p className="text-sm text-primary font-medium flex items-center gap-2">
                 <Check className="h-4 w-4" />
-                GIS geöffnet – bitte Parzelle auswählen und Eigentumsauskunft abrufen
+                GIS geöffnet – Eigentumsauskunft abrufen
               </p>
             )}
           </div>
 
           {/* Owner input */}
           <div className="px-8 py-6 space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Eigentümer Name</Label>
-                <Input
-                  placeholder="z.B. Hans Müller"
-                  value={ownerName}
-                  onChange={e => setOwnerName(e.target.value)}
-                  className="h-11"
-                  autoFocus
-                />
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-semibold">Eigentümer 1</Label>
+              {ownerName && (
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1"
+                    onClick={() => window.open(telSearchUrl(ownerName, current.plz_ort || current.gemeinde || ''), '_blank')}>
+                    <Search className="h-3 w-3" /> tel.search.ch
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1"
+                    onClick={() => window.open(opendiUrl(ownerName), '_blank')}>
+                    <Search className="h-3 w-3" /> Opendi
+                  </Button>
+                </div>
+              )}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Name</Label>
+                <Input placeholder="z.B. Hans Müller" value={ownerName} onChange={e => setOwnerName(e.target.value)} className="h-10" autoFocus />
               </div>
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Telefonnummer</Label>
-                <Input
-                  placeholder="z.B. +41 79 123 45 67"
-                  value={ownerPhone}
-                  onChange={e => setOwnerPhone(e.target.value)}
-                  className="h-11"
-                />
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Adresse</Label>
+                <Input placeholder="z.B. Bahnhofstr. 1, 8001 ZH" value={ownerAddress} onChange={e => setOwnerAddress(e.target.value)} className="h-10" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Telefon</Label>
+                <Input placeholder="+41 79 123 45 67" value={ownerPhone} onChange={e => setOwnerPhone(e.target.value)} className="h-10" />
               </div>
             </div>
+
+            {/* Owner 2 */}
+            {!showOwner2 ? (
+              <Button size="sm" variant="ghost" className="text-xs text-muted-foreground gap-1" onClick={() => setShowOwner2(true)}>
+                <Plus className="h-3 w-3" /> 2. Eigentümer hinzufügen
+              </Button>
+            ) : (
+              <div className="space-y-3 border-t pt-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-semibold">Eigentümer 2</Label>
+                  <div className="flex gap-2">
+                    {ownerName2 && (
+                      <>
+                        <Button size="sm" variant="outline" className="h-7 text-xs gap-1"
+                          onClick={() => window.open(telSearchUrl(ownerName2, current.plz_ort || current.gemeinde || ''), '_blank')}>
+                          <Search className="h-3 w-3" /> tel.search.ch
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-7 text-xs gap-1"
+                          onClick={() => window.open(opendiUrl(ownerName2), '_blank')}>
+                          <Search className="h-3 w-3" /> Opendi
+                        </Button>
+                      </>
+                    )}
+                    <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" onClick={() => { setShowOwner2(false); setOwnerName2(''); setOwnerAddress2(''); setOwnerPhone2(''); }}>
+                      <Minus className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Name</Label>
+                    <Input placeholder="2. Eigentümer" value={ownerName2} onChange={e => setOwnerName2(e.target.value)} className="h-10" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Adresse</Label>
+                    <Input placeholder="Adresse" value={ownerAddress2} onChange={e => setOwnerAddress2(e.target.value)} className="h-10" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Telefon</Label>
+                    <Input placeholder="+41..." value={ownerPhone2} onChange={e => setOwnerPhone2(e.target.value)} className="h-10" />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Action buttons */}
           <div className="px-8 py-5 bg-muted/30 border-t flex flex-col sm:flex-row gap-3">
-            <Button
-              variant="ghost"
-              onClick={handleHide}
-              disabled={processing}
-              className="text-muted-foreground"
-            >
-              <EyeOff className="h-4 w-4 mr-2" />
-              Ausblenden
+            <Button variant="ghost" onClick={handleHide} disabled={processing} className="text-muted-foreground">
+              <EyeOff className="h-4 w-4 mr-2" /> Ausblenden
             </Button>
-            <Button
-              variant="outline"
-              onClick={handleSkip}
-              disabled={processing}
-            >
-              <SkipForward className="h-4 w-4 mr-2" />
-              Überspringen
+            <Button variant="outline" onClick={handleSkip} disabled={processing}>
+              <SkipForward className="h-4 w-4 mr-2" /> Überspringen
             </Button>
             <Button
               onClick={handleSave}
@@ -357,11 +418,11 @@ export function AkquiseMode() {
         </CardContent>
       </Card>
 
-      {/* Next 3 in queue */}
+      {/* Next in queue */}
       {items.length > 1 && (
         <div className="space-y-2">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Nächste in der Queue</p>
-          {items.slice(currentIndex + 1, currentIndex + 4).map((p, i) => {
+          {items.slice(currentIndex + 1, currentIndex + 4).map(p => {
             const s = p._score;
             return (
               <div key={p.id} className="flex items-center gap-3 bg-card rounded-xl px-4 py-3 shadow-sm border">

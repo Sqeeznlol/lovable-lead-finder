@@ -1,21 +1,23 @@
 import { useState } from 'react';
-import { Building2, LayoutDashboard, Upload, ListTodo, Phone, Menu, X, Zap } from 'lucide-react';
+import { Building2, LayoutDashboard, Upload, Phone, Menu, X, Zap, Search, FileSpreadsheet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dashboard } from '@/components/Dashboard';
 import { PropertyList } from '@/components/PropertyList';
 import { CsvImport } from '@/components/CsvImport';
-import { QueryQueue } from '@/components/QueryQueue';
 import { PhoneManager } from '@/components/PhoneManager';
 import { AkquiseMode } from '@/components/AkquiseMode';
+import { TelefonSuche } from '@/components/TelefonSuche';
+import { PipedriveExport } from '@/components/PipedriveExport';
 
-type Tab = 'dashboard' | 'akquise' | 'properties' | 'import' | 'queue' | 'phones';
+type Tab = 'dashboard' | 'akquise' | 'telsuche' | 'properties' | 'import' | 'phones' | 'export';
 
 const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'akquise', label: 'Akquise-Modus', icon: Zap },
+  { id: 'telsuche', label: 'Telefon-Suche', icon: Search },
   { id: 'properties', label: 'Liegenschaften', icon: Building2 },
+  { id: 'export', label: 'Pipedrive Export', icon: FileSpreadsheet },
   { id: 'import', label: 'CSV Import', icon: Upload },
-  { id: 'queue', label: 'Abfrage-Queue', icon: ListTodo },
   { id: 'phones', label: 'Telefone', icon: Phone },
 ];
 
@@ -25,7 +27,6 @@ export default function Index() {
 
   return (
     <div className="flex min-h-screen">
-      {/* Sidebar */}
       <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-card border-r transform transition-transform lg:translate-x-0 lg:static ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-6 border-b">
           <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
@@ -51,10 +52,8 @@ export default function Index() {
         </nav>
       </aside>
 
-      {/* Mobile overlay */}
       {mobileOpen && <div className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm lg:hidden" onClick={() => setMobileOpen(false)} />}
 
-      {/* Main */}
       <main className="flex-1 min-w-0">
         <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-sm border-b px-6 py-3 flex items-center gap-4 lg:hidden">
           <Button size="icon" variant="ghost" onClick={() => setMobileOpen(!mobileOpen)}>
@@ -65,9 +64,10 @@ export default function Index() {
         <div className="p-6 lg:p-10 max-w-7xl">
           {active === 'dashboard' && <Dashboard />}
           {active === 'akquise' && <AkquiseMode />}
+          {active === 'telsuche' && <TelefonSuche />}
           {active === 'properties' && <PropertyList />}
+          {active === 'export' && <PipedriveExport />}
           {active === 'import' && <CsvImport />}
-          {active === 'queue' && <QueryQueue />}
           {active === 'phones' && <PhoneManager />}
         </div>
       </main>
