@@ -14,6 +14,7 @@ const EXPORT_STATUSES = ['Telefon gefunden', 'Eigentümer ermittelt', 'Kontaktie
 export function PipedriveExport() {
   const [exportStatus, setExportStatus] = useState('Telefon gefunden');
   const [showArchive, setShowArchive] = useState(false);
+  const [archiveFilter, setArchiveFilter] = useState<'with-phone' | 'without-phone'>('with-phone');
   const { data: result, isLoading, refetch } = useProperties({
     statusFilter: showArchive ? 'Exportiert' : exportStatus,
     pageSize: 1000,
