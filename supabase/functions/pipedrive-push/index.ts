@@ -328,6 +328,7 @@ Deno.serve(async (req) => {
           });
         }
 
+        exportedAddresses.add(prop.address);
         results.push({ propertyId: prop.id, leadId, personId, orgId: orgId || undefined });
       } catch (err) {
         results.push({ propertyId: prop.id, error: String(err) });
