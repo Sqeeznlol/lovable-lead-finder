@@ -201,9 +201,23 @@ export function PipedriveExport() {
           )}
 
           {showArchive && (
-            <div className="text-center pt-2">
-              <p className="text-3xl font-bold">{isLoading ? '...' : count.toLocaleString('de-CH')}</p>
-              <p className="text-xs text-muted-foreground">im Archiv</p>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-3xl font-bold">{isLoading ? '...' : (archiveFilter === 'with-phone' ? archiveWithPhone.length : archiveWithoutPhone.length).toLocaleString('de-CH')}</p>
+                <p className="text-xs text-muted-foreground">von {count.toLocaleString('de-CH')} im Archiv</p>
+              </div>
+              <Tabs value={archiveFilter} onValueChange={(v) => setArchiveFilter(v as 'with-phone' | 'without-phone')}>
+                <TabsList className="w-full">
+                  <TabsTrigger value="with-phone" className="flex-1 gap-1.5">
+                    <Phone className="h-3.5 w-3.5" />
+                    Mit Telefon ({archiveWithPhone.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="without-phone" className="flex-1 gap-1.5">
+                    <PhoneOff className="h-3.5 w-3.5" />
+                    Ohne Telefon ({archiveWithoutPhone.length})
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
             </div>
           )}
 
