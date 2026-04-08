@@ -175,7 +175,7 @@ async function upsertPerson(
 
   console.log('Creating person:', JSON.stringify(personData));
   const personRes = await pipedrivePost('/persons', token, personData);
-  console.log('Person response:', JSON.stringify({ id: personRes?.data?.id, name: personRes?.data?.name }));
+  console.log('Person full response:', JSON.stringify(personRes));
   return personRes?.data?.id;
 }
 
