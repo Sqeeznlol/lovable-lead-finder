@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Phone, Check, ArrowRight, SkipForward, ExternalLink, AlertTriangle, Building2, Landmark } from 'lucide-react';
+import { Search, Phone, Check, ArrowRight, SkipForward, ExternalLink, AlertTriangle, Building2, Landmark, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -253,6 +253,19 @@ export function TelefonSuche() {
 
           {/* Actions */}
           <div className="px-6 py-5 bg-muted/30 flex gap-3 flex-wrap">
+            <Button variant="ghost" disabled={processing} className="text-muted-foreground"
+              onClick={async () => {
+                if (!current) return;
+                setProcessing(true);
+                try {
+                  await updateProp.mutateAsync({ id: current.id, status: 'Ausgeblendet' });
+                  toast({ title: 'Ausgeblendet' });
+                  moveToNext();
+                } catch { toast({ title: 'Fehler', variant: 'destructive' }); }
+                finally { setProcessing(false); }
+              }}>
+              <EyeOff className="h-4 w-4 mr-2" /> Ausblenden
+            </Button>
             {isLowChance && (
               <Button variant="outline" onClick={handleMarkLowChance} disabled={processing} className="text-destructive border-destructive/30">
                 <AlertTriangle className="h-4 w-4 mr-2" /> Geringe Chance
