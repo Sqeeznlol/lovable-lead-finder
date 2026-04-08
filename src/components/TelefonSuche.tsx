@@ -196,20 +196,18 @@ export function TelefonSuche() {
                 </p>
               </div>
             </div>
-            {ownerType1 === 'person' && (
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" className="gap-1"
-                  onClick={() => window.open(telSearchUrlParsed(parsed1, ort), '_blank')}>
-                  <Search className="h-3.5 w-3.5" /> tel.search.ch
-                  <ExternalLink className="h-3 w-3" />
-                </Button>
-                <Button size="sm" variant="outline" className="gap-1"
-                  onClick={() => window.open(opendiUrlParsed(parsed1), '_blank')}>
-                  <Search className="h-3.5 w-3.5" /> Opendi
-                  <ExternalLink className="h-3 w-3" />
-                </Button>
-              </div>
-            )}
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" className="gap-1"
+                onClick={() => window.open(telSearchUrlParsed(parsed1, ort), '_blank')}>
+                <Search className="h-3.5 w-3.5" /> tel.search.ch
+                <ExternalLink className="h-3 w-3" />
+              </Button>
+              <Button size="sm" variant="outline" className="gap-1"
+                onClick={() => window.open(opendiUrlParsed(parsed1), '_blank')}>
+                <Search className="h-3.5 w-3.5" /> Opendi
+                <ExternalLink className="h-3 w-3" />
+              </Button>
+            </div>
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Telefonnummer</Label>
               <Input placeholder="+41 ..." value={phone1} onChange={e => setPhone1(e.target.value)} className="h-10" autoFocus />
@@ -232,18 +230,16 @@ export function TelefonSuche() {
                   </p>
                 </div>
               </div>
-              {ownerType2 === 'person' && (
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline" className="gap-1"
-                    onClick={() => window.open(telSearchUrlParsed(parsed2, ort), '_blank')}>
-                    <Search className="h-3.5 w-3.5" /> tel.search.ch
-                  </Button>
-                  <Button size="sm" variant="outline" className="gap-1"
-                    onClick={() => window.open(opendiUrlParsed(parsed2), '_blank')}>
-                    <Search className="h-3.5 w-3.5" /> Opendi
-                  </Button>
-                </div>
-              )}
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" className="gap-1"
+                onClick={() => window.open(telSearchUrlParsed(parsed2, ort), '_blank')}>
+                <Search className="h-3.5 w-3.5" /> tel.search.ch
+              </Button>
+              <Button size="sm" variant="outline" className="gap-1"
+                onClick={() => window.open(opendiUrlParsed(parsed2), '_blank')}>
+                <Search className="h-3.5 w-3.5" /> Opendi
+              </Button>
+            </div>
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Telefonnummer</Label>
                 <Input placeholder="+41 ..." value={phone2} onChange={e => setPhone2(e.target.value)} className="h-10" />
