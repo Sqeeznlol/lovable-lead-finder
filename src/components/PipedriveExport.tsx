@@ -71,6 +71,9 @@ export function PipedriveExport() {
           owner_phone_2: p.owner_phone_2,
           notes: p.notes,
           status: p.status,
+          google_maps_url: p.google_maps_url,
+          kategorie: p.kategorie,
+          wohnungen: p.wohnungen ? Number(p.wohnungen) : null,
         }));
 
         const { data, error } = await supabase.functions.invoke('pipedrive-push', {

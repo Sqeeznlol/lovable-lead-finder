@@ -37,6 +37,9 @@ const PropertySchema = z.object({
   owner_phone_2: z.string().nullish(),
   notes: z.string().nullish(),
   status: z.string(),
+  google_maps_url: z.string().nullish(),
+  kategorie: z.string().nullish(),
+  wohnungen: z.number().nullish(),
 });
 
 const BodySchema = z.object({
@@ -70,7 +73,6 @@ async function getOrCreateLeadLabel(token: string, zone: string): Promise<string
   if (!zone) return undefined;
   if (labelCache.has(zone)) return labelCache.get(zone);
 
-  // Fetch existing lead labels
   const res = await pipedriveGet('/leadLabels', token);
   const labels = res?.data || [];
   for (const label of labels) {
@@ -80,7 +82,6 @@ async function getOrCreateLeadLabel(token: string, zone: string): Promise<string
     }
   }
 
-  // Create new label
   const createRes = await pipedrivePost('/leadLabels', token, {
     name: zone,
     color: 'blue',
@@ -108,18 +109,6 @@ function parseOwnerForPipedrive(rawName: string | null | undefined): { firstName
   return { firstName: '', lastName: trimmed };
 }
 
-function extractStreetFromAddress(rawName: string | null | undefined): string {
-  if (!rawName || !rawName.trim()) return '';
-  const parts = rawName.trim().split(',').map(s => s.trim());
-  const ownershipPatterns = ['alleineigentum', 'miteigentum', 'gesamteigentum', 'stockwerkeigentum'];
-  const countryPatterns = ['schweiz', 'suisse', 'svizzera', 'switzerland', 'ch'];
-  const addressParts = parts.slice(2).filter(p => {
-    const lower = p.toLowerCase();
-    return !ownershipPatterns.some(op => lower.includes(op)) && !countryPatterns.includes(lower);
-  });
-  return addressParts.join(', ');
-}
-
 // --- Clean phone number and format to Swiss +41 ---
 
 function cleanPhoneNumber(phone: string | null | undefined): string {
@@ -136,6 +125,14 @@ function cleanPhoneNumber(phone: string | null | undefined): string {
     num = '+41' + num;
   }
   return num;
+}
+
+// --- Check if a phone string is a real number (not just text like "keine Nummer") ---
+
+function isValidPhone(phone: string | null | undefined): boolean {
+  if (!phone) return false;
+  const cleaned = phone.replace(/[^\d]/g, '');
+  return cleaned.length >= 7;
 }
 
 // --- Duplicate Check ---
@@ -176,8 +173,6 @@ async function upsertPerson(
 
   const existingPerson = await findExistingPerson(token, displayName);
   if (existingPerson) {
-    // Don't overwrite org_id – person may own multiple properties.
-    // The lead itself links person + org together.
     const updatePayload: Record<string, unknown> = {};
     if (cleanPhone) updatePayload.phone = [{ value: cleanPhone, primary: true }];
     if (Object.keys(updatePayload).length > 0) {
@@ -190,7 +185,6 @@ async function upsertPerson(
     return existingPerson;
   }
 
-  // Create new person (no address field – Pipedrive v1 rejects it)
   const personData: Record<string, unknown> = {
     name: displayName,
     first_name: firstName,
@@ -201,6 +195,76 @@ async function upsertPerson(
 
   const personRes = await pipedrivePost('/persons', token, personData);
   return personRes?.data?.id;
+}
+
+// --- Build rich notes HTML ---
+
+function buildLeadNotes(prop: z.infer<typeof PropertySchema>): string {
+  const lines: string[] = [];
+
+  // Address & maps
+  const fullAddress = prop.address + (prop.plz_ort ? ', ' + prop.plz_ort : '');
+  lines.push(`<b>Adresse:</b> ${fullAddress}`);
+  
+  if (prop.google_maps_url) {
+    lines.push(`<b>Google Maps:</b> <a href="${prop.google_maps_url}">Karte öffnen</a>`);
+  } else {
+    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`;
+    lines.push(`<b>Google Maps:</b> <a href="${mapsUrl}">Karte öffnen</a>`);
+  }
+
+  // Property details
+  const details: string[] = [];
+  if (prop.zone) details.push(`Zone: ${prop.zone}`);
+  if (prop.baujahr) details.push(`Baujahr: ${prop.baujahr}`);
+  if (prop.gebaeudeflaeche) details.push(`HNF: ${Math.round(prop.gebaeudeflaeche)}m²`);
+  if (prop.area) details.push(`Grundstück: ${Math.round(prop.area)}m²`);
+  if (prop.geschosse) details.push(`Geschosse: ${prop.geschosse}`);
+  if (prop.kategorie) details.push(`Kategorie: ${prop.kategorie}`);
+  if (prop.wohnungen) details.push(`Wohnungen: ${prop.wohnungen}`);
+  if (prop.egrid) details.push(`EGRID: ${prop.egrid}`);
+  if (prop.gwr_egid) details.push(`EGID: ${prop.gwr_egid}`);
+  if (details.length > 0) {
+    lines.push(`<br/><b>Liegenschaft:</b><br/>${details.join('<br/>')}`);
+  }
+
+  // Owner 1
+  if (prop.owner_name) {
+    lines.push(`<br/><b>Eigentümer 1:</b> ${prop.owner_name}`);
+    if (prop.owner_address) lines.push(`Adresse: ${prop.owner_address}`);
+    if (prop.owner_phone && isValidPhone(prop.owner_phone)) {
+      lines.push(`Telefon: ${prop.owner_phone}`);
+    } else if (prop.owner_phone) {
+      lines.push(`Telefon: ${prop.owner_phone} (nicht verifiziert)`);
+    }
+    // Search links for owner 1
+    const parsed1 = parseOwnerForPipedrive(prop.owner_name);
+    const name1 = parsed1.firstName ? `${parsed1.firstName} ${parsed1.lastName}` : parsed1.lastName;
+    const telSearchUrl1 = `https://tel.search.ch/?was=${encodeURIComponent(name1)}`;
+    const opendiUrl1 = `https://www.opendi.ch/q?q=${encodeURIComponent(name1)}`;
+    lines.push(`<a href="${telSearchUrl1}">tel.search.ch</a> | <a href="${opendiUrl1}">Opendi</a>`);
+  }
+
+  // Owner 2
+  if (prop.owner_name_2) {
+    lines.push(`<br/><b>Eigentümer 2:</b> ${prop.owner_name_2}`);
+    if (prop.owner_address_2) lines.push(`Adresse: ${prop.owner_address_2}`);
+    if (prop.owner_phone_2 && isValidPhone(prop.owner_phone_2)) {
+      lines.push(`Telefon: ${prop.owner_phone_2}`);
+    } else if (prop.owner_phone_2) {
+      lines.push(`Telefon: ${prop.owner_phone_2} (nicht verifiziert)`);
+    }
+    const parsed2 = parseOwnerForPipedrive(prop.owner_name_2);
+    const name2 = parsed2.firstName ? `${parsed2.firstName} ${parsed2.lastName}` : parsed2.lastName;
+    const telSearchUrl2 = `https://tel.search.ch/?was=${encodeURIComponent(name2)}`;
+    const opendiUrl2 = `https://www.opendi.ch/q?q=${encodeURIComponent(name2)}`;
+    lines.push(`<a href="${telSearchUrl2}">tel.search.ch</a> | <a href="${opendiUrl2}">Opendi</a>`);
+  }
+
+  // User notes
+  if (prop.notes) lines.push(`<br/><b>Notizen:</b> ${prop.notes}`);
+
+  return lines.join('<br/>');
 }
 
 // --- Main Handler ---
@@ -259,15 +323,15 @@ Deno.serve(async (req) => {
         });
         const orgId = orgRes?.data?.id;
 
-        // 3. Create/update Person 1 (primary owner)
+        // 3. Create/update Person 1 ONLY if they have a valid phone number
         let personId: number | undefined;
-        if (prop.owner_name) {
+        if (prop.owner_name && isValidPhone(prop.owner_phone)) {
           personId = await upsertPerson(PIPEDRIVE_API_TOKEN, prop.owner_name, prop.owner_phone, orgId);
         }
 
-        // 4. Create/update Person 2 (secondary owner)
+        // 4. Create/update Person 2 ONLY if they have a valid phone number
         let person2Id: number | undefined;
-        if (prop.owner_name_2) {
+        if (prop.owner_name_2 && isValidPhone(prop.owner_phone_2)) {
           person2Id = await upsertPerson(PIPEDRIVE_API_TOKEN, prop.owner_name_2, prop.owner_phone_2, orgId);
         }
 
@@ -275,12 +339,12 @@ Deno.serve(async (req) => {
         const labelId = await getOrCreateLeadLabel(PIPEDRIVE_API_TOKEN, prop.zone || '');
         const leadData: Record<string, unknown> = {
           title: leadTitle,
-          person_id: personId,
           organization_id: orgId,
         };
+        if (personId) leadData.person_id = personId;
         if (labelId) leadData.label_ids = [labelId];
 
-        // Custom fields (shared between Leads & Deals)
+        // Custom fields
         if (prop.zone) leadData[FIELD_ZONE] = prop.zone;
         if (prop.baujahr) leadData[FIELD_BAUJAHR] = prop.baujahr;
         if (prop.gebaeudeflaeche) leadData[FIELD_HNF] = Math.round(prop.gebaeudeflaeche);
@@ -300,16 +364,11 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // 6. Add note via Notes API (address + maps + user notes)
-        const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(prop.address + (prop.plz_ort ? ', ' + prop.plz_ort : ''))}`;
-        const noteLines: string[] = [];
-        noteLines.push(`<b>Adresse:</b> ${prop.address}${prop.plz_ort ? ', ' + prop.plz_ort : ''}`);
-        noteLines.push(`<b>Maps:</b> <a href="${mapsUrl}">Google Maps</a>`);
-        if (prop.notes) noteLines.push(`<br/><b>Notizen:</b> ${prop.notes}`);
-
+        // 6. Add rich note with all details, links, owner info
+        const noteContent = buildLeadNotes(prop);
         await pipedrivePost('/notes', PIPEDRIVE_API_TOKEN, {
           lead_id: leadId,
-          content: noteLines.join('<br/>'),
+          content: noteContent,
         });
 
         exportedAddresses.add(prop.address);
