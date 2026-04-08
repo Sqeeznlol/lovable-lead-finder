@@ -11,7 +11,8 @@ import { useUnqueriedProperties, useUpdateProperty, useZones } from '@/hooks/use
 import { usePhoneNumbers, useIncrementPhoneQuery } from '@/hooks/use-phones';
 import { useToast } from '@/hooks/use-toast';
 import { calculateDealScore, scoreColor, scoreBg } from '@/lib/deal-score';
-import { parseOwnerString, classifyOwner, ownerTypeLabel, ownerTypeColor, telSearchUrlParsed, opendiUrlParsed, type ParsedOwner } from '@/lib/owner-utils';
+import { parseOwnerString, parseMultipleOwners, classifyOwner, ownerTypeLabel, ownerTypeColor, telSearchUrlParsed, opendiUrlParsed, type ParsedOwner } from '@/lib/owner-utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface OwnerEntry {
   raw: string;
