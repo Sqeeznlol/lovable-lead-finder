@@ -28,6 +28,12 @@ export function PipedriveExport() {
   const properties = result?.data || [];
   const count = result?.count || 0;
 
+  const archiveWithPhone = useMemo(() => properties.filter(p => p.owner_phone), [properties]);
+  const archiveWithoutPhone = useMemo(() => properties.filter(p => !p.owner_phone), [properties]);
+  const archiveDisplayed = showArchive
+    ? (archiveFilter === 'with-phone' ? archiveWithPhone : archiveWithoutPhone)
+    : properties;
+
   const pushToPipedrive = async () => {
     if (properties.length === 0) {
       toast({ title: 'Keine Daten zum Exportieren', variant: 'destructive' });
