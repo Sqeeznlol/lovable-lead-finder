@@ -106,49 +106,39 @@ async function ensureCustomFields(token: string): Promise<FieldMap> {
 
 // --- Pipeline Management ---
 
-async function ensurePipeline(token: string): Promise<{ pipelineId: number; stageNewId: number; stageContactedId: number; stageInterestedId: number }> {
+async function ensurePipeline(token: string): Promise<{ pipelineId: number; stageImportedId: number }> {
   // Check existing pipelines
   const pipelinesRes = await pipedriveGet('/pipelines', token);
   const pipelines: { id: number; name: string }[] = pipelinesRes?.data || [];
 
   let pipelineId: number;
-  const existing = pipelines.find(p => p.name === 'Immobilien-Akquise');
+  const existing = pipelines.find(p => p.name === 'Neue Leads');
 
   if (existing) {
     pipelineId = existing.id;
   } else {
-    const created = await pipedrivePost('/pipelines', token, { name: 'Immobilien-Akquise', active: true });
+    const created = await pipedrivePost('/pipelines', token, { name: 'Neue Leads', active: true });
     pipelineId = created?.data?.id;
   }
 
   // Get stages for this pipeline
   const stagesRes = await pipedriveGet('/stages', token, { pipeline_id: String(pipelineId) });
-  const stages: { id: number; name: string; order_nr: number }[] = stagesRes?.data || [];
+  const stages: { id: number; name: string }[] = stagesRes?.data || [];
 
-  const stageNames = ['Neuer Lead', 'Kontaktiert', 'Interesse'];
-  const stageIds: number[] = [];
-
-  for (let i = 0; i < stageNames.length; i++) {
-    const name = stageNames[i];
-    const existingStage = stages.find(s => s.name === name);
-    if (existingStage) {
-      stageIds.push(existingStage.id);
-    } else {
-      const created = await pipedrivePost('/stages', token, {
-        name,
-        pipeline_id: pipelineId,
-        order_nr: i + 1,
-      });
-      stageIds.push(created?.data?.id);
-    }
+  let stageImportedId: number;
+  const existingStage = stages.find(s => s.name === 'Importiert');
+  if (existingStage) {
+    stageImportedId = existingStage.id;
+  } else {
+    const created = await pipedrivePost('/stages', token, {
+      name: 'Importiert',
+      pipeline_id: pipelineId,
+      order_nr: 1,
+    });
+    stageImportedId = created?.data?.id;
   }
 
-  return {
-    pipelineId,
-    stageNewId: stageIds[0],
-    stageContactedId: stageIds[1],
-    stageInterestedId: stageIds[2],
-  };
+  return { pipelineId, stageImportedId };
 }
 
 // --- Duplicate Check ---
@@ -295,18 +285,13 @@ Deno.serve(async (req) => {
           }
         }
 
-        // 5. Determine stage based on status
-        let stageId = pipeline.stageNewId;
-        if (prop.status === 'Kontaktiert') stageId = pipeline.stageContactedId;
-        if (prop.status === 'Interesse' || prop.status === 'Interessant') stageId = pipeline.stageInterestedId;
-
-        // 6. Create Deal with custom fields
+        // 5. Create Deal with custom fields
         const dealData: Record<string, unknown> = {
           title: dealTitle,
           person_id: personId,
           org_id: orgId,
           pipeline_id: pipeline.pipelineId,
-          stage_id: stageId,
+          stage_id: pipeline.stageImportedId,
           status: 'open',
         };
 
