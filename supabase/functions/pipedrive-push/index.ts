@@ -320,36 +320,45 @@ Deno.serve(async (req) => {
         const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(prop.address + (prop.plz_ort ? ', ' + prop.plz_ort : ''))}`;
         const fullAddress = prop.address + (prop.plz_ort ? ', ' + prop.plz_ort : '');
 
-        // 6. Create Lead with custom fields included directly
+        // 6. Create Lead (basic fields only)
         const leadData: Record<string, unknown> = {
           title: leadTitle,
           person_id: personId,
           organization_id: orgId,
-          // Custom fields (leads inherit deal custom fields)
-          [FIELD_ADRESSE]: fullAddress,
-          [FIELD_MAPS]: mapsUrl,
         };
         if (labelId) {
           leadData.label_ids = [labelId];
         }
-        if (prop.zone) leadData[FIELD_ZONE] = prop.zone;
-        if (prop.baujahr) leadData[FIELD_BAUJAHR] = prop.baujahr;
-        if (prop.gebaeudeflaeche) leadData[FIELD_HNF] = Math.round(prop.gebaeudeflaeche);
-        if (prop.area) leadData[FIELD_GRUNDSTUECK] = Math.round(prop.area);
-        if (prop.geschosse) leadData[FIELD_GESCHOSSE] = prop.geschosse;
-        if (prop.egrid) leadData[FIELD_EGRID] = prop.egrid;
-        if (prop.gwr_egid) leadData[FIELD_EGID] = prop.gwr_egid;
-        if (prop.gemeinde) leadData[FIELD_GEMEINDE] = prop.gemeinde;
 
         const leadRes = await pipedrivePost('/leads', PIPEDRIVE_API_TOKEN, leadData);
         const leadId = leadRes?.data?.id;
 
         if (!leadId) {
-          // Log full response for debugging
           console.error('Lead creation failed:', JSON.stringify(leadRes));
           results.push({ propertyId: prop.id, error: `Lead creation failed: ${JSON.stringify(leadRes)}` });
           continue;
         }
+
+        // 7. Update lead with custom fields via PATCH
+        const patchData: Record<string, unknown> = {};
+        if (prop.zone) patchData[FIELD_ZONE] = prop.zone;
+        if (prop.baujahr) patchData[FIELD_BAUJAHR] = prop.baujahr;
+        if (prop.gebaeudeflaeche) patchData[FIELD_HNF] = Math.round(prop.gebaeudeflaeche);
+        if (prop.area) patchData[FIELD_GRUNDSTUECK] = Math.round(prop.area);
+        if (prop.geschosse) patchData[FIELD_GESCHOSSE] = prop.geschosse;
+        if (prop.egrid) patchData[FIELD_EGRID] = prop.egrid;
+        if (prop.gwr_egid) patchData[FIELD_EGID] = prop.gwr_egid;
+        if (prop.gemeinde) patchData[FIELD_GEMEINDE] = prop.gemeinde;
+        patchData[FIELD_ADRESSE] = fullAddress;
+        patchData[FIELD_MAPS] = mapsUrl;
+
+        const patchRes = await fetch(`${PIPEDRIVE_BASE}/leads/${leadId}?api_token=${PIPEDRIVE_API_TOKEN}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patchData),
+        });
+        const patchJson = await patchRes.json();
+        console.log('Lead PATCH result:', JSON.stringify(patchJson));
 
         // 8. Add note if we have notes
         if (prop.notes) {
