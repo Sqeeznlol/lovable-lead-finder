@@ -1,21 +1,27 @@
 import { useState } from 'react';
-import { Download, FileSpreadsheet, Users, Send, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Download, Send, CheckCircle, AlertCircle, Loader2, Users, SkipForward, ArchiveRestore, Archive } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useProperties } from '@/hooks/use-properties';
+import { useProperties, useUpdateProperty } from '@/hooks/use-properties';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
-const EXPORT_STATUSES = ['Eigentümer ermittelt', 'Telefon gefunden', 'Kontaktiert', 'Interesse', 'Interessant'];
+const EXPORT_STATUSES = ['Telefon gefunden', 'Eigentümer ermittelt', 'Kontaktiert', 'Interesse', 'Interessant'];
 
 export function PipedriveExport() {
   const [exportStatus, setExportStatus] = useState('Telefon gefunden');
-  const { data: result, isLoading } = useProperties({ statusFilter: exportStatus, pageSize: 1000 });
+  const [showArchive, setShowArchive] = useState(false);
+  const { data: result, isLoading, refetch } = useProperties({
+    statusFilter: showArchive ? 'Exportiert' : exportStatus,
+    pageSize: 1000,
+  });
+  const updateProp = useUpdateProperty();
   const { toast } = useToast();
   const [pushing, setPushing] = useState(false);
-  const [pushResult, setPushResult] = useState<{ success: number; errors: number } | null>(null);
+  const [pushResult, setPushResult] = useState<{ created: number; skipped: number; errors: number } | null>(null);
+  const [restoring, setRestoring] = useState<string | null>(null);
 
   const properties = result?.data || [];
   const count = result?.count || 0;
@@ -30,9 +36,10 @@ export function PipedriveExport() {
     setPushResult(null);
 
     try {
-      // Send in batches of 20
-      let success = 0;
-      let errors = 0;
+      let totalCreated = 0;
+      let totalSkipped = 0;
+      let totalErrors = 0;
+      const successIds: string[] = [];
 
       for (let i = 0; i < properties.length; i += 20) {
         const batch = properties.slice(i, i + 20).map(p => ({
@@ -62,19 +69,35 @@ export function PipedriveExport() {
         });
 
         if (error) {
-          errors += batch.length;
-        } else if (data?.results) {
-          success += data.results.filter((r: any) => !r.error).length;
-          errors += data.results.filter((r: any) => r.error).length;
+          totalErrors += batch.length;
+        } else if (data?.summary) {
+          totalCreated += data.summary.created;
+          totalSkipped += data.summary.skipped;
+          totalErrors += data.summary.errors;
+          // Collect successfully created IDs
+          if (data.results) {
+            for (const r of data.results) {
+              if (!r.error && !r.skipped) successIds.push(r.propertyId);
+            }
+          }
         }
       }
 
-      setPushResult({ success, errors });
+      // Move successfully pushed properties to "Exportiert" status
+      if (successIds.length > 0) {
+        for (const id of successIds) {
+          await updateProp.mutateAsync({ id, status: 'Exportiert' });
+        }
+      }
+
+      setPushResult({ created: totalCreated, skipped: totalSkipped, errors: totalErrors });
+      refetch();
+
       toast({
-        title: errors === 0
-          ? `✅ ${success} Deals in Pipedrive erstellt`
-          : `⚠️ ${success} erstellt, ${errors} Fehler`,
-        variant: errors > 0 ? 'destructive' : 'default',
+        title: totalErrors === 0
+          ? `✅ ${totalCreated} Deals erstellt${totalSkipped > 0 ? `, ${totalSkipped} Duplikate übersprungen` : ''}`
+          : `⚠️ ${totalCreated} erstellt, ${totalErrors} Fehler`,
+        variant: totalErrors > 0 ? 'destructive' : 'default',
       });
     } catch (err) {
       toast({ title: 'Fehler beim Push zu Pipedrive', description: String(err), variant: 'destructive' });
@@ -83,45 +106,47 @@ export function PipedriveExport() {
     }
   };
 
+  const restoreFromArchive = async (id: string) => {
+    setRestoring(id);
+    try {
+      await updateProp.mutateAsync({ id, status: 'Telefon gefunden' });
+      toast({ title: '✅ Wiederhergestellt' });
+      refetch();
+    } catch {
+      toast({ title: 'Fehler', variant: 'destructive' });
+    } finally {
+      setRestoring(null);
+    }
+  };
+
   const exportCsv = () => {
     if (properties.length === 0) return;
-
     const headers = [
       'Person - Name', 'Person - Phone', 'Person - Address',
       'Person - Name 2', 'Person - Phone 2', 'Person - Address 2',
-      'Deal - Title', 'Deal - Value',
-      'Organization - Name', 'Organization - Address',
-      'Note',
-      'Liegenschaft - Adresse', 'Liegenschaft - PLZ/Ort', 'Liegenschaft - Gemeinde',
-      'Liegenschaft - Zone', 'Liegenschaft - Baujahr', 'Liegenschaft - HNF m2',
-      'Liegenschaft - Grundstück m2', 'Liegenschaft - Geschosse',
-      'Liegenschaft - EGRID', 'Liegenschaft - EGID',
-      'Status',
+      'Deal - Title', 'Organization - Name', 'Organization - Address',
+      'Note', 'Zone', 'Baujahr', 'HNF m2', 'Grundstück m2', 'Geschosse',
+      'EGRID', 'EGID', 'Gemeinde', 'Status',
     ];
-
     const rows = properties.map(p => [
       p.owner_name || '', p.owner_phone || '', p.owner_address || '',
       p.owner_name_2 || '', p.owner_phone_2 || '', p.owner_address_2 || '',
-      `Akquise: ${p.address}`, '',
-      '', p.address + (p.plz_ort ? ', ' + p.plz_ort : ''),
-      p.notes || '',
-      p.address, p.plz_ort || '', p.gemeinde || '',
-      p.zone || '', p.baujahr?.toString() || '',
+      `Akquise: ${p.address}`, `Liegenschaft: ${p.address}`,
+      p.address + (p.plz_ort ? ', ' + p.plz_ort : ''),
+      p.notes || '', p.zone || '', p.baujahr?.toString() || '',
       p.gebaeudeflaeche ? Math.round(Number(p.gebaeudeflaeche)).toString() : '',
       p.area ? Math.round(Number(p.area)).toString() : '',
       p.geschosse ? Number(p.geschosse).toString() : '',
-      p.egrid || '', p.gwr_egid || '', p.status,
+      p.egrid || '', p.gwr_egid || '', p.gemeinde || '', p.status,
     ]);
-
     const csvContent = [headers, ...rows]
       .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
       .join('\n');
-
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `pipedrive-export-${exportStatus.replace(/\s+/g, '-').toLowerCase()}-${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `pipedrive-export-${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
     URL.revokeObjectURL(url);
     toast({ title: `✅ ${properties.length} Einträge exportiert` });
@@ -129,36 +154,53 @@ export function PipedriveExport() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Pipedrive Export</h2>
-        <p className="text-muted-foreground text-sm mt-1">Direkt zu Pipedrive pushen oder CSV exportieren</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Pipedrive Export</h2>
+          <p className="text-muted-foreground text-sm mt-1">
+            {showArchive ? 'Bereits exportierte Deals – bei Bedarf wiederherstellen' : 'Direkt zu Pipedrive pushen mit Custom Fields & Duplikat-Check'}
+          </p>
+        </div>
+        <Button variant={showArchive ? 'default' : 'outline'} size="sm" className="gap-1.5" onClick={() => { setShowArchive(!showArchive); setPushResult(null); }}>
+          {showArchive ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
+          {showArchive ? 'Zurück' : 'Archiv'}
+        </Button>
       </div>
 
       <Card className="border-none shadow-lg">
         <CardContent className="p-6 space-y-6">
-          <div className="flex items-center gap-4">
-            <div className="space-y-1 flex-1">
-              <label className="text-sm font-medium">Status filtern</label>
-              <Select value={exportStatus} onValueChange={setExportStatus}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {EXPORT_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                </SelectContent>
-              </Select>
+          {!showArchive && (
+            <div className="flex items-center gap-4">
+              <div className="space-y-1 flex-1">
+                <label className="text-sm font-medium">Status filtern</label>
+                <Select value={exportStatus} onValueChange={setExportStatus}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {EXPORT_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="text-center pt-5">
+                <p className="text-3xl font-bold">{isLoading ? '...' : count.toLocaleString('de-CH')}</p>
+                <p className="text-xs text-muted-foreground">Einträge</p>
+              </div>
             </div>
-            <div className="text-center pt-5">
-              <p className="text-3xl font-bold">{isLoading ? '...' : count.toLocaleString('de-CH')}</p>
-              <p className="text-xs text-muted-foreground">Einträge</p>
-            </div>
-          </div>
+          )}
 
-          {/* Preview */}
+          {showArchive && (
+            <div className="text-center pt-2">
+              <p className="text-3xl font-bold">{isLoading ? '...' : count.toLocaleString('de-CH')}</p>
+              <p className="text-xs text-muted-foreground">im Archiv</p>
+            </div>
+          )}
+
+          {/* Preview / Archive list */}
           {properties.length > 0 && (
-            <div className="rounded-lg border bg-muted/30 p-4 space-y-2 max-h-60 overflow-y-auto">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Vorschau (erste 5)</p>
-              {properties.slice(0, 5).map(p => (
+            <div className="rounded-lg border bg-muted/30 p-4 space-y-2 max-h-80 overflow-y-auto">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                {showArchive ? 'Exportierte Deals' : `Vorschau (erste ${Math.min(properties.length, 10)})`}
+              </p>
+              {(showArchive ? properties : properties.slice(0, 10)).map(p => (
                 <div key={p.id} className="flex items-center gap-3 bg-background rounded-lg px-3 py-2 text-sm">
                   <Users className="h-4 w-4 text-primary flex-shrink-0" />
                   <div className="flex-1 min-w-0">
@@ -167,40 +209,64 @@ export function PipedriveExport() {
                   </div>
                   {p.owner_phone && <Badge variant="outline" className="text-xs shrink-0">{p.owner_phone}</Badge>}
                   {p.zone && <Badge variant="secondary" className="text-xs shrink-0">{p.zone}</Badge>}
+                  {showArchive && (
+                    <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 shrink-0"
+                      disabled={restoring === p.id}
+                      onClick={() => restoreFromArchive(p.id)}>
+                      <ArchiveRestore className="h-3 w-3" />
+                      {restoring === p.id ? '...' : 'Zurück'}
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>
           )}
 
+          {properties.length === 0 && !isLoading && (
+            <div className="text-center py-8 text-muted-foreground">
+              <p>{showArchive ? 'Noch keine exportierten Deals' : 'Keine Einträge mit diesem Status'}</p>
+            </div>
+          )}
+
           {/* Push result */}
           {pushResult && (
-            <div className={`rounded-lg border p-4 flex items-center gap-3 ${pushResult.errors === 0 ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'}`}>
-              {pushResult.errors === 0 
-                ? <CheckCircle className="h-5 w-5 text-green-600" />
-                : <AlertCircle className="h-5 w-5 text-orange-600" />
-              }
-              <div>
-                <p className="text-sm font-medium">{pushResult.success} Deals erstellt</p>
-                {pushResult.errors > 0 && <p className="text-xs text-muted-foreground">{pushResult.errors} Fehler</p>}
+            <div className="rounded-lg border p-4 space-y-1 bg-muted/50">
+              <div className="flex items-center gap-2">
+                {pushResult.errors === 0 ? <CheckCircle className="h-5 w-5 text-green-600" /> : <AlertCircle className="h-5 w-5 text-orange-600" />}
+                <p className="text-sm font-semibold">{pushResult.created} Deals erstellt</p>
               </div>
+              {pushResult.skipped > 0 && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <SkipForward className="h-3 w-3" /> {pushResult.skipped} Duplikate übersprungen
+                </p>
+              )}
+              {pushResult.errors > 0 && (
+                <p className="text-xs text-destructive">{pushResult.errors} Fehler</p>
+              )}
             </div>
           )}
 
           {/* Actions */}
-          <div className="flex gap-3">
-            <Button onClick={pushToPipedrive} disabled={isLoading || properties.length === 0 || pushing} className="flex-1 h-12 text-base gap-2" size="lg">
-              {pushing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-              {pushing ? 'Wird gepusht...' : `Direkt zu Pipedrive (${count})`}
-            </Button>
-            <Button onClick={exportCsv} disabled={isLoading || properties.length === 0} variant="outline" className="h-12 gap-2" size="lg">
-              <Download className="h-4 w-4" />
-              CSV
-            </Button>
-          </div>
+          {!showArchive && (
+            <div className="flex gap-3">
+              <Button onClick={pushToPipedrive} disabled={isLoading || properties.length === 0 || pushing} className="flex-1 h-12 text-base gap-2" size="lg">
+                {pushing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+                {pushing ? 'Wird gepusht...' : `Zu Pipedrive pushen (${count})`}
+              </Button>
+              <Button onClick={exportCsv} disabled={isLoading || properties.length === 0} variant="outline" className="h-12 gap-2" size="lg">
+                <Download className="h-4 w-4" /> CSV
+              </Button>
+            </div>
+          )}
 
-          <p className="text-xs text-muted-foreground text-center">
-            Erstellt automatisch Organisation, Person(en) und Deal in Pipedrive
-          </p>
+          {!showArchive && (
+            <div className="text-xs text-muted-foreground text-center space-y-1">
+              <p>✓ Custom Fields (Zone, Baujahr, HNF, etc.) werden automatisch erstellt</p>
+              <p>✓ Pipeline "Immobilien-Akquise" mit Stages: Neuer Lead → Kontaktiert → Interesse</p>
+              <p>✓ Duplikate werden erkannt und übersprungen</p>
+              <p>✓ Nach Push → automatisch ins Archiv verschoben</p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
