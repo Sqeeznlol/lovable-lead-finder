@@ -1,51 +1,18 @@
 
 
-## Sqeeztraum – Optimierungen
+## Problem
 
-### Zusammenfassung
-Drei Hauptänderungen: (1) Sortierung nach HNF/Fläche absteigend, (2) alle 70k+ Datensätze laden statt nur 1000, (3) Abfrage-Queue und Telefon-Workflow verbessern.
+The Google Maps link in the Akquise-Modus popup opens via `window.open()`, which gets blocked by Google's consent/redirect page when opened from within a popup context. Copying the URL manually into a new tab works fine.
 
-### Änderungen
+## Solution
 
-#### 1. Sortierung: HNF (gebaeudeflaeche) & Fläche (area) absteigend
-- **`use-properties.ts`**: `useProperties` und `useUnqueriedProperties` sortieren primär nach `gebaeudeflaeche` DESC NULLS LAST, sekundär nach `area` DESC NULLS LAST
-- Grösste Liegenschaften erscheinen zuerst → beste Akquise-Targets oben
+Instead of opening the link with `window.open()`, create a proper `<a href="..." target="_blank" rel="noopener noreferrer">` link styled as a button. This avoids popup-blocker issues and Google's redirect blocking, since the browser treats it as a direct user-initiated navigation rather than a programmatic popup.
 
-#### 2. Alle Liegenschaften laden (nicht nur 1000)
-- **`use-properties.ts`**: Pagination serverseitig statt clientseitig. Supabase hat ein 1000-Row-Limit pro Query.
-- Lösung: Neue `useProperties`-Hook mit serverseitiger Pagination – `range(from, to)` statt `limit(500)`. Lade jeweils 100 Einträge pro Seite direkt vom Server mit Offset.
-- Separate Count-Query für Gesamtanzahl (`select('*', { count: 'exact', head: true })`)
-- **`PropertyList.tsx`**: Page-Wechsel triggert neuen DB-Query statt Client-Slice. Filter (Gemeinde, Status, Suche) werden serverseitig angewendet.
-- Spalte **"Eigentümer"** wird erweitert: Wenn `is_queried` true aber kein `owner_name`, zeige "Abgefragt – kein Ergebnis". Neue visuelle Spalte "Abgefragt" mit Häkchen/X.
+## Changes
 
-#### 3. Telefon-Manager: Nummern speichern & wiederverwenden
-- **`PhoneManager.tsx`** funktioniert bereits mit Add/Delete/Reset. Keine strukturelle Änderung nötig – Nummern sind persistent in der DB, unbegrenzt hinzufügbar. Nur UI-Text klarer machen.
+**File: `src/components/AkquiseMode.tsx`**
+- Replace the `<Button onClick={() => window.open(googleMapsUrl)}>` with an `<a>` tag (or `Button asChild` wrapping an `<a>`) that has `href={googleMapsUrl}` and `target="_blank"`.
+- This applies to the Google Maps button around line 342-346.
 
-#### 4. Abfrage-Queue optimieren
-- **`QueryQueue.tsx`**: 
-  - Sortierung der Queue nach HNF/Fläche absteigend (grösste zuerst)
-  - Pro Telefonnummer 5 Liegenschaften zuweisen
-  - "Portal öffnen"-Link öffnet direkt die EGRID-URL
-  - Nach Eingabe von Eigentümer-Daten: Status automatisch auf "Eigentümer ermittelt", `is_queried = true`
-  - Neue Spalte in PropertyList zeigt ob Eigentümer bereits abgefragt wurde
-
-### Technische Details
-
-**Serverseitige Pagination** (70k+ Rows):
-```
-// Count total
-supabase.from('properties').select('*', { count: 'exact', head: true }).eq(...)
-
-// Fetch page
-supabase.from('properties').select('*')
-  .order('gebaeudeflaeche', { ascending: false, nullsFirst: false })
-  .order('area', { ascending: false, nullsFirst: false })
-  .range(page * 50, (page + 1) * 50 - 1)
-```
-
-**Dateien die geändert werden:**
-- `src/hooks/use-properties.ts` – Sortierung, serverseitige Pagination, Count
-- `src/components/PropertyList.tsx` – Server-Pagination, neue "Abgefragt"-Spalte, Suche serverseitig
-- `src/components/QueryQueue.tsx` – Sortierung nach HNF/Fläche
-- `src/components/PhoneManager.tsx` – Kleinere UI-Verbesserungen
+This is a minimal one-line change that should fix the blocking issue entirely.
 
