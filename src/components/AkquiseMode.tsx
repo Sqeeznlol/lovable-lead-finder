@@ -246,6 +246,17 @@ export function AkquiseMode() {
               {(zones || []).map(z => <SelectItem key={z} value={z}>{z}</SelectItem>)}
             </SelectContent>
           </Select>
+          <div className="flex items-center gap-1.5">
+            <Label htmlFor="baujahr-bis" className="text-xs text-muted-foreground whitespace-nowrap">Bj. bis</Label>
+            <Input
+              id="baujahr-bis"
+              type="number"
+              value={baujahrBis}
+              onChange={e => { setBaujahrBis(e.target.value); setCurrentIndex(0); }}
+              placeholder="z.B. 1980"
+              className="w-24 h-9"
+            />
+          </div>
           {selectedPhone && (
             <span className="text-sm text-muted-foreground">{remaining} übrig</span>
           )}
