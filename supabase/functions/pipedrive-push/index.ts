@@ -230,16 +230,22 @@ Deno.serve(async (req) => {
           const ownerStreet = extractStreetFromAddress(prop.owner_name);
           const personAddress = prop.owner_address || ownerStreet;
 
+          console.log('Person payload:', JSON.stringify({ displayName, firstName, lastName, cleanPhone, personAddress }));
+
           const existingPerson = await findExistingPerson(PIPEDRIVE_API_TOKEN, displayName);
           if (existingPerson) {
             personId = existingPerson;
-            if (cleanPhone) {
-              await fetch(`${PIPEDRIVE_BASE}/persons/${personId}?api_token=${PIPEDRIVE_API_TOKEN}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone: [{ value: cleanPhone, primary: true }], org_id: orgId }),
-              });
-            }
+            // Update existing person with latest phone + address + org
+            const updatePayload: Record<string, unknown> = { org_id: orgId };
+            if (cleanPhone) updatePayload.phone = [{ value: cleanPhone, primary: true }];
+            if (personAddress) updatePayload.address = personAddress;
+            const updateRes = await fetch(`${PIPEDRIVE_BASE}/persons/${personId}?api_token=${PIPEDRIVE_API_TOKEN}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(updatePayload),
+            });
+            const updateJson = await updateRes.json();
+            console.log('Person update result:', JSON.stringify(updateJson?.data?.id));
           } else {
             const personData: Record<string, unknown> = {
               name: displayName,
@@ -251,6 +257,7 @@ Deno.serve(async (req) => {
             if (personAddress) personData.address = personAddress;
             const personRes = await pipedrivePost('/persons', PIPEDRIVE_API_TOKEN, personData);
             personId = personRes?.data?.id;
+            console.log('Person created:', personId, JSON.stringify(personRes?.data));
           }
         }
 
