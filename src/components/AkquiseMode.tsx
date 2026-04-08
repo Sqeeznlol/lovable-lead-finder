@@ -66,14 +66,13 @@ export function AkquiseMode() {
   // Reset index when zone filter changes
   useEffect(() => { setCurrentIndex(0); }, [zoneFilter]);
 
-  // GIS URL — OerebKatasterZH (public, no login required)
-  // User switches to "Eigentumsauskunft" theme manually in GIS browser
+  // GIS URL — AVfarbigZH (Amtliche Vermessung) mit Eigentumsauskunft
   const portalUrl = current?.egrid
-    ? `https://maps.zh.ch/?locate=parz&locations=${current.egrid}&topic=OerebKatasterZH&scale=500`
+    ? `https://maps.zh.ch/?locate=parz&locations=${current.egrid}&topic=AVfarbigZH&scale=500`
     : current?.parzelle && current?.bfs_nr
-      ? `https://maps.zh.ch/?locate=parz&locations=${current.bfs_nr},${current.parzelle}&topic=OerebKatasterZH&scale=500`
+      ? `https://maps.zh.ch/?locate=parz&locations=${current.bfs_nr},${current.parzelle}&topic=AVfarbigZH&scale=500`
       : current?.address
-        ? `https://maps.zh.ch/?topic=OerebKatasterZH&search=${encodeURIComponent(current.address + (current.plz_ort ? ' ' + current.plz_ort : ''))}&scale=500`
+        ? `https://maps.zh.ch/?topic=AVfarbigZH&search=${encodeURIComponent(current.address + (current.plz_ort ? ' ' + current.plz_ort : ''))}&scale=500`
         : null;
 
   const googleMapsUrl = current?.address
