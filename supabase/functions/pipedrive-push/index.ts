@@ -7,7 +7,7 @@ const corsHeaders = {
 
 const PIPEDRIVE_BASE = 'https://api.pipedrive.com/v1';
 
-// Pipedrive custom field keys (Deal fields)
+// Pipedrive custom field keys (shared between Deals & Leads)
 const FIELD_ZONE = '6283f1bd5f9e2220c96dfebf3904e789c9850773';
 const FIELD_BAUJAHR = 'd8e495e217d7f56099b33cf339612f0bb58bb2b7';
 const FIELD_HNF = '7773ad912df15700b104f5057012a28cbc6b220a';
@@ -60,36 +60,6 @@ async function pipedrivePost(path: string, token: string, body: unknown) {
     body: JSON.stringify(body),
   });
   return res.json();
-}
-
-// --- Pipeline Management ---
-
-async function ensurePipeline(token: string): Promise<{ pipelineId: number; stageId: number }> {
-  const pipelinesRes = await pipedriveGet('/pipelines', token);
-  const pipelines: { id: number; name: string }[] = pipelinesRes?.data || [];
-
-  let pipelineId: number;
-  const existing = pipelines.find(p => p.name === 'Neue Leads');
-  if (existing) {
-    pipelineId = existing.id;
-  } else {
-    const created = await pipedrivePost('/pipelines', token, { name: 'Neue Leads', active: true });
-    pipelineId = created?.data?.id;
-  }
-
-  const stagesRes = await pipedriveGet('/stages', token, { pipeline_id: String(pipelineId) });
-  const stages: { id: number; name: string }[] = stagesRes?.data || [];
-
-  let stageId: number;
-  const existingStage = stages.find(s => s.name === 'Importiert');
-  if (existingStage) {
-    stageId = existingStage.id;
-  } else {
-    const created = await pipedrivePost('/stages', token, { name: 'Importiert', pipeline_id: pipelineId, order_nr: 1 });
-    stageId = created?.data?.id;
-  }
-
-  return { pipelineId, stageId };
 }
 
 // --- Name Parsing ---
@@ -161,6 +131,54 @@ async function findExistingPerson(token: string, name: string): Promise<number |
   return null;
 }
 
+// --- Create or update a person in Pipedrive ---
+
+async function upsertPerson(
+  token: string,
+  ownerName: string,
+  ownerPhone: string | null | undefined,
+  ownerAddress: string | null | undefined,
+  orgId: number | undefined,
+): Promise<number | undefined> {
+  const { firstName, lastName } = parseOwnerForPipedrive(ownerName);
+  const displayName = firstName ? `${firstName} ${lastName}` : lastName;
+  const cleanPhone = cleanPhoneNumber(ownerPhone);
+  const ownerStreet = extractStreetFromAddress(ownerName);
+  const personAddress = ownerAddress || ownerStreet;
+
+  const existingPerson = await findExistingPerson(token, displayName);
+  if (existingPerson) {
+    // Update existing person with phone, address, org
+    const updatePayload: Record<string, unknown> = {};
+    if (orgId) updatePayload.org_id = orgId;
+    if (cleanPhone) updatePayload.phone = [{ value: cleanPhone, primary: true }];
+    if (personAddress) updatePayload.address = personAddress;
+    if (Object.keys(updatePayload).length > 0) {
+      await fetch(`${PIPEDRIVE_BASE}/persons/${existingPerson}?api_token=${token}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatePayload),
+      });
+    }
+    return existingPerson;
+  }
+
+  // Create new person
+  const personData: Record<string, unknown> = {
+    name: displayName,
+    first_name: firstName,
+    last_name: lastName,
+  };
+  if (orgId) personData.org_id = orgId;
+  if (cleanPhone) personData.phone = [{ value: cleanPhone, primary: true }];
+  if (personAddress) personData.address = personAddress;
+
+  console.log('Creating person:', JSON.stringify(personData));
+  const personRes = await pipedrivePost('/persons', token, personData);
+  console.log('Person response:', JSON.stringify({ id: personRes?.data?.id, name: personRes?.data?.name }));
+  return personRes?.data?.id;
+}
+
 // --- Main Handler ---
 
 Deno.serve(async (req) => {
@@ -184,12 +202,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Ensure pipeline exists
-    const pipeline = await ensurePipeline(PIPEDRIVE_API_TOKEN);
-
-    // Batch dedup
     const exportedAddresses = new Set<string>();
-    const results: { propertyId: string; dealId?: number; personId?: number; orgId?: number; skipped?: boolean; error?: string }[] = [];
+    const results: { propertyId: string; leadId?: string; personId?: number; person2Id?: number; orgId?: number; skipped?: boolean; error?: string }[] = [];
 
     for (const prop of parsed.data.properties) {
       try {
@@ -204,7 +218,7 @@ Deno.serve(async (req) => {
           prop.gebaeudeflaeche ? `${Math.round(prop.gebaeudeflaeche)}m²` : '',
           prop.gemeinde || prop.plz_ort || '',
         ].filter(Boolean);
-        const dealTitle = titleParts.join(' · ') || prop.address;
+        const leadTitle = titleParts.join(' · ') || prop.address;
 
         // 1. Duplicate check via org
         const existingOrgId = await findExistingOrg(PIPEDRIVE_API_TOKEN, prop.address);
@@ -221,95 +235,46 @@ Deno.serve(async (req) => {
         });
         const orgId = orgRes?.data?.id;
 
-        // 3. Find or create Person (owner 1)
+        // 3. Create/update Person 1 (primary owner)
         let personId: number | undefined;
         if (prop.owner_name) {
-          const { firstName, lastName } = parseOwnerForPipedrive(prop.owner_name);
-          const displayName = firstName ? `${firstName} ${lastName}` : lastName;
-          const cleanPhone = cleanPhoneNumber(prop.owner_phone);
-          const ownerStreet = extractStreetFromAddress(prop.owner_name);
-          const personAddress = prop.owner_address || ownerStreet;
-
-          console.log('Person payload:', JSON.stringify({ displayName, firstName, lastName, cleanPhone, personAddress }));
-
-          const existingPerson = await findExistingPerson(PIPEDRIVE_API_TOKEN, displayName);
-          if (existingPerson) {
-            personId = existingPerson;
-            // Update existing person with latest phone + address + org
-            const updatePayload: Record<string, unknown> = { org_id: orgId };
-            if (cleanPhone) updatePayload.phone = [{ value: cleanPhone, primary: true }];
-            if (personAddress) updatePayload.address = personAddress;
-            const updateRes = await fetch(`${PIPEDRIVE_BASE}/persons/${personId}?api_token=${PIPEDRIVE_API_TOKEN}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(updatePayload),
-            });
-            const updateJson = await updateRes.json();
-            console.log('Person update result:', JSON.stringify(updateJson?.data?.id));
-          } else {
-            const personData: Record<string, unknown> = {
-              name: displayName,
-              first_name: firstName,
-              last_name: lastName,
-              org_id: orgId,
-            };
-            if (cleanPhone) personData.phone = [{ value: cleanPhone, primary: true }];
-            if (personAddress) personData.address = personAddress;
-            const personRes = await pipedrivePost('/persons', PIPEDRIVE_API_TOKEN, personData);
-            personId = personRes?.data?.id;
-            console.log('Person created:', personId, JSON.stringify(personRes?.data));
-          }
+          personId = await upsertPerson(PIPEDRIVE_API_TOKEN, prop.owner_name, prop.owner_phone, prop.owner_address, orgId);
         }
 
-        // 4. Person 2
+        // 4. Create/update Person 2 (secondary owner)
+        let person2Id: number | undefined;
         if (prop.owner_name_2) {
-          const { firstName: fn2, lastName: ln2 } = parseOwnerForPipedrive(prop.owner_name_2);
-          const displayName2 = fn2 ? `${fn2} ${ln2}` : ln2;
-          const cleanPhone2 = cleanPhoneNumber(prop.owner_phone_2);
-          const ownerStreet2 = extractStreetFromAddress(prop.owner_name_2);
-          const personAddress2 = prop.owner_address_2 || ownerStreet2;
-
-          const existing2 = await findExistingPerson(PIPEDRIVE_API_TOKEN, displayName2);
-          if (!existing2) {
-            const personData2: Record<string, unknown> = {
-              name: displayName2, first_name: fn2, last_name: ln2, org_id: orgId,
-            };
-            if (cleanPhone2) personData2.phone = [{ value: cleanPhone2, primary: true }];
-            if (personAddress2) personData2.address = personAddress2;
-            await pipedrivePost('/persons', PIPEDRIVE_API_TOKEN, personData2);
-          }
+          person2Id = await upsertPerson(PIPEDRIVE_API_TOKEN, prop.owner_name_2, prop.owner_phone_2, prop.owner_address_2, orgId);
         }
 
-        // 5. Create Deal with custom fields
-        const dealData: Record<string, unknown> = {
-          title: dealTitle,
+        // 5. Create Lead with custom fields
+        const leadData: Record<string, unknown> = {
+          title: leadTitle,
           person_id: personId,
-          org_id: orgId,
-          pipeline_id: pipeline.pipelineId,
-          stage_id: pipeline.stageId,
-          status: 'open',
+          organization_id: orgId,
         };
 
-        // Custom fields
-        if (prop.zone) dealData[FIELD_ZONE] = prop.zone;
-        if (prop.baujahr) dealData[FIELD_BAUJAHR] = prop.baujahr;
-        if (prop.gebaeudeflaeche) dealData[FIELD_HNF] = Math.round(prop.gebaeudeflaeche);
-        if (prop.area) dealData[FIELD_GRUNDSTUECK] = Math.round(prop.area);
-        if (prop.geschosse) dealData[FIELD_GESCHOSSE] = prop.geschosse;
-        if (prop.egrid) dealData[FIELD_EGRID] = prop.egrid;
-        if (prop.gwr_egid) dealData[FIELD_EGID] = prop.gwr_egid;
-        if (prop.gemeinde) dealData[FIELD_GEMEINDE] = prop.gemeinde;
+        // Custom fields (shared between Leads & Deals)
+        if (prop.zone) leadData[FIELD_ZONE] = prop.zone;
+        if (prop.baujahr) leadData[FIELD_BAUJAHR] = prop.baujahr;
+        if (prop.gebaeudeflaeche) leadData[FIELD_HNF] = Math.round(prop.gebaeudeflaeche);
+        if (prop.area) leadData[FIELD_GRUNDSTUECK] = Math.round(prop.area);
+        if (prop.geschosse) leadData[FIELD_GESCHOSSE] = prop.geschosse;
+        if (prop.egrid) leadData[FIELD_EGRID] = prop.egrid;
+        if (prop.gwr_egid) leadData[FIELD_EGID] = prop.gwr_egid;
+        if (prop.gemeinde) leadData[FIELD_GEMEINDE] = prop.gemeinde;
 
-        const dealRes = await pipedrivePost('/deals', PIPEDRIVE_API_TOKEN, dealData);
-        const dealId = dealRes?.data?.id;
+        console.log('Creating lead:', JSON.stringify({ title: leadTitle, person_id: personId, organization_id: orgId }));
+        const leadRes = await pipedrivePost('/leads', PIPEDRIVE_API_TOKEN, leadData);
+        const leadId = leadRes?.data?.id;
 
-        if (!dealId) {
-          console.error('Deal creation failed:', JSON.stringify(dealRes));
-          results.push({ propertyId: prop.id, error: `Deal creation failed: ${JSON.stringify(dealRes)}` });
+        if (!leadId) {
+          console.error('Lead creation failed:', JSON.stringify(leadRes));
+          results.push({ propertyId: prop.id, error: `Lead creation failed: ${JSON.stringify(leadRes)}` });
           continue;
         }
 
-        // 6. Add note with additional details
+        // 6. Add note via Notes API (address + maps + user notes)
         const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(prop.address + (prop.plz_ort ? ', ' + prop.plz_ort : ''))}`;
         const noteLines: string[] = [];
         noteLines.push(`<b>Adresse:</b> ${prop.address}${prop.plz_ort ? ', ' + prop.plz_ort : ''}`);
@@ -317,12 +282,12 @@ Deno.serve(async (req) => {
         if (prop.notes) noteLines.push(`<br/><b>Notizen:</b> ${prop.notes}`);
 
         await pipedrivePost('/notes', PIPEDRIVE_API_TOKEN, {
-          deal_id: dealId,
+          lead_id: leadId,
           content: noteLines.join('<br/>'),
         });
 
         exportedAddresses.add(prop.address);
-        results.push({ propertyId: prop.id, dealId, personId, orgId: orgId || undefined });
+        results.push({ propertyId: prop.id, leadId, personId, person2Id, orgId: orgId || undefined });
       } catch (err) {
         results.push({ propertyId: prop.id, error: String(err) });
       }
