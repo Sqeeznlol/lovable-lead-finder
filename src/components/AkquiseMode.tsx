@@ -69,8 +69,10 @@ export function AkquiseMode() {
   }, []);
 
   // Sort queue by deal score, apply zone filter
+  const baujahrMax = baujahrBis ? parseInt(baujahrBis, 10) : null;
   const items = (queue || [])
     .filter(p => zoneFilter === 'Alle' || p.zone === zoneFilter)
+    .filter(p => !baujahrMax || !p.baujahr || p.baujahr <= baujahrMax)
     .map(p => ({ ...p, _score: calculateDealScore(p) }))
     .sort((a, b) => b._score - a._score);
 
