@@ -37,7 +37,7 @@ export function Vorauswahl() {
   const current = items[currentIndex];
   const score = current?._score ?? 0;
 
-  useEffect(() => { setCurrentIndex(0); }, [zoneFilter, baujahrBis]);
+  useEffect(() => { setCurrentIndex(0); }, [zoneFilter, baujahrBis, maxWhg]);
 
   const moveToNext = useCallback(() => {
     if (currentIndex < items.length - 1) {
