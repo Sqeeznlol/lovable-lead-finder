@@ -285,18 +285,13 @@ Deno.serve(async (req) => {
           }
         }
 
-        // 5. Determine stage based on status
-        let stageId = pipeline.stageNewId;
-        if (prop.status === 'Kontaktiert') stageId = pipeline.stageContactedId;
-        if (prop.status === 'Interesse' || prop.status === 'Interessant') stageId = pipeline.stageInterestedId;
-
-        // 6. Create Deal with custom fields
+        // 5. Create Deal with custom fields
         const dealData: Record<string, unknown> = {
           title: dealTitle,
           person_id: personId,
           org_id: orgId,
           pipeline_id: pipeline.pipelineId,
-          stage_id: stageId,
+          stage_id: pipeline.stageImportedId,
           status: 'open',
         };
 
