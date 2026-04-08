@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { Download, Send, CheckCircle, AlertCircle, Loader2, Users, SkipForward, ArchiveRestore, Archive } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Download, Send, CheckCircle, AlertCircle, Loader2, Users, SkipForward, ArchiveRestore, Archive, Phone, PhoneOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -13,6 +14,7 @@ const EXPORT_STATUSES = ['Telefon gefunden', 'Eigentümer ermittelt', 'Kontaktie
 export function PipedriveExport() {
   const [exportStatus, setExportStatus] = useState('Telefon gefunden');
   const [showArchive, setShowArchive] = useState(false);
+  const [archiveFilter, setArchiveFilter] = useState<'with-phone' | 'without-phone'>('with-phone');
   const { data: result, isLoading, refetch } = useProperties({
     statusFilter: showArchive ? 'Exportiert' : exportStatus,
     pageSize: 1000,
@@ -25,6 +27,12 @@ export function PipedriveExport() {
 
   const properties = result?.data || [];
   const count = result?.count || 0;
+
+  const archiveWithPhone = useMemo(() => properties.filter(p => p.owner_phone), [properties]);
+  const archiveWithoutPhone = useMemo(() => properties.filter(p => !p.owner_phone), [properties]);
+  const archiveDisplayed = showArchive
+    ? (archiveFilter === 'with-phone' ? archiveWithPhone : archiveWithoutPhone)
+    : properties;
 
   const pushToPipedrive = async () => {
     if (properties.length === 0) {
@@ -193,9 +201,23 @@ export function PipedriveExport() {
           )}
 
           {showArchive && (
-            <div className="text-center pt-2">
-              <p className="text-3xl font-bold">{isLoading ? '...' : count.toLocaleString('de-CH')}</p>
-              <p className="text-xs text-muted-foreground">im Archiv</p>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-3xl font-bold">{isLoading ? '...' : (archiveFilter === 'with-phone' ? archiveWithPhone.length : archiveWithoutPhone.length).toLocaleString('de-CH')}</p>
+                <p className="text-xs text-muted-foreground">von {count.toLocaleString('de-CH')} im Archiv</p>
+              </div>
+              <Tabs value={archiveFilter} onValueChange={(v) => setArchiveFilter(v as 'with-phone' | 'without-phone')}>
+                <TabsList className="w-full">
+                  <TabsTrigger value="with-phone" className="flex-1 gap-1.5">
+                    <Phone className="h-3.5 w-3.5" />
+                    Mit Telefon ({archiveWithPhone.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="without-phone" className="flex-1 gap-1.5">
+                    <PhoneOff className="h-3.5 w-3.5" />
+                    Ohne Telefon ({archiveWithoutPhone.length})
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
             </div>
           )}
 
@@ -205,7 +227,7 @@ export function PipedriveExport() {
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 {showArchive ? 'Exportierte Deals' : `Vorschau (erste ${Math.min(properties.length, 10)})`}
               </p>
-              {(showArchive ? properties : properties.slice(0, 10)).map(p => (
+              {(showArchive ? archiveDisplayed : properties.slice(0, 10)).map(p => (
                 <div key={p.id} className="flex items-center gap-3 bg-background rounded-lg px-3 py-2 text-sm">
                   <Users className="h-4 w-4 text-primary flex-shrink-0" />
                   <div className="flex-1 min-w-0">
