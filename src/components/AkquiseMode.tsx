@@ -634,7 +634,7 @@ export function AkquiseMode() {
                 </div>
               </div>
             </>
-          )}
+
         </CardContent>
       </Card>
 
