@@ -40,6 +40,7 @@ export function PipedriveExport() {
       let totalSkipped = 0;
       let totalErrors = 0;
       const successIds: string[] = [];
+      const errorDetails: Array<{ address: string; error: string }> = [];
 
       for (let i = 0; i < properties.length; i += 20) {
         const batch = properties.slice(i, i + 20).map(p => ({
@@ -70,14 +71,18 @@ export function PipedriveExport() {
 
         if (error) {
           totalErrors += batch.length;
+          batch.forEach(b => errorDetails.push({ address: b.address, error: String(error) }));
         } else if (data?.summary) {
           totalCreated += data.summary.created;
           totalSkipped += data.summary.skipped;
           totalErrors += data.summary.errors;
-          // Collect successfully created IDs
           if (data.results) {
             for (const r of data.results) {
               if (!r.error && !r.skipped) successIds.push(r.propertyId);
+              if (r.error) {
+                const prop = batch.find(b => b.id === r.propertyId);
+                errorDetails.push({ address: prop?.address || r.propertyId, error: r.error });
+              }
             }
           }
         }
@@ -90,7 +95,7 @@ export function PipedriveExport() {
         }
       }
 
-      setPushResult({ created: totalCreated, skipped: totalSkipped, errors: totalErrors });
+      setPushResult({ created: totalCreated, skipped: totalSkipped, errors: totalErrors, errorDetails });
       refetch();
 
       toast({
