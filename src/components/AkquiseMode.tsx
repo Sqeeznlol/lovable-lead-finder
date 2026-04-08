@@ -586,23 +586,49 @@ export function AkquiseMode() {
           </div>
 
           {/* Action buttons */}
-          <div className="px-8 py-5 bg-muted/30 border-t flex flex-col sm:flex-row gap-3">
-            <Button variant="ghost" onClick={handleHide} disabled={processing} className="text-muted-foreground">
-              <EyeOff className="h-4 w-4 mr-2" /> Ausblenden
-            </Button>
-            <Button variant="outline" onClick={handleSkip} disabled={processing}>
-              <SkipForward className="h-4 w-4 mr-2" /> Überspringen
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={processing || !selectedPhone || remaining <= 0}
-              className="sm:ml-auto h-12 px-8 text-base"
-              size="lg"
-            >
-              <Check className="h-5 w-5 mr-2" />
-              {hasAnyOwner ? 'Speichern & Nächstes' : 'Kein Ergebnis & Nächstes'}
-              <ArrowRight className="h-4 w-4 ml-2" />
-            </Button>
+          <div className="px-8 py-5 bg-muted/30 border-t space-y-3">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" onClick={handleHide} disabled={processing} className="text-muted-foreground">
+                      <EyeOff className="h-4 w-4 mr-2" /> Ausblenden
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent><kbd className="font-mono text-xs">Ctrl+H</kbd></TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" onClick={handleSkip} disabled={processing}>
+                      <SkipForward className="h-4 w-4 mr-2" /> Überspringen
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent><kbd className="font-mono text-xs">Ctrl+→</kbd></TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={handleSave}
+                      disabled={processing || !selectedPhone || remaining <= 0}
+                      className="sm:ml-auto h-12 px-8 text-base"
+                      size="lg"
+                    >
+                      <Check className="h-5 w-5 mr-2" />
+                      {hasAnyOwner ? 'Speichern & Nächstes' : 'Kein Ergebnis & Nächstes'}
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent><kbd className="font-mono text-xs">Ctrl+Enter</kbd></TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
+              <Keyboard className="h-3 w-3" />
+              <span><kbd className="bg-muted px-1 rounded font-mono">Ctrl+Enter</kbd> Speichern</span>
+              <span><kbd className="bg-muted px-1 rounded font-mono">Ctrl+→</kbd> Skip</span>
+              <span><kbd className="bg-muted px-1 rounded font-mono">Ctrl+G</kbd> GIS</span>
+              <span><kbd className="bg-muted px-1 rounded font-mono">Ctrl+H</kbd> Ausblenden</span>
+            </div>
           </div>
         </CardContent>
       </Card>
