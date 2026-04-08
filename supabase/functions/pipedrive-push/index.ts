@@ -52,6 +52,81 @@ async function pipedrivePost(path: string, token: string, body: unknown) {
   return res.json();
 }
 
+// --- Label Management ---
+
+const ZONE_COLORS = ['blue', 'green', 'purple', 'orange', 'red', 'yellow', 'brown', 'pink', 'dark-gray', 'gray'];
+
+async function ensureZoneLabel(token: string, zone: string, labelCache: Map<string, string>): Promise<string | undefined> {
+  if (!zone) return undefined;
+
+  // Check cache first
+  if (labelCache.has(zone)) return labelCache.get(zone);
+
+  // Fetch all labels
+  if (labelCache.size === 0) {
+    const res = await pipedriveGet('/leadLabels', token);
+    const labels: { id: string; name: string }[] = res?.data || [];
+    for (const l of labels) {
+      labelCache.set(l.name, l.id);
+    }
+    if (labelCache.has(zone)) return labelCache.get(zone);
+  }
+
+  // Create new label with a color
+  const colorIndex = labelCache.size % ZONE_COLORS.length;
+  const created = await pipedrivePost('/leadLabels', token, {
+    name: zone,
+    color: ZONE_COLORS[colorIndex],
+  });
+  if (created?.data?.id) {
+    labelCache.set(zone, created.data.id);
+    return created.data.id;
+  }
+  return undefined;
+}
+
+// --- Name Parsing ---
+
+function parseOwnerForPipedrive(rawName: string | null | undefined): { firstName: string; lastName: string } {
+  if (!rawName || !rawName.trim()) return { firstName: '', lastName: '' };
+
+  const trimmed = rawName.trim();
+  const parts = trimmed.split(',').map(s => s.trim());
+
+  if (parts.length >= 2) {
+    // Format: "Nachname, Vorname ..." -> take first word of second part as firstName
+    const lastName = parts[0];
+    const firstNameParts = parts[1].split(/\s+/);
+    const firstName = firstNameParts[0] || '';
+    return { firstName, lastName };
+  }
+
+  // Single name or org
+  return { firstName: '', lastName: trimmed };
+}
+
+function extractStreetFromAddress(rawName: string | null | undefined): string {
+  if (!rawName || !rawName.trim()) return '';
+  const parts = rawName.trim().split(',').map(s => s.trim());
+  // Address parts start after lastName, firstName — typically index 2+
+  // Filter out ownership types and country
+  const ownershipPatterns = ['alleineigentum', 'miteigentum', 'gesamteigentum', 'stockwerkeigentum'];
+  const countryPatterns = ['schweiz', 'suisse', 'svizzera', 'switzerland', 'ch'];
+  
+  const addressParts = parts.slice(2).filter(p => {
+    const lower = p.toLowerCase();
+    return !ownershipPatterns.some(op => lower.includes(op)) && !countryPatterns.includes(lower);
+  });
+  return addressParts.join(', ');
+}
+
+// --- Clean phone number (only digits and +) ---
+
+function cleanPhoneNumber(phone: string | null | undefined): string {
+  if (!phone) return '';
+  return phone.replace(/[^\d+]/g, '');
+}
+
 // --- Duplicate Check ---
 
 async function findExistingOrg(token: string, address: string): Promise<number | null> {
@@ -107,6 +182,9 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Label cache (zone -> label_id)
+    const labelCache = new Map<string, string>();
+
     const results: { propertyId: string; leadId?: string; personId?: number; orgId?: number; skipped?: boolean; error?: string }[] = [];
 
     for (const prop of parsed.data.properties) {
@@ -129,56 +207,97 @@ Deno.serve(async (req) => {
           orgId = orgRes?.data?.id;
         }
 
-        // 2. Find or create Person (owner 1)
+        // 2. Find or create Person (owner 1) with proper name splitting
         let personId: number | undefined;
         if (prop.owner_name) {
-          const existingPerson = await findExistingPerson(PIPEDRIVE_API_TOKEN, prop.owner_name);
+          const { firstName, lastName } = parseOwnerForPipedrive(prop.owner_name);
+          const displayName = firstName ? `${firstName} ${lastName}` : lastName;
+          const cleanPhone = cleanPhoneNumber(prop.owner_phone);
+          const ownerStreet = extractStreetFromAddress(prop.owner_name);
+          const personAddress = prop.owner_address || ownerStreet;
+
+          const existingPerson = await findExistingPerson(PIPEDRIVE_API_TOKEN, displayName);
           if (existingPerson) {
             personId = existingPerson;
-            if (prop.owner_phone) {
+            if (cleanPhone) {
               await fetch(`${PIPEDRIVE_BASE}/persons/${personId}?api_token=${PIPEDRIVE_API_TOKEN}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                  phone: [{ value: prop.owner_phone, primary: true }],
+                  phone: [{ value: cleanPhone, primary: true }],
                   org_id: orgId,
                 }),
               });
             }
           } else {
-            const personRes = await pipedrivePost('/persons', PIPEDRIVE_API_TOKEN, {
-              name: prop.owner_name,
-              phone: prop.owner_phone ? [{ value: prop.owner_phone, primary: true }] : undefined,
+            const personData: Record<string, unknown> = {
+              name: displayName,
+              first_name: firstName,
+              last_name: lastName,
               org_id: orgId,
-              ...(prop.owner_address ? { address: prop.owner_address } : {}),
-            });
+            };
+            if (cleanPhone) {
+              personData.phone = [{ value: cleanPhone, primary: true }];
+            }
+            if (personAddress) {
+              personData.address = personAddress;
+            }
+            const personRes = await pipedrivePost('/persons', PIPEDRIVE_API_TOKEN, personData);
             personId = personRes?.data?.id;
           }
         }
 
         // 3. Create Person (owner 2) if exists
         if (prop.owner_name_2) {
-          const existing2 = await findExistingPerson(PIPEDRIVE_API_TOKEN, prop.owner_name_2);
+          const { firstName: fn2, lastName: ln2 } = parseOwnerForPipedrive(prop.owner_name_2);
+          const displayName2 = fn2 ? `${fn2} ${ln2}` : ln2;
+          const cleanPhone2 = cleanPhoneNumber(prop.owner_phone_2);
+          const ownerStreet2 = extractStreetFromAddress(prop.owner_name_2);
+          const personAddress2 = prop.owner_address_2 || ownerStreet2;
+
+          const existing2 = await findExistingPerson(PIPEDRIVE_API_TOKEN, displayName2);
           if (!existing2) {
-            await pipedrivePost('/persons', PIPEDRIVE_API_TOKEN, {
-              name: prop.owner_name_2,
-              phone: prop.owner_phone_2 ? [{ value: prop.owner_phone_2, primary: true }] : undefined,
+            const personData2: Record<string, unknown> = {
+              name: displayName2,
+              first_name: fn2,
+              last_name: ln2,
               org_id: orgId,
-              ...(prop.owner_address_2 ? { address: prop.owner_address_2 } : {}),
-            });
+            };
+            if (cleanPhone2) {
+              personData2.phone = [{ value: cleanPhone2, primary: true }];
+            }
+            if (personAddress2) {
+              personData2.address = personAddress2;
+            }
+            await pipedrivePost('/persons', PIPEDRIVE_API_TOKEN, personData2);
           }
         }
 
-        // 4. Create Lead (goes to "Neue Leads" inbox)
+        // 4. Get or create zone label
+        const labelId = await ensureZoneLabel(PIPEDRIVE_API_TOKEN, prop.zone || '', labelCache);
+
+        // 5. Build lead note with property details
+        const noteLines: string[] = [];
+        noteLines.push(`📍 Adresse: ${prop.address}${prop.plz_ort ? ', ' + prop.plz_ort : ''}`);
+        if (prop.area) noteLines.push(`📐 Grundstück: ${Math.round(prop.area)} m²`);
+        if (prop.gebaeudeflaeche) noteLines.push(`🏠 Gebäudefläche: ${Math.round(prop.gebaeudeflaeche)} m²`);
+        if (prop.baujahr) noteLines.push(`📅 Baujahr: ${prop.baujahr}`);
+        if (prop.geschosse) noteLines.push(`🏗 Geschosse: ${prop.geschosse}`);
+        if (prop.zone) noteLines.push(`🗺 Zone: ${prop.zone}`);
+        if (prop.gemeinde) noteLines.push(`🏘 Gemeinde: ${prop.gemeinde}`);
+        if (prop.egrid) noteLines.push(`EGRID: ${prop.egrid}`);
+        if (prop.gwr_egid) noteLines.push(`EGID: ${prop.gwr_egid}`);
+        if (prop.notes) noteLines.push(`\n📝 Notizen: ${prop.notes}`);
+
+        // 6. Create Lead
         const leadData: Record<string, unknown> = {
           title: leadTitle,
           person_id: personId,
           organization_id: orgId,
+          note: noteLines.join('\n'),
         };
-
-        // Add note as lead note
-        if (prop.notes) {
-          leadData.note = prop.notes;
+        if (labelId) {
+          leadData.label_ids = [labelId];
         }
 
         const leadRes = await pipedrivePost('/leads', PIPEDRIVE_API_TOKEN, leadData);
