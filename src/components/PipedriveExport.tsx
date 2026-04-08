@@ -20,7 +20,7 @@ export function PipedriveExport() {
   const updateProp = useUpdateProperty();
   const { toast } = useToast();
   const [pushing, setPushing] = useState(false);
-  const [pushResult, setPushResult] = useState<{ created: number; skipped: number; errors: number } | null>(null);
+  const [pushResult, setPushResult] = useState<{ created: number; skipped: number; errors: number; errorDetails: Array<{ address: string; error: string }> } | null>(null);
   const [restoring, setRestoring] = useState<string | null>(null);
 
   const properties = result?.data || [];
@@ -40,6 +40,7 @@ export function PipedriveExport() {
       let totalSkipped = 0;
       let totalErrors = 0;
       const successIds: string[] = [];
+      const errorDetails: Array<{ address: string; error: string }> = [];
 
       for (let i = 0; i < properties.length; i += 20) {
         const batch = properties.slice(i, i + 20).map(p => ({
@@ -70,14 +71,18 @@ export function PipedriveExport() {
 
         if (error) {
           totalErrors += batch.length;
+          batch.forEach(b => errorDetails.push({ address: b.address, error: String(error) }));
         } else if (data?.summary) {
           totalCreated += data.summary.created;
           totalSkipped += data.summary.skipped;
           totalErrors += data.summary.errors;
-          // Collect successfully created IDs
           if (data.results) {
             for (const r of data.results) {
               if (!r.error && !r.skipped) successIds.push(r.propertyId);
+              if (r.error) {
+                const prop = batch.find(b => b.id === r.propertyId);
+                errorDetails.push({ address: prop?.address || r.propertyId, error: r.error });
+              }
             }
           }
         }
@@ -90,7 +95,7 @@ export function PipedriveExport() {
         }
       }
 
-      setPushResult({ created: totalCreated, skipped: totalSkipped, errors: totalErrors });
+      setPushResult({ created: totalCreated, skipped: totalSkipped, errors: totalErrors, errorDetails });
       refetch();
 
       toast({
@@ -241,7 +246,16 @@ export function PipedriveExport() {
                 </p>
               )}
               {pushResult.errors > 0 && (
-                <p className="text-xs text-destructive">{pushResult.errors} Fehler</p>
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold text-destructive">{pushResult.errors} Fehler:</p>
+                  <div className="max-h-40 overflow-y-auto space-y-1">
+                    {pushResult.errorDetails.map((e, i) => (
+                      <p key={i} className="text-xs text-destructive bg-destructive/10 rounded px-2 py-1">
+                        <span className="font-medium">{e.address}:</span> {e.error}
+                      </p>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           )}
