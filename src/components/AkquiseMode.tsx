@@ -340,13 +340,15 @@ export function AkquiseMode() {
                 <ExternalLink className="h-4 w-4 ml-auto" />
               </Button>
               <Button
-                onClick={() => googleMapsUrl && window.open(googleMapsUrl, '_blank')}
-                disabled={!googleMapsUrl}
+                asChild
                 variant="outline"
                 className="h-12 gap-2"
+                disabled={!googleMapsUrl}
               >
-                <ExternalLink className="h-4 w-4" />
-                Google Maps
+                <a href={googleMapsUrl || '#'} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="h-4 w-4" />
+                  Google Maps
+                </a>
               </Button>
             </div>
 
