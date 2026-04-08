@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Building2, LayoutDashboard, Upload, Phone, Menu, X, Zap, Search, FileSpreadsheet } from 'lucide-react';
+import { Building2, LayoutDashboard, Upload, Phone, Menu, X, Zap, Search, FileSpreadsheet, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dashboard } from '@/components/Dashboard';
 import { PropertyList } from '@/components/PropertyList';
@@ -8,11 +8,13 @@ import { PhoneManager } from '@/components/PhoneManager';
 import { AkquiseMode } from '@/components/AkquiseMode';
 import { TelefonSuche } from '@/components/TelefonSuche';
 import { PipedriveExport } from '@/components/PipedriveExport';
+import { Vorauswahl } from '@/components/Vorauswahl';
 
-type Tab = 'dashboard' | 'akquise' | 'telsuche' | 'properties' | 'import' | 'phones' | 'export';
+type Tab = 'dashboard' | 'vorauswahl' | 'akquise' | 'telsuche' | 'properties' | 'import' | 'phones' | 'export';
 
 const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'vorauswahl', label: 'Vorauswahl', icon: Eye },
   { id: 'akquise', label: 'Akquise-Modus', icon: Zap },
   { id: 'telsuche', label: 'Telefon-Suche', icon: Search },
   { id: 'properties', label: 'Liegenschaften', icon: Building2 },
@@ -63,6 +65,7 @@ export default function Index() {
         </header>
         <div className="p-6 lg:p-10 max-w-7xl">
           {active === 'dashboard' && <Dashboard />}
+          {active === 'vorauswahl' && <Vorauswahl />}
           {active === 'akquise' && <AkquiseMode />}
           {active === 'telsuche' && <TelefonSuche />}
           {active === 'properties' && <PropertyList />}
