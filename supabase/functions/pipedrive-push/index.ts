@@ -7,6 +7,18 @@ const corsHeaders = {
 
 const PIPEDRIVE_BASE = 'https://api.pipedrive.com/v1';
 
+// Pipedrive custom field keys (from deal/lead fields)
+const FIELD_ZONE = '6283f1bd5f9e2220c96dfebf3904e789c9850773';
+const FIELD_BAUJAHR = 'd8e495e217d7f56099b33cf339612f0bb58bb2b7';
+const FIELD_HNF = '7773ad912df15700b104f5057012a28cbc6b220a';
+const FIELD_GRUNDSTUECK = 'caf47d7ebeb687f75a0d0e4a069073846f0a37b9';
+const FIELD_GESCHOSSE = 'df02438b21bc6d823e3abf7dc7d4a71f2239724e';
+const FIELD_EGRID = 'd210ce9334d6812187af1be8b71b7c97f6afd8db';
+const FIELD_EGID = '0c81850c8b58b9d88b9ff57b919824bc8f7b6c91';
+const FIELD_GEMEINDE = 'e9bd061887c619b93d0ad759dfbef11e55e4c58a';
+const FIELD_ADRESSE = '3f9bb1e671f9d3a2a264d056d827844ea33670db';
+const FIELD_MAPS = '58fa258249a145c3264c66e66c3f6e2d78837cfe';
+
 const PropertySchema = z.object({
   id: z.string(),
   address: z.string(),
