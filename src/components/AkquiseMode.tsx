@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ExternalLink, Check, SkipForward, EyeOff, ArrowRight, Phone, Zap, MapPin, Calendar, Layers, Home, Ruler, Search, Plus, Minus } from 'lucide-react';
+import { ExternalLink, Check, SkipForward, EyeOff, ArrowRight, Phone, Zap, MapPin, Calendar, Layers, Home, Ruler, Search, Plus, Minus, AlertTriangle, Building2, Landmark } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -349,6 +349,52 @@ export function AkquiseMode() {
                 <Input placeholder="+41 79 123 45 67" value={ownerPhone} onChange={e => setOwnerPhone(e.target.value)} className="h-10" />
               </div>
             </div>
+
+            {/* AG/Stadt warning with quick dismiss */}
+            {ownerName && classifyOwner(ownerName) !== 'person' && (
+              <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4 flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-destructive">
+                    {classifyOwner(ownerName) === 'stadt' ? 'Öffentlicher Eigentümer' : 'Firma / AG'}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {classifyOwner(ownerName) === 'stadt'
+                      ? 'Stadt/Gemeinde/Kanton – verkauft praktisch nie. Direkt ausblenden?'
+                      : 'Firmen/AGs verkaufen selten einzelne Liegenschaften. Direkt ausblenden?'}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="shrink-0 gap-1.5"
+                  disabled={processing}
+                  onClick={async () => {
+                    if (!current) return;
+                    setProcessing(true);
+                    try {
+                      await updateProp.mutateAsync({
+                        id: current.id,
+                        is_queried: true,
+                        owner_name: ownerName || null,
+                        owner_address: ownerAddress || null,
+                        status: 'Ausgeblendet',
+                        notes: (current.notes ? current.notes + '\n' : '') + `Eigentümer-Typ: ${ownerTypeLabel(classifyOwner(ownerName))} – nicht interessant`,
+                      });
+                      toast({ title: '⚠️ Ausgeblendet – weiter' });
+                      moveToNext();
+                    } catch {
+                      toast({ title: 'Fehler', variant: 'destructive' });
+                    } finally {
+                      setProcessing(false);
+                    }
+                  }}
+                >
+                  <EyeOff className="h-3.5 w-3.5" />
+                  Nicht interessant
+                </Button>
+              </div>
+            )}
 
             {/* Owner 2 */}
             {!showOwner2 ? (
