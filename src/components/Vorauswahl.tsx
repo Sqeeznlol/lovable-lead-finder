@@ -14,6 +14,7 @@ import { calculateDealScore, scoreColor, scoreBg } from '@/lib/deal-score';
 export function Vorauswahl() {
   const [zoneFilter, setZoneFilter] = useState<string>('Alle');
   const [baujahrBis, setBaujahrBis] = useState<string>('1980');
+  const [maxWhg, setMaxWhg] = useState<string>('');
   const { data: zones } = useZones();
   const { data: queue, refetch } = useUnqueriedProperties(200);
   const updateProp = useUpdateProperty();
@@ -24,10 +25,12 @@ export function Vorauswahl() {
   const [stats, setStats] = useState({ interessant: 0, ausgeblendet: 0, skipped: 0 });
 
   const baujahrMax = baujahrBis ? parseInt(baujahrBis, 10) : null;
+  const maxWhgNum = maxWhg ? parseInt(maxWhg, 10) : null;
   const items = (queue || [])
     .filter(p => p.status === 'Neu' || p.status === 'Offen')
     .filter(p => zoneFilter === 'Alle' || p.zone === zoneFilter)
     .filter(p => !baujahrMax || !p.baujahr || p.baujahr <= baujahrMax)
+    .filter(p => !maxWhgNum || !p.wohnungen || Number(p.wohnungen) <= maxWhgNum)
     .map(p => ({ ...p, _score: calculateDealScore(p) }))
     .sort((a, b) => b._score - a._score);
 
