@@ -62,6 +62,37 @@ async function pipedrivePost(path: string, token: string, body: unknown) {
   return res.json();
 }
 
+// --- Lead Label Cache ---
+
+const labelCache = new Map<string, string>();
+
+async function getOrCreateLeadLabel(token: string, zone: string): Promise<string | undefined> {
+  if (!zone) return undefined;
+  if (labelCache.has(zone)) return labelCache.get(zone);
+
+  // Fetch existing lead labels
+  const res = await pipedriveGet('/leadLabels', token);
+  const labels = res?.data || [];
+  for (const label of labels) {
+    if (label.name === zone) {
+      labelCache.set(zone, label.id);
+      return label.id;
+    }
+  }
+
+  // Create new label
+  const createRes = await pipedrivePost('/leadLabels', token, {
+    name: zone,
+    color: 'blue',
+  });
+  const newId = createRes?.data?.id;
+  if (newId) {
+    labelCache.set(zone, newId);
+    return newId;
+  }
+  return undefined;
+}
+
 // --- Name Parsing ---
 
 function parseOwnerForPipedrive(rawName: string | null | undefined): { firstName: string; lastName: string } {
