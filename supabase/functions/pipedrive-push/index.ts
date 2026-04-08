@@ -206,12 +206,17 @@ function buildLeadNotes(prop: z.infer<typeof PropertySchema>): string {
   const fullAddress = prop.address + (prop.plz_ort ? ', ' + prop.plz_ort : '');
   lines.push(`<b>Adresse:</b> ${fullAddress}`);
   
-  if (prop.google_maps_url) {
-    lines.push(`<b>Google Maps:</b> <a href="${prop.google_maps_url}">Karte öffnen</a>`);
-  } else {
-    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`;
-    lines.push(`<b>Google Maps:</b> <a href="${mapsUrl}">Karte öffnen</a>`);
-  }
+  const mapsQuery = encodeURIComponent(fullAddress);
+  const mapsUrl = prop.google_maps_url || `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
+  lines.push(`<b>Google Maps:</b> <a href="${mapsUrl}">Karte öffnen</a>`);
+
+  // Google Maps satellite image
+  const staticMapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${mapsQuery}&zoom=18&size=600x300&maptype=satellite&markers=color:red|${mapsQuery}`;
+  lines.push(`<br/><a href="${mapsUrl}"><img src="${staticMapUrl}" width="600" height="300" alt="Satellitenbild" /></a>`);
+
+  // Street View image
+  const streetViewUrl = `https://maps.googleapis.com/maps/api/streetview?size=600x300&location=${mapsQuery}`;
+  lines.push(`<a href="${mapsUrl}"><img src="${streetViewUrl}" width="600" height="300" alt="Street View" /></a>`);
 
   // Property details
   const details: string[] = [];
