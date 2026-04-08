@@ -35,39 +35,34 @@ export function AkquiseMode() {
   const { toast } = useToast();
 
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [ownerName, setOwnerName] = useState('');
-  const [ownerAddress, setOwnerAddress] = useState('');
-  const [ownerPhone, setOwnerPhone] = useState('');
-  const [ownerName2, setOwnerName2] = useState('');
-  const [ownerAddress2, setOwnerAddress2] = useState('');
-  const [ownerPhone2, setOwnerPhone2] = useState('');
-  const [showOwner2, setShowOwner2] = useState(false);
+  const [owners, setOwners] = useState<OwnerEntry[]>([{ raw: '', parsed: parseOwnerString(''), phone: '' }]);
   const [processing, setProcessing] = useState(false);
   const [gisOpened, setGisOpened] = useState(false);
 
-  // Sort queue by deal score, apply zone filter
-  const items = (queue || [])
-    .filter(p => zoneFilter === 'Alle' || p.zone === zoneFilter)
-    .map(p => ({ ...p, _score: calculateDealScore(p) }))
-    .sort((a, b) => b._score - a._score);
+  const updateOwnerRaw = useCallback((index: number, raw: string) => {
+    setOwners(prev => {
+      const next = [...prev];
+      next[index] = { raw, parsed: parseOwnerString(raw), phone: next[index].phone };
+      return next;
+    });
+  }, []);
 
-  const current = items[currentIndex];
-  const score = current?._score ?? 0;
+  const updateOwnerPhone = useCallback((index: number, phone: string) => {
+    setOwners(prev => {
+      const next = [...prev];
+      next[index] = { ...next[index], phone };
+      return next;
+    });
+  }, []);
 
-  // Auto-select first phone
-  useEffect(() => {
-    if (!selectedPhoneId && allPhones.length > 0) {
-      const available = allPhones.find(p => p.daily_queries_used < 5);
-      if (available) setSelectedPhoneId(available.id);
-    }
-  }, [allPhones, selectedPhoneId]);
+  const addOwner = useCallback(() => {
+    if (owners.length >= 10) return;
+    setOwners(prev => [...prev, { raw: '', parsed: parseOwnerString(''), phone: '' }]);
+  }, [owners.length]);
 
-  // Reset form on property change
-  useEffect(() => {
-    setOwnerName(''); setOwnerAddress(''); setOwnerPhone('');
-    setOwnerName2(''); setOwnerAddress2(''); setOwnerPhone2('');
-    setShowOwner2(false); setGisOpened(false);
-  }, [currentIndex]);
+  const removeOwner = useCallback((index: number) => {
+    setOwners(prev => prev.length <= 1 ? prev : prev.filter((_, i) => i !== index));
+  }, []);
 
   // Reset index when zone filter changes
   useEffect(() => { setCurrentIndex(0); }, [zoneFilter]);
