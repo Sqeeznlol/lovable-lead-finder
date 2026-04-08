@@ -197,7 +197,21 @@ Deno.serve(async (req) => {
         ].filter(Boolean);
         const leadTitle = titleParts.join(' · ') || prop.address;
 
-        // 1. Find or create Organization
+        // 1. Check for duplicate lead by title
+        const existingLeads = await pipedriveGet('/leads/search', PIPEDRIVE_API_TOKEN, {
+          term: leadTitle,
+          fields: 'title',
+          exact_match: 'true',
+        });
+        const existingLead = (existingLeads?.data?.items || []).find(
+          (item: { item?: { title?: string } }) => item?.item?.title === leadTitle
+        );
+        if (existingLead) {
+          results.push({ propertyId: prop.id, leadId: existingLead.item.id, skipped: true });
+          continue;
+        }
+
+        // 2. Find or create Organization
         let orgId = await findExistingOrg(PIPEDRIVE_API_TOKEN, prop.address);
         if (!orgId) {
           const orgRes = await pipedrivePost('/organizations', PIPEDRIVE_API_TOKEN, {
