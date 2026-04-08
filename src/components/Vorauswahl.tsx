@@ -182,7 +182,17 @@ export function Vorauswahl() {
               className="w-24 h-9"
             />
           </div>
-        </div>
+          <div className="flex items-center gap-1.5">
+            <Label htmlFor="va-maxwhg" className="text-xs text-muted-foreground whitespace-nowrap">Max Whg.</Label>
+            <Input
+              id="va-maxwhg"
+              type="number"
+              value={maxWhg}
+              onChange={e => setMaxWhg(e.target.value)}
+              placeholder="∞"
+              className="w-20 h-9"
+            />
+          </div>
         <div className="flex gap-3 text-sm text-muted-foreground">
           <span>✅ {stats.interessant}</span>
           <span>❌ {stats.ausgeblendet}</span>
