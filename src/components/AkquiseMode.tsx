@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { ExternalLink, Check, SkipForward, EyeOff, ArrowRight, Phone, Zap, MapPin, Calendar, Layers, Home, Ruler, Search, Plus, Minus, AlertTriangle, Building2, Landmark } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { ExternalLink, Check, SkipForward, EyeOff, ArrowRight, Phone, Zap, MapPin, Calendar, Layers, Home, Ruler, Search, Plus, Minus, AlertTriangle, Building2, Landmark, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,13 @@ import { useUnqueriedProperties, useUpdateProperty, useZones } from '@/hooks/use
 import { usePhoneNumbers, useIncrementPhoneQuery } from '@/hooks/use-phones';
 import { useToast } from '@/hooks/use-toast';
 import { calculateDealScore, scoreColor, scoreBg } from '@/lib/deal-score';
-import { parseOwnerString, classifyOwner, ownerTypeLabel, ownerTypeColor, telSearchUrlParsed, opendiUrlParsed } from '@/lib/owner-utils';
+import { parseOwnerString, classifyOwner, ownerTypeLabel, ownerTypeColor, telSearchUrlParsed, opendiUrlParsed, type ParsedOwner } from '@/lib/owner-utils';
+
+interface OwnerEntry {
+  raw: string;
+  parsed: ParsedOwner;
+  phone: string;
+}
 
 export function AkquiseMode() {
   const { data: phones } = usePhoneNumbers();
