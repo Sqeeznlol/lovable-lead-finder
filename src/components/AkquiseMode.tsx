@@ -119,6 +119,7 @@ export function AkquiseMode() {
   useEffect(() => {
     setOwners([createEmptyOwner()]);
     setGisOpened(false);
+    setPrescreen(true);
     // Auto-focus owner input after property change
     setTimeout(() => ownerInputRef.current?.focus(), 100);
   }, [currentIndex]);
