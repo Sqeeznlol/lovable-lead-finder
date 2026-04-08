@@ -66,14 +66,13 @@ export function AkquiseMode() {
   // Reset index when zone filter changes
   useEffect(() => { setCurrentIndex(0); }, [zoneFilter]);
 
-  // GIS URL — OerebKatasterZH (public, no login required)
-  // User switches to "Eigentumsauskunft" theme manually in GIS browser
+  // GIS URL — AVfarbigZH (Amtliche Vermessung) mit Eigentumsauskunft
   const portalUrl = current?.egrid
-    ? `https://maps.zh.ch/?locate=parz&locations=${current.egrid}&topic=OerebKatasterZH&scale=500`
+    ? `https://maps.zh.ch/?locate=parz&locations=${current.egrid}&topic=AVfarbigZH&scale=500`
     : current?.parzelle && current?.bfs_nr
-      ? `https://maps.zh.ch/?locate=parz&locations=${current.bfs_nr},${current.parzelle}&topic=OerebKatasterZH&scale=500`
+      ? `https://maps.zh.ch/?locate=parz&locations=${current.bfs_nr},${current.parzelle}&topic=AVfarbigZH&scale=500`
       : current?.address
-        ? `https://maps.zh.ch/?topic=OerebKatasterZH&search=${encodeURIComponent(current.address + (current.plz_ort ? ' ' + current.plz_ort : ''))}&scale=500`
+        ? `https://maps.zh.ch/?topic=AVfarbigZH&search=${encodeURIComponent(current.address + (current.plz_ort ? ' ' + current.plz_ort : ''))}&scale=500`
         : null;
 
   const googleMapsUrl = current?.address
@@ -279,9 +278,8 @@ export function AkquiseMode() {
             <div className="rounded-lg bg-primary/5 border border-primary/20 px-4 py-3 space-y-1">
               <p className="text-xs font-semibold text-primary uppercase tracking-wider">Anleitung Eigentumsauskunft</p>
               <ol className="text-sm text-muted-foreground space-y-0.5 list-decimal list-inside">
-                <li>Wechsle oben rechts das Thema auf <span className="font-medium text-foreground">"Eigentumsauskunft"</span></li>
                 <li>Klicke auf die <span className="font-medium text-foreground">markierte Parzelle</span> in der Karte</li>
-                <li>Wähle <span className="font-medium text-foreground">"Eigentumsauskunft bestellen"</span></li>
+                <li>Wähle <span className="font-medium text-foreground">"Eigentumsauskunft"</span> im Menü</li>
                 <li>SMS-Code eingeben und Eigentümer ablesen</li>
               </ol>
             </div>
