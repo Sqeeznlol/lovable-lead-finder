@@ -229,7 +229,13 @@ Deno.serve(async (req) => {
 
     for (const prop of parsed.data.properties) {
       try {
-        const dealTitle = `Akquise: ${prop.address}`;
+        // Title: "W5 · 320m² · Winterthur" format
+        const titleParts = [
+          prop.zone || '',
+          prop.gebaeudeflaeche ? `${Math.round(prop.gebaeudeflaeche)}m²` : '',
+          prop.gemeinde || prop.plz_ort || '',
+        ].filter(Boolean);
+        const dealTitle = titleParts.join(' · ') || prop.address;
 
         // 1. Check for duplicate deal
         const existingDealId = await findExistingDeal(PIPEDRIVE_API_TOKEN, dealTitle);
