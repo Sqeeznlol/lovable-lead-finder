@@ -65,8 +65,11 @@ export type Database = {
           notes: string | null
           ortschaftsname: string | null
           owner_address: string | null
+          owner_address_2: string | null
           owner_name: string | null
+          owner_name_2: string | null
           owner_phone: string | null
+          owner_phone_2: string | null
           parzelle: string | null
           plot_number: string | null
           plz: string | null
@@ -103,8 +106,11 @@ export type Database = {
           notes?: string | null
           ortschaftsname?: string | null
           owner_address?: string | null
+          owner_address_2?: string | null
           owner_name?: string | null
+          owner_name_2?: string | null
           owner_phone?: string | null
+          owner_phone_2?: string | null
           parzelle?: string | null
           plot_number?: string | null
           plz?: string | null
@@ -141,8 +147,11 @@ export type Database = {
           notes?: string | null
           ortschaftsname?: string | null
           owner_address?: string | null
+          owner_address_2?: string | null
           owner_name?: string | null
+          owner_name_2?: string | null
           owner_phone?: string | null
+          owner_phone_2?: string | null
           parzelle?: string | null
           plot_number?: string | null
           plz?: string | null
