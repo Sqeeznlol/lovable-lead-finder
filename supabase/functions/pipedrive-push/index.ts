@@ -230,13 +230,13 @@ Deno.serve(async (req) => {
         // 3. Create/update Person 1 (primary owner)
         let personId: number | undefined;
         if (prop.owner_name) {
-          personId = await upsertPerson(PIPEDRIVE_API_TOKEN, prop.owner_name, prop.owner_phone, prop.owner_address, orgId);
+          personId = await upsertPerson(PIPEDRIVE_API_TOKEN, prop.owner_name, prop.owner_phone, orgId);
         }
 
         // 4. Create/update Person 2 (secondary owner)
         let person2Id: number | undefined;
         if (prop.owner_name_2) {
-          person2Id = await upsertPerson(PIPEDRIVE_API_TOKEN, prop.owner_name_2, prop.owner_phone_2, prop.owner_address_2, orgId);
+          person2Id = await upsertPerson(PIPEDRIVE_API_TOKEN, prop.owner_name_2, prop.owner_phone_2, orgId);
         }
 
         // 5. Create Lead with custom fields
