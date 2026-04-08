@@ -184,11 +184,19 @@ Deno.serve(async (req) => {
 
     // Label cache (zone -> label_id)
     const labelCache = new Map<string, string>();
+    // Batch dedup: track addresses already exported in this request
+    const exportedAddresses = new Set<string>();
 
     const results: { propertyId: string; leadId?: string; personId?: number; orgId?: number; skipped?: boolean; error?: string }[] = [];
 
     for (const prop of parsed.data.properties) {
       try {
+        // Batch-level dedup by address
+        if (exportedAddresses.has(prop.address)) {
+          results.push({ propertyId: prop.id, skipped: true });
+          continue;
+        }
+
         // Title: "W5 · 320m² · Winterthur" format
         const titleParts = [
           prop.zone || '',
@@ -197,15 +205,20 @@ Deno.serve(async (req) => {
         ].filter(Boolean);
         const leadTitle = titleParts.join(' · ') || prop.address;
 
-        // 1. Find or create Organization
-        let orgId = await findExistingOrg(PIPEDRIVE_API_TOKEN, prop.address);
-        if (!orgId) {
-          const orgRes = await pipedrivePost('/organizations', PIPEDRIVE_API_TOKEN, {
-            name: `Liegenschaft: ${prop.address}`,
-            address: prop.address + (prop.plz_ort ? ', ' + prop.plz_ort : ''),
-          });
-          orgId = orgRes?.data?.id;
+        // 1. Check for duplicate: if org already exists, skip (same address = same property)
+        const existingOrgId = await findExistingOrg(PIPEDRIVE_API_TOKEN, prop.address);
+        if (existingOrgId) {
+          results.push({ propertyId: prop.id, orgId: existingOrgId, skipped: true });
+          exportedAddresses.add(prop.address);
+          continue;
         }
+
+        // 2. Create Organization
+        const orgRes = await pipedrivePost('/organizations', PIPEDRIVE_API_TOKEN, {
+          name: `Liegenschaft: ${prop.address}`,
+          address: prop.address + (prop.plz_ort ? ', ' + prop.plz_ort : ''),
+        });
+        const orgId = orgRes?.data?.id;
 
         // 2. Find or create Person (owner 1) with proper name splitting
         let personId: number | undefined;
@@ -315,6 +328,7 @@ Deno.serve(async (req) => {
           });
         }
 
+        exportedAddresses.add(prop.address);
         results.push({ propertyId: prop.id, leadId, personId, orgId: orgId || undefined });
       } catch (err) {
         results.push({ propertyId: prop.id, error: String(err) });
