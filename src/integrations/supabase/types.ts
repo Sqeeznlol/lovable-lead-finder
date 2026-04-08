@@ -70,6 +70,7 @@ export type Database = {
           owner_name_2: string | null
           owner_phone: string | null
           owner_phone_2: string | null
+          owners_json: Json | null
           parzelle: string | null
           plot_number: string | null
           plz: string | null
@@ -111,6 +112,7 @@ export type Database = {
           owner_name_2?: string | null
           owner_phone?: string | null
           owner_phone_2?: string | null
+          owners_json?: Json | null
           parzelle?: string | null
           plot_number?: string | null
           plz?: string | null
@@ -152,6 +154,7 @@ export type Database = {
           owner_name_2?: string | null
           owner_phone?: string | null
           owner_phone_2?: string | null
+          owners_json?: Json | null
           parzelle?: string | null
           plot_number?: string | null
           plz?: string | null

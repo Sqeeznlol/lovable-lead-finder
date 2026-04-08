@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { ExternalLink, Check, SkipForward, EyeOff, ArrowRight, Phone, Zap, MapPin, Calendar, Layers, Home, Ruler, Search, Plus, Minus, AlertTriangle, Building2, Landmark } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { ExternalLink, Check, SkipForward, EyeOff, ArrowRight, Phone, Zap, MapPin, Calendar, Layers, Home, Ruler, Search, Plus, Trash2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,17 @@ import { useUnqueriedProperties, useUpdateProperty, useZones } from '@/hooks/use
 import { usePhoneNumbers, useIncrementPhoneQuery } from '@/hooks/use-phones';
 import { useToast } from '@/hooks/use-toast';
 import { calculateDealScore, scoreColor, scoreBg } from '@/lib/deal-score';
-import { parseOwnerString, classifyOwner, ownerTypeLabel, ownerTypeColor, telSearchUrlParsed, opendiUrlParsed } from '@/lib/owner-utils';
+import { parseOwnerString, classifyOwner, ownerTypeLabel, ownerTypeColor, telSearchUrlParsed, opendiUrlParsed, type ParsedOwner } from '@/lib/owner-utils';
+
+interface OwnerEntry {
+  raw: string;
+  parsed: ParsedOwner;
+  phone: string;
+}
+
+function createEmptyOwner(): OwnerEntry {
+  return { raw: '', parsed: parseOwnerString(''), phone: '' };
+}
 
 export function AkquiseMode() {
   const { data: phones } = usePhoneNumbers();
@@ -29,15 +39,33 @@ export function AkquiseMode() {
   const { toast } = useToast();
 
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [ownerName, setOwnerName] = useState('');
-  const [ownerAddress, setOwnerAddress] = useState('');
-  const [ownerPhone, setOwnerPhone] = useState('');
-  const [ownerName2, setOwnerName2] = useState('');
-  const [ownerAddress2, setOwnerAddress2] = useState('');
-  const [ownerPhone2, setOwnerPhone2] = useState('');
-  const [showOwner2, setShowOwner2] = useState(false);
+  const [owners, setOwners] = useState<OwnerEntry[]>([createEmptyOwner()]);
   const [processing, setProcessing] = useState(false);
   const [gisOpened, setGisOpened] = useState(false);
+
+  const updateOwnerRaw = useCallback((index: number, raw: string) => {
+    setOwners(prev => {
+      const next = [...prev];
+      next[index] = { raw, parsed: parseOwnerString(raw), phone: next[index].phone };
+      return next;
+    });
+  }, []);
+
+  const updateOwnerPhone = useCallback((index: number, phone: string) => {
+    setOwners(prev => {
+      const next = [...prev];
+      next[index] = { ...next[index], phone };
+      return next;
+    });
+  }, []);
+
+  const addOwner = useCallback(() => {
+    setOwners(prev => prev.length >= 10 ? prev : [...prev, createEmptyOwner()]);
+  }, []);
+
+  const removeOwner = useCallback((index: number) => {
+    setOwners(prev => prev.length <= 1 ? prev : prev.filter((_, i) => i !== index));
+  }, []);
 
   // Sort queue by deal score, apply zone filter
   const items = (queue || [])
@@ -58,15 +86,14 @@ export function AkquiseMode() {
 
   // Reset form on property change
   useEffect(() => {
-    setOwnerName(''); setOwnerAddress(''); setOwnerPhone('');
-    setOwnerName2(''); setOwnerAddress2(''); setOwnerPhone2('');
-    setShowOwner2(false); setGisOpened(false);
+    setOwners([createEmptyOwner()]);
+    setGisOpened(false);
   }, [currentIndex]);
 
   // Reset index when zone filter changes
   useEffect(() => { setCurrentIndex(0); }, [zoneFilter]);
 
-  // GIS URL — DLGOWfarbigZH = Eigentumsauskunft (Amtliche Vermessung)
+  // GIS URL
   const portalUrl = current?.egrid
     ? `https://maps.zh.ch/?locate=parz&locations=${current.egrid}&topic=DLGOWfarbigZH&scale=500`
     : current?.parzelle && current?.bfs_nr
@@ -79,10 +106,9 @@ export function AkquiseMode() {
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(current.address + (current.plz_ort ? ', ' + current.plz_ort : ''))}`
     : null;
 
-  // Smart name parsing for search links
-  const parsed1 = parseOwnerString(ownerName);
-  const parsed2 = parseOwnerString(ownerName2);
   const ownerOrt = current?.plz_ort || current?.gemeinde || '';
+  const firstOwnerName = owners[0]?.raw || '';
+  const hasAnyOwner = owners.some(o => o.raw.trim());
 
   const moveToNext = () => {
     if (currentIndex < items.length - 1) {
@@ -98,20 +124,37 @@ export function AkquiseMode() {
     setProcessing(true);
     try {
       await incrementPhone.mutateAsync(selectedPhone.id);
+
+      // Build owners JSON for all owners
+      const ownersJson = owners
+        .filter(o => o.raw.trim())
+        .map(o => ({
+          name: o.parsed.fullName || o.raw,
+          address: o.parsed.address,
+          phone: o.phone,
+          ownershipType: o.parsed.ownershipType,
+          type: o.parsed.type,
+        }));
+
+      // First 2 owners go to flat fields for backward compat
+      const o1 = owners[0];
+      const o2 = owners[1];
+
       await updateProp.mutateAsync({
         id: current.id,
         is_queried: true,
         queried_at: new Date().toISOString(),
         queried_by_phone: selectedPhone.number,
-        owner_name: ownerName || null,
-        owner_address: ownerAddress || null,
-        owner_phone: ownerPhone || null,
-        owner_name_2: ownerName2 || null,
-        owner_address_2: ownerAddress2 || null,
-        owner_phone_2: ownerPhone2 || null,
-        status: ownerName ? 'Eigentümer ermittelt' : 'Kein Ergebnis',
+        owner_name: o1?.parsed.fullName || o1?.raw || null,
+        owner_address: o1?.parsed.address || null,
+        owner_phone: o1?.phone || null,
+        owner_name_2: o2?.parsed.fullName || o2?.raw || null,
+        owner_address_2: o2?.parsed.address || null,
+        owner_phone_2: o2?.phone || null,
+        status: hasAnyOwner ? 'Eigentümer ermittelt' : 'Kein Ergebnis',
+        owners_json: ownersJson as any,
       });
-      toast({ title: ownerName ? '✅ Eigentümer gespeichert' : '✅ Kein Ergebnis – weiter' });
+      toast({ title: hasAnyOwner ? '✅ Eigentümer gespeichert' : '✅ Kein Ergebnis – weiter' });
       moveToNext();
     } catch {
       toast({ title: 'Fehler', variant: 'destructive' });
@@ -170,7 +213,7 @@ export function AkquiseMode() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      {/* Top bar: Phone + Zone filter + progress */}
+      {/* Top bar */}
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div className="flex items-center gap-3 flex-wrap">
           <Select value={selectedPhoneId} onValueChange={setSelectedPhoneId}>
@@ -315,129 +358,142 @@ export function AkquiseMode() {
             )}
           </div>
 
-          {/* Owner input */}
+          {/* Owner inputs — dynamic list */}
           <div className="px-8 py-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm font-semibold">Eigentümer 1</Label>
-              {ownerName && (
-                <div className="flex gap-2 items-center">
-                  {classifyOwner(ownerName) !== 'person' && (
-                    <Badge className={`${ownerTypeColor(classifyOwner(ownerName))} text-[10px]`}>{ownerTypeLabel(classifyOwner(ownerName))}</Badge>
-                  )}
-                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1"
-                    onClick={() => window.open(telSearchUrlParsed(parsed1, ownerOrt), '_blank')}>
-                    <Search className="h-3 w-3" /> tel.search.ch
-                  </Button>
-                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1"
-                    onClick={() => window.open(opendiUrlParsed(parsed1), '_blank')}>
-                    <Search className="h-3 w-3" /> Opendi
-                  </Button>
-                </div>
-              )}
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Name</Label>
-                <Input placeholder="z.B. Hans Müller" value={ownerName} onChange={e => setOwnerName(e.target.value)} className="h-10" autoFocus />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Adresse</Label>
-                <Input placeholder="z.B. Bahnhofstr. 1, 8001 ZH" value={ownerAddress} onChange={e => setOwnerAddress(e.target.value)} className="h-10" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Telefon</Label>
-                <Input placeholder="+41 79 123 45 67" value={ownerPhone} onChange={e => setOwnerPhone(e.target.value)} className="h-10" />
-              </div>
-            </div>
-
-            {/* AG/Stadt warning with quick dismiss */}
-            {ownerName && classifyOwner(ownerName) !== 'person' && (
-              <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4 flex items-start gap-3">
-                <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-destructive">
-                    {classifyOwner(ownerName) === 'stadt' ? 'Öffentlicher Eigentümer' : 'Firma / AG'}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {classifyOwner(ownerName) === 'stadt'
-                      ? 'Stadt/Gemeinde/Kanton – verkauft praktisch nie. Direkt ausblenden?'
-                      : 'Firmen/AGs verkaufen selten einzelne Liegenschaften. Direkt ausblenden?'}
-                  </p>
-                </div>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  className="shrink-0 gap-1.5"
-                  disabled={processing}
-                  onClick={async () => {
-                    if (!current) return;
-                    setProcessing(true);
-                    try {
-                      await updateProp.mutateAsync({
-                        id: current.id,
-                        is_queried: true,
-                        owner_name: ownerName || null,
-                        owner_address: ownerAddress || null,
-                        status: 'Ausgeblendet',
-                        notes: (current.notes ? current.notes + '\n' : '') + `Eigentümer-Typ: ${ownerTypeLabel(classifyOwner(ownerName))} – nicht interessant`,
-                      });
-                      toast({ title: '⚠️ Ausgeblendet – weiter' });
-                      moveToNext();
-                    } catch {
-                      toast({ title: 'Fehler', variant: 'destructive' });
-                    } finally {
-                      setProcessing(false);
-                    }
-                  }}
-                >
-                  <EyeOff className="h-3.5 w-3.5" />
-                  Nicht interessant
-                </Button>
-              </div>
-            )}
-
-            {/* Owner 2 */}
-            {!showOwner2 ? (
-              <Button size="sm" variant="ghost" className="text-xs text-muted-foreground gap-1" onClick={() => setShowOwner2(true)}>
-                <Plus className="h-3 w-3" /> 2. Eigentümer hinzufügen
-              </Button>
-            ) : (
-              <div className="space-y-3 border-t pt-4">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-semibold">Eigentümer 2</Label>
-                  <div className="flex gap-2">
-                    {ownerName2 && (
-                      <>
-                        <Button size="sm" variant="outline" className="h-7 text-xs gap-1"
-                          onClick={() => window.open(telSearchUrlParsed(parsed2, ownerOrt), '_blank')}>
-                          <Search className="h-3 w-3" /> tel.search.ch
+            {owners.map((owner, idx) => {
+              const ownerType = classifyOwner(owner.raw);
+              const isNonPerson = owner.raw.trim() && ownerType !== 'person';
+              return (
+                <div key={idx} className={`space-y-3 ${idx > 0 ? 'border-t pt-4' : ''}`}>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-semibold">Eigentümer {idx + 1}</Label>
+                    <div className="flex gap-2 items-center">
+                      {owner.raw.trim() && (
+                        <>
+                          {isNonPerson && (
+                            <Badge className={`${ownerTypeColor(ownerType)} text-[10px]`}>{ownerTypeLabel(ownerType)}</Badge>
+                          )}
+                          <Button size="sm" variant="outline" className="h-7 text-xs gap-1"
+                            onClick={() => window.open(telSearchUrlParsed(owner.parsed, ownerOrt), '_blank')}>
+                            <Search className="h-3 w-3" /> tel.search
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-7 text-xs gap-1"
+                            onClick={() => window.open(opendiUrlParsed(owner.parsed), '_blank')}>
+                            <Search className="h-3 w-3" /> Opendi
+                          </Button>
+                        </>
+                      )}
+                      {idx > 0 && (
+                        <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" onClick={() => removeOwner(idx)}>
+                          <Trash2 className="h-3 w-3" />
                         </Button>
-                        <Button size="sm" variant="outline" className="h-7 text-xs gap-1"
-                          onClick={() => window.open(opendiUrlParsed(parsed2), '_blank')}>
-                          <Search className="h-3 w-3" /> Opendi
-                        </Button>
-                      </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Single paste field + parsed display */}
+                  <div className="space-y-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">
+                        Eigentümer einfügen (Name, Adresse, etc. – wird automatisch getrennt)
+                      </Label>
+                      <Input
+                        placeholder="z.B. Meier, Michael, Habsburgstrasse 9, 8057 Zürich, Schweiz, Alleineigentum"
+                        value={owner.raw}
+                        onChange={e => updateOwnerRaw(idx, e.target.value)}
+                        className="h-10 font-mono text-xs"
+                        autoFocus={idx === 0}
+                      />
+                    </div>
+
+                    {/* Show parsed result */}
+                    {owner.raw.trim() && (
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                        <div className="bg-muted/50 rounded px-2 py-1.5">
+                          <span className="text-muted-foreground">Name: </span>
+                          <span className="font-medium">{owner.parsed.fullName || '–'}</span>
+                        </div>
+                        <div className="bg-muted/50 rounded px-2 py-1.5">
+                          <span className="text-muted-foreground">Adresse: </span>
+                          <span className="font-medium">{owner.parsed.address || '–'}</span>
+                        </div>
+                        <div className="bg-muted/50 rounded px-2 py-1.5">
+                          <span className="text-muted-foreground">Eigentum: </span>
+                          <span className="font-medium">{owner.parsed.ownershipType || '–'}</span>
+                        </div>
+                        <div className="bg-muted/50 rounded px-2 py-1.5">
+                          <span className="text-muted-foreground">Suche: </span>
+                          <span className="font-medium text-primary">{owner.parsed.searchName || '–'}</span>
+                        </div>
+                      </div>
                     )}
-                    <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" onClick={() => { setShowOwner2(false); setOwnerName2(''); setOwnerAddress2(''); setOwnerPhone2(''); }}>
-                      <Minus className="h-3 w-3" />
-                    </Button>
+
+                    {/* Phone field */}
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Telefon</Label>
+                      <Input
+                        placeholder="+41 79 123 45 67"
+                        value={owner.phone}
+                        onChange={e => updateOwnerPhone(idx, e.target.value)}
+                        className="h-10"
+                      />
+                    </div>
                   </div>
+
+                  {/* AG/Stadt warning */}
+                  {isNonPerson && (
+                    <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 flex items-start gap-3">
+                      <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="text-xs font-semibold text-destructive">
+                          {ownerType === 'stadt' ? 'Öffentlicher Eigentümer' : 'Firma / AG'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {ownerType === 'stadt'
+                            ? 'Stadt/Gemeinde/Kanton – verkauft praktisch nie.'
+                            : 'Firmen/AGs verkaufen selten einzelne Liegenschaften.'}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="shrink-0 gap-1 text-xs h-7"
+                        disabled={processing}
+                        onClick={async () => {
+                          if (!current) return;
+                          setProcessing(true);
+                          try {
+                            await updateProp.mutateAsync({
+                              id: current.id,
+                              is_queried: true,
+                              owner_name: owner.parsed.fullName || owner.raw || null,
+                              owner_address: owner.parsed.address || null,
+                              status: 'Ausgeblendet',
+                              notes: (current.notes ? current.notes + '\n' : '') + `Eigentümer-Typ: ${ownerTypeLabel(ownerType)} – nicht interessant`,
+                            });
+                            toast({ title: '⚠️ Ausgeblendet – weiter' });
+                            moveToNext();
+                          } catch {
+                            toast({ title: 'Fehler', variant: 'destructive' });
+                          } finally {
+                            setProcessing(false);
+                          }
+                        }}
+                      >
+                        <EyeOff className="h-3 w-3" />
+                        Ausblenden
+                      </Button>
+                    </div>
+                  )}
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Name</Label>
-                    <Input placeholder="2. Eigentümer" value={ownerName2} onChange={e => setOwnerName2(e.target.value)} className="h-10" />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Adresse</Label>
-                    <Input placeholder="Adresse" value={ownerAddress2} onChange={e => setOwnerAddress2(e.target.value)} className="h-10" />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Telefon</Label>
-                    <Input placeholder="+41..." value={ownerPhone2} onChange={e => setOwnerPhone2(e.target.value)} className="h-10" />
-                  </div>
-                </div>
-              </div>
+              );
+            })}
+
+            {/* Add owner button */}
+            {owners.length < 10 && (
+              <Button size="sm" variant="ghost" className="text-xs text-muted-foreground gap-1" onClick={addOwner}>
+                <Plus className="h-3 w-3" /> Weiteren Eigentümer hinzufügen ({owners.length}/10)
+              </Button>
             )}
           </div>
 
@@ -456,7 +512,7 @@ export function AkquiseMode() {
               size="lg"
             >
               <Check className="h-5 w-5 mr-2" />
-              {ownerName ? 'Speichern & Nächstes' : 'Kein Ergebnis & Nächstes'}
+              {hasAnyOwner ? 'Speichern & Nächstes' : 'Kein Ergebnis & Nächstes'}
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
           </div>
