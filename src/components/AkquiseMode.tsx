@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { ExternalLink, Check, SkipForward, EyeOff, ArrowRight, Phone, Zap, MapPin, Calendar, Layers, Home, Ruler, Search, Plus, Trash2, AlertTriangle } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { ExternalLink, Check, SkipForward, EyeOff, ArrowRight, Phone, Zap, MapPin, Calendar, Layers, Home, Ruler, Search, Plus, Trash2, AlertTriangle, Keyboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,8 @@ import { useUnqueriedProperties, useUpdateProperty, useZones } from '@/hooks/use
 import { usePhoneNumbers, useIncrementPhoneQuery } from '@/hooks/use-phones';
 import { useToast } from '@/hooks/use-toast';
 import { calculateDealScore, scoreColor, scoreBg } from '@/lib/deal-score';
-import { parseOwnerString, classifyOwner, ownerTypeLabel, ownerTypeColor, telSearchUrlParsed, opendiUrlParsed, type ParsedOwner } from '@/lib/owner-utils';
+import { parseOwnerString, parseMultipleOwners, classifyOwner, ownerTypeLabel, ownerTypeColor, telSearchUrlParsed, opendiUrlParsed, type ParsedOwner } from '@/lib/owner-utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface OwnerEntry {
   raw: string;
@@ -43,6 +44,7 @@ export function AkquiseMode() {
   const [owners, setOwners] = useState<OwnerEntry[]>([createEmptyOwner()]);
   const [processing, setProcessing] = useState(false);
   const [gisOpened, setGisOpened] = useState(false);
+  const ownerInputRef = useRef<HTMLInputElement>(null);
 
   const updateOwnerRaw = useCallback((index: number, raw: string) => {
     setOwners(prev => {
@@ -50,6 +52,31 @@ export function AkquiseMode() {
       next[index] = { raw, parsed: parseOwnerString(raw), phone: next[index].phone };
       return next;
     });
+  }, []);
+
+  // Smart paste: detect multi-line paste and split into multiple owners
+  const handlePaste = useCallback((index: number, e: React.ClipboardEvent<HTMLInputElement>) => {
+    const pasted = e.clipboardData.getData('text');
+    if (!pasted) return;
+
+    // Check if pasted text contains multiple owners (newlines or semicolons)
+    const lines = pasted.split(/[\n;]/).map(s => s.trim()).filter(Boolean);
+    if (lines.length > 1) {
+      e.preventDefault();
+      setOwners(prev => {
+        const next = [...prev];
+        // Fill current + add new entries for remaining lines
+        lines.forEach((line, i) => {
+          const targetIdx = index + i;
+          if (targetIdx < next.length) {
+            next[targetIdx] = { raw: line, parsed: parseOwnerString(line), phone: '' };
+          } else if (next.length < 10) {
+            next.push({ raw: line, parsed: parseOwnerString(line), phone: '' });
+          }
+        });
+        return next;
+      });
+    }
   }, []);
 
   const updateOwnerPhone = useCallback((index: number, phone: string) => {
@@ -91,10 +118,48 @@ export function AkquiseMode() {
   useEffect(() => {
     setOwners([createEmptyOwner()]);
     setGisOpened(false);
+    // Auto-focus owner input after property change
+    setTimeout(() => ownerInputRef.current?.focus(), 100);
   }, [currentIndex]);
 
   // Reset index when zone filter changes
   useEffect(() => { setCurrentIndex(0); }, [zoneFilter]);
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Don't trigger in dropdowns/selects
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'SELECT') return;
+
+      // Ctrl+Enter or Ctrl+S → Save & Next
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'Enter' || e.key === 's')) {
+        e.preventDefault();
+        handleSave();
+        return;
+      }
+      // Ctrl+→ → Skip
+      if ((e.ctrlKey || e.metaKey) && e.key === 'ArrowRight') {
+        e.preventDefault();
+        handleSkip();
+        return;
+      }
+      // Ctrl+G → Open GIS
+      if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
+        e.preventDefault();
+        if (portalUrl) { window.open(portalUrl, '_blank'); setGisOpened(true); }
+        return;
+      }
+      // Ctrl+H → Hide
+      if ((e.ctrlKey || e.metaKey) && e.key === 'h') {
+        e.preventDefault();
+        handleHide();
+        return;
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  });
 
   // GIS URL
   const portalUrl = current?.egrid
@@ -419,9 +484,11 @@ export function AkquiseMode() {
                         Eigentümer einfügen (Name, Adresse, etc. – wird automatisch getrennt)
                       </Label>
                       <Input
+                        ref={idx === 0 ? ownerInputRef : undefined}
                         placeholder="z.B. Meier, Michael, Habsburgstrasse 9, 8057 Zürich, Schweiz, Alleineigentum"
                         value={owner.raw}
                         onChange={e => updateOwnerRaw(idx, e.target.value)}
+                        onPaste={e => handlePaste(idx, e)}
                         className="h-10 font-mono text-xs"
                         autoFocus={idx === 0}
                       />
@@ -519,23 +586,49 @@ export function AkquiseMode() {
           </div>
 
           {/* Action buttons */}
-          <div className="px-8 py-5 bg-muted/30 border-t flex flex-col sm:flex-row gap-3">
-            <Button variant="ghost" onClick={handleHide} disabled={processing} className="text-muted-foreground">
-              <EyeOff className="h-4 w-4 mr-2" /> Ausblenden
-            </Button>
-            <Button variant="outline" onClick={handleSkip} disabled={processing}>
-              <SkipForward className="h-4 w-4 mr-2" /> Überspringen
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={processing || !selectedPhone || remaining <= 0}
-              className="sm:ml-auto h-12 px-8 text-base"
-              size="lg"
-            >
-              <Check className="h-5 w-5 mr-2" />
-              {hasAnyOwner ? 'Speichern & Nächstes' : 'Kein Ergebnis & Nächstes'}
-              <ArrowRight className="h-4 w-4 ml-2" />
-            </Button>
+          <div className="px-8 py-5 bg-muted/30 border-t space-y-3">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" onClick={handleHide} disabled={processing} className="text-muted-foreground">
+                      <EyeOff className="h-4 w-4 mr-2" /> Ausblenden
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent><kbd className="font-mono text-xs">Ctrl+H</kbd></TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" onClick={handleSkip} disabled={processing}>
+                      <SkipForward className="h-4 w-4 mr-2" /> Überspringen
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent><kbd className="font-mono text-xs">Ctrl+→</kbd></TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={handleSave}
+                      disabled={processing || !selectedPhone || remaining <= 0}
+                      className="sm:ml-auto h-12 px-8 text-base"
+                      size="lg"
+                    >
+                      <Check className="h-5 w-5 mr-2" />
+                      {hasAnyOwner ? 'Speichern & Nächstes' : 'Kein Ergebnis & Nächstes'}
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent><kbd className="font-mono text-xs">Ctrl+Enter</kbd></TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
+              <Keyboard className="h-3 w-3" />
+              <span><kbd className="bg-muted px-1 rounded font-mono">Ctrl+Enter</kbd> Speichern</span>
+              <span><kbd className="bg-muted px-1 rounded font-mono">Ctrl+→</kbd> Skip</span>
+              <span><kbd className="bg-muted px-1 rounded font-mono">Ctrl+G</kbd> GIS</span>
+              <span><kbd className="bg-muted px-1 rounded font-mono">Ctrl+H</kbd> Ausblenden</span>
+            </div>
           </div>
         </CardContent>
       </Card>
