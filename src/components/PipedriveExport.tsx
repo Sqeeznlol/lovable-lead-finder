@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { Download, Send, CheckCircle, AlertCircle, Loader2, Users, SkipForward, ArchiveRestore, Archive } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Download, Send, CheckCircle, AlertCircle, Loader2, Users, SkipForward, ArchiveRestore, Archive, Phone, PhoneOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
