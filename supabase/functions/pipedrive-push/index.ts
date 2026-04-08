@@ -16,8 +16,6 @@ const FIELD_GESCHOSSE = 'df02438b21bc6d823e3abf7dc7d4a71f2239724e';
 const FIELD_EGRID = 'd210ce9334d6812187af1be8b71b7c97f6afd8db';
 const FIELD_EGID = '0c81850c8b58b9d88b9ff57b919824bc8f7b6c91';
 const FIELD_GEMEINDE = 'e9bd061887c619b93d0ad759dfbef11e55e4c58a';
-const FIELD_ADRESSE = '3f9bb1e671f9d3a2a264d056d827844ea33670db';
-const FIELD_MAPS = '58fa258249a145c3264c66e66c3f6e2d78837cfe';
 
 const PropertySchema = z.object({
   id: z.string(),
@@ -277,9 +275,6 @@ Deno.serve(async (req) => {
         }
 
         // 5. Create Deal with all custom fields
-        const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(prop.address + (prop.plz_ort ? ', ' + prop.plz_ort : ''))}`;
-        const fullAddress = prop.address + (prop.plz_ort ? ', ' + prop.plz_ort : '');
-
         const dealData: Record<string, unknown> = {
           title: dealTitle,
           person_id: personId,
@@ -297,8 +292,7 @@ Deno.serve(async (req) => {
         if (prop.egrid) dealData[FIELD_EGRID] = prop.egrid;
         if (prop.gwr_egid) dealData[FIELD_EGID] = prop.gwr_egid;
         if (prop.gemeinde) dealData[FIELD_GEMEINDE] = prop.gemeinde;
-        dealData[FIELD_ADRESSE] = fullAddress;
-        dealData[FIELD_MAPS] = mapsUrl;
+
 
         const dealRes = await pipedrivePost('/deals', PIPEDRIVE_API_TOKEN, dealData);
         const dealId = dealRes?.data?.id;
