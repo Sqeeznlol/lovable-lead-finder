@@ -193,6 +193,7 @@ export function Vorauswahl() {
               className="w-20 h-9"
             />
           </div>
+        </div>
         <div className="flex gap-3 text-sm text-muted-foreground">
           <span>✅ {stats.interessant}</span>
           <span>❌ {stats.ausgeblendet}</span>
