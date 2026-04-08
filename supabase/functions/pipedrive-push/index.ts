@@ -131,6 +131,46 @@ async function findExistingPerson(token: string, name: string): Promise<number |
   return null;
 }
 
+// --- Create or update a person in Pipedrive ---
+
+async function upsertPerson(
+  token: string,
+  ownerName: string,
+  ownerPhone: string | null | undefined,
+  orgId: number | undefined,
+): Promise<number | undefined> {
+  const { firstName, lastName } = parseOwnerForPipedrive(ownerName);
+  const displayName = firstName ? `${firstName} ${lastName}` : lastName;
+  const cleanPhone = cleanPhoneNumber(ownerPhone);
+
+  const existingPerson = await findExistingPerson(token, displayName);
+  if (existingPerson) {
+    const updatePayload: Record<string, unknown> = {};
+    if (orgId) updatePayload.org_id = orgId;
+    if (cleanPhone) updatePayload.phone = [{ value: cleanPhone, primary: true }];
+    if (Object.keys(updatePayload).length > 0) {
+      await fetch(`${PIPEDRIVE_BASE}/persons/${existingPerson}?api_token=${token}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatePayload),
+      });
+    }
+    return existingPerson;
+  }
+
+  // Create new person (no address field – Pipedrive v1 rejects it)
+  const personData: Record<string, unknown> = {
+    name: displayName,
+    first_name: firstName,
+    last_name: lastName,
+  };
+  if (orgId) personData.org_id = orgId;
+  if (cleanPhone) personData.phone = [{ value: cleanPhone, primary: true }];
+
+  const personRes = await pipedrivePost('/persons', token, personData);
+  return personRes?.data?.id;
+}
+
 // --- Main Handler ---
 
 Deno.serve(async (req) => {
@@ -154,9 +194,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Batch dedup
     const exportedAddresses = new Set<string>();
-    const results: { propertyId: string; leadId?: string; personId?: number; orgId?: number; skipped?: boolean; error?: string }[] = [];
+    const results: { propertyId: string; leadId?: string; personId?: number; person2Id?: number; orgId?: number; skipped?: boolean; error?: string }[] = [];
 
     for (const prop of parsed.data.properties) {
       try {
@@ -188,66 +227,26 @@ Deno.serve(async (req) => {
         });
         const orgId = orgRes?.data?.id;
 
-        // 3. Find or create Person (owner 1)
+        // 3. Create/update Person 1 (primary owner)
         let personId: number | undefined;
         if (prop.owner_name) {
-          const { firstName, lastName } = parseOwnerForPipedrive(prop.owner_name);
-          const displayName = firstName ? `${firstName} ${lastName}` : lastName;
-          const cleanPhone = cleanPhoneNumber(prop.owner_phone);
-          const ownerStreet = extractStreetFromAddress(prop.owner_name);
-          const personAddress = prop.owner_address || ownerStreet;
-
-          const existingPerson = await findExistingPerson(PIPEDRIVE_API_TOKEN, displayName);
-          if (existingPerson) {
-            personId = existingPerson;
-            if (cleanPhone) {
-              await fetch(`${PIPEDRIVE_BASE}/persons/${personId}?api_token=${PIPEDRIVE_API_TOKEN}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone: [{ value: cleanPhone, primary: true }], org_id: orgId }),
-              });
-            }
-          } else {
-            const personData: Record<string, unknown> = {
-              name: displayName,
-              first_name: firstName,
-              last_name: lastName,
-              org_id: orgId,
-            };
-            if (cleanPhone) personData.phone = [{ value: cleanPhone, primary: true }];
-            if (personAddress) personData.address = personAddress;
-            const personRes = await pipedrivePost('/persons', PIPEDRIVE_API_TOKEN, personData);
-            personId = personRes?.data?.id;
-          }
+          personId = await upsertPerson(PIPEDRIVE_API_TOKEN, prop.owner_name, prop.owner_phone, orgId);
         }
 
-        // 4. Person 2
+        // 4. Create/update Person 2 (secondary owner)
+        let person2Id: number | undefined;
         if (prop.owner_name_2) {
-          const { firstName: fn2, lastName: ln2 } = parseOwnerForPipedrive(prop.owner_name_2);
-          const displayName2 = fn2 ? `${fn2} ${ln2}` : ln2;
-          const cleanPhone2 = cleanPhoneNumber(prop.owner_phone_2);
-          const ownerStreet2 = extractStreetFromAddress(prop.owner_name_2);
-          const personAddress2 = prop.owner_address_2 || ownerStreet2;
-
-          const existing2 = await findExistingPerson(PIPEDRIVE_API_TOKEN, displayName2);
-          if (!existing2) {
-            const personData2: Record<string, unknown> = {
-              name: displayName2, first_name: fn2, last_name: ln2, org_id: orgId,
-            };
-            if (cleanPhone2) personData2.phone = [{ value: cleanPhone2, primary: true }];
-            if (personAddress2) personData2.address = personAddress2;
-            await pipedrivePost('/persons', PIPEDRIVE_API_TOKEN, personData2);
-          }
+          person2Id = await upsertPerson(PIPEDRIVE_API_TOKEN, prop.owner_name_2, prop.owner_phone_2, orgId);
         }
 
-        // 5. Create Lead with custom fields (Leads share Deal custom fields)
+        // 5. Create Lead with custom fields
         const leadData: Record<string, unknown> = {
           title: leadTitle,
           person_id: personId,
           organization_id: orgId,
         };
 
-        // Custom fields
+        // Custom fields (shared between Leads & Deals)
         if (prop.zone) leadData[FIELD_ZONE] = prop.zone;
         if (prop.baujahr) leadData[FIELD_BAUJAHR] = prop.baujahr;
         if (prop.gebaeudeflaeche) leadData[FIELD_HNF] = Math.round(prop.gebaeudeflaeche);
@@ -257,6 +256,7 @@ Deno.serve(async (req) => {
         if (prop.gwr_egid) leadData[FIELD_EGID] = prop.gwr_egid;
         if (prop.gemeinde) leadData[FIELD_GEMEINDE] = prop.gemeinde;
 
+        console.log('Creating lead:', JSON.stringify({ title: leadTitle, person_id: personId, organization_id: orgId }));
         const leadRes = await pipedrivePost('/leads', PIPEDRIVE_API_TOKEN, leadData);
         const leadId = leadRes?.data?.id;
 
@@ -266,7 +266,7 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // 6. Add note via Notes API (with address, maps link, user notes)
+        // 6. Add note via Notes API (address + maps + user notes)
         const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(prop.address + (prop.plz_ort ? ', ' + prop.plz_ort : ''))}`;
         const noteLines: string[] = [];
         noteLines.push(`<b>Adresse:</b> ${prop.address}${prop.plz_ort ? ', ' + prop.plz_ort : ''}`);
@@ -279,7 +279,7 @@ Deno.serve(async (req) => {
         });
 
         exportedAddresses.add(prop.address);
-        results.push({ propertyId: prop.id, leadId, personId, orgId: orgId || undefined });
+        results.push({ propertyId: prop.id, leadId, personId, person2Id, orgId: orgId || undefined });
       } catch (err) {
         results.push({ propertyId: prop.id, error: String(err) });
       }
