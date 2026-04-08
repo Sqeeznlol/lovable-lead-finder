@@ -62,6 +62,37 @@ async function pipedrivePost(path: string, token: string, body: unknown) {
   return res.json();
 }
 
+// --- Lead Label Cache ---
+
+const labelCache = new Map<string, string>();
+
+async function getOrCreateLeadLabel(token: string, zone: string): Promise<string | undefined> {
+  if (!zone) return undefined;
+  if (labelCache.has(zone)) return labelCache.get(zone);
+
+  // Fetch existing lead labels
+  const res = await pipedriveGet('/leadLabels', token);
+  const labels = res?.data || [];
+  for (const label of labels) {
+    if (label.name === zone) {
+      labelCache.set(zone, label.id);
+      return label.id;
+    }
+  }
+
+  // Create new label
+  const createRes = await pipedrivePost('/leadLabels', token, {
+    name: zone,
+    color: 'blue',
+  });
+  const newId = createRes?.data?.id;
+  if (newId) {
+    labelCache.set(zone, newId);
+    return newId;
+  }
+  return undefined;
+}
+
 // --- Name Parsing ---
 
 function parseOwnerForPipedrive(rawName: string | null | undefined): { firstName: string; lastName: string } {
@@ -145,8 +176,9 @@ async function upsertPerson(
 
   const existingPerson = await findExistingPerson(token, displayName);
   if (existingPerson) {
+    // Don't overwrite org_id – person may own multiple properties.
+    // The lead itself links person + org together.
     const updatePayload: Record<string, unknown> = {};
-    if (orgId) updatePayload.org_id = orgId;
     if (cleanPhone) updatePayload.phone = [{ value: cleanPhone, primary: true }];
     if (Object.keys(updatePayload).length > 0) {
       await fetch(`${PIPEDRIVE_BASE}/persons/${existingPerson}?api_token=${token}`, {
@@ -239,12 +271,14 @@ Deno.serve(async (req) => {
           person2Id = await upsertPerson(PIPEDRIVE_API_TOKEN, prop.owner_name_2, prop.owner_phone_2, orgId);
         }
 
-        // 5. Create Lead with custom fields
+        // 5. Create Lead with custom fields + zone label
+        const labelId = await getOrCreateLeadLabel(PIPEDRIVE_API_TOKEN, prop.zone || '');
         const leadData: Record<string, unknown> = {
           title: leadTitle,
           person_id: personId,
           organization_id: orgId,
         };
+        if (labelId) leadData.label_ids = [labelId];
 
         // Custom fields (shared between Leads & Deals)
         if (prop.zone) leadData[FIELD_ZONE] = prop.zone;
