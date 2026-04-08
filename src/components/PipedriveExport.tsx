@@ -227,7 +227,7 @@ export function PipedriveExport() {
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 {showArchive ? 'Exportierte Deals' : `Vorschau (erste ${Math.min(properties.length, 10)})`}
               </p>
-              {(showArchive ? properties : properties.slice(0, 10)).map(p => (
+              {(showArchive ? archiveDisplayed : properties.slice(0, 10)).map(p => (
                 <div key={p.id} className="flex items-center gap-3 bg-background rounded-lg px-3 py-2 text-sm">
                   <Users className="h-4 w-4 text-primary flex-shrink-0" />
                   <div className="flex-1 min-w-0">
