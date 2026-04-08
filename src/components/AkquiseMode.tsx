@@ -44,6 +44,7 @@ export function AkquiseMode() {
   const [owners, setOwners] = useState<OwnerEntry[]>([createEmptyOwner()]);
   const [processing, setProcessing] = useState(false);
   const [gisOpened, setGisOpened] = useState(false);
+  const ownerInputRef = useRef<HTMLInputElement>(null);
 
   const updateOwnerRaw = useCallback((index: number, raw: string) => {
     setOwners(prev => {
@@ -51,6 +52,31 @@ export function AkquiseMode() {
       next[index] = { raw, parsed: parseOwnerString(raw), phone: next[index].phone };
       return next;
     });
+  }, []);
+
+  // Smart paste: detect multi-line paste and split into multiple owners
+  const handlePaste = useCallback((index: number, e: React.ClipboardEvent<HTMLInputElement>) => {
+    const pasted = e.clipboardData.getData('text');
+    if (!pasted) return;
+
+    // Check if pasted text contains multiple owners (newlines or semicolons)
+    const lines = pasted.split(/[\n;]/).map(s => s.trim()).filter(Boolean);
+    if (lines.length > 1) {
+      e.preventDefault();
+      setOwners(prev => {
+        const next = [...prev];
+        // Fill current + add new entries for remaining lines
+        lines.forEach((line, i) => {
+          const targetIdx = index + i;
+          if (targetIdx < next.length) {
+            next[targetIdx] = { raw: line, parsed: parseOwnerString(line), phone: '' };
+          } else if (next.length < 10) {
+            next.push({ raw: line, parsed: parseOwnerString(line), phone: '' });
+          }
+        });
+        return next;
+      });
+    }
   }, []);
 
   const updateOwnerPhone = useCallback((index: number, phone: string) => {
