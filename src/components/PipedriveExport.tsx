@@ -20,7 +20,7 @@ export function PipedriveExport() {
   const updateProp = useUpdateProperty();
   const { toast } = useToast();
   const [pushing, setPushing] = useState(false);
-  const [pushResult, setPushResult] = useState<{ created: number; skipped: number; errors: number } | null>(null);
+  const [pushResult, setPushResult] = useState<{ created: number; skipped: number; errors: number; errorDetails: Array<{ address: string; error: string }> } | null>(null);
   const [restoring, setRestoring] = useState<string | null>(null);
 
   const properties = result?.data || [];
