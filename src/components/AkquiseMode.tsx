@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ExternalLink, Check, SkipForward, EyeOff, ArrowRight, Phone, Zap, MapPin, Calendar, Layers, Home, Ruler, Search, Plus, Trash2, AlertTriangle, Keyboard } from 'lucide-react';
+import { ExternalLink, Check, SkipForward, EyeOff, ArrowRight, Phone, Zap, MapPin, Calendar, Layers, Home, Ruler, Search, Plus, Trash2, AlertTriangle, Keyboard, Eye, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -44,6 +44,7 @@ export function AkquiseMode() {
   const [owners, setOwners] = useState<OwnerEntry[]>([createEmptyOwner()]);
   const [processing, setProcessing] = useState(false);
   const [gisOpened, setGisOpened] = useState(false);
+  const [prescreen, setPrescreen] = useState(true);
   const ownerInputRef = useRef<HTMLInputElement>(null);
 
   const updateOwnerRaw = useCallback((index: number, raw: string) => {
@@ -118,6 +119,7 @@ export function AkquiseMode() {
   useEffect(() => {
     setOwners([createEmptyOwner()]);
     setGisOpened(false);
+    setPrescreen(true);
     // Auto-focus owner input after property change
     setTimeout(() => ownerInputRef.current?.focus(), 100);
   }, [currentIndex]);
@@ -128,29 +130,49 @@ export function AkquiseMode() {
   // Global keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Don't trigger in dropdowns/selects
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'SELECT') return;
 
-      // Ctrl+Enter or Ctrl+S → Save & Next
+      // Prescreen phase shortcuts
+      if (prescreen) {
+        // Enter or Ctrl+Enter → Interessant (proceed)
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          setPrescreen(false);
+          setTimeout(() => ownerInputRef.current?.focus(), 100);
+          return;
+        }
+        // ArrowRight or Ctrl+→ → Skip
+        if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          handleSkip();
+          return;
+        }
+        // Ctrl+H or just H → Hide
+        if (e.key === 'h' || e.key === 'H') {
+          e.preventDefault();
+          handleHide();
+          return;
+        }
+        return;
+      }
+
+      // Akquise phase shortcuts
       if ((e.ctrlKey || e.metaKey) && (e.key === 'Enter' || e.key === 's')) {
         e.preventDefault();
         handleSave();
         return;
       }
-      // Ctrl+→ → Skip
       if ((e.ctrlKey || e.metaKey) && e.key === 'ArrowRight') {
         e.preventDefault();
         handleSkip();
         return;
       }
-      // Ctrl+G → Open GIS
       if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
         e.preventDefault();
         if (portalUrl) { window.open(portalUrl, '_blank'); setGisOpened(true); }
         return;
       }
-      // Ctrl+H → Hide
       if ((e.ctrlKey || e.metaKey) && e.key === 'h') {
         e.preventDefault();
         handleHide();
@@ -172,6 +194,11 @@ export function AkquiseMode() {
 
   const googleMapsUrl = current?.address
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(current.address + (current.plz_ort ? ', ' + current.plz_ort : ''))}`
+    : null;
+
+  // Embeddable Google Maps URL for prescreen
+  const mapsEmbedUrl = current?.address
+    ? `https://maps.google.com/maps?q=${encodeURIComponent(current.address + (current.plz_ort ? ', ' + current.plz_ort : ''))}&t=k&z=18&output=embed`
     : null;
 
   const ownerOrt = current?.plz_ort || current?.gemeinde || '';
@@ -395,241 +422,295 @@ export function AkquiseMode() {
             </div>
           </div>
 
-          {/* GIS Section */}
-          <div className="px-8 py-5 border-t border-b space-y-3">
-            <div className="rounded-lg bg-primary/5 border border-primary/20 px-4 py-3 space-y-1">
-              <p className="text-xs font-semibold text-primary uppercase tracking-wider">Anleitung Eigentumsauskunft</p>
-              <ol className="text-sm text-muted-foreground space-y-0.5 list-decimal list-inside">
-                <li>Klicke auf die <span className="font-medium text-foreground">markierte Parzelle</span> in der Karte</li>
-                <li>Wähle <span className="font-medium text-foreground">"Eigentumsauskunft"</span> im Menü</li>
-                <li>SMS-Code eingeben und Eigentümer ablesen</li>
-              </ol>
-            </div>
-
-            <div className="flex gap-3">
-              <Button
-                onClick={() => {
-                  if (portalUrl) { window.open(portalUrl, '_blank'); setGisOpened(true); }
-                }}
-                disabled={!portalUrl}
-                className="flex-1 h-12 text-base gap-2"
-              >
-                <MapPin className="h-5 w-5" />
-                GIS Eigentumsauskunft
-                <ExternalLink className="h-4 w-4 ml-auto" />
-              </Button>
-              {googleMapsUrl ? (
-                <a
-                  href={googleMapsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-12 px-4 py-2"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  Google Maps
-                </a>
-              ) : (
-                <Button variant="outline" className="h-12 gap-2" disabled>
-                  <ExternalLink className="h-4 w-4" />
-                  Google Maps
-                </Button>
-              )}
-            </div>
-
-            {gisOpened && (
-              <p className="text-sm text-primary font-medium flex items-center gap-2">
-                <Check className="h-4 w-4" />
-                GIS geöffnet – Eigentumsauskunft abrufen
-              </p>
-            )}
-          </div>
-
-          {/* Owner inputs — dynamic list */}
-          <div className="px-8 py-6 space-y-4">
-            {owners.map((owner, idx) => {
-              const ownerType = classifyOwner(owner.raw);
-              const isNonPerson = owner.raw.trim() && ownerType !== 'person';
-              return (
-                <div key={idx} className={`space-y-3 ${idx > 0 ? 'border-t pt-4' : ''}`}>
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm font-semibold">Eigentümer {idx + 1}</Label>
-                    <div className="flex gap-2 items-center">
-                      {owner.raw.trim() && (
-                        <>
-                          {isNonPerson && (
-                            <Badge className={`${ownerTypeColor(ownerType)} text-[10px]`}>{ownerTypeLabel(ownerType)}</Badge>
-                          )}
-                          <Button size="sm" variant="outline" className="h-7 text-xs gap-1"
-                            onClick={() => window.open(telSearchUrlParsed(owner.parsed, ownerOrt), '_blank')}>
-                            <Search className="h-3 w-3" /> tel.search
-                          </Button>
-                          <Button size="sm" variant="outline" className="h-7 text-xs gap-1"
-                            onClick={() => window.open(opendiUrlParsed(owner.parsed), '_blank')}>
-                            <Search className="h-3 w-3" /> Opendi
-                          </Button>
-                        </>
-                      )}
-                      {idx > 0 && (
-                        <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" onClick={() => removeOwner(idx)}>
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      )}
-                    </div>
+          {prescreen ? (
+            /* ─── VORAUSWAHL: Map preview + quick decision ─── */
+            <>
+              {/* Embedded Google Maps */}
+              <div className="border-t">
+                {mapsEmbedUrl ? (
+                  <iframe
+                    src={mapsEmbedUrl}
+                    className="w-full h-72 sm:h-80"
+                    style={{ border: 0 }}
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                    allowFullScreen
+                    title="Google Maps Vorschau"
+                  />
+                ) : (
+                  <div className="w-full h-72 sm:h-80 flex items-center justify-center bg-muted/30">
+                    <p className="text-muted-foreground text-sm">Keine Kartenvorschau verfügbar</p>
                   </div>
+                )}
+              </div>
 
-                  {/* Single paste field + parsed display */}
-                  <div className="space-y-2">
-                    <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">
-                        Eigentümer einfügen (Name, Adresse, etc. – wird automatisch getrennt)
-                      </Label>
-                      <Input
-                        ref={idx === 0 ? ownerInputRef : undefined}
-                        placeholder="z.B. Meier, Michael, Habsburgstrasse 9, 8057 Zürich, Schweiz, Alleineigentum"
-                        value={owner.raw}
-                        onChange={e => updateOwnerRaw(idx, e.target.value)}
-                        onPaste={e => handlePaste(idx, e)}
-                        className="h-10 font-mono text-xs"
-                        autoFocus={idx === 0}
-                      />
-                    </div>
+              {/* Quick decision buttons */}
+              <div className="px-8 py-5 bg-muted/30 border-t space-y-3">
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button variant="ghost" onClick={handleHide} disabled={processing} className="text-muted-foreground gap-2">
+                    <EyeOff className="h-4 w-4" /> Ausblenden
+                  </Button>
+                  <Button variant="outline" onClick={handleSkip} disabled={processing} className="gap-2">
+                    <SkipForward className="h-4 w-4" /> Überspringen
+                  </Button>
+                  <Button
+                    onClick={() => { setPrescreen(false); setTimeout(() => ownerInputRef.current?.focus(), 100); }}
+                    className="sm:ml-auto h-12 px-8 text-base gap-2"
+                    size="lg"
+                  >
+                    <ThumbsUp className="h-5 w-5" />
+                    Interessant – Weiter zur Akquise
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
+                  <Keyboard className="h-3 w-3" />
+                  <span><kbd className="bg-muted px-1 rounded font-mono">Enter</kbd> Interessant</span>
+                  <span><kbd className="bg-muted px-1 rounded font-mono">→</kbd> Skip</span>
+                  <span><kbd className="bg-muted px-1 rounded font-mono">H</kbd> Ausblenden</span>
+                </div>
+              </div>
+            </>
+          ) : (
+            /* ─── AKQUISE: GIS + Owner inputs ─── */
+            <>
+              {/* GIS Section */}
+              <div className="px-8 py-5 border-t border-b space-y-3">
+                <div className="rounded-lg bg-primary/5 border border-primary/20 px-4 py-3 space-y-1">
+                  <p className="text-xs font-semibold text-primary uppercase tracking-wider">Anleitung Eigentumsauskunft</p>
+                  <ol className="text-sm text-muted-foreground space-y-0.5 list-decimal list-inside">
+                    <li>Klicke auf die <span className="font-medium text-foreground">markierte Parzelle</span> in der Karte</li>
+                    <li>Wähle <span className="font-medium text-foreground">"Eigentumsauskunft"</span> im Menü</li>
+                    <li>SMS-Code eingeben und Eigentümer ablesen</li>
+                  </ol>
+                </div>
 
-                    {/* Show parsed result */}
-                    {owner.raw.trim() && (
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                        <div className="bg-muted/50 rounded px-2 py-1.5">
-                          <span className="text-muted-foreground">Name: </span>
-                          <span className="font-medium">{owner.parsed.fullName || '–'}</span>
-                        </div>
-                        <div className="bg-muted/50 rounded px-2 py-1.5">
-                          <span className="text-muted-foreground">Adresse: </span>
-                          <span className="font-medium">{owner.parsed.address || '–'}</span>
-                        </div>
-                        <div className="bg-muted/50 rounded px-2 py-1.5">
-                          <span className="text-muted-foreground">Eigentum: </span>
-                          <span className="font-medium">{owner.parsed.ownershipType || '–'}</span>
-                        </div>
-                        <div className="bg-muted/50 rounded px-2 py-1.5">
-                          <span className="text-muted-foreground">Suche: </span>
-                          <span className="font-medium text-primary">{owner.parsed.searchName || '–'}</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Phone field */}
-                    <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">Telefon</Label>
-                      <Input
-                        placeholder="+41 79 123 45 67"
-                        value={owner.phone}
-                        onChange={e => updateOwnerPhone(idx, e.target.value)}
-                        className="h-10"
-                      />
-                    </div>
-                  </div>
-
-                  {/* AG/Stadt warning */}
-                  {isNonPerson && (
-                    <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 flex items-start gap-3">
-                      <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-xs font-semibold text-destructive">
-                          {ownerType === 'stadt' ? 'Öffentlicher Eigentümer' : 'Firma / AG'}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {ownerType === 'stadt'
-                            ? 'Stadt/Gemeinde/Kanton – verkauft praktisch nie.'
-                            : 'Firmen/AGs verkaufen selten einzelne Liegenschaften.'}
-                        </p>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        className="shrink-0 gap-1 text-xs h-7"
-                        disabled={processing}
-                        onClick={async () => {
-                          if (!current) return;
-                          setProcessing(true);
-                          try {
-                            await updateProp.mutateAsync({
-                              id: current.id,
-                              is_queried: true,
-                              owner_name: owner.parsed.fullName || owner.raw || null,
-                              owner_address: owner.parsed.address || null,
-                              status: 'Ausgeblendet',
-                              notes: (current.notes ? current.notes + '\n' : '') + `Eigentümer-Typ: ${ownerTypeLabel(ownerType)} – nicht interessant`,
-                            });
-                            toast({ title: '⚠️ Ausgeblendet – weiter' });
-                            moveToNext();
-                          } catch {
-                            toast({ title: 'Fehler', variant: 'destructive' });
-                          } finally {
-                            setProcessing(false);
-                          }
-                        }}
-                      >
-                        <EyeOff className="h-3 w-3" />
-                        Ausblenden
-                      </Button>
-                    </div>
+                <div className="flex gap-3">
+                  <Button
+                    onClick={() => {
+                      if (portalUrl) { window.open(portalUrl, '_blank'); setGisOpened(true); }
+                    }}
+                    disabled={!portalUrl}
+                    className="flex-1 h-12 text-base gap-2"
+                  >
+                    <MapPin className="h-5 w-5" />
+                    GIS Eigentumsauskunft
+                    <ExternalLink className="h-4 w-4 ml-auto" />
+                  </Button>
+                  {googleMapsUrl ? (
+                    <a
+                      href={googleMapsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-12 px-4 py-2"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      Google Maps
+                    </a>
+                  ) : (
+                    <Button variant="outline" className="h-12 gap-2" disabled>
+                      <ExternalLink className="h-4 w-4" />
+                      Google Maps
+                    </Button>
                   )}
                 </div>
-              );
-            })}
 
-            {/* Add owner button */}
-            {owners.length < 10 && (
-              <Button size="sm" variant="ghost" className="text-xs text-muted-foreground gap-1" onClick={addOwner}>
-                <Plus className="h-3 w-3" /> Weiteren Eigentümer hinzufügen ({owners.length}/10)
-              </Button>
-            )}
-          </div>
+                {gisOpened && (
+                  <p className="text-sm text-primary font-medium flex items-center gap-2">
+                    <Check className="h-4 w-4" />
+                    GIS geöffnet – Eigentumsauskunft abrufen
+                  </p>
+                )}
+              </div>
 
-          {/* Action buttons */}
-          <div className="px-8 py-5 bg-muted/30 border-t space-y-3">
-            <div className="flex flex-col sm:flex-row gap-3">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" onClick={handleHide} disabled={processing} className="text-muted-foreground">
-                      <EyeOff className="h-4 w-4 mr-2" /> Ausblenden
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent><kbd className="font-mono text-xs">Ctrl+H</kbd></TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="outline" onClick={handleSkip} disabled={processing}>
-                      <SkipForward className="h-4 w-4 mr-2" /> Überspringen
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent><kbd className="font-mono text-xs">Ctrl+→</kbd></TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      onClick={handleSave}
-                      disabled={processing || !selectedPhone || remaining <= 0}
-                      className="sm:ml-auto h-12 px-8 text-base"
-                      size="lg"
-                    >
-                      <Check className="h-5 w-5 mr-2" />
-                      {hasAnyOwner ? 'Speichern & Nächstes' : 'Kein Ergebnis & Nächstes'}
-                      <ArrowRight className="h-4 w-4 ml-2" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent><kbd className="font-mono text-xs">Ctrl+Enter</kbd></TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-            <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
-              <Keyboard className="h-3 w-3" />
-              <span><kbd className="bg-muted px-1 rounded font-mono">Ctrl+Enter</kbd> Speichern</span>
-              <span><kbd className="bg-muted px-1 rounded font-mono">Ctrl+→</kbd> Skip</span>
-              <span><kbd className="bg-muted px-1 rounded font-mono">Ctrl+G</kbd> GIS</span>
-              <span><kbd className="bg-muted px-1 rounded font-mono">Ctrl+H</kbd> Ausblenden</span>
-            </div>
-          </div>
+              {/* Owner inputs — dynamic list */}
+              <div className="px-8 py-6 space-y-4">
+                {owners.map((owner, idx) => {
+                  const ownerType = classifyOwner(owner.raw);
+                  const isNonPerson = owner.raw.trim() && ownerType !== 'person';
+                  return (
+                    <div key={idx} className={`space-y-3 ${idx > 0 ? 'border-t pt-4' : ''}`}>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-semibold">Eigentümer {idx + 1}</Label>
+                        <div className="flex gap-2 items-center">
+                          {owner.raw.trim() && (
+                            <>
+                              {isNonPerson && (
+                                <Badge className={`${ownerTypeColor(ownerType)} text-[10px]`}>{ownerTypeLabel(ownerType)}</Badge>
+                              )}
+                              <Button size="sm" variant="outline" className="h-7 text-xs gap-1"
+                                onClick={() => window.open(telSearchUrlParsed(owner.parsed, ownerOrt), '_blank')}>
+                                <Search className="h-3 w-3" /> tel.search
+                              </Button>
+                              <Button size="sm" variant="outline" className="h-7 text-xs gap-1"
+                                onClick={() => window.open(opendiUrlParsed(owner.parsed), '_blank')}>
+                                <Search className="h-3 w-3" /> Opendi
+                              </Button>
+                            </>
+                          )}
+                          {idx > 0 && (
+                            <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" onClick={() => removeOwner(idx)}>
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Single paste field + parsed display */}
+                      <div className="space-y-2">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">
+                            Eigentümer einfügen (Name, Adresse, etc. – wird automatisch getrennt)
+                          </Label>
+                          <Input
+                            ref={idx === 0 ? ownerInputRef : undefined}
+                            placeholder="z.B. Meier, Michael, Habsburgstrasse 9, 8057 Zürich, Schweiz, Alleineigentum"
+                            value={owner.raw}
+                            onChange={e => updateOwnerRaw(idx, e.target.value)}
+                            onPaste={e => handlePaste(idx, e)}
+                            className="h-10 font-mono text-xs"
+                            autoFocus={idx === 0}
+                          />
+                        </div>
+
+                        {/* Show parsed result */}
+                        {owner.raw.trim() && (
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                            <div className="bg-muted/50 rounded px-2 py-1.5">
+                              <span className="text-muted-foreground">Name: </span>
+                              <span className="font-medium">{owner.parsed.fullName || '–'}</span>
+                            </div>
+                            <div className="bg-muted/50 rounded px-2 py-1.5">
+                              <span className="text-muted-foreground">Adresse: </span>
+                              <span className="font-medium">{owner.parsed.address || '–'}</span>
+                            </div>
+                            <div className="bg-muted/50 rounded px-2 py-1.5">
+                              <span className="text-muted-foreground">Eigentum: </span>
+                              <span className="font-medium">{owner.parsed.ownershipType || '–'}</span>
+                            </div>
+                            <div className="bg-muted/50 rounded px-2 py-1.5">
+                              <span className="text-muted-foreground">Suche: </span>
+                              <span className="font-medium text-primary">{owner.parsed.searchName || '–'}</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Phone field */}
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Telefon</Label>
+                          <Input
+                            placeholder="+41 79 123 45 67"
+                            value={owner.phone}
+                            onChange={e => updateOwnerPhone(idx, e.target.value)}
+                            className="h-10"
+                          />
+                        </div>
+                      </div>
+
+                      {/* AG/Stadt warning */}
+                      {isNonPerson && (
+                        <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 flex items-start gap-3">
+                          <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                          <div className="flex-1">
+                            <p className="text-xs font-semibold text-destructive">
+                              {ownerType === 'stadt' ? 'Öffentlicher Eigentümer' : 'Firma / AG'}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {ownerType === 'stadt'
+                                ? 'Stadt/Gemeinde/Kanton – verkauft praktisch nie.'
+                                : 'Firmen/AGs verkaufen selten einzelne Liegenschaften.'}
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="shrink-0 gap-1 text-xs h-7"
+                            disabled={processing}
+                            onClick={async () => {
+                              if (!current) return;
+                              setProcessing(true);
+                              try {
+                                await updateProp.mutateAsync({
+                                  id: current.id,
+                                  is_queried: true,
+                                  owner_name: owner.parsed.fullName || owner.raw || null,
+                                  owner_address: owner.parsed.address || null,
+                                  status: 'Ausgeblendet',
+                                  notes: (current.notes ? current.notes + '\n' : '') + `Eigentümer-Typ: ${ownerTypeLabel(ownerType)} – nicht interessant`,
+                                });
+                                toast({ title: '⚠️ Ausgeblendet – weiter' });
+                                moveToNext();
+                              } catch {
+                                toast({ title: 'Fehler', variant: 'destructive' });
+                              } finally {
+                                setProcessing(false);
+                              }
+                            }}
+                          >
+                            <EyeOff className="h-3 w-3" />
+                            Ausblenden
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Add owner button */}
+                {owners.length < 10 && (
+                  <Button size="sm" variant="ghost" className="text-xs text-muted-foreground gap-1" onClick={addOwner}>
+                    <Plus className="h-3 w-3" /> Weiteren Eigentümer hinzufügen ({owners.length}/10)
+                  </Button>
+                )}
+              </div>
+
+              {/* Action buttons */}
+              <div className="px-8 py-5 bg-muted/30 border-t space-y-3">
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" onClick={handleHide} disabled={processing} className="text-muted-foreground">
+                          <EyeOff className="h-4 w-4 mr-2" /> Ausblenden
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent><kbd className="font-mono text-xs">Ctrl+H</kbd></TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="outline" onClick={handleSkip} disabled={processing}>
+                          <SkipForward className="h-4 w-4 mr-2" /> Überspringen
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent><kbd className="font-mono text-xs">Ctrl+→</kbd></TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          onClick={handleSave}
+                          disabled={processing || !selectedPhone || remaining <= 0}
+                          className="sm:ml-auto h-12 px-8 text-base"
+                          size="lg"
+                        >
+                          <Check className="h-5 w-5 mr-2" />
+                          {hasAnyOwner ? 'Speichern & Nächstes' : 'Kein Ergebnis & Nächstes'}
+                          <ArrowRight className="h-4 w-4 ml-2" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent><kbd className="font-mono text-xs">Ctrl+Enter</kbd></TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
+                  <Keyboard className="h-3 w-3" />
+                  <span><kbd className="bg-muted px-1 rounded font-mono">Ctrl+Enter</kbd> Speichern</span>
+                  <span><kbd className="bg-muted px-1 rounded font-mono">Ctrl+→</kbd> Skip</span>
+                  <span><kbd className="bg-muted px-1 rounded font-mono">Ctrl+G</kbd> GIS</span>
+                  <span><kbd className="bg-muted px-1 rounded font-mono">Ctrl+H</kbd> Ausblenden</span>
+                </div>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
