@@ -132,11 +132,26 @@ function extractStreetFromAddress(rawName: string | null | undefined): string {
   return addressParts.join(', ');
 }
 
-// --- Clean phone number (only digits and +) ---
+// --- Clean phone number and format to Swiss +41 ---
 
 function cleanPhoneNumber(phone: string | null | undefined): string {
   if (!phone) return '';
-  return phone.replace(/[^\d+]/g, '');
+  // Strip everything except digits and +
+  let num = phone.replace(/[^\d+]/g, '');
+  if (!num) return '';
+  
+  // Convert to +41 format
+  if (num.startsWith('0041')) {
+    num = '+41' + num.slice(4);
+  } else if (num.startsWith('41') && !num.startsWith('+')) {
+    num = '+' + num;
+  } else if (num.startsWith('0')) {
+    num = '+41' + num.slice(1);
+  } else if (!num.startsWith('+')) {
+    num = '+41' + num;
+  }
+  
+  return num;
 }
 
 // --- Duplicate Check ---
