@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ExternalLink, Check, SkipForward, EyeOff, ArrowRight, Phone, Zap, MapPin, Calendar, Layers, Home, Ruler, Search, Plus, Trash2, AlertTriangle, Keyboard, Eye, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { ExternalLink, Check, SkipForward, EyeOff, ArrowRight, Phone, Zap, MapPin, Calendar, Layers, Home, Ruler, Search, Plus, Trash2, AlertTriangle, Keyboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useUnqueriedProperties, useUpdateProperty, useZones } from '@/hooks/use-properties';
+import { usePreselectedProperties, useUpdateProperty, useZones } from '@/hooks/use-properties';
 import { usePhoneNumbers, useIncrementPhoneQuery } from '@/hooks/use-phones';
 import { useToast } from '@/hooks/use-toast';
 import { calculateDealScore, scoreColor, scoreBg } from '@/lib/deal-score';
@@ -35,7 +35,7 @@ export function AkquiseMode() {
   const [baujahrBis, setBaujahrBis] = useState<string>('1980');
   const { data: zones } = useZones();
 
-  const { data: queue, refetch } = useUnqueriedProperties(100);
+  const { data: queue, refetch } = usePreselectedProperties(100);
   const updateProp = useUpdateProperty();
   const incrementPhone = useIncrementPhoneQuery();
   const { toast } = useToast();
@@ -44,7 +44,6 @@ export function AkquiseMode() {
   const [owners, setOwners] = useState<OwnerEntry[]>([createEmptyOwner()]);
   const [processing, setProcessing] = useState(false);
   const [gisOpened, setGisOpened] = useState(false);
-  const [prescreen, setPrescreen] = useState(true);
   const ownerInputRef = useRef<HTMLInputElement>(null);
 
   const updateOwnerRaw = useCallback((index: number, raw: string) => {
@@ -119,8 +118,6 @@ export function AkquiseMode() {
   useEffect(() => {
     setOwners([createEmptyOwner()]);
     setGisOpened(false);
-    setPrescreen(true);
-    // Auto-focus owner input after property change
     setTimeout(() => ownerInputRef.current?.focus(), 100);
   }, [currentIndex]);
 
