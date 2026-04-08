@@ -297,6 +297,8 @@ Deno.serve(async (req) => {
         if (prop.egrid) dealData[FIELD_EGRID] = prop.egrid;
         if (prop.gwr_egid) dealData[FIELD_EGID] = prop.gwr_egid;
         if (prop.gemeinde) dealData[FIELD_GEMEINDE] = prop.gemeinde;
+        dealData[FIELD_ADRESSE] = fullAddress;
+        dealData[FIELD_MAPS] = mapsUrl;
 
         const dealRes = await pipedrivePost('/deals', PIPEDRIVE_API_TOKEN, dealData);
         const dealId = dealRes?.data?.id;
