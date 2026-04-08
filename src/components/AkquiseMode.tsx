@@ -320,13 +320,16 @@ export function AkquiseMode() {
             <div className="flex items-center justify-between">
               <Label className="text-sm font-semibold">Eigentümer 1</Label>
               {ownerName && (
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
+                  {classifyOwner(ownerName) !== 'person' && (
+                    <Badge className={`${ownerTypeColor(classifyOwner(ownerName))} text-[10px]`}>{ownerTypeLabel(classifyOwner(ownerName))}</Badge>
+                  )}
                   <Button size="sm" variant="outline" className="h-7 text-xs gap-1"
-                    onClick={() => window.open(telSearchUrl(ownerName, current.plz_ort || current.gemeinde || ''), '_blank')}>
+                    onClick={() => window.open(telSearchUrlParsed(parsed1, ownerOrt), '_blank')}>
                     <Search className="h-3 w-3" /> tel.search.ch
                   </Button>
                   <Button size="sm" variant="outline" className="h-7 text-xs gap-1"
-                    onClick={() => window.open(opendiUrl(ownerName), '_blank')}>
+                    onClick={() => window.open(opendiUrlParsed(parsed1), '_blank')}>
                     <Search className="h-3 w-3" /> Opendi
                   </Button>
                 </div>
@@ -360,11 +363,11 @@ export function AkquiseMode() {
                     {ownerName2 && (
                       <>
                         <Button size="sm" variant="outline" className="h-7 text-xs gap-1"
-                          onClick={() => window.open(telSearchUrl(ownerName2, current.plz_ort || current.gemeinde || ''), '_blank')}>
+                          onClick={() => window.open(telSearchUrlParsed(parsed2, ownerOrt), '_blank')}>
                           <Search className="h-3 w-3" /> tel.search.ch
                         </Button>
                         <Button size="sm" variant="outline" className="h-7 text-xs gap-1"
-                          onClick={() => window.open(opendiUrl(ownerName2), '_blank')}>
+                          onClick={() => window.open(opendiUrlParsed(parsed2), '_blank')}>
                           <Search className="h-3 w-3" /> Opendi
                         </Button>
                       </>
