@@ -118,6 +118,25 @@ export function useUnqueriedProperties(limit: number) {
         .like('zone', 'W%')
         .or('baujahr.lte.1980,baujahr.is.null')
         .eq('geb_status', 'Bestehend')
+        .not('status', 'in', '("Ausgeblendet","Nicht interessant","Vorausgewählt")')
+        .order('gebaeudeflaeche', { ascending: false, nullsFirst: false })
+        .order('area', { ascending: false, nullsFirst: false })
+        .limit(limit);
+      if (error) throw error;
+      return data as Property[];
+    },
+  });
+}
+
+export function usePreselectedProperties(limit: number) {
+  return useQuery({
+    queryKey: ['properties', 'preselected', limit],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('properties')
+        .select('*')
+        .eq('status', 'Vorausgewählt')
+        .eq('is_queried', false)
         .order('gebaeudeflaeche', { ascending: false, nullsFirst: false })
         .order('area', { ascending: false, nullsFirst: false })
         .limit(limit);
