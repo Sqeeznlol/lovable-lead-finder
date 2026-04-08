@@ -31,6 +31,7 @@ export function AkquiseMode() {
   const remaining = selectedPhone ? Math.max(0, 5 - selectedPhone.daily_queries_used) : 0;
 
   const [zoneFilter, setZoneFilter] = useState<string>('Alle');
+  const [baujahrBis, setBaujahrBis] = useState<string>('1980');
   const { data: zones } = useZones();
 
   const { data: queue, refetch } = useUnqueriedProperties(100);
