@@ -14,6 +14,7 @@ import { calculateDealScore, scoreColor, scoreBg } from '@/lib/deal-score';
 export function Vorauswahl() {
   const [zoneFilter, setZoneFilter] = useState<string>('Alle');
   const [baujahrBis, setBaujahrBis] = useState<string>('1980');
+  const [maxWhg, setMaxWhg] = useState<string>('');
   const { data: zones } = useZones();
   const { data: queue, refetch } = useUnqueriedProperties(200);
   const updateProp = useUpdateProperty();
@@ -24,17 +25,19 @@ export function Vorauswahl() {
   const [stats, setStats] = useState({ interessant: 0, ausgeblendet: 0, skipped: 0 });
 
   const baujahrMax = baujahrBis ? parseInt(baujahrBis, 10) : null;
+  const maxWhgNum = maxWhg ? parseInt(maxWhg, 10) : null;
   const items = (queue || [])
     .filter(p => p.status === 'Neu' || p.status === 'Offen')
     .filter(p => zoneFilter === 'Alle' || p.zone === zoneFilter)
     .filter(p => !baujahrMax || !p.baujahr || p.baujahr <= baujahrMax)
+    .filter(p => !maxWhgNum || !p.wohnungen || Number(p.wohnungen) <= maxWhgNum)
     .map(p => ({ ...p, _score: calculateDealScore(p) }))
     .sort((a, b) => b._score - a._score);
 
   const current = items[currentIndex];
   const score = current?._score ?? 0;
 
-  useEffect(() => { setCurrentIndex(0); }, [zoneFilter, baujahrBis]);
+  useEffect(() => { setCurrentIndex(0); }, [zoneFilter, baujahrBis, maxWhg]);
 
   const moveToNext = useCallback(() => {
     if (currentIndex < items.length - 1) {
@@ -177,6 +180,17 @@ export function Vorauswahl() {
               value={baujahrBis}
               onChange={e => setBaujahrBis(e.target.value)}
               className="w-24 h-9"
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Label htmlFor="va-maxwhg" className="text-xs text-muted-foreground whitespace-nowrap">Max Whg.</Label>
+            <Input
+              id="va-maxwhg"
+              type="number"
+              value={maxWhg}
+              onChange={e => setMaxWhg(e.target.value)}
+              placeholder="∞"
+              className="w-20 h-9"
             />
           </div>
         </div>
