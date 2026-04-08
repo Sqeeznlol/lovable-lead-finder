@@ -320,44 +320,35 @@ Deno.serve(async (req) => {
         const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(prop.address + (prop.plz_ort ? ', ' + prop.plz_ort : ''))}`;
         const fullAddress = prop.address + (prop.plz_ort ? ', ' + prop.plz_ort : '');
 
-        // 6. Create Lead with custom fields
+        // 6. Create Lead with custom fields included directly
         const leadData: Record<string, unknown> = {
           title: leadTitle,
           person_id: personId,
           organization_id: orgId,
+          // Custom fields (leads inherit deal custom fields)
+          [FIELD_ADRESSE]: fullAddress,
+          [FIELD_MAPS]: mapsUrl,
         };
         if (labelId) {
           leadData.label_ids = [labelId];
         }
+        if (prop.zone) leadData[FIELD_ZONE] = prop.zone;
+        if (prop.baujahr) leadData[FIELD_BAUJAHR] = prop.baujahr;
+        if (prop.gebaeudeflaeche) leadData[FIELD_HNF] = Math.round(prop.gebaeudeflaeche);
+        if (prop.area) leadData[FIELD_GRUNDSTUECK] = Math.round(prop.area);
+        if (prop.geschosse) leadData[FIELD_GESCHOSSE] = prop.geschosse;
+        if (prop.egrid) leadData[FIELD_EGRID] = prop.egrid;
+        if (prop.gwr_egid) leadData[FIELD_EGID] = prop.gwr_egid;
+        if (prop.gemeinde) leadData[FIELD_GEMEINDE] = prop.gemeinde;
 
         const leadRes = await pipedrivePost('/leads', PIPEDRIVE_API_TOKEN, leadData);
         const leadId = leadRes?.data?.id;
 
         if (!leadId) {
+          // Log full response for debugging
+          console.error('Lead creation failed:', JSON.stringify(leadRes));
           results.push({ propertyId: prop.id, error: `Lead creation failed: ${JSON.stringify(leadRes)}` });
           continue;
-        }
-
-        // 7. Convert lead to deal to set custom fields, then back? 
-        // Actually: Leads inherit deal custom fields. We need to PATCH the lead with custom fields.
-        const leadPatchData: Record<string, unknown> = {};
-        if (prop.zone) leadPatchData[FIELD_ZONE] = prop.zone;
-        if (prop.baujahr) leadPatchData[FIELD_BAUJAHR] = prop.baujahr;
-        if (prop.gebaeudeflaeche) leadPatchData[FIELD_HNF] = Math.round(prop.gebaeudeflaeche);
-        if (prop.area) leadPatchData[FIELD_GRUNDSTUECK] = Math.round(prop.area);
-        if (prop.geschosse) leadPatchData[FIELD_GESCHOSSE] = prop.geschosse;
-        if (prop.egrid) leadPatchData[FIELD_EGRID] = prop.egrid;
-        if (prop.gwr_egid) leadPatchData[FIELD_EGID] = prop.gwr_egid;
-        if (prop.gemeinde) leadPatchData[FIELD_GEMEINDE] = prop.gemeinde;
-        leadPatchData[FIELD_ADRESSE] = fullAddress;
-        leadPatchData[FIELD_MAPS] = mapsUrl;
-
-        if (Object.keys(leadPatchData).length > 0) {
-          await fetch(`${PIPEDRIVE_BASE}/leads/${leadId}?api_token=${PIPEDRIVE_API_TOKEN}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(leadPatchData),
-          });
         }
 
         // 8. Add note if we have notes
