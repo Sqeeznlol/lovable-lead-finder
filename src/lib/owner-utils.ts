@@ -135,23 +135,31 @@ export function parseMultipleOwners(raw: string): ParsedOwner[] {
 }
 
 /**
- * Generate tel.search.ch URL with smart name handling
+ * Generate search.ch/tel URL: "Nachname, Vorname  Strasse"
  */
 export function telSearchUrl(name: string, ort?: string): string {
   const parsed = parseOwnerString(name);
-  const searchName = parsed.searchName || name;
-  // For tel.search, use "firstName lastName" format with location
-  const q = [searchName, ort].filter(Boolean).join(' ');
-  return `https://tel.search.ch/?was=${encodeURIComponent(q)}`;
+  return telSearchUrlParsed(parsed, ort);
 }
 
 /**
- * Generate tel.search.ch URL from parsed owner with their own address
+ * Generate search.ch/tel URL from parsed owner
+ * Format: "Nachname, Vorname  Strassenname" (without PLZ/Ort)
  */
 export function telSearchUrlParsed(parsed: ParsedOwner, fallbackOrt?: string): string {
-  const location = parsed.address || fallbackOrt || '';
-  const q = [parsed.searchName, location].filter(Boolean).join(' ');
-  return `https://tel.search.ch/?was=${encodeURIComponent(q)}`;
+  // Extract just the street name (first part of address before comma)
+  const addressParts = (parsed.address || '').split(',').map(s => s.trim());
+  const street = addressParts[0] || '';
+
+  let q: string;
+  if (parsed.lastName && parsed.firstName) {
+    // "Meier, Michael  Habsburgstrasse"
+    q = `${parsed.lastName}, ${parsed.firstName}  ${street}`.trim();
+  } else {
+    q = [parsed.searchName || parsed.fullName, street].filter(Boolean).join('  ');
+  }
+
+  return `https://search.ch/tel/?all=${encodeURIComponent(q)}`;
 }
 
 /**
