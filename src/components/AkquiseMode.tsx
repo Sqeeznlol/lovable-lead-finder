@@ -118,10 +118,48 @@ export function AkquiseMode() {
   useEffect(() => {
     setOwners([createEmptyOwner()]);
     setGisOpened(false);
+    // Auto-focus owner input after property change
+    setTimeout(() => ownerInputRef.current?.focus(), 100);
   }, [currentIndex]);
 
   // Reset index when zone filter changes
   useEffect(() => { setCurrentIndex(0); }, [zoneFilter]);
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Don't trigger in dropdowns/selects
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'SELECT') return;
+
+      // Ctrl+Enter or Ctrl+S → Save & Next
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'Enter' || e.key === 's')) {
+        e.preventDefault();
+        handleSave();
+        return;
+      }
+      // Ctrl+→ → Skip
+      if ((e.ctrlKey || e.metaKey) && e.key === 'ArrowRight') {
+        e.preventDefault();
+        handleSkip();
+        return;
+      }
+      // Ctrl+G → Open GIS
+      if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
+        e.preventDefault();
+        if (portalUrl) { window.open(portalUrl, '_blank'); setGisOpened(true); }
+        return;
+      }
+      // Ctrl+H → Hide
+      if ((e.ctrlKey || e.metaKey) && e.key === 'h') {
+        e.preventDefault();
+        handleHide();
+        return;
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  });
 
   // GIS URL
   const portalUrl = current?.egrid
