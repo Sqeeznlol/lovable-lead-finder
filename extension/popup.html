@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 320px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0a0a0a;
+      color: #fafafa;
+      padding: 16px;
+    }
+    h1 { font-size: 14px; font-weight: 700; margin-bottom: 12px; }
+    .status {
+      background: #1a1a2e;
+      border: 1px solid #262640;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+    .status-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+    .status-value { font-size: 13px; font-weight: 600; margin-top: 4px; }
+    .status-value.active { color: #22c55e; }
+    .status-value.waiting { color: #f59e0b; }
+    .status-value.idle { color: #666; }
+    .info { font-size: 11px; color: #666; line-height: 1.5; }
+    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+    .dot.green { background: #22c55e; }
+    .dot.yellow { background: #f59e0b; animation: pulse 1.5s infinite; }
+    .dot.gray { background: #444; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+  </style>
+</head>
+<body>
+  <h1>🏠 Akquise GIS Automation</h1>
+  <div class="status">
+    <div class="status-label">Status</div>
+    <div class="status-value idle" id="statusText">
+      <span class="dot gray" id="statusDot"></span>
+      Bereit
+    </div>
+  </div>
+  <div class="status" id="jobInfo" style="display:none">
+    <div class="status-label">Aktiver Job</div>
+    <div class="status-value" id="jobEgrid" style="font-family:monospace;font-size:12px;color:#aaa"></div>
+  </div>
+  <p class="info">
+    Die Automatisierung wird von der Akquise-App gesteuert. Klicke dort auf "Auto-Recherche" um eine Eigentumsauskunft zu starten.
+  </p>
+  <script src="popup.js"></script>
+</body>
+</html>

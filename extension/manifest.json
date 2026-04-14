@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "Akquise GIS Automation",
+  "version": "1.0.0",
+  "description": "Automatisiert die Eigentumsauskunft über maps.zh.ch und das kantonale Portal",
+  "permissions": ["activeTab", "storage", "tabs", "scripting"],
+  "host_permissions": [
+    "https://maps.zh.ch/*",
+    "https://portal.objektwesen.zh.ch/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://maps.zh.ch/*"],
+      "js": ["content-gis.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://portal.objektwesen.zh.ch/*"],
+      "js": ["content-portal.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://*.lovable.app/*", "http://localhost:*/*"],
+      "js": ["content-app.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "externally_connectable": {
+    "matches": ["https://*.lovable.app/*", "http://localhost:*/*"]
+  },
+  "icons": {
+    "48": "icon.png",
+    "128": "icon.png"
+  }
+}
