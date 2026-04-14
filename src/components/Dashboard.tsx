@@ -1,9 +1,10 @@
-import { Building2, Users, Search, Clock, Sparkles, Send, Phone, AlertTriangle, TrendingUp, CheckCircle } from 'lucide-react';
+import { Building2, Users, Search, Sparkles, Send, Phone, AlertTriangle, TrendingUp, CheckCircle, Eye, BarChart3, Clock } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { usePropertyStats } from '@/hooks/use-properties';
+import { useVorauswahlStats } from '@/hooks/use-vorauswahl-stats';
 import { usePhoneNumbers } from '@/hooks/use-phones';
 import { supabase } from '@/integrations/supabase/client';
 import { useState } from 'react';
@@ -11,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 
 export function Dashboard() {
   const { data: stats } = usePropertyStats();
+  const { data: vaStats } = useVorauswahlStats();
   const { data: phones } = usePhoneNumbers();
   const { toast } = useToast();
   const [analyzing, setAnalyzing] = useState(false);
@@ -55,6 +57,31 @@ export function Dashboard() {
           {analyzing ? 'Analysiert...' : 'KI-Analyse starten'}
         </Button>
       </div>
+
+      {/* Vorauswahl stats - prominent */}
+      <Card className="border-none shadow-md bg-gradient-to-br from-primary/5 to-accent/5">
+        <CardContent className="p-5">
+          <h3 className="font-semibold mb-3 flex items-center gap-2">
+            <Eye className="h-4 w-4 text-primary" /> Vorauswahl-Fortschritt
+          </h3>
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+            {[
+              { label: 'Insgesamt', value: vaStats?.total ?? 0, color: 'text-foreground' },
+              { label: 'Offen', value: vaStats?.pending ?? 0, color: 'text-warning' },
+              { label: 'Interessant', value: vaStats?.approved ?? 0, color: 'text-accent' },
+              { label: 'Nicht int.', value: vaStats?.rejected ?? 0, color: 'text-destructive' },
+              { label: 'Heute bearb.', value: vaStats?.todayProcessed ?? 0, color: 'text-primary' },
+              { label: 'Fortschritt', value: `${vaStats?.progressPercent ?? 0}%`, color: 'text-primary' },
+            ].map(s => (
+              <div key={s.label} className="text-center">
+                <p className={`text-xl font-bold ${s.color}`}>{typeof s.value === 'number' ? s.value.toLocaleString('de-CH') : s.value}</p>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{s.label}</p>
+              </div>
+            ))}
+          </div>
+          <Progress value={vaStats?.progressPercent ?? 0} className="h-1.5 mt-3" />
+        </CardContent>
+      </Card>
 
       {/* Key Metrics */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -130,9 +157,15 @@ export function Dashboard() {
         <Card className="border-none shadow-md">
           <CardContent className="p-6">
             <h3 className="font-semibold mb-3 flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-warning" /> Aktionen
+              <AlertTriangle className="h-4 w-4 text-warning" /> Nächste Aktionen
             </h3>
             <div className="space-y-2 text-sm">
+              {(vaStats?.pending ?? 0) > 0 && (
+                <div className="flex items-center gap-2 bg-warning/5 rounded-lg px-3 py-2">
+                  <Eye className="h-4 w-4 text-warning" />
+                  <span>{vaStats?.pending?.toLocaleString('de-CH')} noch in Vorauswahl</span>
+                </div>
+              )}
               {(stats?.statuses?.['Vorausgewählt'] ?? 0) > 0 && (
                 <div className="flex items-center gap-2 bg-primary/5 rounded-lg px-3 py-2">
                   <CheckCircle className="h-4 w-4 text-primary" />
