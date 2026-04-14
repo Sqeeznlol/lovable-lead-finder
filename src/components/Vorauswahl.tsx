@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ThumbsUp, ThumbsDown, SkipForward, EyeOff, Keyboard, MapPin, Calendar, Home, Ruler, Layers, ExternalLink } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, SkipForward, EyeOff, Keyboard, MapPin, Calendar, Home, Ruler, Layers, ExternalLink, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,18 +7,24 @@ import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useUnqueriedProperties, useUpdateProperty, useZones } from '@/hooks/use-properties';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/use-auth';
+import { supabase } from '@/integrations/supabase/client';
 import { calculateDealScore, scoreColor, scoreBg } from '@/lib/deal-score';
 
 export function Vorauswahl() {
   const [zoneFilter, setZoneFilter] = useState<string>('Alle');
   const [baujahrBis, setBaujahrBis] = useState<string>('1980');
   const [maxWhg, setMaxWhg] = useState<string>('');
+  const [minWhg, setMinWhg] = useState<string>('');
+  const [gemeindeFilter, setGemeindeFilter] = useState<string>('');
   const { data: zones } = useZones();
   const { data: queue, refetch } = useUnqueriedProperties(200);
   const updateProp = useUpdateProperty();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [processing, setProcessing] = useState(false);
