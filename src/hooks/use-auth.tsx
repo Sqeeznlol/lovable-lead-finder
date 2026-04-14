@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, createContext, useContext } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { User, Session } from '@supabase/supabase-js';
 
@@ -11,12 +11,42 @@ interface AuthState {
   loading: boolean;
 }
 
-export function useAuth() {
+interface AuthContextType extends AuthState {
+  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, displayName?: string) => Promise<{ error: Error | null }>;
+  signOut: () => Promise<void>;
+  hasRole: (role: AppRole) => boolean;
+  isAdmin: boolean;
+  isOffice: boolean;
+  isMobileSwipe: boolean;
+}
+
+const AuthContext = createContext<AuthContextType | null>(null);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const auth = useAuthInternal();
+  return <AuthContext.Provider value={auth}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth(): AuthContextType {
+  const ctx = useContext(AuthContext);
+  if (!ctx) {
+    // Fallback for components rendered outside AuthProvider
+    return {
+      user: null, session: null, roles: [], loading: false,
+      signIn: async () => ({ error: new Error('No auth provider') }),
+      signUp: async () => ({ error: new Error('No auth provider') }),
+      signOut: async () => {},
+      hasRole: () => false,
+      isAdmin: false, isOffice: false, isMobileSwipe: false,
+    };
+  }
+  return ctx;
+}
+
+function useAuthInternal(): AuthContextType {
   const [state, setState] = useState<AuthState>({
-    user: null,
-    session: null,
-    roles: [],
-    loading: true,
+    user: null, session: null, roles: [], loading: true,
   });
 
   const fetchRoles = useCallback(async (userId: string) => {
@@ -28,17 +58,22 @@ export function useAuth() {
   }, []);
 
   useEffect(() => {
+    // Set up listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         if (session?.user) {
-          const roles = await fetchRoles(session.user.id);
-          setState({ user: session.user, session, roles, loading: false });
+          // Use setTimeout to avoid Supabase deadlock
+          setTimeout(async () => {
+            const roles = await fetchRoles(session.user.id);
+            setState({ user: session.user, session, roles, loading: false });
+          }, 0);
         } else {
           setState({ user: null, session: null, roles: [], loading: false });
         }
       }
     );
 
+    // Then check existing session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         const roles = await fetchRoles(session.user.id);
@@ -58,8 +93,7 @@ export function useAuth() {
 
   const signUp = async (email: string, password: string, displayName?: string) => {
     const { error } = await supabase.auth.signUp({
-      email,
-      password,
+      email, password,
       options: {
         data: { display_name: displayName },
         emailRedirectTo: window.location.origin,
@@ -78,13 +112,6 @@ export function useAuth() {
   const isMobileSwipe = hasRole('mobile_swipe');
 
   return {
-    ...state,
-    signIn,
-    signUp,
-    signOut,
-    hasRole,
-    isAdmin,
-    isOffice,
-    isMobileSwipe,
+    ...state, signIn, signUp, signOut, hasRole, isAdmin, isOffice, isMobileSwipe,
   };
 }
