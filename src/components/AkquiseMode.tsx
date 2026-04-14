@@ -413,9 +413,22 @@ export function AkquiseMode() {
                         <p className="text-sm font-bold font-mono tracking-wider">{selectedPhone.number}</p>
                       </div>
                     </div>
-                    <Badge variant={remaining <= 1 ? 'destructive' : 'secondary'} className="text-xs">
-                      {remaining} Abfragen übrig
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs gap-1"
+                        onClick={() => {
+                          navigator.clipboard.writeText(selectedPhone.number);
+                          toast({ title: '📋 Nummer kopiert' });
+                        }}
+                      >
+                        <Copy className="h-3 w-3" /> Kopieren
+                      </Button>
+                      <Badge variant={remaining <= 1 ? 'destructive' : 'secondary'} className="text-xs">
+                        {remaining} Abfragen übrig
+                      </Badge>
+                    </div>
                   </div>
                 )}
 
