@@ -157,8 +157,8 @@ export function AkquiseMode() {
   });
 
   // Direct portal URL (skips GIS map entirely)
-  const directPortalUrl = current?.egrid && current?.bfs_nr
-    ? `https://portal.objektwesen.zh.ch/aks/detail?egrid=${current.egrid}&bfsNr=${current.bfs_nr}`
+  const directPortalUrl = current?.egrid
+    ? `https://portal.objektwesen.zh.ch/aks/detail?egrid=${current.egrid}${current.bfs_nr ? `&bfsNr=${current.bfs_nr}` : ''}`
     : null;
 
   // GIS URL as fallback
