@@ -463,13 +463,82 @@ export function AkquiseMode() {
                   </div>
                 )}
 
-                <div className="rounded-lg bg-primary/5 border border-primary/20 px-4 py-3 space-y-1">
-                  <p className="text-xs font-semibold text-primary uppercase tracking-wider">Anleitung Eigentumsauskunft</p>
-                  <ol className="text-sm text-muted-foreground space-y-0.5 list-decimal list-inside">
-                    <li>Klicke auf die <span className="font-medium text-foreground">markierte Parzelle</span> in der Karte</li>
-                    <li>Klicke <span className="font-medium text-foreground">"öffentlicher Zugang"</span> im Info-Fenster</li>
-                    <li>Nummer <span className="font-medium text-foreground font-mono">{selectedPhone?.number || '...'}</span> eingeben & SMS-Code bestätigen</li>
-                    <li>Eigentümer-Daten kopieren & hier einfügen</li>
+                {/* Auto-Recherche button (requires Chrome Extension) */}
+                {current?.egrid && selectedPhone && (
+                  <div className="rounded-lg bg-primary/10 border border-primary/30 px-4 py-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Bot className="h-4 w-4 text-primary" />
+                        <p className="text-sm font-semibold text-primary">Auto-Recherche</p>
+                        {autoStatus && (
+                          <Badge variant="outline" className="text-xs animate-pulse">{autoStatus}</Badge>
+                        )}
+                      </div>
+                      {!extensionAvailable && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs gap-1 text-muted-foreground"
+                          onClick={() => {
+                            const downloadExtension = () => {
+                              fetch('/akquise-extension.zip')
+                                .then(res => { if (!res.ok) throw new Error('Download failed'); return res.blob(); })
+                                .then(blob => {
+                                  const a = document.createElement('a');
+                                  a.href = URL.createObjectURL(blob);
+                                  a.download = 'akquise-extension.zip';
+                                  a.click();
+                                  URL.revokeObjectURL(a.href);
+                                })
+                                .catch(() => toast({ title: 'Download fehlgeschlagen', variant: 'destructive' }));
+                            };
+                            downloadExtension();
+                          }}
+                        >
+                          <Download className="h-3 w-3" /> Extension herunterladen
+                        </Button>
+                      )}
+                    </div>
+
+                    <Button
+                      onClick={() => {
+                        if (!current?.egrid || !selectedPhone) return;
+                        setAutoStatus('Starte...');
+                        // Send message to extension via custom event
+                        window.dispatchEvent(new CustomEvent('akquise-start-lookup', {
+                          detail: {
+                            egrid: current.egrid,
+                            bfsNr: current.bfs_nr || '',
+                            phoneNumber: selectedPhone.number,
+                            propertyId: current.id,
+                            appOrigin: window.location.hostname,
+                          }
+                        }));
+                        setGisOpened(true);
+                        setAutoStatus('GIS wird geöffnet...');
+                        // Timeout fallback
+                        setTimeout(() => setAutoStatus(null), 120000);
+                      }}
+                      disabled={remaining <= 0 || !!autoStatus}
+                      className="w-full h-12 text-base gap-2"
+                    >
+                      <Bot className="h-5 w-5" />
+                      {autoStatus || 'Auto-Recherche starten'}
+                    </Button>
+
+                    {!extensionAvailable && (
+                      <p className="text-[11px] text-muted-foreground">
+                        Chrome Extension benötigt. Herunterladen → entpacken → <code className="bg-muted px-1 rounded">chrome://extensions</code> → Developer Mode → Load Unpacked
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <div className="rounded-lg bg-muted/50 border border-border px-4 py-3 space-y-1">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Manuell</p>
+                  <ol className="text-xs text-muted-foreground space-y-0.5 list-decimal list-inside">
+                    <li>GIS öffnen → Parzelle klicken → "öffentlicher Zugang"</li>
+                    <li>Nummer eingeben → SMS-Code → Eigentümer kopieren</li>
                   </ol>
                 </div>
 
