@@ -19,7 +19,8 @@ export function AuthPage() {
     setLoading(true);
 
     try {
-      const email = name.includes('@') ? name : `${name.toLowerCase()}@sqeezn.local`;
+      // Support both plain name and email
+      const email = name.includes('@') ? name : `${name.toLowerCase().replace(/\s+/g, '')}@sqeezn.local`;
       const { error } = await signIn(email, password);
       if (error) {
         toast({ title: 'Anmeldung fehlgeschlagen', description: 'Name oder Passwort falsch.', variant: 'destructive' });
