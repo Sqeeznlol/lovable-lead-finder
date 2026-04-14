@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { Building2, LayoutDashboard, Upload, Phone, Menu, X, Zap, Search, FileSpreadsheet, Eye, Shield, LogOut, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dashboard } from '@/components/Dashboard';
