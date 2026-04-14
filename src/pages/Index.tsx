@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Building2, LayoutDashboard, Upload, Phone, Menu, X, Zap, Search, FileSpreadsheet, Eye, Shield, LogOut, Loader2, Sparkles } from 'lucide-react';
+import { Building2, LayoutDashboard, Upload, Phone, Menu, X, Zap, Search, FileSpreadsheet, Eye, Shield, LogOut, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dashboard } from '@/components/Dashboard';
 import { PropertyList } from '@/components/PropertyList';
@@ -15,7 +15,14 @@ import { useAuth } from '@/hooks/use-auth';
 
 type Tab = 'dashboard' | 'vorauswahl' | 'akquise' | 'telsuche' | 'properties' | 'import' | 'phones' | 'export' | 'admin';
 
-const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }>; adminOnly?: boolean }[] = [
+interface TabDef {
+  id: Tab;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  adminOnly?: boolean;
+}
+
+const allTabs: TabDef[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'vorauswahl', label: 'Vorauswahl', icon: Eye },
   { id: 'akquise', label: 'Akquise-Modus', icon: Zap },
@@ -27,8 +34,11 @@ const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: st
   { id: 'admin', label: 'Admin', icon: Shield, adminOnly: true },
 ];
 
+// mobile_swipe users only see dashboard + vorauswahl + telsuche
+const mobileSwipeTabs: Tab[] = ['dashboard', 'vorauswahl', 'telsuche'];
+
 export default function Index() {
-  const { user, loading, signOut, isAdmin } = useAuth();
+  const { user, loading, signOut, isAdmin, isOffice, isMobileSwipe } = useAuth();
   const [active, setActive] = useState<Tab>('dashboard');
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -42,7 +52,22 @@ export default function Index() {
 
   if (!user) return <AuthPage />;
 
-  const visibleTabs = tabs.filter(t => !t.adminOnly || isAdmin);
+  // If user is only mobile_swipe (not admin/office), redirect to /swipe
+  if (isMobileSwipe && !isAdmin && !isOffice) {
+    window.location.href = '/swipe';
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  const visibleTabs = allTabs.filter(t => {
+    if (t.adminOnly && !isAdmin) return false;
+    return true;
+  });
+
+  const displayName = user.user_metadata?.display_name || user.email?.split('@')[0] || 'User';
 
   return (
     <div className="flex min-h-screen">
@@ -71,7 +96,7 @@ export default function Index() {
         </nav>
         <div className="p-3 border-t">
           <div className="px-4 py-2 text-xs text-muted-foreground truncate mb-2">
-            {user.email}
+            👤 {displayName}
           </div>
           <button
             onClick={signOut}

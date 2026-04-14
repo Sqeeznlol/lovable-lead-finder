@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LogIn, UserPlus, Loader2 } from 'lucide-react';
+import { LogIn, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -8,12 +8,10 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 
 export function AuthPage() {
-  const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
   const [password, setPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn, signUp } = useAuth();
+  const { signIn } = useAuth();
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -21,19 +19,10 @@ export function AuthPage() {
     setLoading(true);
 
     try {
-      if (mode === 'login') {
-        const { error } = await signIn(email, password);
-        if (error) {
-          toast({ title: 'Anmeldung fehlgeschlagen', description: error.message, variant: 'destructive' });
-        }
-      } else {
-        const { error } = await signUp(email, password, displayName);
-        if (error) {
-          toast({ title: 'Registrierung fehlgeschlagen', description: error.message, variant: 'destructive' });
-        } else {
-          toast({ title: 'Registrierung erfolgreich', description: 'Bitte bestätige deine E-Mail-Adresse.' });
-          setMode('login');
-        }
+      const email = name.includes('@') ? name : `${name.toLowerCase()}@sqeezn.local`;
+      const { error } = await signIn(email, password);
+      if (error) {
+        toast({ title: 'Anmeldung fehlgeschlagen', description: 'Name oder Passwort falsch.', variant: 'destructive' });
       }
     } finally {
       setLoading(false);
@@ -42,36 +31,25 @@ export function AuthPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md border-none shadow-2xl">
+      <Card className="w-full max-w-sm border-none shadow-2xl">
         <CardContent className="p-8 space-y-6">
           <div className="text-center space-y-2">
             <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
               Sqeeztraum
             </h1>
-            <p className="text-sm text-muted-foreground">Immobilien-Akquise CRM</p>
+            <p className="text-sm text-muted-foreground">Immobilien-Akquise</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {mode === 'register' && (
-              <div className="space-y-1.5">
-                <Label htmlFor="displayName">Name</Label>
-                <Input
-                  id="displayName"
-                  value={displayName}
-                  onChange={e => setDisplayName(e.target.value)}
-                  placeholder="Max Mustermann"
-                />
-              </div>
-            )}
             <div className="space-y-1.5">
-              <Label htmlFor="email">E-Mail</Label>
+              <Label htmlFor="name">Name</Label>
               <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="name@firma.ch"
+                id="name"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="z.B. Karin"
                 required
+                autoComplete="username"
               />
             </div>
             <div className="space-y-1.5">
@@ -83,29 +61,17 @@ export function AuthPage() {
                 onChange={e => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
-                minLength={6}
+                autoComplete="current-password"
               />
             </div>
             <Button type="submit" className="w-full h-11" disabled={loading}>
               {loading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
-              ) : mode === 'login' ? (
-                <><LogIn className="h-4 w-4 mr-2" /> Anmelden</>
               ) : (
-                <><UserPlus className="h-4 w-4 mr-2" /> Registrieren</>
+                <><LogIn className="h-4 w-4 mr-2" /> Anmelden</>
               )}
             </Button>
           </form>
-
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {mode === 'login' ? 'Noch kein Konto? Registrieren' : 'Bereits ein Konto? Anmelden'}
-            </button>
-          </div>
         </CardContent>
       </Card>
     </div>
