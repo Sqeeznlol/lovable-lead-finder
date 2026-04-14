@@ -32,11 +32,14 @@ export function Vorauswahl() {
 
   const baujahrMax = baujahrBis ? parseInt(baujahrBis, 10) : null;
   const maxWhgNum = maxWhg ? parseInt(maxWhg, 10) : null;
+  const minWhgNum = minWhg ? parseInt(minWhg, 10) : null;
   const items = (queue || [])
     .filter(p => p.status === 'Neu' || p.status === 'Offen')
     .filter(p => zoneFilter === 'Alle' || p.zone === zoneFilter)
     .filter(p => !baujahrMax || !p.baujahr || p.baujahr <= baujahrMax)
     .filter(p => !maxWhgNum || !p.wohnungen || Number(p.wohnungen) <= maxWhgNum)
+    .filter(p => !minWhgNum || (p.wohnungen && Number(p.wohnungen) >= minWhgNum))
+    .filter(p => !gemeindeFilter || (p.gemeinde && p.gemeinde.toLowerCase().includes(gemeindeFilter.toLowerCase())))
     .map(p => ({ ...p, _score: calculateDealScore(p) }))
     .sort((a, b) => b._score - a._score);
 
