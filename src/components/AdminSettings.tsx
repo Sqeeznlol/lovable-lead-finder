@@ -64,7 +64,7 @@ export function AdminSettings() {
   const removeRole = async (userId: string, role: string) => {
     const { error } = await supabase.from('user_roles').delete()
       .eq('user_id', userId)
-      .eq('role', role);
+      .eq('role', role as 'admin' | 'office' | 'mobile_swipe');
     if (error) {
       toast({ title: 'Fehler', description: error.message, variant: 'destructive' });
     } else {
