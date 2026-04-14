@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { Building2, LayoutDashboard, Upload, Phone, Menu, X, Zap, Search, FileSpreadsheet, Eye, Shield, LogOut, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dashboard } from '@/components/Dashboard';
@@ -52,14 +53,8 @@ export default function Index() {
 
   if (!user) return <AuthPage />;
 
-  // If user is only mobile_swipe (not admin/office), redirect to /swipe
   if (isMobileSwipe && !isAdmin && !isOffice) {
-    window.location.href = '/swipe';
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <Navigate to="/swipe" replace />;
   }
 
   const visibleTabs = allTabs.filter(t => {
