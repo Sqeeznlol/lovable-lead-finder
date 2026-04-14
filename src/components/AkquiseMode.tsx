@@ -44,6 +44,8 @@ export function AkquiseMode() {
   const [owners, setOwners] = useState<OwnerEntry[]>([createEmptyOwner()]);
   const [processing, setProcessing] = useState(false);
   const [gisOpened, setGisOpened] = useState(false);
+  const [extensionAvailable, setExtensionAvailable] = useState(false);
+  const [autoStatus, setAutoStatus] = useState<string | null>(null);
   const ownerInputRef = useRef<HTMLInputElement>(null);
 
   const updateOwnerRaw = useCallback((index: number, raw: string) => {
