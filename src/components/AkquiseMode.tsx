@@ -156,14 +156,21 @@ export function AkquiseMode() {
     return () => window.removeEventListener('keydown', handler);
   });
 
-  // GIS URL
-  const portalUrl = current?.egrid
+  // Direct portal URL (skips GIS map entirely)
+  const directPortalUrl = current?.egrid && current?.bfs_nr
+    ? `https://portal.objektwesen.zh.ch/aks/detail?egrid=${current.egrid}&bfsNr=${current.bfs_nr}`
+    : null;
+
+  // GIS URL as fallback
+  const gisUrl = current?.egrid
     ? `https://maps.zh.ch/?locate=parz&locations=${current.egrid}&topic=DLGOWfarbigZH&scale=500`
     : current?.parzelle && current?.bfs_nr
       ? `https://maps.zh.ch/?locate=parz&locations=${current.bfs_nr},${current.parzelle}&topic=DLGOWfarbigZH&scale=500`
       : current?.address
         ? `https://maps.zh.ch/?topic=DLGOWfarbigZH&search=${encodeURIComponent(current.address + (current.plz_ort ? ' ' + current.plz_ort : ''))}&scale=500`
         : null;
+
+  const portalUrl = directPortalUrl || gisUrl;
 
   const googleMapsUrl = current?.address
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(current.address + (current.plz_ort ? ', ' + current.plz_ort : ''))}`
