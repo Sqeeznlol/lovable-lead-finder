@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ThumbsUp, ThumbsDown, SkipForward, EyeOff, Keyboard, MapPin, Calendar, Home, Ruler, Layers, ExternalLink } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, SkipForward, EyeOff, Keyboard, MapPin, Calendar, Home, Ruler, Layers, ExternalLink, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,18 +7,24 @@ import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useUnqueriedProperties, useUpdateProperty, useZones } from '@/hooks/use-properties';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/use-auth';
+import { supabase } from '@/integrations/supabase/client';
 import { calculateDealScore, scoreColor, scoreBg } from '@/lib/deal-score';
 
 export function Vorauswahl() {
   const [zoneFilter, setZoneFilter] = useState<string>('Alle');
   const [baujahrBis, setBaujahrBis] = useState<string>('1980');
   const [maxWhg, setMaxWhg] = useState<string>('');
+  const [minWhg, setMinWhg] = useState<string>('');
+  const [gemeindeFilter, setGemeindeFilter] = useState<string>('');
   const { data: zones } = useZones();
   const { data: queue, refetch } = useUnqueriedProperties(200);
   const updateProp = useUpdateProperty();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [processing, setProcessing] = useState(false);
@@ -26,18 +32,21 @@ export function Vorauswahl() {
 
   const baujahrMax = baujahrBis ? parseInt(baujahrBis, 10) : null;
   const maxWhgNum = maxWhg ? parseInt(maxWhg, 10) : null;
+  const minWhgNum = minWhg ? parseInt(minWhg, 10) : null;
   const items = (queue || [])
     .filter(p => p.status === 'Neu' || p.status === 'Offen')
     .filter(p => zoneFilter === 'Alle' || p.zone === zoneFilter)
     .filter(p => !baujahrMax || !p.baujahr || p.baujahr <= baujahrMax)
     .filter(p => !maxWhgNum || !p.wohnungen || Number(p.wohnungen) <= maxWhgNum)
+    .filter(p => !minWhgNum || (p.wohnungen && Number(p.wohnungen) >= minWhgNum))
+    .filter(p => !gemeindeFilter || (p.gemeinde && p.gemeinde.toLowerCase().includes(gemeindeFilter.toLowerCase())))
     .map(p => ({ ...p, _score: calculateDealScore(p) }))
     .sort((a, b) => b._score - a._score);
 
   const current = items[currentIndex];
   const score = current?._score ?? 0;
 
-  useEffect(() => { setCurrentIndex(0); }, [zoneFilter, baujahrBis, maxWhg]);
+  useEffect(() => { setCurrentIndex(0); }, [zoneFilter, baujahrBis, maxWhg, minWhg, gemeindeFilter]);
 
   const moveToNext = useCallback(() => {
     if (currentIndex < items.length - 1) {
@@ -48,11 +57,27 @@ export function Vorauswahl() {
     }
   }, [currentIndex, items.length, refetch]);
 
+  const logDecision = useCallback(async (decision: string) => {
+    if (!current || !user) return;
+    await supabase.from('property_decisions').insert({
+      property_id: current.id,
+      user_id: user.id,
+      ai_score: current.ai_score ? Number(current.ai_score) : null,
+      ai_recommendation: current.ai_recommendation,
+      user_decision: decision,
+      decision_matches_ai: current.ai_recommendation
+        ? (decision === 'interessant' && current.ai_recommendation === 'interessant') ||
+          (decision === 'nicht_interessant' && current.ai_recommendation === 'eher nicht interessant')
+        : null,
+    });
+  }, [current, user]);
+
   const handleInteressant = useCallback(async () => {
     if (!current || processing) return;
     setProcessing(true);
     try {
-      await updateProp.mutateAsync({ id: current.id, status: 'Vorausgewählt' });
+      await updateProp.mutateAsync({ id: current.id, status: 'Vorausgewählt', review_status: 'approved', decided_by: user?.id, decided_at: new Date().toISOString() });
+      await logDecision('interessant');
       setStats(s => ({ ...s, interessant: s.interessant + 1 }));
       toast({ title: '👍 Vorausgewählt' });
       moveToNext();
@@ -61,13 +86,14 @@ export function Vorauswahl() {
     } finally {
       setProcessing(false);
     }
-  }, [current, processing, updateProp, moveToNext, toast]);
+  }, [current, processing, updateProp, moveToNext, toast, logDecision, user]);
 
   const handleNichtInteressant = useCallback(async () => {
     if (!current || processing) return;
     setProcessing(true);
     try {
-      await updateProp.mutateAsync({ id: current.id, status: 'Nicht interessant' });
+      await updateProp.mutateAsync({ id: current.id, status: 'Nicht interessant', review_status: 'rejected', decided_by: user?.id, decided_at: new Date().toISOString() });
+      await logDecision('nicht_interessant');
       setStats(s => ({ ...s, ausgeblendet: s.ausgeblendet + 1 }));
       toast({ title: '👎 Nicht interessant' });
       moveToNext();
@@ -76,7 +102,7 @@ export function Vorauswahl() {
     } finally {
       setProcessing(false);
     }
-  }, [current, processing, updateProp, moveToNext, toast]);
+  }, [current, processing, updateProp, moveToNext, toast, logDecision, user]);
 
   const handleSkip = useCallback(() => {
     setStats(s => ({ ...s, skipped: s.skipped + 1 }));
@@ -193,6 +219,11 @@ export function Vorauswahl() {
               className="w-20 h-9"
             />
           </div>
+          <div className="flex items-center gap-1.5">
+            <Label htmlFor="va-minwhg" className="text-xs text-muted-foreground whitespace-nowrap">Min Whg.</Label>
+            <Input id="va-minwhg" type="number" value={minWhg} onChange={e => setMinWhg(e.target.value)} placeholder="0" className="w-20 h-9" />
+          </div>
+          <Input value={gemeindeFilter} onChange={e => setGemeindeFilter(e.target.value)} placeholder="Gemeinde..." className="w-32 h-9" />
         </div>
         <div className="flex gap-3 text-sm text-muted-foreground">
           <span>✅ {stats.interessant}</span>
@@ -216,6 +247,16 @@ export function Vorauswahl() {
                   {current.gebaeudeart && <Badge variant="outline" className="text-xs">{current.gebaeudeart}</Badge>}
                   {current.kategorie && <Badge variant="outline" className="text-xs">{current.kategorie}</Badge>}
                   {current.wohnungen && <Badge variant="outline" className="text-xs">{current.wohnungen} Whg.</Badge>}
+                  {current.ai_recommendation && (
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Badge className={`text-xs gap-1 ${current.ai_recommendation === 'interessant' ? 'bg-accent/10 text-accent border-accent/20' : current.ai_recommendation === 'prüfen' ? 'bg-warning/10 text-warning border-warning/20' : 'bg-muted text-muted-foreground'}`}>
+                          <Sparkles className="h-3 w-3" /> KI: {current.ai_recommendation}
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent><p className="max-w-xs text-xs">{current.ai_summary || 'Keine Begründung'}</p></TooltipContent>
+                    </Tooltip>
+                  )}
                 </div>
                 <h2 className="text-2xl sm:text-3xl font-bold tracking-tight leading-tight">{current.address}</h2>
                 <p className="text-muted-foreground mt-1">{current.plz_ort || current.gemeinde || ''}</p>

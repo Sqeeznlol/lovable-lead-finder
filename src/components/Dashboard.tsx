@@ -1,38 +1,162 @@
-import { Building2, Users, Search, Clock, MapPin, Home } from 'lucide-react';
+import { Building2, Users, Search, Clock, Sparkles, Send, Phone, AlertTriangle, TrendingUp, CheckCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
 import { usePropertyStats } from '@/hooks/use-properties';
+import { usePhoneNumbers } from '@/hooks/use-phones';
+import { supabase } from '@/integrations/supabase/client';
+import { useState } from 'react';
+import { useToast } from '@/hooks/use-toast';
 
 export function Dashboard() {
   const { data: stats } = usePropertyStats();
+  const { data: phones } = usePhoneNumbers();
+  const { toast } = useToast();
+  const [analyzing, setAnalyzing] = useState(false);
 
-  const cards = [
-    { label: 'Liegenschaften', value: stats?.total?.toLocaleString('de-CH') ?? '0', icon: Building2, color: 'text-primary' },
-    { label: 'Eigentümer ermittelt', value: stats?.withOwner?.toLocaleString('de-CH') ?? '0', icon: Users, color: 'text-accent' },
-    { label: 'Abgefragt', value: stats?.queried?.toLocaleString('de-CH') ?? '0', icon: Search, color: 'text-primary' },
-    { label: 'Ausstehend', value: stats?.pending?.toLocaleString('de-CH') ?? '0', icon: Clock, color: 'text-muted-foreground' },
+  const totalCapacity = (phones || []).length * 5;
+  const usedToday = (phones || []).reduce((acc, p) => acc + p.daily_queries_used, 0);
+
+  const pipelineSteps = [
+    { label: 'Importiert', value: stats?.total ?? 0, color: 'text-muted-foreground' },
+    { label: 'Vorausgewählt', value: stats?.statuses?.['Vorausgewählt'] ?? 0, color: 'text-primary' },
+    { label: 'Eigentümer ermittelt', value: stats?.statuses?.['Eigentümer ermittelt'] ?? 0, color: 'text-accent' },
+    { label: 'Telefon gefunden', value: stats?.statuses?.['Telefon gefunden'] ?? 0, color: 'text-accent' },
+    { label: 'Exportiert', value: stats?.statuses?.['Exportiert'] ?? 0, color: 'text-primary' },
   ];
+
+  const conversionRate = (from: number, to: number) => from > 0 ? Math.round((to / from) * 100) : 0;
+
+  const triggerAiAnalysis = async () => {
+    setAnalyzing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-analyze', {
+        body: { batch_mode: true },
+      });
+      if (error) throw error;
+      toast({ title: `✅ ${data?.analyzed || 0} Liegenschaften analysiert` });
+    } catch (err) {
+      toast({ title: 'KI-Analyse Fehler', description: String(err), variant: 'destructive' });
+    } finally {
+      setAnalyzing(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
-        <p className="text-muted-foreground mt-1">Überblick über deine Akquise-Pipeline</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
+          <p className="text-muted-foreground mt-1">Überblick über deine Akquise-Pipeline</p>
+        </div>
+        <Button onClick={triggerAiAnalysis} disabled={analyzing} variant="outline" className="gap-2">
+          <Sparkles className="h-4 w-4" />
+          {analyzing ? 'Analysiert...' : 'KI-Analyse starten'}
+        </Button>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {cards.map(c => (
-          <Card key={c.label} className="border-none shadow-md bg-card">
-            <CardContent className="p-6 flex items-center gap-4">
-              <div className="rounded-xl bg-muted p-3">
-                <c.icon className={`h-6 w-6 ${c.color}`} />
+
+      {/* Key Metrics */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {[
+          { label: 'Liegenschaften', value: stats?.total ?? 0, icon: Building2, color: 'text-primary' },
+          { label: 'Eigentümer ermittelt', value: stats?.withOwner ?? 0, icon: Users, color: 'text-accent' },
+          { label: 'Mit Telefon', value: stats?.statuses?.['Telefon gefunden'] ?? 0, icon: Phone, color: 'text-accent' },
+          { label: 'Exportiert', value: stats?.statuses?.['Exportiert'] ?? 0, icon: Send, color: 'text-primary' },
+        ].map(c => (
+          <Card key={c.label} className="border-none shadow-md">
+            <CardContent className="p-5 flex items-center gap-3">
+              <div className="rounded-xl bg-muted p-2.5">
+                <c.icon className={`h-5 w-5 ${c.color}`} />
               </div>
               <div>
-                <p className="text-2xl font-bold">{c.value}</p>
-                <p className="text-sm text-muted-foreground">{c.label}</p>
+                <p className="text-2xl font-bold">{(c.value as number).toLocaleString('de-CH')}</p>
+                <p className="text-xs text-muted-foreground">{c.label}</p>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
+
+      {/* Pipeline funnel */}
+      <Card className="border-none shadow-md">
+        <CardContent className="p-6">
+          <h3 className="font-semibold mb-4 flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-primary" /> Pipeline-Funnel
+          </h3>
+          <div className="space-y-3">
+            {pipelineSteps.map((step, i) => {
+              const nextStep = pipelineSteps[i + 1];
+              const width = stats?.total ? Math.max(5, ((step.value as number) / stats.total) * 100) : 5;
+              return (
+                <div key={step.label}>
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <span className="font-medium">{step.label}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold">{(step.value as number).toLocaleString('de-CH')}</span>
+                      {nextStep && (step.value as number) > 0 && (
+                        <Badge variant="outline" className="text-[10px]">
+                          → {conversionRate(step.value as number, nextStep.value as number)}%
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  <Progress value={width} className="h-2" />
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Phone capacity + Action items */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Card className="border-none shadow-md">
+          <CardContent className="p-6">
+            <h3 className="font-semibold mb-3 flex items-center gap-2">
+              <Phone className="h-4 w-4 text-primary" /> Telefon-Kapazität
+            </h3>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Heute genutzt</span>
+                <span className="font-bold">{usedToday} / {totalCapacity}</span>
+              </div>
+              <Progress value={totalCapacity > 0 ? (usedToday / totalCapacity) * 100 : 0} className="h-2" />
+              <p className="text-xs text-muted-foreground">{phones?.length || 0} Nummern aktiv</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-none shadow-md">
+          <CardContent className="p-6">
+            <h3 className="font-semibold mb-3 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-warning" /> Aktionen
+            </h3>
+            <div className="space-y-2 text-sm">
+              {(stats?.statuses?.['Vorausgewählt'] ?? 0) > 0 && (
+                <div className="flex items-center gap-2 bg-primary/5 rounded-lg px-3 py-2">
+                  <CheckCircle className="h-4 w-4 text-primary" />
+                  <span>{stats?.statuses?.['Vorausgewählt']} bereit für Akquise</span>
+                </div>
+              )}
+              {(stats?.statuses?.['Eigentümer ermittelt'] ?? 0) > 0 && (
+                <div className="flex items-center gap-2 bg-accent/5 rounded-lg px-3 py-2">
+                  <Search className="h-4 w-4 text-accent" />
+                  <span>{stats?.statuses?.['Eigentümer ermittelt']} für Telefon-Suche</span>
+                </div>
+              )}
+              {(stats?.statuses?.['Telefon gefunden'] ?? 0) > 0 && (
+                <div className="flex items-center gap-2 bg-accent/5 rounded-lg px-3 py-2">
+                  <Send className="h-4 w-4 text-accent" />
+                  <span>{stats?.statuses?.['Telefon gefunden']} exportbereit</span>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Status distribution */}
       {stats?.statuses && Object.keys(stats.statuses).length > 0 && (
         <Card className="border-none shadow-md">
           <CardContent className="p-6">
@@ -48,6 +172,8 @@ export function Dashboard() {
           </CardContent>
         </Card>
       )}
+
+      {/* Top Gemeinden */}
       {stats?.gemeinden && Object.keys(stats.gemeinden).length > 0 && (
         <Card className="border-none shadow-md">
           <CardContent className="p-6">

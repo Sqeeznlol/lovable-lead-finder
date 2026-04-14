@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Building2, LayoutDashboard, Upload, Phone, Menu, X, Zap, Search, FileSpreadsheet, Eye } from 'lucide-react';
+import { Building2, LayoutDashboard, Upload, Phone, Menu, X, Zap, Search, FileSpreadsheet, Eye, Shield, LogOut, Loader2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dashboard } from '@/components/Dashboard';
 import { PropertyList } from '@/components/PropertyList';
@@ -9,10 +9,13 @@ import { AkquiseMode } from '@/components/AkquiseMode';
 import { TelefonSuche } from '@/components/TelefonSuche';
 import { PipedriveExport } from '@/components/PipedriveExport';
 import { Vorauswahl } from '@/components/Vorauswahl';
+import { AdminSettings } from '@/components/AdminSettings';
+import { AuthPage } from '@/components/AuthPage';
+import { useAuth } from '@/hooks/use-auth';
 
-type Tab = 'dashboard' | 'vorauswahl' | 'akquise' | 'telsuche' | 'properties' | 'import' | 'phones' | 'export';
+type Tab = 'dashboard' | 'vorauswahl' | 'akquise' | 'telsuche' | 'properties' | 'import' | 'phones' | 'export' | 'admin';
 
-const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }>; adminOnly?: boolean }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'vorauswahl', label: 'Vorauswahl', icon: Eye },
   { id: 'akquise', label: 'Akquise-Modus', icon: Zap },
@@ -21,11 +24,25 @@ const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: st
   { id: 'export', label: 'Pipedrive Export', icon: FileSpreadsheet },
   { id: 'import', label: 'CSV Import', icon: Upload },
   { id: 'phones', label: 'Telefone', icon: Phone },
+  { id: 'admin', label: 'Admin', icon: Shield, adminOnly: true },
 ];
 
 export default function Index() {
+  const { user, loading, signOut, isAdmin } = useAuth();
   const [active, setActive] = useState<Tab>('dashboard');
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) return <AuthPage />;
+
+  const visibleTabs = tabs.filter(t => !t.adminOnly || isAdmin);
 
   return (
     <div className="flex min-h-screen">
@@ -36,8 +53,8 @@ export default function Index() {
           </h1>
           <p className="text-xs text-muted-foreground mt-1">Immobilien-Akquise CRM</p>
         </div>
-        <nav className="p-3 space-y-1">
-          {tabs.map(t => (
+        <nav className="p-3 space-y-1 flex-1">
+          {visibleTabs.map(t => (
             <button
               key={t.id}
               onClick={() => { setActive(t.id); setMobileOpen(false); }}
@@ -52,6 +69,18 @@ export default function Index() {
             </button>
           ))}
         </nav>
+        <div className="p-3 border-t">
+          <div className="px-4 py-2 text-xs text-muted-foreground truncate mb-2">
+            {user.email}
+          </div>
+          <button
+            onClick={signOut}
+            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          >
+            <LogOut className="h-4 w-4" />
+            Abmelden
+          </button>
+        </div>
       </aside>
 
       {mobileOpen && <div className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm lg:hidden" onClick={() => setMobileOpen(false)} />}
@@ -72,6 +101,7 @@ export default function Index() {
           {active === 'export' && <PipedriveExport />}
           {active === 'import' && <CsvImport />}
           {active === 'phones' && <PhoneManager />}
+          {active === 'admin' && isAdmin && <AdminSettings />}
         </div>
       </main>
     </div>
