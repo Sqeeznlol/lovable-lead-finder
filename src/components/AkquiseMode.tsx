@@ -403,13 +403,39 @@ export function AkquiseMode() {
             <>
               {/* GIS Section */}
               <div className="px-8 py-5 border-t border-b space-y-3">
+                {/* Phone number hint */}
+                {selectedPhone && (
+                  <div className="rounded-lg bg-accent/10 border border-accent/20 px-4 py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Phone className="h-4 w-4 text-accent-foreground" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Nummer für SMS-Verifizierung</p>
+                        <p className="text-sm font-bold font-mono tracking-wider">{selectedPhone.number}</p>
+                      </div>
+                    </div>
+                    <Badge variant={remaining <= 1 ? 'destructive' : 'secondary'} className="text-xs">
+                      {remaining} Abfragen übrig
+                    </Badge>
+                  </div>
+                )}
+
                 <div className="rounded-lg bg-primary/5 border border-primary/20 px-4 py-3 space-y-1">
-                  <p className="text-xs font-semibold text-primary uppercase tracking-wider">Anleitung Eigentumsauskunft</p>
-                  <ol className="text-sm text-muted-foreground space-y-0.5 list-decimal list-inside">
-                    <li>Klicke auf die <span className="font-medium text-foreground">markierte Parzelle</span> in der Karte</li>
-                    <li>Wähle <span className="font-medium text-foreground">"Eigentumsauskunft"</span> im Menü</li>
-                    <li>SMS-Code eingeben und Eigentümer ablesen</li>
-                  </ol>
+                  <p className="text-xs font-semibold text-primary uppercase tracking-wider">
+                    {directPortalUrl ? 'Direkter Zugang' : 'Anleitung Eigentumsauskunft'}
+                  </p>
+                  {directPortalUrl ? (
+                    <ol className="text-sm text-muted-foreground space-y-0.5 list-decimal list-inside">
+                      <li>Portal öffnen → Eigentümerauskunft wird <span className="font-medium text-foreground">direkt geladen</span></li>
+                      <li>Nummer <span className="font-medium text-foreground font-mono">{selectedPhone?.number || '...'}</span> eingeben & SMS-Code bestätigen</li>
+                      <li>Eigentümer-Daten hier einfügen</li>
+                    </ol>
+                  ) : (
+                    <ol className="text-sm text-muted-foreground space-y-0.5 list-decimal list-inside">
+                      <li>Klicke auf die <span className="font-medium text-foreground">markierte Parzelle</span> in der Karte</li>
+                      <li>Wähle <span className="font-medium text-foreground">"Eigentumsauskunft"</span></li>
+                      <li>SMS-Code eingeben und Eigentümer ablesen</li>
+                    </ol>
+                  )}
                 </div>
 
                 <div className="flex gap-3">
@@ -417,13 +443,20 @@ export function AkquiseMode() {
                     onClick={() => {
                       if (portalUrl) { window.open(portalUrl, '_blank'); setGisOpened(true); }
                     }}
-                    disabled={!portalUrl}
+                    disabled={!portalUrl || remaining <= 0}
                     className="flex-1 h-12 text-base gap-2"
                   >
                     <MapPin className="h-5 w-5" />
-                    GIS Eigentumsauskunft
+                    {directPortalUrl ? 'Portal Eigentumsauskunft' : 'GIS Eigentumsauskunft'}
                     <ExternalLink className="h-4 w-4 ml-auto" />
                   </Button>
+                  {gisUrl && directPortalUrl && (
+                    <Button variant="outline" className="h-12 gap-2"
+                      onClick={() => window.open(gisUrl, '_blank')}>
+                      <MapPin className="h-4 w-4" />
+                      GIS Karte
+                    </Button>
+                  )}
                   {googleMapsUrl ? (
                     <a
                       href={googleMapsUrl}
@@ -432,12 +465,12 @@ export function AkquiseMode() {
                       className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-12 px-4 py-2"
                     >
                       <ExternalLink className="h-4 w-4" />
-                      Google Maps
+                      Maps
                     </a>
                   ) : (
                     <Button variant="outline" className="h-12 gap-2" disabled>
                       <ExternalLink className="h-4 w-4" />
-                      Google Maps
+                      Maps
                     </Button>
                   )}
                 </div>
@@ -445,7 +478,7 @@ export function AkquiseMode() {
                 {gisOpened && (
                   <p className="text-sm text-primary font-medium flex items-center gap-2">
                     <Check className="h-4 w-4" />
-                    GIS geöffnet – Eigentumsauskunft abrufen
+                    Portal geöffnet – Eigentümer ablesen & hier einfügen
                   </p>
                 )}
               </div>
