@@ -46,7 +46,7 @@ export function Vorauswahl() {
   const current = items[currentIndex];
   const score = current?._score ?? 0;
 
-  useEffect(() => { setCurrentIndex(0); }, [zoneFilter, baujahrBis, maxWhg]);
+  useEffect(() => { setCurrentIndex(0); }, [zoneFilter, baujahrBis, maxWhg, minWhg, gemeindeFilter]);
 
   const moveToNext = useCallback(() => {
     if (currentIndex < items.length - 1) {
@@ -57,11 +57,27 @@ export function Vorauswahl() {
     }
   }, [currentIndex, items.length, refetch]);
 
+  const logDecision = useCallback(async (decision: string) => {
+    if (!current || !user) return;
+    await supabase.from('property_decisions').insert({
+      property_id: current.id,
+      user_id: user.id,
+      ai_score: current.ai_score ? Number(current.ai_score) : null,
+      ai_recommendation: current.ai_recommendation,
+      user_decision: decision,
+      decision_matches_ai: current.ai_recommendation
+        ? (decision === 'interessant' && current.ai_recommendation === 'interessant') ||
+          (decision === 'nicht_interessant' && current.ai_recommendation === 'eher nicht interessant')
+        : null,
+    });
+  }, [current, user]);
+
   const handleInteressant = useCallback(async () => {
     if (!current || processing) return;
     setProcessing(true);
     try {
-      await updateProp.mutateAsync({ id: current.id, status: 'Vorausgewählt' });
+      await updateProp.mutateAsync({ id: current.id, status: 'Vorausgewählt', review_status: 'approved', decided_by: user?.id, decided_at: new Date().toISOString() });
+      await logDecision('interessant');
       setStats(s => ({ ...s, interessant: s.interessant + 1 }));
       toast({ title: '👍 Vorausgewählt' });
       moveToNext();
@@ -70,13 +86,14 @@ export function Vorauswahl() {
     } finally {
       setProcessing(false);
     }
-  }, [current, processing, updateProp, moveToNext, toast]);
+  }, [current, processing, updateProp, moveToNext, toast, logDecision, user]);
 
   const handleNichtInteressant = useCallback(async () => {
     if (!current || processing) return;
     setProcessing(true);
     try {
-      await updateProp.mutateAsync({ id: current.id, status: 'Nicht interessant' });
+      await updateProp.mutateAsync({ id: current.id, status: 'Nicht interessant', review_status: 'rejected', decided_by: user?.id, decided_at: new Date().toISOString() });
+      await logDecision('nicht_interessant');
       setStats(s => ({ ...s, ausgeblendet: s.ausgeblendet + 1 }));
       toast({ title: '👎 Nicht interessant' });
       moveToNext();
@@ -85,7 +102,7 @@ export function Vorauswahl() {
     } finally {
       setProcessing(false);
     }
-  }, [current, processing, updateProp, moveToNext, toast]);
+  }, [current, processing, updateProp, moveToNext, toast, logDecision, user]);
 
   const handleSkip = useCallback(() => {
     setStats(s => ({ ...s, skipped: s.skipped + 1 }));
