@@ -126,6 +126,42 @@ export function AkquiseMode() {
   // Reset index when zone filter changes
   useEffect(() => { setCurrentIndex(0); }, [zoneFilter]);
 
+  // Listen for owner data from Chrome Extension
+  useEffect(() => {
+    const handler = (e: CustomEvent) => {
+      const { propertyId, owners } = e.detail || {};
+      if (!current || propertyId !== current.id) return;
+
+      setAutoStatus(null);
+      if (owners && owners.length > 0) {
+        const newOwners = owners.map((o: { name: string; address: string }) => ({
+          raw: [o.name, o.address].filter(Boolean).join(', '),
+          parsed: parseOwnerString([o.name, o.address].filter(Boolean).join(', ')),
+          phone: '',
+        }));
+        setOwners(newOwners);
+        toast({ title: `✅ ${owners.length} Eigentümer automatisch übernommen!` });
+      } else {
+        toast({ title: 'Keine Eigentümer gefunden', variant: 'destructive' });
+      }
+    };
+    window.addEventListener('akquise-owner-data', handler as EventListener);
+    return () => window.removeEventListener('akquise-owner-data', handler as EventListener);
+  }, [current, toast]);
+
+  // Check if Chrome Extension is installed
+  useEffect(() => {
+    const check = () => {
+      // Extension injects a marker element
+      const marker = document.getElementById('akquise-extension-marker');
+      setExtensionAvailable(!!marker);
+    };
+    check();
+    // Re-check periodically
+    const interval = setInterval(check, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Global keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
