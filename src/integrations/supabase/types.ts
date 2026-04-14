@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      export_logs: {
+        Row: {
+          created_at: string
+          error_text: string | null
+          id: string
+          notes_content: string | null
+          pipedrive_deal_id: string | null
+          pipedrive_lead_id: string | null
+          property_id: string
+          status: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          error_text?: string | null
+          id?: string
+          notes_content?: string | null
+          pipedrive_deal_id?: string | null
+          pipedrive_lead_id?: string | null
+          property_id: string
+          status?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          error_text?: string | null
+          id?: string
+          notes_content?: string | null
+          pipedrive_deal_id?: string | null
+          pipedrive_lead_id?: string | null
+          property_id?: string
+          status?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "export_logs_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       phone_numbers: {
         Row: {
           created_at: string
@@ -41,15 +85,108 @@ export type Database = {
         }
         Relationships: []
       }
+      phone_search_logs: {
+        Row: {
+          created_at: string
+          error_text: string | null
+          id: string
+          owner_name: string | null
+          phone_number_id: string | null
+          property_id: string
+          result: string | null
+          retry_count: number
+          search_query: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          error_text?: string | null
+          id?: string
+          owner_name?: string | null
+          phone_number_id?: string | null
+          property_id: string
+          result?: string | null
+          retry_count?: number
+          search_query?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          error_text?: string | null
+          id?: string
+          owner_name?: string | null
+          phone_number_id?: string | null
+          property_id?: string
+          result?: string | null
+          retry_count?: number
+          search_query?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "phone_search_logs_phone_number_id_fkey"
+            columns: ["phone_number_id"]
+            isOneToOne: false
+            referencedRelation: "phone_numbers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "phone_search_logs_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          email: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       properties: {
         Row: {
+          acquisition_status: string
           address: string
+          ai_last_analyzed_at: string | null
+          ai_priority: number | null
+          ai_recommendation: string | null
+          ai_score: number | null
+          ai_summary: string | null
           area: number | null
           baujahr: number | null
           bezirk: string | null
           bfs_nr: string | null
           created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          decision_source: string | null
+          duplicate_flag: boolean | null
+          duplicate_group_id: string | null
           egrid: string | null
+          export_status: string
           geb_status: string | null
           gebaeudeart: string | null
           gebaeudeflaeche: number | null
@@ -62,6 +199,8 @@ export type Database = {
           id: string
           is_queried: boolean
           kategorie: string | null
+          last_export_at: string | null
+          last_phone_search_at: string | null
           notes: string | null
           ortschaftsname: string | null
           owner_address: string | null
@@ -72,11 +211,14 @@ export type Database = {
           owner_phone_2: string | null
           owners_json: Json | null
           parzelle: string | null
+          phone_search_status: string
+          pipedrive_deal_id: string | null
           plot_number: string | null
           plz: string | null
           plz_ort: string | null
           queried_at: string | null
           queried_by_phone: string | null
+          review_status: string
           status: string
           strassenname: string | null
           streetview_url: string | null
@@ -85,13 +227,25 @@ export type Database = {
           zone: string | null
         }
         Insert: {
+          acquisition_status?: string
           address: string
+          ai_last_analyzed_at?: string | null
+          ai_priority?: number | null
+          ai_recommendation?: string | null
+          ai_score?: number | null
+          ai_summary?: string | null
           area?: number | null
           baujahr?: number | null
           bezirk?: string | null
           bfs_nr?: string | null
           created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_source?: string | null
+          duplicate_flag?: boolean | null
+          duplicate_group_id?: string | null
           egrid?: string | null
+          export_status?: string
           geb_status?: string | null
           gebaeudeart?: string | null
           gebaeudeflaeche?: number | null
@@ -104,6 +258,8 @@ export type Database = {
           id?: string
           is_queried?: boolean
           kategorie?: string | null
+          last_export_at?: string | null
+          last_phone_search_at?: string | null
           notes?: string | null
           ortschaftsname?: string | null
           owner_address?: string | null
@@ -114,11 +270,14 @@ export type Database = {
           owner_phone_2?: string | null
           owners_json?: Json | null
           parzelle?: string | null
+          phone_search_status?: string
+          pipedrive_deal_id?: string | null
           plot_number?: string | null
           plz?: string | null
           plz_ort?: string | null
           queried_at?: string | null
           queried_by_phone?: string | null
+          review_status?: string
           status?: string
           strassenname?: string | null
           streetview_url?: string | null
@@ -127,13 +286,25 @@ export type Database = {
           zone?: string | null
         }
         Update: {
+          acquisition_status?: string
           address?: string
+          ai_last_analyzed_at?: string | null
+          ai_priority?: number | null
+          ai_recommendation?: string | null
+          ai_score?: number | null
+          ai_summary?: string | null
           area?: number | null
           baujahr?: number | null
           bezirk?: string | null
           bfs_nr?: string | null
           created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_source?: string | null
+          duplicate_flag?: boolean | null
+          duplicate_group_id?: string | null
           egrid?: string | null
+          export_status?: string
           geb_status?: string | null
           gebaeudeart?: string | null
           gebaeudeflaeche?: number | null
@@ -146,6 +317,8 @@ export type Database = {
           id?: string
           is_queried?: boolean
           kategorie?: string | null
+          last_export_at?: string | null
+          last_phone_search_at?: string | null
           notes?: string | null
           ortschaftsname?: string | null
           owner_address?: string | null
@@ -156,11 +329,14 @@ export type Database = {
           owner_phone_2?: string | null
           owners_json?: Json | null
           parzelle?: string | null
+          phone_search_status?: string
+          pipedrive_deal_id?: string | null
           plot_number?: string | null
           plz?: string | null
           plz_ort?: string | null
           queried_at?: string | null
           queried_by_phone?: string | null
+          review_status?: string
           status?: string
           strassenname?: string | null
           streetview_url?: string | null
@@ -170,15 +346,89 @@ export type Database = {
         }
         Relationships: []
       }
+      property_decisions: {
+        Row: {
+          ai_recommendation: string | null
+          ai_score: number | null
+          ai_summary: string | null
+          created_at: string
+          decision_matches_ai: boolean | null
+          feedback_note: string | null
+          id: string
+          property_id: string
+          user_decision: string
+          user_id: string | null
+        }
+        Insert: {
+          ai_recommendation?: string | null
+          ai_score?: number | null
+          ai_summary?: string | null
+          created_at?: string
+          decision_matches_ai?: boolean | null
+          feedback_note?: string | null
+          id?: string
+          property_id: string
+          user_decision: string
+          user_id?: string | null
+        }
+        Update: {
+          ai_recommendation?: string | null
+          ai_score?: number | null
+          ai_summary?: string | null
+          created_at?: string
+          decision_matches_ai?: boolean | null
+          feedback_note?: string | null
+          id?: string
+          property_id?: string
+          user_decision?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_decisions_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "office" | "mobile_swipe"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -305,6 +555,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "office", "mobile_swipe"],
+    },
   },
 } as const
