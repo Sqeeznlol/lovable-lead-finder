@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
-import { Building2, LayoutDashboard, Upload, Phone, Menu, X, Zap, Search, FileSpreadsheet, Eye, Shield, LogOut, Loader2 } from 'lucide-react';
+import { Building2, LayoutDashboard, Upload, Phone, Menu, X, Zap, Search, FileSpreadsheet, Eye, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dashboard } from '@/components/Dashboard';
 import { PropertyList } from '@/components/PropertyList';
@@ -11,50 +10,24 @@ import { TelefonSuche } from '@/components/TelefonSuche';
 import { PipedriveExport } from '@/components/PipedriveExport';
 import { Vorauswahl } from '@/components/Vorauswahl';
 import { AdminSettings } from '@/components/AdminSettings';
-import { AuthPage } from '@/components/AuthPage';
-import { useAuth } from '@/hooks/use-auth';
 
 type Tab = 'dashboard' | 'vorauswahl' | 'akquise' | 'telsuche' | 'properties' | 'import' | 'phones' | 'export' | 'admin';
 
-const allTabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }>; roles?: string[] }[] = [
+const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'vorauswahl', label: 'Vorauswahl', icon: Eye },
   { id: 'akquise', label: 'Akquise-Modus', icon: Zap },
   { id: 'telsuche', label: 'Telefon-Suche', icon: Search },
-  { id: 'properties', label: 'Liegenschaften', icon: Building2, roles: ['admin', 'office'] },
-  { id: 'export', label: 'Pipedrive Export', icon: FileSpreadsheet, roles: ['admin', 'office'] },
-  { id: 'import', label: 'CSV Import', icon: Upload, roles: ['admin'] },
-  { id: 'phones', label: 'Telefone', icon: Phone, roles: ['admin', 'office'] },
-  { id: 'admin', label: 'Admin', icon: Shield, roles: ['admin'] },
+  { id: 'properties', label: 'Liegenschaften', icon: Building2 },
+  { id: 'export', label: 'Pipedrive Export', icon: FileSpreadsheet },
+  { id: 'import', label: 'CSV Import', icon: Upload },
+  { id: 'phones', label: 'Telefone', icon: Phone },
+  { id: 'admin', label: 'Admin', icon: Shield },
 ];
 
 export default function Index() {
-  const { user, loading, isAdmin, isOffice, isMobileSwipe, roles, signOut } = useAuth();
   const [active, setActive] = useState<Tab>('dashboard');
   const [mobileOpen, setMobileOpen] = useState(false);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!user) return <AuthPage />;
-
-  // Mobile-only users go to swipe page
-  if (isMobileSwipe && !isAdmin && !isOffice) {
-    return <Navigate to="/swipe" replace />;
-  }
-
-  // Filter tabs based on roles
-  const tabs = allTabs.filter(t => {
-    if (!t.roles) return true;
-    if (isAdmin) return true;
-    if (isOffice && t.roles.includes('office')) return true;
-    return false;
-  });
 
   return (
     <div className="flex min-h-screen">
@@ -81,15 +54,6 @@ export default function Index() {
             </button>
           ))}
         </nav>
-        <div className="p-3 border-t">
-          <button
-            onClick={signOut}
-            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-          >
-            <LogOut className="h-4 w-4" />
-            Abmelden
-          </button>
-        </div>
       </aside>
 
       {mobileOpen && <div className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm lg:hidden" onClick={() => setMobileOpen(false)} />}
