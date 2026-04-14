@@ -426,22 +426,13 @@ export function AkquiseMode() {
                 )}
 
                 <div className="rounded-lg bg-primary/5 border border-primary/20 px-4 py-3 space-y-1">
-                  <p className="text-xs font-semibold text-primary uppercase tracking-wider">
-                    {directPortalUrl ? 'Direkter Zugang' : 'Anleitung Eigentumsauskunft'}
-                  </p>
-                  {directPortalUrl ? (
-                    <ol className="text-sm text-muted-foreground space-y-0.5 list-decimal list-inside">
-                      <li>Portal öffnen → Eigentümerauskunft wird <span className="font-medium text-foreground">direkt geladen</span></li>
-                      <li>Nummer <span className="font-medium text-foreground font-mono">{selectedPhone?.number || '...'}</span> eingeben & SMS-Code bestätigen</li>
-                      <li>Eigentümer-Daten hier einfügen</li>
-                    </ol>
-                  ) : (
-                    <ol className="text-sm text-muted-foreground space-y-0.5 list-decimal list-inside">
-                      <li>Klicke auf die <span className="font-medium text-foreground">markierte Parzelle</span> in der Karte</li>
-                      <li>Wähle <span className="font-medium text-foreground">"Eigentumsauskunft"</span></li>
-                      <li>SMS-Code eingeben und Eigentümer ablesen</li>
-                    </ol>
-                  )}
+                  <p className="text-xs font-semibold text-primary uppercase tracking-wider">Anleitung Eigentumsauskunft</p>
+                  <ol className="text-sm text-muted-foreground space-y-0.5 list-decimal list-inside">
+                    <li>Klicke auf die <span className="font-medium text-foreground">markierte Parzelle</span> in der Karte</li>
+                    <li>Klicke <span className="font-medium text-foreground">"öffentlicher Zugang"</span> im Info-Fenster</li>
+                    <li>Nummer <span className="font-medium text-foreground font-mono">{selectedPhone?.number || '...'}</span> eingeben & SMS-Code bestätigen</li>
+                    <li>Eigentümer-Daten kopieren & hier einfügen</li>
+                  </ol>
                 </div>
 
                 <div className="flex gap-3">
@@ -453,16 +444,9 @@ export function AkquiseMode() {
                     className="flex-1 h-12 text-base gap-2"
                   >
                     <MapPin className="h-5 w-5" />
-                    {directPortalUrl ? 'Portal Eigentumsauskunft' : 'GIS Eigentumsauskunft'}
+                    GIS Eigentumsauskunft
                     <ExternalLink className="h-4 w-4 ml-auto" />
                   </Button>
-                  {gisUrl && directPortalUrl && (
-                    <Button variant="outline" className="h-12 gap-2"
-                      onClick={() => window.open(gisUrl, '_blank')}>
-                      <MapPin className="h-4 w-4" />
-                      GIS Karte
-                    </Button>
-                  )}
                   {googleMapsUrl ? (
                     <a
                       href={googleMapsUrl}
