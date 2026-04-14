@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ExternalLink, Check, SkipForward, EyeOff, ArrowRight, Phone, Zap, MapPin, Calendar, Layers, Home, Ruler, Search, Plus, Trash2, AlertTriangle, Keyboard } from 'lucide-react';
+import { ExternalLink, Check, SkipForward, EyeOff, ArrowRight, Phone, Zap, MapPin, Calendar, Layers, Home, Ruler, Search, Plus, Trash2, AlertTriangle, Keyboard, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -157,8 +157,8 @@ export function AkquiseMode() {
   });
 
   // Direct portal URL (skips GIS map entirely)
-  const directPortalUrl = current?.egrid && current?.bfs_nr
-    ? `https://portal.objektwesen.zh.ch/aks/detail?egrid=${current.egrid}&bfsNr=${current.bfs_nr}`
+  const directPortalUrl = current?.egrid
+    ? `https://portal.objektwesen.zh.ch/aks/detail?egrid=${current.egrid}${current.bfs_nr ? `&bfsNr=${current.bfs_nr}` : ''}`
     : null;
 
   // GIS URL as fallback
@@ -413,9 +413,22 @@ export function AkquiseMode() {
                         <p className="text-sm font-bold font-mono tracking-wider">{selectedPhone.number}</p>
                       </div>
                     </div>
-                    <Badge variant={remaining <= 1 ? 'destructive' : 'secondary'} className="text-xs">
-                      {remaining} Abfragen übrig
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs gap-1"
+                        onClick={() => {
+                          navigator.clipboard.writeText(selectedPhone.number);
+                          toast({ title: '📋 Nummer kopiert' });
+                        }}
+                      >
+                        <Copy className="h-3 w-3" /> Kopieren
+                      </Button>
+                      <Badge variant={remaining <= 1 ? 'destructive' : 'secondary'} className="text-xs">
+                        {remaining} Abfragen übrig
+                      </Badge>
+                    </div>
                   </div>
                 )}
 
