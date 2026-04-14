@@ -219,6 +219,11 @@ export function Vorauswahl() {
               className="w-20 h-9"
             />
           </div>
+          <div className="flex items-center gap-1.5">
+            <Label htmlFor="va-minwhg" className="text-xs text-muted-foreground whitespace-nowrap">Min Whg.</Label>
+            <Input id="va-minwhg" type="number" value={minWhg} onChange={e => setMinWhg(e.target.value)} placeholder="0" className="w-20 h-9" />
+          </div>
+          <Input value={gemeindeFilter} onChange={e => setGemeindeFilter(e.target.value)} placeholder="Gemeinde..." className="w-32 h-9" />
         </div>
         <div className="flex gap-3 text-sm text-muted-foreground">
           <span>✅ {stats.interessant}</span>
@@ -242,6 +247,16 @@ export function Vorauswahl() {
                   {current.gebaeudeart && <Badge variant="outline" className="text-xs">{current.gebaeudeart}</Badge>}
                   {current.kategorie && <Badge variant="outline" className="text-xs">{current.kategorie}</Badge>}
                   {current.wohnungen && <Badge variant="outline" className="text-xs">{current.wohnungen} Whg.</Badge>}
+                  {current.ai_recommendation && (
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Badge className={`text-xs gap-1 ${current.ai_recommendation === 'interessant' ? 'bg-accent/10 text-accent border-accent/20' : current.ai_recommendation === 'prüfen' ? 'bg-warning/10 text-warning border-warning/20' : 'bg-muted text-muted-foreground'}`}>
+                          <Sparkles className="h-3 w-3" /> KI: {current.ai_recommendation}
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent><p className="max-w-xs text-xs">{current.ai_summary || 'Keine Begründung'}</p></TooltipContent>
+                    </Tooltip>
+                  )}
                 </div>
                 <h2 className="text-2xl sm:text-3xl font-bold tracking-tight leading-tight">{current.address}</h2>
                 <p className="text-muted-foreground mt-1">{current.plz_ort || current.gemeinde || ''}</p>
