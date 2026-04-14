@@ -25,8 +25,16 @@
       "matches": ["https://portal.objektwesen.zh.ch/*"],
       "js": ["content-portal.js"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://*.lovable.app/*", "http://localhost:*/*"],
+      "js": ["content-app.js"],
+      "run_at": "document_idle"
     }
   ],
+  "externally_connectable": {
+    "matches": ["https://*.lovable.app/*", "http://localhost:*/*"]
+  },
   "icons": {
     "48": "icon.png",
     "128": "icon.png"
