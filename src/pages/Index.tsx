@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
-import { Building2, LayoutDashboard, Upload, Phone, Menu, X, Zap, Search, FileSpreadsheet, Eye, Shield, LogOut, Loader2 } from 'lucide-react';
+import { Building2, LayoutDashboard, Upload, Phone, Menu, X, Zap, Search, FileSpreadsheet, Eye, Shield, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dashboard } from '@/components/Dashboard';
 import { PropertyList } from '@/components/PropertyList';
@@ -11,19 +10,10 @@ import { TelefonSuche } from '@/components/TelefonSuche';
 import { PipedriveExport } from '@/components/PipedriveExport';
 import { Vorauswahl } from '@/components/Vorauswahl';
 import { AdminSettings } from '@/components/AdminSettings';
-import { AuthPage } from '@/components/AuthPage';
-import { useAuth } from '@/hooks/use-auth';
 
 type Tab = 'dashboard' | 'vorauswahl' | 'akquise' | 'telsuche' | 'properties' | 'import' | 'phones' | 'export' | 'admin';
 
-interface TabDef {
-  id: Tab;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  adminOnly?: boolean;
-}
-
-const allTabs: TabDef[] = [
+const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'vorauswahl', label: 'Vorauswahl', icon: Eye },
   { id: 'akquise', label: 'Akquise-Modus', icon: Zap },
@@ -32,37 +22,12 @@ const allTabs: TabDef[] = [
   { id: 'export', label: 'Pipedrive Export', icon: FileSpreadsheet },
   { id: 'import', label: 'CSV Import', icon: Upload },
   { id: 'phones', label: 'Telefone', icon: Phone },
-  { id: 'admin', label: 'Admin', icon: Shield, adminOnly: true },
+  { id: 'admin', label: 'Admin', icon: Shield },
 ];
 
-// mobile_swipe users only see dashboard + vorauswahl + telsuche
-const mobileSwipeTabs: Tab[] = ['dashboard', 'vorauswahl', 'telsuche'];
-
 export default function Index() {
-  const { user, loading, signOut, isAdmin, isOffice, isMobileSwipe } = useAuth();
   const [active, setActive] = useState<Tab>('dashboard');
   const [mobileOpen, setMobileOpen] = useState(false);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!user) return <AuthPage />;
-
-  if (isMobileSwipe && !isAdmin && !isOffice) {
-    return <Navigate to="/swipe" replace />;
-  }
-
-  const visibleTabs = allTabs.filter(t => {
-    if (t.adminOnly && !isAdmin) return false;
-    return true;
-  });
-
-  const displayName = user.user_metadata?.display_name || user.email?.split('@')[0] || 'User';
 
   return (
     <div className="flex min-h-screen">
@@ -74,7 +39,7 @@ export default function Index() {
           <p className="text-xs text-muted-foreground mt-1">Immobilien-Akquise CRM</p>
         </div>
         <nav className="p-3 space-y-1 flex-1">
-          {visibleTabs.map(t => (
+          {tabs.map(t => (
             <button
               key={t.id}
               onClick={() => { setActive(t.id); setMobileOpen(false); }}
@@ -89,18 +54,6 @@ export default function Index() {
             </button>
           ))}
         </nav>
-        <div className="p-3 border-t">
-          <div className="px-4 py-2 text-xs text-muted-foreground truncate mb-2">
-            👤 {displayName}
-          </div>
-          <button
-            onClick={signOut}
-            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-          >
-            <LogOut className="h-4 w-4" />
-            Abmelden
-          </button>
-        </div>
       </aside>
 
       {mobileOpen && <div className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm lg:hidden" onClick={() => setMobileOpen(false)} />}
@@ -121,7 +74,7 @@ export default function Index() {
           {active === 'export' && <PipedriveExport />}
           {active === 'import' && <CsvImport />}
           {active === 'phones' && <PhoneManager />}
-          {active === 'admin' && isAdmin && <AdminSettings />}
+          {active === 'admin' && <AdminSettings />}
         </div>
       </main>
     </div>
