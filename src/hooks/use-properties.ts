@@ -67,6 +67,7 @@ export function useProperties(options: UsePropertiesOptions = {}) {
       if (geschosseMin) query = query.gte('geschosse', geschosseMin);
       if (ownerFilter === 'mit') query = query.not('owner_name', 'is', null);
       if (ownerFilter === 'ohne') query = query.is('owner_name', null);
+      if (listId) query = query.eq('list_id', listId);
 
       const { data, error, count } = await query;
       if (error) throw error;
