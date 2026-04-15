@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Akquise GIS Automation",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Automatisiert die Eigentumsauskunft über das kantonale Portal",
   "permissions": ["activeTab", "storage", "tabs", "scripting"],
   "host_permissions": [
@@ -21,13 +21,13 @@
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://*.lovable.app/*", "http://localhost:*/*"],
+      "matches": ["https://*.lovable.app/*", "https://*.lovableproject.com/*", "http://localhost:*/*"],
       "js": ["content-app.js"],
       "run_at": "document_idle"
     }
   ],
   "externally_connectable": {
-    "matches": ["https://*.lovable.app/*", "http://localhost:*/*"]
+    "matches": ["https://*.lovable.app/*", "https://*.lovableproject.com/*", "http://localhost:*/*"]
   },
   "icons": {
     "48": "icon.png",
