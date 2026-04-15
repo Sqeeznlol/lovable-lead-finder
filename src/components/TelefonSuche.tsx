@@ -17,7 +17,7 @@ export function TelefonSuche() {
   const [phone1, setPhone1] = useState('');
   const [phone2, setPhone2] = useState('');
   const [processing, setProcessing] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'person' | 'ag' | 'stadt'>('person');
+  const [filter, setFilter] = useState<'all' | 'person' | 'ag' | 'stadt'>('all');
 
   const allItems = (result?.data || []).filter(p => p.owner_name && !p.owner_phone);
   
