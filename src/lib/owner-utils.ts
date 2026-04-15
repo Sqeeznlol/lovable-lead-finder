@@ -6,6 +6,8 @@
  * - "Multari, Giuseppe Peter, Wydenweg 24, ..."  (Peter = middle name, strip for search)
  * - "Immobilien AG, Zürich" → classified as AG
  * - "Stadt Zürich, ..." → classified as Stadt
+ * - Portal group headers: "Vollenweider/Vollenweider, einfache Gesellschaft, Gesamteigentum"
+ * - Portal individual: "Vollenweider, Moritz Andreas, Holzrai 5, 8602 Wangen b. Dübendorf, Schweiz"
  */
 
 export type OwnerType = 'person' | 'ag' | 'stadt' | 'other_org';
@@ -61,67 +63,225 @@ export interface ParsedOwner {
   firstName: string;       // "Giuseppe"
   lastName: string;        // "Multari"
   address: string;         // "Wydenweg 24, 8408 Winterthur"
+  street: string;          // "Holzrai"
+  streetNumber: string;    // "5"
+  plz: string;             // "8602"
+  ort: string;             // "Wangen b. Dübendorf"
   ownershipType: string;   // "Alleineigentum"
   type: OwnerType;
 }
 
+const EMPTY_PARSED: ParsedOwner = {
+  fullName: '', searchName: '', firstName: '', lastName: '',
+  address: '', street: '', streetNumber: '', plz: '', ort: '',
+  ownershipType: '', type: 'person',
+};
+
 /**
- * Parse raw owner string from GIS:
- * "Multari, Giuseppe Peter, Wydenweg 24, 8408 Winterthur, Schweiz, Alleineigentum"
+ * Detect if a line is a portal group header like:
+ * "Vollenweider/Vollenweider, einfache Gesellschaft, Gesamteigentum"
+ * These contain "/" in the first segment and ownership keywords but no street address.
  */
-export function parseOwnerString(raw: string): ParsedOwner {
+export function isGroupHeader(line: string): boolean {
+  if (!line) return false;
+  const lower = line.toLowerCase();
+  // Group headers often have: "Name/Name, einfache Gesellschaft, Gesamteigentum"
+  if (line.includes('/') && (
+    lower.includes('einfache gesellschaft') ||
+    lower.includes('gesamteigentum') ||
+    lower.includes('miteigentum') ||
+    lower.includes('stockwerkeigentum')
+  )) return true;
+  // Also detect standalone ownership type lines
+  if (/^(Gesamt|Mit|Allein|Stockwerk)eigentum$/i.test(line.trim())) return true;
+  return false;
+}
+
+/**
+ * Extract ownership type from a group header line
+ */
+function extractOwnershipFromHeader(header: string): string {
+  const lower = header.toLowerCase();
+  if (lower.includes('gesamteigentum')) return 'Gesamteigentum';
+  if (lower.includes('miteigentum')) return 'Miteigentum';
+  if (lower.includes('stockwerkeigentum')) return 'Stockwerkeigentum';
+  if (lower.includes('alleineigentum')) return 'Alleineigentum';
+  return '';
+}
+
+/**
+ * Parse raw owner string from GIS portal:
+ * "Vollenweider, Moritz Andreas, Holzrai 5, 8602 Wangen b. Dübendorf, Schweiz"
+ * "A. Bommer Immobilien AG, mit Sitz in Zürich, Aktiengesellschaft, Schweighofstrasse 409, 8055 Zürich, Schweiz, Alleineigentum"
+ */
+export function parseOwnerString(raw: string, groupOwnershipType?: string): ParsedOwner {
   if (!raw || !raw.trim()) {
-    return { fullName: '', searchName: '', firstName: '', lastName: '', address: '', ownershipType: '', type: 'person' };
+    return { ...EMPTY_PARSED };
   }
 
   const trimmed = raw.trim();
   const type = classifyOwner(trimmed);
 
-  // For organizations, don't try to parse as person
-  if (type !== 'person') {
-    return {
-      fullName: trimmed,
-      searchName: trimmed,
-      firstName: '',
-      lastName: trimmed,
-      address: '',
-      ownershipType: '',
-      type,
-    };
-  }
-
   // Split by comma
   const parts = trimmed.split(',').map(s => s.trim());
 
-  // Ownership patterns to detect
+  // Ownership patterns
   const ownershipPatterns = ['Alleineigentum', 'Miteigentum', 'Gesamteigentum', 'Stockwerkeigentum'];
   const ownershipIdx = parts.findIndex(p => ownershipPatterns.some(op => p.toLowerCase().includes(op.toLowerCase())));
-  const ownershipType = ownershipIdx >= 0 ? parts[ownershipIdx] : '';
+  const ownershipType = ownershipIdx >= 0 ? parts[ownershipIdx] : (groupOwnershipType || '');
 
   // Country to strip
   const countryIdx = parts.findIndex(p => /^(Schweiz|Suisse|Svizzera|Switzerland|CH)$/i.test(p));
 
-  // lastName = first part
-  const lastName = parts[0] || '';
+  // Skip phrases for AG/org owners
+  const skipPhrases = ['mit sitz in', 'aktiengesellschaft', 'gesellschaft mit', 'genossenschaft', 'einfache gesellschaft'];
 
-  // firstName = second part, but strip middle names (keep only first word)
-  let firstName = '';
-  if (parts.length > 1) {
-    const nameParts = parts[1].trim().split(/\s+/);
-    firstName = nameParts[0] || ''; // Only first name, strip middle names
+  // For organizations: take first part as name, find address in remaining
+  if (type !== 'person') {
+    let name = parts[0] || '';
+    let street = '';
+    let streetNumber = '';
+    let plz = '';
+    let ort = '';
+
+    for (let i = 1; i < parts.length; i++) {
+      const p = parts[i];
+      const pLower = p.toLowerCase();
+
+      if (i === ownershipIdx || i === countryIdx) continue;
+      if (skipPhrases.some(s => pLower.startsWith(s) || pLower === s)) continue;
+
+      // PLZ + Ort pattern: "8055 Zürich" or "8602 Wangen b. Dübendorf"
+      const plzMatch = p.match(/^(\d{4})\s+(.+)$/);
+      if (plzMatch) {
+        plz = plzMatch[1];
+        ort = plzMatch[2];
+        continue;
+      }
+
+      // Street + number pattern: "Schweighofstrasse 409"
+      const streetMatch = p.match(/^(.+?)\s+(\d+\w*)$/);
+      if (streetMatch && !street) {
+        street = streetMatch[1];
+        streetNumber = streetMatch[2];
+        continue;
+      }
+    }
+
+    const addressStr = [
+      street && streetNumber ? `${street} ${streetNumber}` : street,
+      plz && ort ? `${plz} ${ort}` : ''
+    ].filter(Boolean).join(', ');
+
+    return {
+      fullName: name,
+      searchName: name,
+      firstName: '',
+      lastName: name,
+      address: addressStr,
+      street,
+      streetNumber,
+      plz,
+      ort,
+      ownershipType,
+      type,
+    };
   }
 
-  const fullName = firstName ? `${lastName}, ${firstName}` : lastName;
+  // Person parsing: "Nachname, Vorname(n), Strasse Nr, PLZ Ort, Land, Eigentum"
+  const lastName = parts[0] || '';
+
+  // firstName = second part (may have multiple names like "Moritz Andreas")
+  let firstName = '';
+  let firstNameFull = '';
+  if (parts.length > 1 && !parts[1].match(/\d/)) {
+    firstNameFull = parts[1].trim();
+    const nameParts = firstNameFull.split(/\s+/);
+    firstName = nameParts[0] || ''; // First name only for search
+  }
+
+  const fullName = firstNameFull ? `${lastName}, ${firstNameFull}` : lastName;
   const searchName = firstName ? `${firstName} ${lastName}` : lastName;
 
-  // Address: everything between name parts and ownership/country
-  const addressParts = parts.slice(2).filter((_, i) => {
-    const actualIdx = i + 2;
-    return actualIdx !== ownershipIdx && actualIdx !== countryIdx;
-  });
-  const address = addressParts.join(', ');
+  // Find street + PLZ/Ort in remaining parts
+  let street = '';
+  let streetNumber = '';
+  let plz = '';
+  let ort = '';
 
-  return { fullName, searchName, firstName, lastName, address, ownershipType, type };
+  const startIdx = firstNameFull ? 2 : 1;
+  for (let i = startIdx; i < parts.length; i++) {
+    const p = parts[i];
+    if (i === ownershipIdx || i === countryIdx) continue;
+
+    // PLZ + Ort: "8602 Wangen b. Dübendorf"
+    const plzMatch = p.match(/^(\d{4})\s+(.+)$/);
+    if (plzMatch) {
+      plz = plzMatch[1];
+      ort = plzMatch[2];
+      continue;
+    }
+
+    // Street + number: "Holzrai 5" or "Hegnaustrasse 51"
+    const streetMatch = p.match(/^(.+?)\s+(\d+\w*)$/);
+    if (streetMatch && !street) {
+      street = streetMatch[1];
+      streetNumber = streetMatch[2];
+      continue;
+    }
+  }
+
+  const addressStr = [
+    street && streetNumber ? `${street} ${streetNumber}` : street,
+    plz && ort ? `${plz} ${ort}` : ''
+  ].filter(Boolean).join(', ');
+
+  return { fullName, searchName, firstName, lastName, address: addressStr, street, streetNumber, plz, ort, ownershipType, type };
+}
+
+/**
+ * Parse portal text that may contain a group header + multiple owners.
+ * 
+ * Input format from portal:
+ * ```
+ * Vollenweider/Vollenweider, einfache Gesellschaft, Gesamteigentum
+ * (blank line)
+ * Vollenweider, Moritz Andreas, Holzrai 5, 8602 Wangen b. Dübendorf, Schweiz
+ * (blank line)
+ * Vollenweider, Matthias Ulrich, Hegnaustrasse 51, 8602 Wangen b. Dübendorf, Schweiz
+ * ```
+ */
+export function parsePortalOwnerText(raw: string): ParsedOwner[] {
+  if (!raw) return [];
+
+  // Split by blank lines or double newlines to get blocks
+  const blocks = raw.split(/\n\s*\n/).map(s => s.trim()).filter(Boolean);
+
+  // If no blank-line separation, try single newlines
+  const lines = blocks.length <= 1
+    ? raw.split(/\n/).map(s => s.trim()).filter(Boolean)
+    : blocks;
+
+  let groupOwnership = '';
+  const owners: ParsedOwner[] = [];
+
+  for (const line of lines) {
+    // Check if this is a group header
+    if (isGroupHeader(line)) {
+      groupOwnership = extractOwnershipFromHeader(line);
+      continue;
+    }
+
+    // Skip very short lines
+    if (line.length < 5) continue;
+
+    const parsed = parseOwnerString(line, groupOwnership);
+    if (parsed.fullName) {
+      owners.push(parsed);
+    }
+  }
+
+  return owners;
 }
 
 /**
@@ -129,9 +289,8 @@ export function parseOwnerString(raw: string): ParsedOwner {
  */
 export function parseMultipleOwners(raw: string): ParsedOwner[] {
   if (!raw) return [];
-  // Split by newline or semicolon
-  const lines = raw.split(/[\n;]/).map(s => s.trim()).filter(Boolean);
-  return lines.map(parseOwnerString);
+  // Use the smart portal parser
+  return parsePortalOwnerText(raw);
 }
 
 /**
@@ -147,13 +306,11 @@ export function telSearchUrl(name: string, ort?: string): string {
  * Format: "Nachname, Vorname  Strassenname" (without PLZ/Ort)
  */
 export function telSearchUrlParsed(parsed: ParsedOwner, fallbackOrt?: string): string {
-  // Extract just the street name (first part of address before comma)
-  const addressParts = (parsed.address || '').split(',').map(s => s.trim());
-  const street = addressParts[0] || '';
+  // Use structured street if available, otherwise extract from address
+  const street = parsed.street || (parsed.address || '').split(',')[0]?.trim() || '';
 
   let q: string;
   if (parsed.lastName && parsed.firstName) {
-    // "Meier, Michael  Habsburgstrasse"
     q = `${parsed.lastName}, ${parsed.firstName}  ${street}`.trim();
   } else {
     q = [parsed.searchName || parsed.fullName, street].filter(Boolean).join('  ');

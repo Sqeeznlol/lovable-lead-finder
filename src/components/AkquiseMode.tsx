@@ -13,7 +13,7 @@ import { ListSelector } from '@/components/ListSelector';
 import { usePhoneNumbers, useIncrementPhoneQuery } from '@/hooks/use-phones';
 import { useToast } from '@/hooks/use-toast';
 import { calculateDealScore, scoreColor, scoreBg } from '@/lib/deal-score';
-import { parseOwnerString, parseMultipleOwners, classifyOwner, ownerTypeLabel, ownerTypeColor, telSearchUrlParsed, opendiUrlParsed, type ParsedOwner } from '@/lib/owner-utils';
+import { parseOwnerString, parseMultipleOwners, parsePortalOwnerText, isGroupHeader, classifyOwner, ownerTypeLabel, ownerTypeColor, telSearchUrlParsed, opendiUrlParsed, type ParsedOwner } from '@/lib/owner-utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface OwnerEntry {
@@ -59,28 +59,34 @@ export function AkquiseMode() {
     });
   }, []);
 
-  // Smart paste: detect multi-line paste and split into multiple owners
+  // Smart paste: detect multi-line paste, parse portal format with group headers
   const handlePaste = useCallback((index: number, e: React.ClipboardEvent<HTMLInputElement>) => {
     const pasted = e.clipboardData.getData('text');
     if (!pasted) return;
 
-    // Check if pasted text contains multiple owners (newlines or semicolons)
-    const lines = pasted.split(/[\n;]/).map(s => s.trim()).filter(Boolean);
-    if (lines.length > 1) {
+    // Check if pasted text contains multiple lines
+    const hasMultipleLines = pasted.includes('\n');
+    if (hasMultipleLines) {
       e.preventDefault();
-      setOwners(prev => {
-        const next = [...prev];
-        // Fill current + add new entries for remaining lines
-        lines.forEach((line, i) => {
-          const targetIdx = index + i;
-          if (targetIdx < next.length) {
-            next[targetIdx] = { raw: line, parsed: parseOwnerString(line), phone: '' };
-          } else if (next.length < 10) {
-            next.push({ raw: line, parsed: parseOwnerString(line), phone: '' });
-          }
-        });
-        return next;
-      });
+      // Use the portal-aware parser that handles group headers + multiple owners
+      const parsedOwners = parsePortalOwnerText(pasted);
+      if (parsedOwners.length > 0) {
+        setOwners(parsedOwners.slice(0, 10).map(p => ({
+          raw: p.fullName + (p.address ? ', ' + p.address : '') + (p.ownershipType ? ', ' + p.ownershipType : ''),
+          parsed: p,
+          phone: '',
+        })));
+        return;
+      }
+      // Fallback: split by lines
+      const lines = pasted.split(/\n/).map(s => s.trim()).filter(s => s.length > 5);
+      if (lines.length > 0) {
+        setOwners(lines.slice(0, 10).map(line => ({
+          raw: line,
+          parsed: parseOwnerString(line),
+          phone: '',
+        })));
+      }
     }
   }, []);
 
@@ -649,16 +655,20 @@ export function AkquiseMode() {
                               <span className="font-medium">{owner.parsed.fullName || '–'}</span>
                             </div>
                             <div className="bg-muted/50 rounded px-2 py-1.5">
-                              <span className="text-muted-foreground">Adresse: </span>
-                              <span className="font-medium">{owner.parsed.address || '–'}</span>
+                              <span className="text-muted-foreground">Strasse: </span>
+                              <span className="font-medium">
+                                {owner.parsed.street ? `${owner.parsed.street} ${owner.parsed.streetNumber}` : (owner.parsed.address || '–')}
+                              </span>
+                            </div>
+                            <div className="bg-muted/50 rounded px-2 py-1.5">
+                              <span className="text-muted-foreground">PLZ/Ort: </span>
+                              <span className="font-medium">
+                                {owner.parsed.plz ? `${owner.parsed.plz} ${owner.parsed.ort}` : '–'}
+                              </span>
                             </div>
                             <div className="bg-muted/50 rounded px-2 py-1.5">
                               <span className="text-muted-foreground">Eigentum: </span>
                               <span className="font-medium">{owner.parsed.ownershipType || '–'}</span>
-                            </div>
-                            <div className="bg-muted/50 rounded px-2 py-1.5">
-                              <span className="text-muted-foreground">Suche: </span>
-                              <span className="font-medium text-primary">{owner.parsed.searchName || '–'}</span>
                             </div>
                           </div>
                         )}
