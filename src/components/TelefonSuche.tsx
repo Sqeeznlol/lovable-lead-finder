@@ -19,6 +19,53 @@ export function TelefonSuche() {
   const [phone2, setPhone2] = useState('');
   const [processing, setProcessing] = useState(false);
   const [filter, setFilter] = useState<'all' | 'person' | 'ag' | 'stadt'>('all');
+  const [autoSearching, setAutoSearching] = useState(false);
+  const [autoResult, setAutoResult] = useState<{ match: boolean; phone?: string; foundAddress?: string; searchUrl?: string } | null>(null);
+
+  const autoSearchOwner = async (ownerName: string, ownerAddress: string | null, setter: (v: string) => void) => {
+    const parsed = parseOwnerString(ownerName);
+    if (!parsed.lastName) return;
+
+    // Extract street info from owners_json or parsed address
+    let street = parsed.street;
+    let streetNumber = parsed.streetNumber;
+
+    // If no structured street from parsing, try to extract from owner_address
+    if (!street && ownerAddress) {
+      const addrMatch = ownerAddress.match(/^(.+?)\s+(\d+\w*)/);
+      if (addrMatch) {
+        street = addrMatch[1];
+        streetNumber = addrMatch[2];
+      }
+    }
+
+    if (!street) {
+      toast({ title: 'Keine Strasse vorhanden für Auto-Suche', variant: 'destructive' });
+      return;
+    }
+
+    setAutoSearching(true);
+    setAutoResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('tel-search', {
+        body: { lastName: parsed.lastName, firstName: parsed.firstName, street, streetNumber },
+      });
+
+      if (error) throw error;
+
+      setAutoResult(data);
+      if (data?.match && data.phone) {
+        setter(data.phone);
+        toast({ title: `✅ Nummer gefunden: ${data.phone}` });
+      } else {
+        toast({ title: 'Kein Treffer mit passender Strasse', description: data?.foundAddress || 'Keine Ergebnisse' });
+      }
+    } catch (err) {
+      toast({ title: 'Auto-Suche fehlgeschlagen', description: String(err), variant: 'destructive' });
+    } finally {
+      setAutoSearching(false);
+    }
+  };
 
   const allItems = (result?.data || []).filter(p => p.owner_name && !p.owner_phone);
   
