@@ -93,7 +93,26 @@ export function TelefonSuche() {
   }, [currentIndex, items.length, refetch]);
 
   // Reset index on filter change
-  useEffect(() => { setCurrentIndex(0); setPhone1(''); setPhone2(''); }, [filter]);
+  useEffect(() => { setCurrentIndex(0); setPhone1(''); setPhone2(''); setAutoResult(null); }, [filter]);
+
+  // Auto-search when current item changes
+  useEffect(() => {
+    if (!current?.owner_name) return;
+    const parsed = parseOwnerString(current.owner_name);
+    const street = parsed.street || (current.owner_address?.match(/^(.+?)\s+(\d+\w*)/)?.[1] || '');
+    if (parsed.lastName && street) {
+      autoSearchOwner(current.owner_name, current.owner_address, setPhone1);
+    }
+    // Also auto-search owner 2
+    if (current.owner_name_2) {
+      const parsed2 = parseOwnerString(current.owner_name_2);
+      const street2 = parsed2.street || (current.owner_address_2?.match(/^(.+?)\s+(\d+\w*)/)?.[1] || '');
+      if (parsed2.lastName && street2) {
+        autoSearchOwner(current.owner_name_2, current.owner_address_2, setPhone2);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?.id]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -252,13 +271,13 @@ export function TelefonSuche() {
                 Auto-Suche
               </Button>
               <Button size="sm" variant="outline" className="gap-1"
-                onClick={() => window.open(telSearchUrlParsed(parsed1, ort), '_blank')}>
-                <Search className="h-3.5 w-3.5" /> {parsed1.lastName}{parsed1.street ? ` ${parsed1.street}` : ''}
+                onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(`${parsed1.searchName} ${parsed1.street || ''} ${parsed1.streetNumber || ''} ${parsed1.ort || ort} Telefon`)}`, '_blank')}>
+                <Search className="h-3.5 w-3.5" /> Google
                 <ExternalLink className="h-3 w-3" />
               </Button>
               <Button size="sm" variant="outline" className="gap-1"
-                onClick={() => window.open(opendiUrlParsed(parsed1), '_blank')}>
-                <Search className="h-3.5 w-3.5" /> Opendi
+                onClick={() => window.open(`https://www.moneyhouse.ch/de/search?q=${encodeURIComponent(parsed1.fullName || parsed1.searchName)}`, '_blank')}>
+                <Search className="h-3.5 w-3.5" /> Moneyhouse
                 <ExternalLink className="h-3 w-3" />
               </Button>
             </div>
@@ -270,7 +289,7 @@ export function TelefonSuche() {
                   : `Kein Treffer${autoResult.foundAddress ? ` (gefunden: ${autoResult.foundAddress})` : ''}`}
                 {autoResult.searchUrl && (
                   <a href={autoResult.searchUrl} target="_blank" rel="noopener" className="ml-auto underline">
-                    Öffnen
+                    tel.search.ch
                   </a>
                 )}
               </div>
@@ -305,12 +324,14 @@ export function TelefonSuche() {
                 Auto-Suche
               </Button>
               <Button size="sm" variant="outline" className="gap-1"
-                onClick={() => window.open(telSearchUrlParsed(parsed2, ort), '_blank')}>
-                <Search className="h-3.5 w-3.5" /> {parsed2.lastName}{parsed2.street ? ` ${parsed2.street}` : ''}
+                onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(`${parsed2.searchName} ${parsed2.street || ''} ${parsed2.streetNumber || ''} ${parsed2.ort || ort} Telefon`)}`, '_blank')}>
+                <Search className="h-3.5 w-3.5" /> Google
+                <ExternalLink className="h-3 w-3" />
               </Button>
               <Button size="sm" variant="outline" className="gap-1"
-                onClick={() => window.open(opendiUrlParsed(parsed2), '_blank')}>
-                <Search className="h-3.5 w-3.5" /> Opendi
+                onClick={() => window.open(`https://www.moneyhouse.ch/de/search?q=${encodeURIComponent(parsed2.fullName || parsed2.searchName)}`, '_blank')}>
+                <Search className="h-3.5 w-3.5" /> Moneyhouse
+                <ExternalLink className="h-3 w-3" />
               </Button>
             </div>
               <div className="space-y-1">
