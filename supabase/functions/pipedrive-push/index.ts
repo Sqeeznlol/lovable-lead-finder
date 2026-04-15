@@ -17,6 +17,12 @@ const FIELD_EGRID = 'd210ce9334d6812187af1be8b71b7c97f6afd8db';
 const FIELD_EGID = '0c81850c8b58b9d88b9ff57b919824bc8f7b6c91';
 const FIELD_GEMEINDE = 'e9bd061887c619b93d0ad759dfbef11e55e4c58a';
 const FIELD_OEREB = '6579ea588f2ed43f6f76b239e3a5d2fe7e65be59';
+const FIELD_OWNER_1 = 'e57bb30238d4f5aa2feeb1c102dfd51c5688928c';
+const FIELD_OWNER_2 = 'ea0de3fe875f87c3e9bde1eb7416030016d18125';
+const FIELD_OWNER_3 = 'd312bedebdad79dfcdeacc7f3912ff3bfd8306a7';
+const FIELD_OWNER_4 = '00586e2f3149ab8f3d6cebb55b7ec626630cb9d0';
+const FIELD_OWNER_5 = '0c4c530966d09ae4874184dc0c4eef6f4532ff90';
+const FIELD_GOOGLE_PIPE = '8318ae128ecd86600b20dc02b3a72537f4c9fd8a';
 
 const PropertySchema = z.object({
   id: z.string(),
