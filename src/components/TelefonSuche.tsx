@@ -324,12 +324,14 @@ export function TelefonSuche() {
                 Auto-Suche
               </Button>
               <Button size="sm" variant="outline" className="gap-1"
-                onClick={() => window.open(telSearchUrlParsed(parsed2, ort), '_blank')}>
-                <Search className="h-3.5 w-3.5" /> {parsed2.lastName}{parsed2.street ? ` ${parsed2.street}` : ''}
+                onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(`${parsed2.searchName} ${parsed2.street || ''} ${parsed2.streetNumber || ''} ${parsed2.ort || ort} Telefon`)}`, '_blank')}>
+                <Search className="h-3.5 w-3.5" /> Google
+                <ExternalLink className="h-3 w-3" />
               </Button>
               <Button size="sm" variant="outline" className="gap-1"
-                onClick={() => window.open(opendiUrlParsed(parsed2), '_blank')}>
-                <Search className="h-3.5 w-3.5" /> Opendi
+                onClick={() => window.open(`https://www.moneyhouse.ch/de/search?q=${encodeURIComponent(parsed2.fullName || parsed2.searchName)}`, '_blank')}>
+                <Search className="h-3.5 w-3.5" /> Moneyhouse
+                <ExternalLink className="h-3 w-3" />
               </Button>
             </div>
               <div className="space-y-1">
