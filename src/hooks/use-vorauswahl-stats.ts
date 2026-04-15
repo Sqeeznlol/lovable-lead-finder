@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useListFilter } from '@/hooks/use-lists';
+import { useListFilter, useLists } from '@/hooks/use-lists';
 
 interface VorauswahlStats {
   total: number;
@@ -13,40 +13,38 @@ interface VorauswahlStats {
 
 export function useVorauswahlStats() {
   const { selectedListId } = useListFilter();
+  const { data: lists } = useLists();
+  const isPrio = !!(selectedListId && lists?.find(l => l.id === selectedListId && l.priority < 0));
   
   return useQuery({
-    queryKey: ['vorauswahl-stats', selectedListId],
+    queryKey: ['vorauswahl-stats', selectedListId, isPrio],
     queryFn: async (): Promise<VorauswahlStats> => {
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
 
-      const addListFilter = (q: any) => {
-        if (selectedListId) return q.eq('list_id', selectedListId);
+      const buildQuery = (extra?: (q: any) => any) => {
+        let q = supabase.from('properties').select('*', { count: 'exact', head: true });
+        if (!isPrio) {
+          q = q.like('zone', 'W%').eq('geb_status', 'Bestehend');
+        }
+        if (selectedListId) q = q.eq('list_id', selectedListId);
+        if (extra) q = extra(q);
         return q;
       };
 
-      const { count: total } = await addListFilter(
-        supabase.from('properties').select('*', { count: 'exact', head: true })
-          .like('zone', 'W%').eq('geb_status', 'Bestehend')
-      );
+      const { count: total } = await buildQuery();
 
-      const { count: pending } = await addListFilter(
-        supabase.from('properties').select('*', { count: 'exact', head: true })
-          .like('zone', 'W%').eq('geb_status', 'Bestehend')
-          .eq('review_status', 'pending')
+      const { count: pending } = await buildQuery(q =>
+        q.eq('review_status', 'pending')
           .not('status', 'in', '("Ausgeblendet","Nicht interessant","Vorausgewählt")')
       );
 
-      const { count: approved } = await addListFilter(
-        supabase.from('properties').select('*', { count: 'exact', head: true })
-          .like('zone', 'W%').eq('geb_status', 'Bestehend')
-          .eq('review_status', 'approved')
+      const { count: approved } = await buildQuery(q =>
+        q.eq('review_status', 'approved')
       );
 
-      const { count: rejected } = await addListFilter(
-        supabase.from('properties').select('*', { count: 'exact', head: true })
-          .like('zone', 'W%').eq('geb_status', 'Bestehend')
-          .eq('review_status', 'rejected')
+      const { count: rejected } = await buildQuery(q =>
+        q.eq('review_status', 'rejected')
       );
 
       const { count: todayProcessed } = await supabase
