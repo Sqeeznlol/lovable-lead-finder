@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ExternalLink, Trash2, Edit, MapPin, Home, CheckCircle2, XCircle, SlidersHorizontal, EyeOff } from 'lucide-react';
+import { ExternalLink, Trash2, Edit, MapPin, Home, CheckCircle2, XCircle, SlidersHorizontal, EyeOff, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -8,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { useProperties, useGemeinden, useZones, useUpdateProperty, useDeleteProperty, type Property } from '@/hooks/use-properties';
+import { fetchAllProperties, useProperties, useGemeinden, useZones, useUpdateProperty, useDeleteProperty, type Property } from '@/hooks/use-properties';
 import { useToast } from '@/hooks/use-toast';
 import { getOerebParzelleUrl } from '@/lib/oereb';
 
