@@ -179,10 +179,25 @@ async function upsertPerson(
   ownerName: string,
   ownerPhone: string | null | undefined,
   orgId: number | undefined,
+  structuredOwner?: { firstName?: string; lastName?: string; street?: string; streetNumber?: string; plz?: string; ort?: string } | null,
 ): Promise<number | undefined> {
-  const { firstName, lastName } = parseOwnerForPipedrive(ownerName);
+  // Prefer structured data from owners_json
+  let firstName = structuredOwner?.firstName || '';
+  let lastName = structuredOwner?.lastName || '';
+
+  // Fallback to parsing raw name
+  if (!firstName && !lastName) {
+    const parsed = parseOwnerForPipedrive(ownerName);
+    firstName = parsed.firstName;
+    lastName = parsed.lastName;
+  }
+
   const displayName = firstName ? `${firstName} ${lastName}` : lastName;
   const cleanPhone = cleanPhoneNumber(ownerPhone);
+
+  // Build structured address from parsed fields
+  const streetFull = [structuredOwner?.street, structuredOwner?.streetNumber].filter(Boolean).join(' ');
+  const plzOrt = [structuredOwner?.plz, structuredOwner?.ort].filter(Boolean).join(' ');
 
   const existingPerson = await findExistingPerson(token, displayName);
   if (existingPerson) {
@@ -205,6 +220,14 @@ async function upsertPerson(
   };
   if (orgId) personData.org_id = orgId;
   if (cleanPhone) personData.phone = [{ value: cleanPhone, primary: true }];
+
+  // Add structured address to Pipedrive person
+  if (streetFull || plzOrt) {
+    personData.postal_address = streetFull;
+    personData.postal_address_zip_code = structuredOwner?.plz || '';
+    personData.postal_address_locality = structuredOwner?.ort || '';
+    personData.postal_address_street_number = structuredOwner?.streetNumber || '';
+  }
 
   const personRes = await pipedrivePost('/persons', token, personData);
   return personRes?.data?.id;
