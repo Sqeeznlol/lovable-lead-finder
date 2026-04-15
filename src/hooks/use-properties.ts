@@ -109,21 +109,24 @@ export function useZones() {
   });
 }
 
-export function useUnqueriedProperties(limit: number, listId?: string | null) {
+export function useUnqueriedProperties(limit: number, listId?: string | null, isPrioList?: boolean) {
   return useQuery({
-    queryKey: ['properties', 'unqueried', limit, listId],
+    queryKey: ['properties', 'unqueried', limit, listId, isPrioList],
     queryFn: async () => {
       let query = supabase
         .from('properties')
         .select('*')
         .eq('is_queried', false)
-        .like('zone', 'W%')
-        .or('baujahr.lte.1980,baujahr.is.null')
-        .eq('geb_status', 'Bestehend')
         .not('status', 'in', '("Ausgeblendet","Nicht interessant","Vorausgewählt")')
         .order('gebaeudeflaeche', { ascending: false, nullsFirst: false })
         .order('area', { ascending: false, nullsFirst: false })
         .limit(limit);
+      // For PRIO lists, skip zone/baujahr/geb_status filters
+      if (!isPrioList) {
+        query = query.like('zone', 'W%')
+          .or('baujahr.lte.1980,baujahr.is.null')
+          .eq('geb_status', 'Bestehend');
+      }
       if (listId) query = query.eq('list_id', listId);
       const { data, error } = await query;
       if (error) throw error;
