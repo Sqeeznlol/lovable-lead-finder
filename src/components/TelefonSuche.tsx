@@ -89,7 +89,7 @@ export function TelefonSuche() {
       refetch();
       setCurrentIndex(0);
     }
-    setPhone1(''); setPhone2('');
+    setPhone1(''); setPhone2(''); setAutoResult(null);
   }, [currentIndex, items.length, refetch]);
 
   // Reset index on filter change
@@ -297,7 +297,13 @@ export function TelefonSuche() {
                   </p>
                 </div>
               </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
+              <Button size="sm" variant="default" className="gap-1.5"
+                disabled={autoSearching}
+                onClick={() => autoSearchOwner(current.owner_name_2 || '', current.owner_address_2, setPhone2)}>
+                {autoSearching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+                Auto-Suche
+              </Button>
               <Button size="sm" variant="outline" className="gap-1"
                 onClick={() => window.open(telSearchUrlParsed(parsed2, ort), '_blank')}>
                 <Search className="h-3.5 w-3.5" /> tel.search.ch
