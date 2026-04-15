@@ -357,16 +357,21 @@ Deno.serve(async (req) => {
         });
         const orgId = orgRes?.data?.id;
 
+        // Extract structured owners from owners_json
+        const owners = Array.isArray(prop.owners_json) ? prop.owners_json : [];
+        const owner1Struct = owners.length > 0 ? owners[0] : null;
+        const owner2Struct = owners.length > 1 ? owners[1] : null;
+
         // 3. Create/update Person 1 ONLY if they have a valid phone number
         let personId: number | undefined;
         if (prop.owner_name && isValidPhone(prop.owner_phone)) {
-          personId = await upsertPerson(PIPEDRIVE_API_TOKEN, prop.owner_name, prop.owner_phone, orgId);
+          personId = await upsertPerson(PIPEDRIVE_API_TOKEN, prop.owner_name, prop.owner_phone, orgId, owner1Struct);
         }
 
         // 4. Create/update Person 2 ONLY if they have a valid phone number
         let person2Id: number | undefined;
         if (prop.owner_name_2 && isValidPhone(prop.owner_phone_2)) {
-          person2Id = await upsertPerson(PIPEDRIVE_API_TOKEN, prop.owner_name_2, prop.owner_phone_2, orgId);
+          person2Id = await upsertPerson(PIPEDRIVE_API_TOKEN, prop.owner_name_2, prop.owner_phone_2, orgId, owner2Struct);
         }
 
         // 5. Create Lead with custom fields + zone label
