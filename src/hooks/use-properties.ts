@@ -22,52 +22,91 @@ interface UsePropertiesOptions {
   listId?: string | null;
 }
 
-export function useProperties(options: UsePropertiesOptions = {}) {
-  const { statusFilter, gemeindeFilter, zoneFilter, search, page = 0, pageSize = 50,
-    baujahrVon, baujahrBis, flaecheMin, flaecheMax, areaMin, areaMax, geschosseMin, ownerFilter, listId } = options;
-  return useQuery({
-    queryKey: ['properties', statusFilter, gemeindeFilter, zoneFilter, search, page, pageSize,
-      baujahrVon, baujahrBis, flaecheMin, flaecheMax, areaMin, areaMax, geschosseMin, ownerFilter, listId],
-    queryFn: async () => {
-      let query = supabase
+function applyPropertyFilters(query: any, options: UsePropertiesOptions) {
+  const {
+    statusFilter,
+    gemeindeFilter,
+    zoneFilter,
+    search,
+    baujahrVon,
+    baujahrBis,
+    flaecheMin,
+    flaecheMax,
+    areaMin,
+    areaMax,
+    geschosseMin,
+    ownerFilter,
+    listId,
+  } = options;
+
+  let nextQuery = query
+    .or('baujahr.lte.1980,baujahr.is.null')
+    .like('zone', 'W%')
+    .eq('geb_status', 'Bestehend');
+
+  if (statusFilter && statusFilter !== 'Alle') {
+    nextQuery = nextQuery.eq('status', statusFilter);
+  } else {
+    nextQuery = nextQuery.neq('status', 'Ausgeblendet');
+  }
+  if (gemeindeFilter && gemeindeFilter !== 'Alle') nextQuery = nextQuery.eq('gemeinde', gemeindeFilter);
+  if (zoneFilter && zoneFilter !== 'Alle') nextQuery = nextQuery.eq('zone', zoneFilter);
+  if (search) nextQuery = nextQuery.or(`address.ilike.%${search}%,egrid.ilike.%${search}%,owner_name.ilike.%${search}%,gemeinde.ilike.%${search}%,strassenname.ilike.%${search}%`);
+  if (baujahrVon) nextQuery = nextQuery.gte('baujahr', baujahrVon);
+  if (baujahrBis) nextQuery = nextQuery.lte('baujahr', baujahrBis);
+  if (flaecheMin) nextQuery = nextQuery.gte('gebaeudeflaeche', flaecheMin);
+  if (flaecheMax) nextQuery = nextQuery.lte('gebaeudeflaeche', flaecheMax);
+  if (areaMin) nextQuery = nextQuery.gte('area', areaMin);
+  if (areaMax) nextQuery = nextQuery.lte('area', areaMax);
+  if (geschosseMin) nextQuery = nextQuery.gte('geschosse', geschosseMin);
+  if (ownerFilter === 'mit') nextQuery = nextQuery.not('owner_name', 'is', null);
+  if (ownerFilter === 'ohne') nextQuery = nextQuery.is('owner_name', null);
+  if (listId) nextQuery = nextQuery.eq('list_id', listId);
+
+  return nextQuery;
+}
+
+export async function fetchAllProperties(options: UsePropertiesOptions = {}) {
+  const batchSize = 1000;
+  let from = 0;
+  let rows: Property[] = [];
+
+  while (true) {
+    const query = applyPropertyFilters(
+      supabase
         .from('properties')
-        .select('*', { count: 'exact' })
+        .select('*')
         .order('gebaeudeflaeche', { ascending: false, nullsFirst: false })
         .order('area', { ascending: false, nullsFirst: false })
-        .range(page * pageSize, (page + 1) * pageSize - 1);
+        .range(from, from + batchSize - 1),
+      options,
+    );
 
-      // Exclude post-1980 buildings
-      query = query.or('baujahr.lte.1980,baujahr.is.null');
-      // Only include Wohnzonen (zones starting with W)
-      query = query.like('zone', 'W%');
-      // Only include existing buildings (exclude projektiert, bewilligt, im Bau)
-      query = query.eq('geb_status', 'Bestehend');
+    const { data, error } = await query;
+    if (error) throw error;
+    const batch = (data || []) as Property[];
+    rows = rows.concat(batch);
+    if (batch.length < batchSize) break;
+    from += batchSize;
+  }
 
-      if (statusFilter && statusFilter !== 'Alle') {
-        query = query.eq('status', statusFilter);
-      } else {
-        // By default hide "Ausgeblendet" properties
-        query = query.neq('status', 'Ausgeblendet');
-      }
-      if (gemeindeFilter && gemeindeFilter !== 'Alle') {
-        query = query.eq('gemeinde', gemeindeFilter);
-      }
-      if (zoneFilter && zoneFilter !== 'Alle') {
-        query = query.eq('zone', zoneFilter);
-      }
-      if (search) {
-        query = query.or(`address.ilike.%${search}%,egrid.ilike.%${search}%,owner_name.ilike.%${search}%,gemeinde.ilike.%${search}%,strassenname.ilike.%${search}%`);
-      }
-      if (baujahrVon) query = query.gte('baujahr', baujahrVon);
-      if (baujahrBis) query = query.lte('baujahr', baujahrBis);
-      if (flaecheMin) query = query.gte('gebaeudeflaeche', flaecheMin);
-      if (flaecheMax) query = query.lte('gebaeudeflaeche', flaecheMax);
-      if (areaMin) query = query.gte('area', areaMin);
-      if (areaMax) query = query.lte('area', areaMax);
-      if (geschosseMin) query = query.gte('geschosse', geschosseMin);
-      if (ownerFilter === 'mit') query = query.not('owner_name', 'is', null);
-      if (ownerFilter === 'ohne') query = query.is('owner_name', null);
-      if (listId) query = query.eq('list_id', listId);
+  return rows;
+}
+
+export function useProperties(options: UsePropertiesOptions = {}) {
+  const { page = 0, pageSize = 50 } = options;
+  return useQuery({
+    queryKey: ['properties', options],
+    queryFn: async () => {
+      const query = applyPropertyFilters(
+        supabase
+          .from('properties')
+          .select('*', { count: 'exact' })
+          .order('gebaeudeflaeche', { ascending: false, nullsFirst: false })
+          .order('area', { ascending: false, nullsFirst: false })
+          .range(page * pageSize, (page + 1) * pageSize - 1),
+        options,
+      );
 
       const { data, error, count } = await query;
       if (error) throw error;
