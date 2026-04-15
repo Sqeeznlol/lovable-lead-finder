@@ -35,6 +35,19 @@ const PropertySchema = z.object({
   owner_name_2: z.string().nullish(),
   owner_address_2: z.string().nullish(),
   owner_phone_2: z.string().nullish(),
+  owners_json: z.array(z.object({
+    fullName: z.string().optional(),
+    firstName: z.string().optional(),
+    lastName: z.string().optional(),
+    street: z.string().optional(),
+    streetNumber: z.string().optional(),
+    plz: z.string().optional(),
+    ort: z.string().optional(),
+    address: z.string().optional(),
+    phone: z.string().optional(),
+    ownershipType: z.string().optional(),
+    type: z.string().optional(),
+  })).nullish(),
   notes: z.string().nullish(),
   status: z.string(),
   google_maps_url: z.string().nullish(),
@@ -166,10 +179,25 @@ async function upsertPerson(
   ownerName: string,
   ownerPhone: string | null | undefined,
   orgId: number | undefined,
+  structuredOwner?: { firstName?: string; lastName?: string; street?: string; streetNumber?: string; plz?: string; ort?: string } | null,
 ): Promise<number | undefined> {
-  const { firstName, lastName } = parseOwnerForPipedrive(ownerName);
+  // Prefer structured data from owners_json
+  let firstName = structuredOwner?.firstName || '';
+  let lastName = structuredOwner?.lastName || '';
+
+  // Fallback to parsing raw name
+  if (!firstName && !lastName) {
+    const parsed = parseOwnerForPipedrive(ownerName);
+    firstName = parsed.firstName;
+    lastName = parsed.lastName;
+  }
+
   const displayName = firstName ? `${firstName} ${lastName}` : lastName;
   const cleanPhone = cleanPhoneNumber(ownerPhone);
+
+  // Build structured address from parsed fields
+  const streetFull = [structuredOwner?.street, structuredOwner?.streetNumber].filter(Boolean).join(' ');
+  const plzOrt = [structuredOwner?.plz, structuredOwner?.ort].filter(Boolean).join(' ');
 
   const existingPerson = await findExistingPerson(token, displayName);
   if (existingPerson) {
@@ -192,6 +220,14 @@ async function upsertPerson(
   };
   if (orgId) personData.org_id = orgId;
   if (cleanPhone) personData.phone = [{ value: cleanPhone, primary: true }];
+
+  // Add structured address to Pipedrive person
+  if (streetFull || plzOrt) {
+    personData.postal_address = streetFull;
+    personData.postal_address_zip_code = structuredOwner?.plz || '';
+    personData.postal_address_locality = structuredOwner?.ort || '';
+    personData.postal_address_street_number = structuredOwner?.streetNumber || '';
+  }
 
   const personRes = await pipedrivePost('/persons', token, personData);
   return personRes?.data?.id;
@@ -321,16 +357,21 @@ Deno.serve(async (req) => {
         });
         const orgId = orgRes?.data?.id;
 
+        // Extract structured owners from owners_json
+        const owners = Array.isArray(prop.owners_json) ? prop.owners_json : [];
+        const owner1Struct = owners.length > 0 ? owners[0] : null;
+        const owner2Struct = owners.length > 1 ? owners[1] : null;
+
         // 3. Create/update Person 1 ONLY if they have a valid phone number
         let personId: number | undefined;
         if (prop.owner_name && isValidPhone(prop.owner_phone)) {
-          personId = await upsertPerson(PIPEDRIVE_API_TOKEN, prop.owner_name, prop.owner_phone, orgId);
+          personId = await upsertPerson(PIPEDRIVE_API_TOKEN, prop.owner_name, prop.owner_phone, orgId, owner1Struct);
         }
 
         // 4. Create/update Person 2 ONLY if they have a valid phone number
         let person2Id: number | undefined;
         if (prop.owner_name_2 && isValidPhone(prop.owner_phone_2)) {
-          person2Id = await upsertPerson(PIPEDRIVE_API_TOKEN, prop.owner_name_2, prop.owner_phone_2, orgId);
+          person2Id = await upsertPerson(PIPEDRIVE_API_TOKEN, prop.owner_name_2, prop.owner_phone_2, orgId, owner2Struct);
         }
 
         // 5. Create Lead with custom fields + zone label
