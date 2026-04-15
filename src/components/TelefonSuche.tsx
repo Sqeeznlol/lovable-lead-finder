@@ -236,6 +236,7 @@ export function TelefonSuche() {
               {current.zone && <Badge variant="outline" className="text-xs">{current.zone}</Badge>}
               {current.baujahr && <Badge variant="outline" className="text-xs">Bj. {current.baujahr}</Badge>}
               {current.parzelle && <Badge variant="outline" className="text-xs">Parz. {current.parzelle}</Badge>}
+              {current.bfs_nr && <Badge variant="outline" className="text-xs font-mono">BFS {current.bfs_nr}</Badge>}
               {current.egrid && <Badge variant="outline" className="text-xs">{current.egrid}</Badge>}
             </div>
 
