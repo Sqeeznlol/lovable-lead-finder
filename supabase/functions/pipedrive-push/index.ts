@@ -16,6 +16,7 @@ const FIELD_GESCHOSSE = 'df02438b21bc6d823e3abf7dc7d4a71f2239724e';
 const FIELD_EGRID = 'd210ce9334d6812187af1be8b71b7c97f6afd8db';
 const FIELD_EGID = '0c81850c8b58b9d88b9ff57b919824bc8f7b6c91';
 const FIELD_GEMEINDE = 'e9bd061887c619b93d0ad759dfbef11e55e4c58a';
+const FIELD_OEREB = '6579ea588f2ed43f6f76b239e3a5d2fe7e65be59';
 
 const PropertySchema = z.object({
   id: z.string(),
@@ -400,6 +401,10 @@ Deno.serve(async (req) => {
         if (prop.egrid) leadData[FIELD_EGRID] = prop.egrid;
         if (prop.gwr_egid) leadData[FIELD_EGID] = prop.gwr_egid;
         if (prop.gemeinde) leadData[FIELD_GEMEINDE] = prop.gemeinde;
+        // ÖREB Kataster link
+        if (prop.parzelle && prop.bfs_nr) {
+          leadData[FIELD_OEREB] = `https://maps.zh.ch/?locate=parz&locations=${prop.bfs_nr},${prop.parzelle}&topic=OerebKatasterZH`;
+        }
 
         console.log('Creating lead:', JSON.stringify({ title: leadTitle, person_id: personId, organization_id: orgId }));
         const leadRes = await pipedrivePost('/leads', PIPEDRIVE_API_TOKEN, leadData);
