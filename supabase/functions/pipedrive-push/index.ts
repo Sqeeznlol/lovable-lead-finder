@@ -248,6 +248,12 @@ function buildLeadNotes(prop: z.infer<typeof PropertySchema>): string {
   const mapsUrl = prop.google_maps_url || `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
   lines.push(`<b>Google Maps:</b> <a href="${mapsUrl}">Karte öffnen</a>`);
 
+  // ÖREB Kataster link
+  if (prop.parzelle && prop.bfs_nr) {
+    const oerebUrl = `https://maps.zh.ch/?locate=parz&locations=${prop.bfs_nr},${prop.parzelle}&topic=OerebKatasterZH`;
+    lines.push(`<b>ÖREB Kataster:</b> <a href="${oerebUrl}">Kataster öffnen</a>`);
+  }
+
 
   // Property details
   const details: string[] = [];
