@@ -1,8 +1,8 @@
-// Content script for maps.zh.ch — clicks parcel and opens portal link
+// Content script for maps.zh.ch — searches address, clicks parcel, opens portal link
 
 (function() {
   let attempts = 0;
-  const MAX_ATTEMPTS = 30;
+  const MAX_ATTEMPTS = 40;
 
   function log(msg) {
     console.log('[Akquise GIS]', msg);
@@ -12,6 +12,53 @@
     return new Promise(r => setTimeout(r, ms));
   }
 
+  async function fillSearchAndSubmit(address) {
+    log('Filling search with: ' + address);
+
+    // Find the address search input
+    const searchInput = document.querySelector('#searchInputField') ||
+                        document.querySelector('input[name="searchInputField"]') ||
+                        document.querySelector('.x-form-text[id*="search"]') ||
+                        document.querySelector('input.x-form-text');
+
+    if (!searchInput) {
+      log('Search input not found, trying alternate selectors...');
+      // Try all text inputs
+      const inputs = document.querySelectorAll('input[type="text"], input:not([type])');
+      for (const input of inputs) {
+        if (input.offsetParent !== null && input.offsetWidth > 100) {
+          log('Using input: ' + input.id);
+          await typeIntoInput(input, address);
+          return true;
+        }
+      }
+      return false;
+    }
+
+    await typeIntoInput(searchInput, address);
+    return true;
+  }
+
+  async function typeIntoInput(input, text) {
+    input.focus();
+    input.value = '';
+    input.dispatchEvent(new Event('focus', { bubbles: true }));
+    await sleep(200);
+
+    // Set value directly
+    input.value = text;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    await sleep(500);
+
+    // Press Enter to trigger search
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent('keypress', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
+
+    log('Search submitted');
+  }
+
   async function clickCanvas() {
     const canvas = document.querySelector('canvas');
     if (!canvas) {
@@ -19,12 +66,10 @@
       return false;
     }
 
-    // Click center of the canvas (where the located parcel should be)
     const rect = canvas.getBoundingClientRect();
     const x = rect.left + rect.width / 2;
     const y = rect.top + rect.height / 2;
 
-    // Simulate human-like mouse events
     const events = ['mousemove', 'mousedown', 'mouseup', 'click'];
     for (const type of events) {
       const evt = new MouseEvent(type, {
@@ -44,41 +89,89 @@
   }
 
   async function findAndClickPortalLink() {
-    // Look for "öffentlicher Zugang" link
+    // Look for various possible link texts for the Eigentumsauskunft portal
     const links = document.querySelectorAll('a');
     for (const link of links) {
-      if (link.textContent && link.textContent.includes('öffentlicher Zugang')) {
+      const text = (link.textContent || '').toLowerCase();
+      if (text.includes('öffentlicher zugang') ||
+          text.includes('eigentumsauskunft') ||
+          text.includes('eigentum') ||
+          (link.href && link.href.includes('portal.objektwesen'))) {
         log('Found portal link: ' + link.href);
-        // Simulate human click
         await sleep(300 + Math.random() * 500);
         link.click();
+        return true;
+      }
+    }
+
+    // Also check buttons
+    const buttons = document.querySelectorAll('button, .x-btn');
+    for (const btn of buttons) {
+      const text = (btn.textContent || '').toLowerCase();
+      if (text.includes('öffentlicher zugang') || text.includes('eigentumsauskunft')) {
+        log('Found portal button');
+        btn.click();
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  async function clickInfoTab() {
+    // Click the "Info" tab in the right panel
+    const infoTab = document.querySelector('#tab-1054-btnInnerEl') ||
+                    document.querySelector('[id*="tab-"][id*="-btnInnerEl"]');
+    if (infoTab) {
+      log('Clicking Info tab');
+      infoTab.click();
+      await sleep(500);
+      return true;
+    }
+
+    // Try clicking any tab that says "Info"
+    const tabs = document.querySelectorAll('.x-tab, [role="tab"]');
+    for (const tab of tabs) {
+      if ((tab.textContent || '').includes('Info')) {
+        log('Clicking tab: ' + tab.textContent);
+        tab.click();
+        await sleep(500);
         return true;
       }
     }
     return false;
   }
 
-  async function tryClickTab() {
-    // Sometimes the info panel needs a tab click (from script 2)
-    const tabBtn = document.querySelector('#tab-1054-btnInnerEl') ||
-                   document.querySelector('[id*="tab-"][id*="-btnInnerEl"]');
-    if (tabBtn) {
-      log('Clicking tab button');
-      tabBtn.click();
-      await sleep(500);
-    }
-  }
-
   async function run() {
-    // Tell background we're on the GIS page
     chrome.runtime.sendMessage({ type: 'GIS_READY' });
 
-    log('GIS page loaded, waiting for map to render...');
+    const job = await new Promise(resolve => {
+      chrome.runtime.sendMessage({ type: 'GET_JOB' }, resolve);
+    });
 
-    // Wait for canvas to be ready
-    await sleep(3000 + Math.random() * 1000);
+    if (!job) {
+      log('No active job');
+      return;
+    }
 
-    // Click the canvas
+    log('GIS page loaded, job: ' + JSON.stringify({ egrid: job.egrid, address: job.address }));
+
+    // Wait for page to fully render
+    await sleep(3000);
+
+    // If we have an address and need to search for it
+    if (job.address && job.needsSearch) {
+      const searched = await fillSearchAndSubmit(job.address);
+      if (searched) {
+        log('Waiting for search results...');
+        await sleep(4000);
+      }
+    }
+
+    // Wait a bit more for map to settle
+    await sleep(2000);
+
+    // Click the canvas to select the parcel
     const clicked = await clickCanvas();
     if (!clicked) {
       log('Failed to click canvas');
@@ -89,7 +182,7 @@
     log('Waiting for info panel...');
 
     for (let i = 0; i < MAX_ATTEMPTS; i++) {
-      await sleep(1000);
+      await sleep(1500);
 
       // Try clicking portal link
       if (await findAndClickPortalLink()) {
@@ -97,13 +190,13 @@
         return;
       }
 
-      // If not found, maybe need to click a tab
-      if (i === 5) {
-        await tryClickTab();
+      // Try clicking Info tab
+      if (i === 3 || i === 8) {
+        await clickInfoTab();
       }
 
-      // Try clicking canvas again if nothing happened
-      if (i === 10) {
+      // Retry canvas click
+      if (i === 6 || i === 15) {
         log('Retrying canvas click...');
         await clickCanvas();
       }
@@ -112,6 +205,12 @@
     }
 
     log('Could not find portal link after ' + MAX_ATTEMPTS + ' attempts');
+    // Send error back
+    chrome.runtime.sendMessage({
+      type: 'OWNER_DATA',
+      owners: [],
+      error: 'Portal-Link nicht gefunden'
+    });
   }
 
   // Only run if we have an active job

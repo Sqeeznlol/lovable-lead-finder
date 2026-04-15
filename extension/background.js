@@ -2,27 +2,34 @@
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'START_LOOKUP') {
+    const address = msg.address || '';
+    const plzOrt = msg.plzOrt || '';
+    const searchAddr = [address, plzOrt].filter(Boolean).join(', ');
+
     // Store the job details
     chrome.storage.local.set({
       currentJob: {
         egrid: msg.egrid,
         bfsNr: msg.bfsNr,
+        parzelle: msg.parzelle,
         phoneNumber: msg.phoneNumber,
         propertyId: msg.propertyId,
         appOrigin: msg.appOrigin,
+        address: searchAddr,
+        needsSearch: true,
         status: 'opening_gis'
       }
     });
 
-    // Open GIS map with the parcel
-    const gisUrl = `https://maps.zh.ch/?locate=parz&locations=${msg.egrid}&topic=DLGOWfarbigZH&scale=500`;
+    // Build GIS URL — use Eigentumsauskunft topic with address search
+    // The search parameter pre-fills the search box
+    const gisUrl = `https://maps.zh.ch/?topic=DLGOWfarbigZH&search=${encodeURIComponent(searchAddr)}&scale=500`;
     chrome.tabs.create({ url: gisUrl });
     sendResponse({ ok: true });
     return true;
   }
 
   if (msg.type === 'GIS_READY') {
-    // GIS page loaded, update status
     chrome.storage.local.get('currentJob', (result) => {
       if (result.currentJob) {
         result.currentJob.status = 'clicking_parcel';
@@ -33,7 +40,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.type === 'PORTAL_OPENED') {
-    // Portal tab opened from GIS
     chrome.storage.local.get('currentJob', (result) => {
       if (result.currentJob) {
         result.currentJob.status = 'on_portal';
@@ -44,7 +50,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.type === 'OWNER_DATA') {
-    // Owner data extracted from portal — send back to app
     chrome.storage.local.get('currentJob', (result) => {
       const job = result.currentJob;
       if (!job) return;
@@ -56,7 +61,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             chrome.tabs.sendMessage(tab.id, {
               type: 'OWNER_RESULT',
               propertyId: job.propertyId,
-              owners: msg.owners
+              owners: msg.owners,
+              error: msg.error || null
             }).catch(() => {});
           }
         }
@@ -77,7 +83,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.type === 'SMS_WAITING') {
-    // Update status — waiting for SMS code
     chrome.storage.local.get('currentJob', (result) => {
       if (result.currentJob) {
         result.currentJob.status = 'waiting_sms';
