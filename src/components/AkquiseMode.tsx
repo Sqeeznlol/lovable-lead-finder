@@ -655,16 +655,20 @@ export function AkquiseMode() {
                               <span className="font-medium">{owner.parsed.fullName || '–'}</span>
                             </div>
                             <div className="bg-muted/50 rounded px-2 py-1.5">
-                              <span className="text-muted-foreground">Adresse: </span>
-                              <span className="font-medium">{owner.parsed.address || '–'}</span>
+                              <span className="text-muted-foreground">Strasse: </span>
+                              <span className="font-medium">
+                                {owner.parsed.street ? `${owner.parsed.street} ${owner.parsed.streetNumber}` : (owner.parsed.address || '–')}
+                              </span>
+                            </div>
+                            <div className="bg-muted/50 rounded px-2 py-1.5">
+                              <span className="text-muted-foreground">PLZ/Ort: </span>
+                              <span className="font-medium">
+                                {owner.parsed.plz ? `${owner.parsed.plz} ${owner.parsed.ort}` : '–'}
+                              </span>
                             </div>
                             <div className="bg-muted/50 rounded px-2 py-1.5">
                               <span className="text-muted-foreground">Eigentum: </span>
                               <span className="font-medium">{owner.parsed.ownershipType || '–'}</span>
-                            </div>
-                            <div className="bg-muted/50 rounded px-2 py-1.5">
-                              <span className="text-muted-foreground">Suche: </span>
-                              <span className="font-medium text-primary">{owner.parsed.searchName || '–'}</span>
                             </div>
                           </div>
                         )}
