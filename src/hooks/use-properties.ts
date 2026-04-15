@@ -109,11 +109,11 @@ export function useZones() {
   });
 }
 
-export function useUnqueriedProperties(limit: number) {
+export function useUnqueriedProperties(limit: number, listId?: string | null) {
   return useQuery({
-    queryKey: ['properties', 'unqueried', limit],
+    queryKey: ['properties', 'unqueried', limit, listId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('properties')
         .select('*')
         .eq('is_queried', false)
@@ -124,6 +124,28 @@ export function useUnqueriedProperties(limit: number) {
         .order('gebaeudeflaeche', { ascending: false, nullsFirst: false })
         .order('area', { ascending: false, nullsFirst: false })
         .limit(limit);
+      if (listId) query = query.eq('list_id', listId);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data as Property[];
+    },
+  });
+}
+
+export function usePreselectedProperties(limit: number, listId?: string | null) {
+  return useQuery({
+    queryKey: ['properties', 'preselected', limit, listId],
+    queryFn: async () => {
+      let query = supabase
+        .from('properties')
+        .select('*')
+        .eq('status', 'Vorausgewählt')
+        .eq('is_queried', false)
+        .order('gebaeudeflaeche', { ascending: false, nullsFirst: false })
+        .order('area', { ascending: false, nullsFirst: false })
+        .limit(limit);
+      if (listId) query = query.eq('list_id', listId);
+      const { data, error } = await query;
       if (error) throw error;
       return data as Property[];
     },
