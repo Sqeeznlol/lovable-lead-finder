@@ -574,16 +574,22 @@ export function Vorauswahl() {
                       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">GIS Zürich – ÖREB Kataster</span>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {getOerebParzelleUrl(current.parzelle, current.bfs_nr) && (
+                      <Button
+                        asChild
+                        variant="default"
+                        size="sm"
+                        className="h-10 px-4 text-sm font-semibold shadow-sm"
+                        disabled={!getOerebParzelleUrl(current.parzelle, current.bfs_nr)}
+                      >
                         <a
                           href={getOerebParzelleUrl(current.parzelle, current.bfs_nr) || undefined}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 bg-primary text-primary-foreground rounded-lg px-4 py-2 text-sm font-semibold hover:bg-primary/90 transition-colors shadow-sm"
+                          aria-disabled={!getOerebParzelleUrl(current.parzelle, current.bfs_nr)}
                         >
                           <ExternalLink className="h-4 w-4" /> ÖREB Kataster öffnen
                         </a>
-                      )}
+                      </Button>
                       {current.egrid && current.bfs_nr && (
                         <a
                           href={`https://maps.zh.ch/?topic=DLGOWfarbigZH&offlayers=bezirkslabels&scale=500&egrid=${current.egrid}&bfsnr=${current.bfs_nr}`}
