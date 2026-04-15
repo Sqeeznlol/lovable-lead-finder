@@ -592,15 +592,6 @@ export function Vorauswahl() {
                         >
                           <ExternalLink className="h-3 w-3" /> Eigentümer GIS
                         </a>
-                      )}
-                      <a
-                        href={`https://maps.zh.ch/?topic=OerebKatasterZH&search=${encodeURIComponent(current.address + (current.plz_ort ? ' ' + current.plz_ort : ''))}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 bg-muted text-muted-foreground border rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-muted/80 transition-colors"
-                      >
-                        <ExternalLink className="h-3 w-3" /> maps.zh.ch (Suche)
-                      </a>
                     </div>
                     {current.parzelle && (
                       <p className="text-[10px] text-muted-foreground mt-1.5">Parzelle: {current.parzelle} {current.egrid ? `• EGRID: ${current.egrid}` : ''}</p>
