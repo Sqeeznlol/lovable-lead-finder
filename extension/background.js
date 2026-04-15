@@ -1,42 +1,28 @@
-// Background service worker — coordinates the GIS automation workflow
+// Background service worker — coordinates the portal automation workflow
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'START_LOOKUP') {
-    const address = msg.address || '';
-    const plzOrt = msg.plzOrt || '';
-    const searchAddr = [address, plzOrt].filter(Boolean).join(', ');
+    const phoneNumber = (msg.phoneNumber || '').replace(/\s+/g, '');
 
     // Store the job details
     chrome.storage.local.set({
       currentJob: {
         egrid: msg.egrid,
         bfsNr: msg.bfsNr,
-        parzelle: msg.parzelle,
-        phoneNumber: msg.phoneNumber,
+        phoneNumber: phoneNumber,
         propertyId: msg.propertyId,
         appOrigin: msg.appOrigin,
-        address: searchAddr,
-        needsSearch: true,
-        status: 'opening_gis'
+        status: 'opening_portal'
       }
     });
 
-    // Build GIS URL — use Eigentumsauskunft topic with address search
-    // The search parameter pre-fills the search box
-    const gisUrl = `https://maps.zh.ch/?topic=DLGOWfarbigZH&search=${encodeURIComponent(searchAddr)}&scale=500`;
-    chrome.tabs.create({ url: gisUrl });
+    // Go DIRECTLY to the portal — skip GIS entirely
+    // URL pattern: /aks/detail?egrid=EGRID&bfsNr=BFS
+    // The portal will ask for SMS verification, then show owner data
+    const portalUrl = `https://portal.objektwesen.zh.ch/aks/detail?egrid=${encodeURIComponent(msg.egrid)}&bfsNr=${encodeURIComponent(msg.bfsNr || '')}`;
+    chrome.tabs.create({ url: portalUrl });
     sendResponse({ ok: true });
     return true;
-  }
-
-  if (msg.type === 'GIS_READY') {
-    chrome.storage.local.get('currentJob', (result) => {
-      if (result.currentJob) {
-        result.currentJob.status = 'clicking_parcel';
-        result.currentJob.gisTabId = sender.tab.id;
-        chrome.storage.local.set({ currentJob: result.currentJob });
-      }
-    });
   }
 
   if (msg.type === 'PORTAL_OPENED') {
@@ -71,10 +57,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       // Close the portal tab
       if (sender.tab?.id) {
         chrome.tabs.remove(sender.tab.id).catch(() => {});
-      }
-      // Close the GIS tab
-      if (job.gisTabId) {
-        chrome.tabs.remove(job.gisTabId).catch(() => {});
       }
 
       // Clear job
