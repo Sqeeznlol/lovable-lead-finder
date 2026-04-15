@@ -152,23 +152,8 @@ export function usePreselectedProperties(limit: number, listId?: string | null) 
   });
 }
 
-export function usePreselectedProperties(limit: number) {
-  return useQuery({
-    queryKey: ['properties', 'preselected', limit],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('properties')
-        .select('*')
-        .eq('status', 'Vorausgewählt')
-        .eq('is_queried', false)
-        .order('gebaeudeflaeche', { ascending: false, nullsFirst: false })
-        .order('area', { ascending: false, nullsFirst: false })
-        .limit(limit);
-      if (error) throw error;
-      return data as Property[];
-    },
-  });
-}
+
+
 
 export function useInsertProperties() {
   const qc = useQueryClient();
