@@ -93,7 +93,26 @@ export function TelefonSuche() {
   }, [currentIndex, items.length, refetch]);
 
   // Reset index on filter change
-  useEffect(() => { setCurrentIndex(0); setPhone1(''); setPhone2(''); }, [filter]);
+  useEffect(() => { setCurrentIndex(0); setPhone1(''); setPhone2(''); setAutoResult(null); }, [filter]);
+
+  // Auto-search when current item changes
+  useEffect(() => {
+    if (!current?.owner_name) return;
+    const parsed = parseOwnerString(current.owner_name);
+    const street = parsed.street || (current.owner_address?.match(/^(.+?)\s+(\d+\w*)/)?.[1] || '');
+    if (parsed.lastName && street) {
+      autoSearchOwner(current.owner_name, current.owner_address, setPhone1);
+    }
+    // Also auto-search owner 2
+    if (current.owner_name_2) {
+      const parsed2 = parseOwnerString(current.owner_name_2);
+      const street2 = parsed2.street || (current.owner_address_2?.match(/^(.+?)\s+(\d+\w*)/)?.[1] || '');
+      if (parsed2.lastName && street2) {
+        autoSearchOwner(current.owner_name_2, current.owner_address_2, setPhone2);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?.id]);
 
   // Keyboard shortcuts
   useEffect(() => {
