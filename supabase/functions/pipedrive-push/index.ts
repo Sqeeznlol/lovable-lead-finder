@@ -429,6 +429,11 @@ Deno.serve(async (req) => {
           leadData[FIELD_OEREB] = `https://maps.zh.ch/?locate=parz&locations=${prop.bfs_nr},${prop.parzelle}&topic=OerebKatasterZH`;
         }
 
+        // Parzelle, Wohnungen, Kategorie
+        if (prop.parzelle) leadData[FIELD_PARZELLE] = prop.parzelle;
+        if (prop.wohnungen) leadData[FIELD_WOHNUNGEN] = prop.wohnungen;
+        if (prop.kategorie) leadData[FIELD_KATEGORIE] = prop.kategorie;
+
         // Google Maps link for Pipedrive
         const fullAddr = prop.address + (prop.plz_ort ? ', ' + prop.plz_ort : '');
         leadData[FIELD_GOOGLE_PIPE] = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddr)}`;
