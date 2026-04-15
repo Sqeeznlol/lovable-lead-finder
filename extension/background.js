@@ -16,9 +16,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
     });
 
-    // Go DIRECTLY to the portal — skip GIS entirely
-    // URL pattern: /aks/detail?egrid=EGRID&bfsNr=BFS
-    // The portal will ask for SMS verification, then show owner data
+    // Go DIRECTLY to the portal
     const portalUrl = `https://portal.objektwesen.zh.ch/aks/detail?egrid=${encodeURIComponent(msg.egrid)}&bfsNr=${encodeURIComponent(msg.bfsNr || '')}`;
     chrome.tabs.create({ url: portalUrl });
     sendResponse({ ok: true });
@@ -40,10 +38,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       const job = result.currentJob;
       if (!job) return;
 
-      // Send data to all app tabs
+      // Send data to all app tabs (match both lovable.app and lovableproject.com)
       chrome.tabs.query({}, (tabs) => {
         for (const tab of tabs) {
-          if (tab.url && tab.url.includes(job.appOrigin || 'lovable.app')) {
+          if (tab.url && (
+            tab.url.includes('lovable.app') ||
+            tab.url.includes('lovableproject.com') ||
+            tab.url.includes('localhost')
+          )) {
             chrome.tabs.sendMessage(tab.id, {
               type: 'OWNER_RESULT',
               propertyId: job.propertyId,

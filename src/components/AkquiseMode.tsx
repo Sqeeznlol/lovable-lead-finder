@@ -526,7 +526,7 @@ export function AkquiseMode() {
                           }
                         }));
                         setGisOpened(true);
-                        setAutoStatus('GIS wird geöffnet...');
+                        setAutoStatus('Portal wird geöffnet...');
                         // Timeout fallback
                         setTimeout(() => setAutoStatus(null), 120000);
                       }}
