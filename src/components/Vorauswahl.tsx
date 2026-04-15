@@ -17,6 +17,9 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { supabase } from '@/integrations/supabase/client';
 import { calculateDealScore, scoreColor, scoreBg } from '@/lib/deal-score';
+import { useListFilter } from '@/hooks/use-lists';
+import { ListSelector } from '@/components/ListSelector';
+import { calculateDealScore, scoreColor, scoreBg } from '@/lib/deal-score';
 
 type ViewMode = 'card' | 'table';
 
@@ -34,7 +37,8 @@ export function Vorauswahl() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const { data: zones } = useZones();
   const { data: gemeinden } = useGemeinden();
-  const { data: queue, refetch } = useUnqueriedProperties(200);
+  const { selectedListId } = useListFilter();
+  const { data: queue, refetch } = useUnqueriedProperties(200, selectedListId);
   const { data: stats, refetch: refetchStats } = useVorauswahlStats();
   const updateProp = useUpdateProperty();
   const { toast } = useToast();
