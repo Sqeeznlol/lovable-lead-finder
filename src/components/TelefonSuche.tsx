@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Phone, Check, ArrowRight, SkipForward, ExternalLink, AlertTriangle, Building2, Landmark, EyeOff } from 'lucide-react';
+import { Search, Phone, Check, ArrowRight, SkipForward, ExternalLink, AlertTriangle, Building2, Landmark, EyeOff, Zap, Loader2, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { useProperties, useUpdateProperty } from '@/hooks/use-properties';
 import { useToast } from '@/hooks/use-toast';
 import { classifyOwner, ownerTypeLabel, ownerTypeColor, parseOwnerString, telSearchUrlParsed, opendiUrlParsed } from '@/lib/owner-utils';
+import { supabase } from '@/integrations/supabase/client';
 
 export function TelefonSuche() {
   const { data: result, refetch } = useProperties({ statusFilter: 'Eigentümer ermittelt', pageSize: 200 });
