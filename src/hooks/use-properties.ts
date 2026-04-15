@@ -19,6 +19,7 @@ interface UsePropertiesOptions {
   areaMax?: number;
   geschosseMin?: number;
   ownerFilter?: string;
+  listId?: string | null;
 }
 
 export function useProperties(options: UsePropertiesOptions = {}) {
