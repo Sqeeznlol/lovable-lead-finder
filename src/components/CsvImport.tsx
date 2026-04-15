@@ -1,29 +1,73 @@
 import { useState, useRef } from 'react';
-import { Upload, FileText, Check } from 'lucide-react';
+import { Upload, FileText, FileSpreadsheet, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { parseCsv } from '@/lib/csv-parser';
+import { parseCsv, type CsvProperty } from '@/lib/csv-parser';
 import { useInsertProperties } from '@/hooks/use-properties';
 import { useToast } from '@/hooks/use-toast';
 
+async function parseExcel(file: File): Promise<CsvProperty[]> {
+  const XLSX = await import('xlsx');
+  const data = await file.arrayBuffer();
+  const wb = XLSX.read(data, { type: 'array' });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows: Record<string, string>[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+  if (rows.length === 0) return [];
+
+  const findKey = (row: Record<string, string>, names: string[]) =>
+    Object.keys(row).find(k => names.some(n => k.toLowerCase().includes(n)));
+
+  const sample = rows[0];
+  const addressKey = findKey(sample, ['adresse', 'address', 'strasse']) || Object.keys(sample)[0];
+  const areaKey = findKey(sample, ['fläche', 'flaeche', 'area']);
+  const plotKey = findKey(sample, ['grundstück', 'grundstueck', 'plot', 'parzelle', 'nummer']);
+  const egridKey = findKey(sample, ['egrid', 'eidg']);
+  const bfsKey = findKey(sample, ['bfs', 'gemeinde']);
+  const streetviewKey = findKey(sample, ['streetview', 'street_view', 'google']);
+
+  return rows
+    .map(r => ({
+      address: String(r[addressKey!] || ''),
+      area: areaKey ? parseFloat(String(r[areaKey])) || undefined : undefined,
+      plot_number: plotKey ? String(r[plotKey]) || undefined : undefined,
+      egrid: egridKey ? String(r[egridKey]) || undefined : undefined,
+      bfs_nr: bfsKey ? String(r[bfsKey]) || undefined : undefined,
+      streetview_url: streetviewKey ? String(r[streetviewKey]) || undefined : undefined,
+    }))
+    .filter(p => p.address);
+}
+
 export function CsvImport() {
-  const [preview, setPreview] = useState<ReturnType<typeof parseCsv>>([]);
+  const [preview, setPreview] = useState<CsvProperty[]>([]);
   const [fileName, setFileName] = useState('');
-  const fileRef = useRef<HTMLInputElement>(null);
+  const csvRef = useRef<HTMLInputElement>(null);
+  const xlsxRef = useRef<HTMLInputElement>(null);
   const insertProps = useInsertProperties();
   const { toast } = useToast();
 
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCsvFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setFileName(file.name);
     const reader = new FileReader();
     reader.onload = (ev) => {
       const text = ev.target?.result as string;
-      const parsed = parseCsv(text);
-      setPreview(parsed);
+      setPreview(parseCsv(text));
     };
     reader.readAsText(file);
+  };
+
+  const handleExcelFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    try {
+      const parsed = await parseExcel(file);
+      setPreview(parsed);
+    } catch (err) {
+      toast({ title: 'Fehler', description: 'Excel konnte nicht gelesen werden: ' + String(err), variant: 'destructive' });
+    }
   };
 
   const handleImport = () => {
@@ -51,8 +95,8 @@ export function CsvImport() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold tracking-tight">CSV Import</h2>
-        <p className="text-muted-foreground mt-1">Lade deine Liegenschafts-Liste hoch</p>
+        <h2 className="text-3xl font-bold tracking-tight">Datei Import</h2>
+        <p className="text-muted-foreground mt-1">Lade deine Liegenschafts-Liste hoch (CSV oder Excel)</p>
       </div>
 
       <Card className="border-dashed border-2 border-muted-foreground/25 bg-card">
@@ -61,13 +105,19 @@ export function CsvImport() {
             <Upload className="h-8 w-8 text-muted-foreground" />
           </div>
           <div className="text-center">
-            <p className="font-medium">CSV-Datei hierhin ziehen oder klicken</p>
+            <p className="font-medium">CSV- oder Excel-Datei hierhin ziehen oder klicken</p>
             <p className="text-sm text-muted-foreground mt-1">Spalten: Adresse, Fläche, Grundstück Nr., EGRID, BFS Nr., Streetview</p>
           </div>
-          <input ref={fileRef} type="file" accept=".csv,.txt,.tsv" onChange={handleFile} className="hidden" />
-          <Button variant="outline" onClick={() => fileRef.current?.click()}>
-            <FileText className="h-4 w-4 mr-2" /> Datei auswählen
-          </Button>
+          <input ref={csvRef} type="file" accept=".csv,.txt,.tsv" onChange={handleCsvFile} className="hidden" />
+          <input ref={xlsxRef} type="file" accept=".xlsx,.xls" onChange={handleExcelFile} className="hidden" />
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={() => csvRef.current?.click()}>
+              <FileText className="h-4 w-4 mr-2" /> CSV-Datei
+            </Button>
+            <Button variant="outline" onClick={() => xlsxRef.current?.click()}>
+              <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel-Datei
+            </Button>
+          </div>
           {fileName && <p className="text-sm text-muted-foreground">{fileName}</p>}
         </CardContent>
       </Card>
