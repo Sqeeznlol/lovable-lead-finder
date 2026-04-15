@@ -49,14 +49,16 @@ export function Vorauswahl() {
   const [processing, setProcessing] = useState(false);
   const [sessionStats, setSessionStats] = useState({ interessant: 0, ausgeblendet: 0, skipped: 0 });
 
-  const baujahrMax = baujahrBis ? parseInt(baujahrBis, 10) : null;
+  const effectiveZoneFilter = isPrioList ? 'Alle' : zoneFilter;
+  const effectiveBaujahrBis = isPrioList ? '' : baujahrBis;
+  const baujahrMax = effectiveBaujahrBis ? parseInt(effectiveBaujahrBis, 10) : null;
   const baujahrMin = baujahrVon ? parseInt(baujahrVon, 10) : null;
   const maxWhgNum = maxWhg ? parseInt(maxWhg, 10) : null;
   const minWhgNum = minWhg ? parseInt(minWhg, 10) : null;
 
   const items = useMemo(() => (queue || [])
     .filter(p => p.status === 'Neu' || p.status === 'Offen')
-    .filter(p => zoneFilter === 'Alle' || p.zone === zoneFilter)
+    .filter(p => effectiveZoneFilter === 'Alle' || p.zone === effectiveZoneFilter)
     .filter(p => !baujahrMax || !p.baujahr || p.baujahr <= baujahrMax)
     .filter(p => !baujahrMin || !p.baujahr || p.baujahr >= baujahrMin)
     .filter(p => !maxWhgNum || !p.wohnungen || Number(p.wohnungen) <= maxWhgNum)
@@ -66,14 +68,20 @@ export function Vorauswahl() {
     .filter(p => !kategorieFilter || kategorieFilter === 'Alle' || p.kategorie === kategorieFilter)
     .map(p => ({ ...p, _score: calculateDealScore(p) }))
     .sort((a, b) => b._score - a._score),
-    [queue, zoneFilter, baujahrMax, baujahrMin, maxWhgNum, minWhgNum, gemeindeFilter, bezirkFilter, kategorieFilter]
+    [queue, effectiveZoneFilter, baujahrMax, baujahrMin, maxWhgNum, minWhgNum, gemeindeFilter, bezirkFilter, kategorieFilter]
   );
 
   const current = items[currentIndex];
   const score = current?._score ?? 0;
-  const hasFilters = zoneFilter !== 'Alle' || baujahrVon || baujahrBis !== '1980' || maxWhg || minWhg || gemeindeFilter || bezirkFilter || (kategorieFilter && kategorieFilter !== 'Alle');
+  const hasFilters = effectiveZoneFilter !== 'Alle' || baujahrVon || effectiveBaujahrBis !== '1980' || maxWhg || minWhg || gemeindeFilter || bezirkFilter || (kategorieFilter && kategorieFilter !== 'Alle');
 
   useEffect(() => { setCurrentIndex(0); }, [zoneFilter, baujahrBis, baujahrVon, maxWhg, minWhg, gemeindeFilter, bezirkFilter, kategorieFilter]);
+
+  useEffect(() => {
+    if (isPrioList && zoneFilter !== 'Alle') {
+      setZoneFilter('Alle');
+    }
+  }, [isPrioList, zoneFilter]);
 
   const moveToNext = useCallback(() => {
     if (currentIndex < items.length - 1) {
@@ -247,7 +255,7 @@ export function Vorauswahl() {
               <Table2 className="h-3.5 w-3.5" />
             </Button>
           </div>
-          <Select value={zoneFilter} onValueChange={setZoneFilter}>
+          <Select value={effectiveZoneFilter} onValueChange={setZoneFilter}>
             <SelectTrigger className="w-32 h-8 text-xs">
               <SelectValue placeholder="Zone" />
             </SelectTrigger>
@@ -258,7 +266,7 @@ export function Vorauswahl() {
           </Select>
           <div className="flex items-center gap-1">
             <Label className="text-[10px] text-muted-foreground">Bj.bis</Label>
-            <Input type="number" value={baujahrBis} onChange={e => setBaujahrBis(e.target.value)} className="w-20 h-8 text-xs" />
+            <Input type="number" value={effectiveBaujahrBis} onChange={e => setBaujahrBis(e.target.value)} className="w-20 h-8 text-xs" placeholder={isPrioList ? 'offen' : undefined} />
           </div>
           <div className="flex items-center gap-1">
             <Label className="text-[10px] text-muted-foreground">MaxWhg</Label>
