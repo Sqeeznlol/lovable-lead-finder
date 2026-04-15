@@ -244,7 +244,13 @@ export function TelefonSuche() {
                 </p>
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
+              <Button size="sm" variant="default" className="gap-1.5"
+                disabled={autoSearching}
+                onClick={() => autoSearchOwner(current.owner_name || '', current.owner_address, setPhone1)}>
+                {autoSearching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+                Auto-Suche
+              </Button>
               <Button size="sm" variant="outline" className="gap-1"
                 onClick={() => window.open(telSearchUrlParsed(parsed1, ort), '_blank')}>
                 <Search className="h-3.5 w-3.5" /> tel.search.ch
@@ -256,6 +262,19 @@ export function TelefonSuche() {
                 <ExternalLink className="h-3 w-3" />
               </Button>
             </div>
+            {autoResult && (
+              <div className={`text-xs rounded-lg p-2 flex items-center gap-2 ${autoResult.match ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-muted text-muted-foreground'}`}>
+                {autoResult.match ? <CheckCircle className="h-3.5 w-3.5" /> : <Search className="h-3.5 w-3.5" />}
+                {autoResult.match
+                  ? `Treffer: ${autoResult.foundAddress}`
+                  : `Kein Treffer${autoResult.foundAddress ? ` (gefunden: ${autoResult.foundAddress})` : ''}`}
+                {autoResult.searchUrl && (
+                  <a href={autoResult.searchUrl} target="_blank" rel="noopener" className="ml-auto underline">
+                    Öffnen
+                  </a>
+                )}
+              </div>
+            )}
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Telefonnummer</Label>
               <Input placeholder="+41 ..." value={phone1} onChange={e => setPhone1(e.target.value)} className="h-10" autoFocus />
