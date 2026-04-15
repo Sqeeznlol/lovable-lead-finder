@@ -543,7 +543,7 @@ export function Vorauswahl() {
                     {mapsEmbedUrl ? (
                       <iframe
                         src={mapsEmbedUrl}
-                        className="w-full h-64 sm:h-80"
+                        className="w-full h-[400px] sm:h-[500px]"
                         style={{ border: 0 }}
                         loading="lazy"
                         referrerPolicy="no-referrer-when-downgrade"
@@ -563,6 +563,31 @@ export function Vorauswahl() {
                       </div>
                     )}
                   </div>
+
+                  {/* GIS ZH ÖREB Map */}
+                  {current.egrid && current.bfs_nr && (
+                    <div className="border-t">
+                      <div className="flex items-center gap-2 px-5 py-1.5 bg-muted/30">
+                        <MapPin className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">GIS ZH – ÖREB / Parzelle</span>
+                        <a
+                          href={`https://maps.zh.ch/?topic=OeijRBKatZH&offlayers=bezirkslabels&scale=2000&x=2683000&y=1248000&egrid=${current.egrid}&bfsnr=${current.bfs_nr}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="ml-auto text-[10px] text-primary hover:underline flex items-center gap-1"
+                        >
+                          <ExternalLink className="h-3 w-3" /> Öffnen
+                        </a>
+                      </div>
+                      <iframe
+                        src={`https://maps.zh.ch/?topic=OeijRBKatZH&offlayers=bezirkslabels&scale=2000&x=2683000&y=1248000&egrid=${current.egrid}&bfsnr=${current.bfs_nr}`}
+                        className="w-full h-[250px]"
+                        style={{ border: 0 }}
+                        loading="lazy"
+                        title="GIS ZH ÖREB"
+                      />
+                    </div>
+                  )}
 
                   {/* Action buttons */}
                   <div className="px-5 py-4 bg-muted/30 border-t space-y-2">
