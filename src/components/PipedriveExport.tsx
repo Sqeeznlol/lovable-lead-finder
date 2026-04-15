@@ -69,6 +69,7 @@ export function PipedriveExport() {
           owner_name_2: p.owner_name_2,
           owner_address_2: p.owner_address_2,
           owner_phone_2: p.owner_phone_2,
+          owners_json: p.owners_json,
           notes: p.notes,
           status: p.status,
           google_maps_url: p.google_maps_url,
