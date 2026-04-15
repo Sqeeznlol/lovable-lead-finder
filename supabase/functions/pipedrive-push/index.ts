@@ -29,6 +29,8 @@ const PropertySchema = z.object({
   geschosse: z.number().nullish(),
   egrid: z.string().nullish(),
   gwr_egid: z.string().nullish(),
+  parzelle: z.string().nullish(),
+  bfs_nr: z.string().nullish(),
   owner_name: z.string().nullish(),
   owner_address: z.string().nullish(),
   owner_phone: z.string().nullish(),
