@@ -310,6 +310,20 @@ function buildLeadNotes(prop: z.infer<typeof PropertySchema>): string {
     lines.push(`<a href="${telSearchUrl2}">tel.search.ch</a> | <a href="${opendiUrl2}">Opendi</a>`);
   }
 
+  // Additional owners (3+) from owners_json
+  const owners = Array.isArray(prop.owners_json) ? prop.owners_json : [];
+  for (let i = 2; i < owners.length; i++) {
+    const o = owners[i];
+    const oName = o.fullName || [o.firstName, o.lastName].filter(Boolean).join(' ');
+    if (!oName) continue;
+    lines.push(`<br/><b>Eigentümer ${i + 1}:</b> ${oName}`);
+    const oAddr = o.address || [o.street, o.streetNumber, o.plz, o.ort].filter(Boolean).join(' ');
+    if (oAddr) lines.push(`Adresse: ${oAddr}`);
+    if (o.phone && isValidPhone(o.phone)) lines.push(`Telefon: ${o.phone}`);
+    const telUrl = `https://tel.search.ch/?was=${encodeURIComponent(oName)}`;
+    lines.push(`<a href="${telUrl}">tel.search.ch</a>`);
+  }
+
   // User notes
   if (prop.notes) lines.push(`<br/><b>Notizen:</b> ${prop.notes}`);
 
