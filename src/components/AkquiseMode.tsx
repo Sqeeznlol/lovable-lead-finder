@@ -36,8 +36,9 @@ export function AkquiseMode() {
   const [zoneFilter, setZoneFilter] = useState<string>('Alle');
   const [baujahrBis, setBaujahrBis] = useState<string>('1980');
   const { data: zones } = useZones();
+  const { selectedListId } = useListFilter();
 
-  const { data: queue, refetch } = usePreselectedProperties(100);
+  const { data: queue, refetch } = usePreselectedProperties(100, selectedListId);
   const updateProp = useUpdateProperty();
   const incrementPhone = useIncrementPhoneQuery();
   const { toast } = useToast();
