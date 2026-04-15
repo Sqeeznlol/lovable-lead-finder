@@ -67,6 +67,8 @@ const PropertySchema = z.object({
   google_maps_url: z.string().nullish(),
   kategorie: z.string().nullish(),
   wohnungen: z.number().nullish(),
+  denkmalschutz: z.string().nullish(),
+  isos: z.string().nullish(),
 });
 
 const BodySchema = z.object({
