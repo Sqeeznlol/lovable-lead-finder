@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Phone, Check, ArrowRight, SkipForward, ExternalLink, AlertTriangle, Building2, Landmark, EyeOff, Zap, Loader2, CheckCircle } from 'lucide-react';
+import { Search, Phone, Check, ArrowRight, SkipForward, ExternalLink, AlertTriangle, Building2, Landmark, EyeOff, Zap, Loader2, CheckCircle, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -235,6 +235,8 @@ export function TelefonSuche() {
             <div className="flex gap-2 mt-3 flex-wrap">
               {current.zone && <Badge variant="outline" className="text-xs">{current.zone}</Badge>}
               {current.baujahr && <Badge variant="outline" className="text-xs">Bj. {current.baujahr}</Badge>}
+              {current.parzelle && <Badge variant="outline" className="text-xs">Parz. {current.parzelle}</Badge>}
+              {current.egrid && <Badge variant="outline" className="text-xs">{current.egrid}</Badge>}
             </div>
 
             {/* Low chance warning */}
@@ -355,6 +357,19 @@ export function TelefonSuche() {
                 finally { setProcessing(false); }
               }}>
               <EyeOff className="h-4 w-4 mr-2" /> Ausblenden
+            </Button>
+            <Button variant="outline" disabled={processing} className="text-orange-600 border-orange-300"
+              onClick={async () => {
+                if (!current) return;
+                setProcessing(true);
+                try {
+                  await updateProp.mutateAsync({ id: current.id, status: 'Akquise', owner_name: null, owner_address: null, owner_name_2: null, owner_address_2: null, owner_phone: null, owner_phone_2: null, owners_json: [] });
+                  toast({ title: '↩️ Zurück zur Akquise – Eigentümer zurückgesetzt' });
+                  moveToNext();
+                } catch { toast({ title: 'Fehler', variant: 'destructive' }); }
+                finally { setProcessing(false); }
+              }}>
+              <Undo2 className="h-4 w-4 mr-2" /> Zurück zur Akquise
             </Button>
             {isLowChance && (
               <Button variant="outline" onClick={handleMarkLowChance} disabled={processing} className="text-destructive border-destructive/30">
