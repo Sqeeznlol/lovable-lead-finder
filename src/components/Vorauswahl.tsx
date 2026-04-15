@@ -456,6 +456,8 @@ export function Vorauswahl() {
                           {current.gebaeudeart && <Badge variant="outline" className="text-[10px]">{current.gebaeudeart}</Badge>}
                           {current.kategorie && <Badge variant="outline" className="text-[10px]">{current.kategorie}</Badge>}
                           {current.wohnungen && <Badge variant="outline" className="text-[10px]">{current.wohnungen} Whg.</Badge>}
+                          {current.parzelle && <Badge variant="outline" className="text-[10px] font-mono">Parz. {current.parzelle}</Badge>}
+                          {current.egrid && <Badge variant="outline" className="text-[10px] font-mono">{current.egrid}</Badge>}
                         </div>
                         <h2 className="text-xl sm:text-2xl font-bold tracking-tight leading-tight">{current.address}</h2>
                         <p className="text-muted-foreground text-sm mt-0.5">{current.plz_ort || current.gemeinde || ''}</p>
