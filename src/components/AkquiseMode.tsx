@@ -517,9 +517,12 @@ export function AkquiseMode() {
                           detail: {
                             egrid: current.egrid,
                             bfsNr: current.bfs_nr || '',
+                            parzelle: current.parzelle || '',
                             phoneNumber: selectedPhone.number,
                             propertyId: current.id,
                             appOrigin: window.location.hostname,
+                            address: current.address,
+                            plzOrt: current.plz_ort || current.gemeinde || '',
                           }
                         }));
                         setGisOpened(true);
