@@ -210,6 +210,9 @@ export function PropertyList() {
             Filter
             {hasAdvancedFilters && <Badge variant="secondary" className="ml-1 text-xs px-1.5">aktiv</Badge>}
           </Button>
+          <Button variant="outline" size="sm" onClick={exportExcel} className="gap-2">
+            <Download className="h-4 w-4" /> Excel
+          </Button>
         </div>
       </div>
 
