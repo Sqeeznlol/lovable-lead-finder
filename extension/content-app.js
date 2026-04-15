@@ -14,9 +14,12 @@
       type: 'START_LOOKUP',
       egrid: detail.egrid,
       bfsNr: detail.bfsNr,
+      parzelle: detail.parzelle,
       phoneNumber: detail.phoneNumber,
       propertyId: detail.propertyId,
       appOrigin: detail.appOrigin,
+      address: detail.address,
+      plzOrt: detail.plzOrt,
     });
   });
 
@@ -26,7 +29,8 @@
       window.dispatchEvent(new CustomEvent('akquise-owner-data', {
         detail: {
           propertyId: msg.propertyId,
-          owners: msg.owners
+          owners: msg.owners,
+          error: msg.error || null
         }
       }));
       sendResponse({ ok: true });

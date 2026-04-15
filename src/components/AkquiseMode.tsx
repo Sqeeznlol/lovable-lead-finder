@@ -319,6 +319,11 @@ export function AkquiseMode() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       {/* Top bar */}
+      {/* List selector */}
+      <div className="max-w-xs">
+        <ListSelector />
+      </div>
+
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div className="flex items-center gap-3 flex-wrap">
           <Select value={selectedPhoneId} onValueChange={setSelectedPhoneId}>
@@ -512,9 +517,12 @@ export function AkquiseMode() {
                           detail: {
                             egrid: current.egrid,
                             bfsNr: current.bfs_nr || '',
+                            parzelle: current.parzelle || '',
                             phoneNumber: selectedPhone.number,
                             propertyId: current.id,
                             appOrigin: window.location.hostname,
+                            address: current.address,
+                            plzOrt: current.plz_ort || current.gemeinde || '',
                           }
                         }));
                         setGisOpened(true);

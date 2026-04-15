@@ -25,69 +25,119 @@
   function isLoginPage() {
     // Check if we see the phone number input (login/SMS page)
     const inputs = document.querySelectorAll('input');
-    const sendBtn = document.querySelector('button');
-    return inputs.length > 0 && sendBtn &&
-           (sendBtn.textContent?.includes('Bestätigungscode') ||
-            sendBtn.textContent?.includes('anfordern'));
+    const buttons = document.querySelectorAll('button');
+    for (const btn of buttons) {
+      const text = (btn.textContent || '').toLowerCase();
+      if (text.includes('bestätigungscode') || text.includes('anfordern') || text.includes('code')) {
+        return true;
+      }
+    }
+    // Check for any form with phone input
+    const phoneInput = document.querySelector('input[type="tel"]') ||
+                       document.querySelector('input[placeholder*="Telefon"]') ||
+                       document.querySelector('input[placeholder*="Mobil"]');
+    if (phoneInput) return true;
+    return false;
   }
 
   function isCodePage() {
-    // Check if we're on the SMS code entry page
     const buttons = document.querySelectorAll('button');
     for (const btn of buttons) {
-      if (btn.textContent?.includes('Senden') && !btn.textContent?.includes('Bestätigungscode')) {
+      const text = (btn.textContent || '').toLowerCase();
+      if ((text.includes('senden') || text.includes('bestätigen') || text.includes('absenden')) &&
+          !text.includes('bestätigungscode anfordern')) {
         return true;
       }
+    }
+    // Also check for a short code input field
+    const inputs = document.querySelectorAll('input');
+    for (const input of inputs) {
+      if (input.maxLength && input.maxLength <= 6 && input.maxLength >= 4) return true;
     }
     return false;
   }
 
   function isOwnerPage() {
-    // Check if owner data is visible
+    // Check for owner data on the page
+    const body = document.body.innerText || '';
+    // Look for common owner-related text patterns
+    if (body.includes('Eigentümer') || body.includes('Grundeigentümer')) {
+      // Make sure it's not just the login page mentioning it
+      if (!isLoginPage() && !isCodePage()) return true;
+    }
     return !!document.querySelector('.name-attribute') ||
-           !!document.querySelector('.attribute-knot');
+           !!document.querySelector('.attribute-knot') ||
+           !!document.querySelector('[class*="owner"]') ||
+           !!document.querySelector('[class*="eigentum"]');
   }
 
   function extractOwners() {
     const owners = [];
 
-    // Try extracting from name-attribute spans
+    // Strategy 1: name-attribute spans
     const nameSpans = document.querySelectorAll('.name-attribute');
-    const addressSpans = document.querySelectorAll('.attribute-knot > span:nth-child(2)');
-
     if (nameSpans.length > 0) {
-      nameSpans.forEach((span, i) => {
+      nameSpans.forEach((span) => {
         const name = span.textContent?.trim() || '';
-        const address = addressSpans[i]?.textContent?.trim() || '';
-        if (name) {
-          owners.push({ name, address });
-        }
+        // Try to find address near this name
+        const parent = span.closest('.attribute-knot, .owner-entry, tr, li, div');
+        const address = parent ?
+          Array.from(parent.querySelectorAll('span, p, td'))
+            .filter(el => el !== span)
+            .map(el => el.textContent?.trim())
+            .filter(t => t && t.length > 3 && t !== name)
+            .join(', ') : '';
+        if (name) owners.push({ name, address });
       });
     }
 
-    // Fallback: try to get all text from the ownership section
+    // Strategy 2: look for structured owner sections
     if (owners.length === 0) {
-      const sections = document.querySelectorAll('.ownership-section, .detail-section, [class*="owner"], [class*="eigentum"]');
+      const sections = document.querySelectorAll('.ownership-section, .detail-section, [class*="owner"], [class*="eigentum"], .card, .panel');
       sections.forEach(section => {
-        const text = section.textContent?.trim();
-        if (text && text.length > 3) {
-          owners.push({ name: text, address: '' });
-        }
-      });
-    }
-
-    // Fallback 2: get any p tags with spans inside the main content
-    if (owners.length === 0) {
-      const paragraphs = document.querySelectorAll('p');
-      paragraphs.forEach(p => {
-        const spans = p.querySelectorAll('span');
-        if (spans.length >= 1) {
-          const text = Array.from(spans).map(s => s.textContent?.trim()).filter(Boolean).join(', ');
-          if (text.length > 3) {
+        const headings = section.querySelectorAll('h2, h3, h4, strong, b');
+        headings.forEach(h => {
+          const text = h.textContent?.trim();
+          if (text && text.length > 3 && text.length < 100) {
             owners.push({ name: text, address: '' });
           }
+        });
+      });
+    }
+
+    // Strategy 3: table-based layout
+    if (owners.length === 0) {
+      const tables = document.querySelectorAll('table');
+      tables.forEach(table => {
+        const rows = table.querySelectorAll('tr');
+        rows.forEach(row => {
+          const cells = row.querySelectorAll('td, th');
+          if (cells.length >= 2) {
+            const label = (cells[0].textContent || '').trim().toLowerCase();
+            if (label.includes('eigentümer') || label.includes('name') || label.includes('besitzer')) {
+              const value = (cells[1].textContent || '').trim();
+              if (value) owners.push({ name: value, address: '' });
+            }
+          }
+        });
+      });
+    }
+
+    // Strategy 4: fallback - any content in main area
+    if (owners.length === 0) {
+      const main = document.querySelector('main, .content, #content, article') || document.body;
+      const paragraphs = main.querySelectorAll('p, div > span');
+      const texts = [];
+      paragraphs.forEach(p => {
+        const text = p.textContent?.trim();
+        if (text && text.length > 5 && text.length < 200 &&
+            !text.includes('Bestätigungscode') && !text.includes('Telefonnummer')) {
+          texts.push(text);
         }
       });
+      if (texts.length > 0) {
+        owners.push({ name: texts.slice(0, 3).join('; '), address: '' });
+      }
     }
 
     return owners;
@@ -123,45 +173,45 @@
       log('Login page detected, entering phone number...');
       await sleep(500 + Math.random() * 500);
 
-      // Find the phone input
-      const phoneInput = document.querySelector('.form-field:nth-child(3) input') ||
-                         document.querySelector('input[type="tel"]') ||
-                         document.querySelector('input');
+      // Find the phone input - try multiple selectors
+      const phoneInput = document.querySelector('input[type="tel"]') ||
+                         document.querySelector('input[placeholder*="Telefon"]') ||
+                         document.querySelector('input[placeholder*="Mobil"]') ||
+                         document.querySelector('.form-field:nth-child(3) input') ||
+                         document.querySelector('input:not([type="hidden"]):not([type="submit"])');
 
       if (phoneInput && job.phoneNumber) {
         await humanType(phoneInput, job.phoneNumber);
         await sleep(500 + Math.random() * 300);
 
-        // Click "Bestätigungscode anfordern"
-        const buttons = document.querySelectorAll('button');
+        // Click submit button
+        const buttons = document.querySelectorAll('button, input[type="submit"]');
         for (const btn of buttons) {
-          if (btn.textContent?.includes('Bestätigungscode') || btn.textContent?.includes('anfordern')) {
-            log('Clicking "Bestätigungscode anfordern"');
+          const text = (btn.textContent || btn.value || '').toLowerCase();
+          if (text.includes('bestätigungscode') || text.includes('anfordern') ||
+              text.includes('code') || text.includes('senden')) {
+            log('Clicking submit button: ' + text);
             btn.click();
             break;
           }
         }
 
-        // Now wait for SMS code — user enters this manually
         chrome.runtime.sendMessage({ type: 'SMS_WAITING' });
         log('Waiting for SMS code entry...');
-
-        // Poll for either: code page visible, or owner data visible
-        await waitForCodeAndSubmit();
+        await waitForOwnerData();
       }
       return;
     }
 
-    // Case 3: Code entry page is already showing
+    // Case 3: Code entry page
     if (isCodePage()) {
       chrome.runtime.sendMessage({ type: 'SMS_WAITING' });
       log('Code page already showing, waiting for user input...');
-      await waitForCodeAndSubmit();
+      await waitForOwnerData();
       return;
     }
 
-    log('Unknown page state, waiting...');
-    // Keep polling
+    log('Unknown page state, polling...');
     for (let i = 0; i < 60; i++) {
       await sleep(2000);
       if (isOwnerPage()) {
@@ -170,20 +220,16 @@
         return;
       }
       if (isLoginPage() || isCodePage()) {
-        // Re-run the flow
         await run();
         return;
       }
     }
   }
 
-  async function waitForCodeAndSubmit() {
-    // Wait for user to enter SMS code and click Senden
-    // OR wait for owner data to appear (if session was already valid)
+  async function waitForOwnerData() {
     for (let i = 0; i < 120; i++) {
       await sleep(2000);
 
-      // Check if owner data appeared (user manually submitted or session resumed)
       if (isOwnerPage()) {
         log('Owner data appeared!');
         await sleep(1500);
@@ -194,6 +240,7 @@
       }
     }
     log('Timeout waiting for owner data');
+    chrome.runtime.sendMessage({ type: 'OWNER_DATA', owners: [], error: 'Timeout' });
   }
 
   run();
