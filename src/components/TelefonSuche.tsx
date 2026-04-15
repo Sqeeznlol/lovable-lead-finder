@@ -358,6 +358,19 @@ export function TelefonSuche() {
               }}>
               <EyeOff className="h-4 w-4 mr-2" /> Ausblenden
             </Button>
+            <Button variant="outline" disabled={processing} className="text-orange-600 border-orange-300"
+              onClick={async () => {
+                if (!current) return;
+                setProcessing(true);
+                try {
+                  await updateProp.mutateAsync({ id: current.id, status: 'Akquise', owner_name: null, owner_address: null, owner_name_2: null, owner_address_2: null, owner_phone: null, owner_phone_2: null, owners_json: [] });
+                  toast({ title: '↩️ Zurück zur Akquise – Eigentümer zurückgesetzt' });
+                  moveToNext();
+                } catch { toast({ title: 'Fehler', variant: 'destructive' }); }
+                finally { setProcessing(false); }
+              }}>
+              <Undo2 className="h-4 w-4 mr-2" /> Zurück zur Akquise
+            </Button>
             {isLowChance && (
               <Button variant="outline" onClick={handleMarkLowChance} disabled={processing} className="text-destructive border-destructive/30">
                 <AlertTriangle className="h-4 w-4 mr-2" /> Geringe Chance
