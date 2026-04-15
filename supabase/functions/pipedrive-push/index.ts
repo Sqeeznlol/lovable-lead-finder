@@ -412,6 +412,27 @@ Deno.serve(async (req) => {
           leadData[FIELD_OEREB] = `https://maps.zh.ch/?locate=parz&locations=${prop.bfs_nr},${prop.parzelle}&topic=OerebKatasterZH`;
         }
 
+        // Google Maps link for Pipedrive
+        const fullAddr = prop.address + (prop.plz_ort ? ', ' + prop.plz_ort : '');
+        leadData[FIELD_GOOGLE_PIPE] = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddr)}`;
+
+        // Owner custom fields (1-5), rest goes into notes
+        const ownerFields = [FIELD_OWNER_1, FIELD_OWNER_2, FIELD_OWNER_3, FIELD_OWNER_4, FIELD_OWNER_5];
+        const owners = Array.isArray(prop.owners_json) ? prop.owners_json : [];
+        // Build display strings for each owner
+        const ownerDisplays: string[] = [];
+        if (prop.owner_name) ownerDisplays.push(prop.owner_name);
+        if (prop.owner_name_2) ownerDisplays.push(prop.owner_name_2);
+        for (let oi = 2; oi < owners.length; oi++) {
+          const o = owners[oi];
+          const oName = o.fullName || [o.firstName, o.lastName].filter(Boolean).join(' ');
+          if (oName) ownerDisplays.push(oName);
+        }
+        // Assign first 5 to custom fields
+        for (let oi = 0; oi < Math.min(ownerDisplays.length, 5); oi++) {
+          leadData[ownerFields[oi]] = ownerDisplays[oi];
+        }
+
         console.log('Creating lead:', JSON.stringify({ title: leadTitle, person_id: personId, organization_id: orgId }));
         const leadRes = await pipedrivePost('/leads', PIPEDRIVE_API_TOKEN, leadData);
         const leadId = leadRes?.data?.id;
