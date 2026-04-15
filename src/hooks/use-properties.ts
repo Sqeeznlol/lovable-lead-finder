@@ -24,10 +24,10 @@ interface UsePropertiesOptions {
 
 export function useProperties(options: UsePropertiesOptions = {}) {
   const { statusFilter, gemeindeFilter, zoneFilter, search, page = 0, pageSize = 50,
-    baujahrVon, baujahrBis, flaecheMin, flaecheMax, areaMin, areaMax, geschosseMin, ownerFilter } = options;
+    baujahrVon, baujahrBis, flaecheMin, flaecheMax, areaMin, areaMax, geschosseMin, ownerFilter, listId } = options;
   return useQuery({
     queryKey: ['properties', statusFilter, gemeindeFilter, zoneFilter, search, page, pageSize,
-      baujahrVon, baujahrBis, flaecheMin, flaecheMax, areaMin, areaMax, geschosseMin, ownerFilter],
+      baujahrVon, baujahrBis, flaecheMin, flaecheMax, areaMin, areaMax, geschosseMin, ownerFilter, listId],
     queryFn: async () => {
       let query = supabase
         .from('properties')
