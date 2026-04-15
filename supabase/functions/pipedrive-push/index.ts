@@ -17,6 +17,12 @@ const FIELD_EGRID = 'd210ce9334d6812187af1be8b71b7c97f6afd8db';
 const FIELD_EGID = '0c81850c8b58b9d88b9ff57b919824bc8f7b6c91';
 const FIELD_GEMEINDE = 'e9bd061887c619b93d0ad759dfbef11e55e4c58a';
 const FIELD_OEREB = '6579ea588f2ed43f6f76b239e3a5d2fe7e65be59';
+const FIELD_OWNER_1 = 'e57bb30238d4f5aa2feeb1c102dfd51c5688928c';
+const FIELD_OWNER_2 = 'ea0de3fe875f87c3e9bde1eb7416030016d18125';
+const FIELD_OWNER_3 = 'd312bedebdad79dfcdeacc7f3912ff3bfd8306a7';
+const FIELD_OWNER_4 = '00586e2f3149ab8f3d6cebb55b7ec626630cb9d0';
+const FIELD_OWNER_5 = '0c4c530966d09ae4874184dc0c4eef6f4532ff90';
+const FIELD_GOOGLE_PIPE = '8318ae128ecd86600b20dc02b3a72537f4c9fd8a';
 
 const PropertySchema = z.object({
   id: z.string(),
@@ -304,6 +310,20 @@ function buildLeadNotes(prop: z.infer<typeof PropertySchema>): string {
     lines.push(`<a href="${telSearchUrl2}">tel.search.ch</a> | <a href="${opendiUrl2}">Opendi</a>`);
   }
 
+  // Additional owners (3+) from owners_json
+  const owners = Array.isArray(prop.owners_json) ? prop.owners_json : [];
+  for (let i = 2; i < owners.length; i++) {
+    const o = owners[i];
+    const oName = o.fullName || [o.firstName, o.lastName].filter(Boolean).join(' ');
+    if (!oName) continue;
+    lines.push(`<br/><b>Eigentümer ${i + 1}:</b> ${oName}`);
+    const oAddr = o.address || [o.street, o.streetNumber, o.plz, o.ort].filter(Boolean).join(' ');
+    if (oAddr) lines.push(`Adresse: ${oAddr}`);
+    if (o.phone && isValidPhone(o.phone)) lines.push(`Telefon: ${o.phone}`);
+    const telUrl = `https://tel.search.ch/?was=${encodeURIComponent(oName)}`;
+    lines.push(`<a href="${telUrl}">tel.search.ch</a>`);
+  }
+
   // User notes
   if (prop.notes) lines.push(`<br/><b>Notizen:</b> ${prop.notes}`);
 
@@ -404,6 +424,27 @@ Deno.serve(async (req) => {
         // ÖREB Kataster link
         if (prop.parzelle && prop.bfs_nr) {
           leadData[FIELD_OEREB] = `https://maps.zh.ch/?locate=parz&locations=${prop.bfs_nr},${prop.parzelle}&topic=OerebKatasterZH`;
+        }
+
+        // Google Maps link for Pipedrive
+        const fullAddr = prop.address + (prop.plz_ort ? ', ' + prop.plz_ort : '');
+        leadData[FIELD_GOOGLE_PIPE] = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddr)}`;
+
+        // Owner custom fields (1-5), rest goes into notes
+        const ownerFields = [FIELD_OWNER_1, FIELD_OWNER_2, FIELD_OWNER_3, FIELD_OWNER_4, FIELD_OWNER_5];
+        const owners = Array.isArray(prop.owners_json) ? prop.owners_json : [];
+        // Build display strings for each owner
+        const ownerDisplays: string[] = [];
+        if (prop.owner_name) ownerDisplays.push(prop.owner_name);
+        if (prop.owner_name_2) ownerDisplays.push(prop.owner_name_2);
+        for (let oi = 2; oi < owners.length; oi++) {
+          const o = owners[oi];
+          const oName = o.fullName || [o.firstName, o.lastName].filter(Boolean).join(' ');
+          if (oName) ownerDisplays.push(oName);
+        }
+        // Assign first 5 to custom fields
+        for (let oi = 0; oi < Math.min(ownerDisplays.length, 5); oi++) {
+          leadData[ownerFields[oi]] = ownerDisplays[oi];
         }
 
         console.log('Creating lead:', JSON.stringify({ title: leadTitle, person_id: personId, organization_id: orgId }));
