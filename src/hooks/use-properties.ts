@@ -22,10 +22,7 @@ interface UsePropertiesOptions {
   listId?: string | null;
 }
 
-function applyPropertyFilters<TQuery>(
-  query: TQuery,
-  options: UsePropertiesOptions,
-) {
+function applyPropertyFilters(query: any, options: UsePropertiesOptions) {
   const {
     statusFilter,
     gemeindeFilter,
@@ -54,9 +51,7 @@ function applyPropertyFilters<TQuery>(
   }
   if (gemeindeFilter && gemeindeFilter !== 'Alle') nextQuery = nextQuery.eq('gemeinde', gemeindeFilter);
   if (zoneFilter && zoneFilter !== 'Alle') nextQuery = nextQuery.eq('zone', zoneFilter);
-  if (search) {
-    nextQuery = nextQuery.or(`address.ilike.%${search}%,egrid.ilike.%${search}%,owner_name.ilike.%${search}%,gemeinde.ilike.%${search}%,strassenname.ilike.%${search}%`);
-  }
+  if (search) nextQuery = nextQuery.or(`address.ilike.%${search}%,egrid.ilike.%${search}%,owner_name.ilike.%${search}%,gemeinde.ilike.%${search}%,strassenname.ilike.%${search}%`);
   if (baujahrVon) nextQuery = nextQuery.gte('baujahr', baujahrVon);
   if (baujahrBis) nextQuery = nextQuery.lte('baujahr', baujahrBis);
   if (flaecheMin) nextQuery = nextQuery.gte('gebaeudeflaeche', flaecheMin);
