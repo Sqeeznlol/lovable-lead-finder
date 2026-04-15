@@ -573,24 +573,26 @@ export function Vorauswahl() {
                       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">GIS Zürich – ÖREB Kataster</span>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {current.parzelle && current.bfs_nr && (
-                        <a
-                          href={`https://maps.zh.ch/?locate=parz&locations=${current.bfs_nr},${current.parzelle}&topic=OerebKatasterZH`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 bg-primary/10 text-primary border border-primary/20 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-primary/20 transition-colors"
-                        >
-                          <ExternalLink className="h-3 w-3" /> ÖREB Kataster
-                        </a>
-                      )}
+                      <a
+                        href={
+                          current.parzelle && current.bfs_nr
+                            ? `https://maps.zh.ch/?locate=parz&locations=${current.bfs_nr},${current.parzelle}&topic=OerebKatasterZH`
+                            : `https://maps.zh.ch/?topic=OerebKatasterZH&search=${encodeURIComponent(current.address + (current.plz_ort ? ' ' + current.plz_ort : ''))}`
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 bg-primary text-primary-foreground rounded-lg px-4 py-2 text-sm font-semibold hover:bg-primary/90 transition-colors shadow-sm"
+                      >
+                        <ExternalLink className="h-4 w-4" /> ÖREB Kataster öffnen
+                      </a>
                       {current.egrid && current.bfs_nr && (
                         <a
                           href={`https://maps.zh.ch/?topic=DLGOWfarbigZH&offlayers=bezirkslabels&scale=500&egrid=${current.egrid}&bfsnr=${current.bfs_nr}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 bg-accent/10 text-accent-foreground border border-accent/20 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-accent/20 transition-colors"
+                          className="inline-flex items-center gap-1.5 bg-accent/10 text-accent-foreground border border-accent/20 rounded-lg px-3 py-2 text-sm font-medium hover:bg-accent/20 transition-colors"
                         >
-                          <ExternalLink className="h-3 w-3" /> Eigentümer GIS
+                          <ExternalLink className="h-3.5 w-3.5" /> Eigentümer GIS
                         </a>
                       )}
                     </div>
