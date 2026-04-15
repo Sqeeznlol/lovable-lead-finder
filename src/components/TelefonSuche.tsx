@@ -253,7 +253,7 @@ export function TelefonSuche() {
               </Button>
               <Button size="sm" variant="outline" className="gap-1"
                 onClick={() => window.open(telSearchUrlParsed(parsed1, ort), '_blank')}>
-                <Search className="h-3.5 w-3.5" /> tel.search.ch
+                <Search className="h-3.5 w-3.5" /> {parsed1.lastName}{parsed1.street ? ` ${parsed1.street}` : ''}
                 <ExternalLink className="h-3 w-3" />
               </Button>
               <Button size="sm" variant="outline" className="gap-1"
@@ -306,7 +306,7 @@ export function TelefonSuche() {
               </Button>
               <Button size="sm" variant="outline" className="gap-1"
                 onClick={() => window.open(telSearchUrlParsed(parsed2, ort), '_blank')}>
-                <Search className="h-3.5 w-3.5" /> tel.search.ch
+                <Search className="h-3.5 w-3.5" /> {parsed2.lastName}{parsed2.street ? ` ${parsed2.street}` : ''}
               </Button>
               <Button size="sm" variant="outline" className="gap-1"
                 onClick={() => window.open(opendiUrlParsed(parsed2), '_blank')}>
