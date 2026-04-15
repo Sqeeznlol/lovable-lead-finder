@@ -17,7 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { supabase } from '@/integrations/supabase/client';
 import { calculateDealScore, scoreColor, scoreBg } from '@/lib/deal-score';
-import { useListFilter } from '@/hooks/use-lists';
+import { useListFilter, useLists } from '@/hooks/use-lists';
 import { ListSelector } from '@/components/ListSelector';
 
 type ViewMode = 'card' | 'table';
@@ -37,7 +37,9 @@ export function Vorauswahl() {
   const { data: zones } = useZones();
   const { data: gemeinden } = useGemeinden();
   const { selectedListId } = useListFilter();
-  const { data: queue, refetch } = useUnqueriedProperties(200, selectedListId);
+  const { data: lists } = useLists();
+  const isPrioList = !!(selectedListId && lists?.find(l => l.id === selectedListId && l.priority < 0));
+  const { data: queue, refetch } = useUnqueriedProperties(200, selectedListId, isPrioList);
   const { data: stats, refetch: refetchStats } = useVorauswahlStats();
   const updateProp = useUpdateProperty();
   const { toast } = useToast();
@@ -528,7 +530,7 @@ export function Vorauswahl() {
                     </div>
                   )}
 
-                  {/* Google Maps embed */}
+                  {/* Google Maps embed or fallback */}
                   <div className="border-t mt-3">
                     {mapsEmbedUrl ? (
                       <iframe
@@ -541,8 +543,15 @@ export function Vorauswahl() {
                         title="Google Maps Vorschau"
                       />
                     ) : (
-                      <div className="w-full h-48 flex items-center justify-center bg-muted/30">
+                      <div className="w-full h-48 flex flex-col items-center justify-center bg-muted/30 gap-3">
+                        <MapPin className="h-10 w-10 text-muted-foreground/40" />
                         <p className="text-muted-foreground text-sm">Keine Kartenvorschau verfügbar</p>
+                        {current.google_maps_url && (
+                          <a href={current.google_maps_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1">
+                            <ExternalLink className="h-3 w-3" /> In Google Maps öffnen
+                          </a>
+                        )}
+                        <p className="text-xs text-muted-foreground">Du kannst trotzdem entscheiden ↓</p>
                       </div>
                     )}
                   </div>
