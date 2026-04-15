@@ -236,6 +236,7 @@ export function Vorauswahl() {
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div className="flex items-center gap-2 flex-wrap">
           <h2 className="text-xl font-bold">Vorauswahl</h2>
+          <ListSelector />
           <div className="flex items-center border rounded-lg overflow-hidden">
             <Button variant={viewMode === 'card' ? 'default' : 'ghost'} size="sm" className="h-7 px-2 rounded-none" onClick={() => setViewMode('card')}>
               <LayoutGrid className="h-3.5 w-3.5" />

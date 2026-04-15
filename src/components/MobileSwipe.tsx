@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useUnqueriedProperties, useUpdateProperty } from '@/hooks/use-properties';
+import { useListFilter } from '@/hooks/use-lists';
 import { useVorauswahlStats } from '@/hooks/use-vorauswahl-stats';
 import { useToast } from '@/hooks/use-toast';
 import { calculateDealScore, scoreColor, scoreBg } from '@/lib/deal-score';
@@ -11,7 +12,8 @@ import { useAuth } from '@/hooks/use-auth';
 import { supabase } from '@/integrations/supabase/client';
 
 export function MobileSwipe() {
-  const { data: queue, refetch } = useUnqueriedProperties(50);
+  const { selectedListId } = useListFilter();
+  const { data: queue, refetch } = useUnqueriedProperties(50, selectedListId);
   const { data: stats, refetch: refetchStats } = useVorauswahlStats();
   const updateProp = useUpdateProperty();
   const { toast } = useToast();

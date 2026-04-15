@@ -8,6 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { usePreselectedProperties, useUpdateProperty, useZones } from '@/hooks/use-properties';
+import { useListFilter } from '@/hooks/use-lists';
+import { ListSelector } from '@/components/ListSelector';
 import { usePhoneNumbers, useIncrementPhoneQuery } from '@/hooks/use-phones';
 import { useToast } from '@/hooks/use-toast';
 import { calculateDealScore, scoreColor, scoreBg } from '@/lib/deal-score';
