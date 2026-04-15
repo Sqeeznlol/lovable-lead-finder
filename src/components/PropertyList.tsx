@@ -373,6 +373,7 @@ function EditDialog({ property, onClose, onSave }: {
             <p className="text-muted-foreground">{property.plz_ort} · {property.gemeinde}</p>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground mt-2">
               {property.egrid && <span>EGRID: <span className="font-mono">{property.egrid}</span></span>}
+              {property.bfs_nr && <span>BFS: <span className="font-mono">{property.bfs_nr}</span></span>}
               {property.zone && <span>Zone: {property.zone}</span>}
               {property.kategorie && <span>Typ: {property.kategorie}</span>}
               {property.baujahr && <span>Baujahr: {property.baujahr}</span>}

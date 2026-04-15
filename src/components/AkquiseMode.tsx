@@ -392,6 +392,7 @@ export function AkquiseMode() {
                   <Badge variant="outline" className="text-xs">#{currentIndex + 1} / {items.length}</Badge>
                   {current.zone && <Badge className="bg-primary/10 text-primary border-primary/20">{current.zone}</Badge>}
                   {current.gwr_egid && <Badge variant="outline" className="text-xs font-mono">EGID: {current.gwr_egid}</Badge>}
+                  {current.bfs_nr && <Badge variant="outline" className="text-xs font-mono">BFS: {current.bfs_nr}</Badge>}
                   {current.egrid && <Badge variant="outline" className="text-xs font-mono">EGRID: {current.egrid}</Badge>}
                 </div>
                 <h2 className="text-2xl sm:text-3xl font-bold tracking-tight leading-tight">{current.address}</h2>

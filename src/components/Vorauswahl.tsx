@@ -458,6 +458,7 @@ export function Vorauswahl() {
                           {current.kategorie && <Badge variant="outline" className="text-[10px]">{current.kategorie}</Badge>}
                           {current.wohnungen && <Badge variant="outline" className="text-[10px]">{current.wohnungen} Whg.</Badge>}
                           {current.parzelle && <Badge variant="outline" className="text-[10px] font-mono">Parz. {current.parzelle}</Badge>}
+                          {current.bfs_nr && <Badge variant="outline" className="text-[10px] font-mono">BFS {current.bfs_nr}</Badge>}
                           {current.egrid && <Badge variant="outline" className="text-[10px] font-mono">{current.egrid}</Badge>}
                         </div>
                         <h2 className="text-xl sm:text-2xl font-bold tracking-tight leading-tight">{current.address}</h2>
@@ -601,8 +602,8 @@ export function Vorauswahl() {
                         </a>
                       )}
                     </div>
-                    {current.parzelle && (
-                      <p className="text-[10px] text-muted-foreground mt-1.5">Parzelle: {current.parzelle} {current.egrid ? `• EGRID: ${current.egrid}` : ''}</p>
+                    {(current.parzelle || current.bfs_nr || current.egrid) && (
+                      <p className="text-[10px] text-muted-foreground mt-1.5">{current.parzelle ? `Parzelle: ${current.parzelle}` : ''}{current.bfs_nr ? ` • BFS: ${current.bfs_nr}` : ''}{current.egrid ? ` • EGRID: ${current.egrid}` : ''}</p>
                     )}
                   </div>
 
