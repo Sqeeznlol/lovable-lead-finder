@@ -571,9 +571,9 @@ export function Vorauswahl() {
                       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">GIS Zürich – ÖREB Kataster</span>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {current.egrid && current.bfs_nr && (
+                      {current.parzelle && current.bfs_nr && (
                         <a
-                          href={`https://maps.zh.ch/?topic=OeijRBKatZH&offlayers=bezirkslabels&scale=2000&egrid=${current.egrid}&bfsnr=${current.bfs_nr}`}
+                          href={`https://maps.zh.ch/?locate=parz&locations=${current.bfs_nr},${current.parzelle}&topic=OerebKatasterZH`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1.5 bg-primary/10 text-primary border border-primary/20 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-primary/20 transition-colors"
@@ -592,7 +592,7 @@ export function Vorauswahl() {
                         </a>
                       )}
                       <a
-                        href={`https://maps.zh.ch/?topic=OeijRBKatZH&offlayers=bezirkslabels&scale=2000&search=${encodeURIComponent(current.address + (current.plz_ort ? ' ' + current.plz_ort : ''))}`}
+                        href={`https://maps.zh.ch/?topic=OerebKatasterZH&search=${encodeURIComponent(current.address + (current.plz_ort ? ' ' + current.plz_ort : ''))}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1.5 bg-muted text-muted-foreground border rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-muted/80 transition-colors"
