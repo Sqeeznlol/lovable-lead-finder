@@ -564,30 +564,46 @@ export function Vorauswahl() {
                     )}
                   </div>
 
-                  {/* GIS ZH ÖREB Map */}
-                  {current.egrid && current.bfs_nr && (
-                    <div className="border-t">
-                      <div className="flex items-center gap-2 px-5 py-1.5 bg-muted/30">
-                        <MapPin className="h-3 w-3 text-muted-foreground" />
-                        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">GIS ZH – ÖREB / Parzelle</span>
+                  {/* GIS ZH ÖREB Kataster Links */}
+                  <div className="border-t bg-muted/20 px-5 py-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <MapPin className="h-3.5 w-3.5 text-primary" />
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">GIS Zürich – ÖREB Kataster</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {current.egrid && current.bfs_nr && (
                         <a
-                          href={`https://maps.zh.ch/?topic=OeijRBKatZH&offlayers=bezirkslabels&scale=2000&x=2683000&y=1248000&egrid=${current.egrid}&bfsnr=${current.bfs_nr}`}
+                          href={`https://maps.zh.ch/?topic=OeijRBKatZH&offlayers=bezirkslabels&scale=2000&egrid=${current.egrid}&bfsnr=${current.bfs_nr}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="ml-auto text-[10px] text-primary hover:underline flex items-center gap-1"
+                          className="inline-flex items-center gap-1.5 bg-primary/10 text-primary border border-primary/20 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-primary/20 transition-colors"
                         >
-                          <ExternalLink className="h-3 w-3" /> Öffnen
+                          <ExternalLink className="h-3 w-3" /> ÖREB Kataster
                         </a>
-                      </div>
-                      <iframe
-                        src={`https://maps.zh.ch/?topic=OeijRBKatZH&offlayers=bezirkslabels&scale=2000&x=2683000&y=1248000&egrid=${current.egrid}&bfsnr=${current.bfs_nr}`}
-                        className="w-full h-[250px]"
-                        style={{ border: 0 }}
-                        loading="lazy"
-                        title="GIS ZH ÖREB"
-                      />
+                      )}
+                      {current.egrid && current.bfs_nr && (
+                        <a
+                          href={`https://maps.zh.ch/?topic=DLGOWfarbigZH&offlayers=bezirkslabels&scale=500&egrid=${current.egrid}&bfsnr=${current.bfs_nr}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 bg-accent/10 text-accent-foreground border border-accent/20 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-accent/20 transition-colors"
+                        >
+                          <ExternalLink className="h-3 w-3" /> Eigentümer GIS
+                        </a>
+                      )}
+                      <a
+                        href={`https://maps.zh.ch/?topic=OeijRBKatZH&offlayers=bezirkslabels&scale=2000&search=${encodeURIComponent(current.address + (current.plz_ort ? ' ' + current.plz_ort : ''))}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 bg-muted text-muted-foreground border rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-muted/80 transition-colors"
+                      >
+                        <ExternalLink className="h-3 w-3" /> maps.zh.ch (Suche)
+                      </a>
                     </div>
-                  )}
+                    {current.parzelle && (
+                      <p className="text-[10px] text-muted-foreground mt-1.5">Parzelle: {current.parzelle} {current.egrid ? `• EGRID: ${current.egrid}` : ''}</p>
+                    )}
+                  </div>
 
                   {/* Action buttons */}
                   <div className="px-5 py-4 bg-muted/30 border-t space-y-2">
