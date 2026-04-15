@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Phone, Check, ArrowRight, SkipForward, ExternalLink, AlertTriangle, Building2, Landmark, EyeOff } from 'lucide-react';
+import { Search, Phone, Check, ArrowRight, SkipForward, ExternalLink, AlertTriangle, Building2, Landmark, EyeOff, Zap, Loader2, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { useProperties, useUpdateProperty } from '@/hooks/use-properties';
 import { useToast } from '@/hooks/use-toast';
 import { classifyOwner, ownerTypeLabel, ownerTypeColor, parseOwnerString, telSearchUrlParsed, opendiUrlParsed } from '@/lib/owner-utils';
+import { supabase } from '@/integrations/supabase/client';
 
 export function TelefonSuche() {
   const { data: result, refetch } = useProperties({ statusFilter: 'Eigentümer ermittelt', pageSize: 200 });
@@ -18,6 +19,53 @@ export function TelefonSuche() {
   const [phone2, setPhone2] = useState('');
   const [processing, setProcessing] = useState(false);
   const [filter, setFilter] = useState<'all' | 'person' | 'ag' | 'stadt'>('all');
+  const [autoSearching, setAutoSearching] = useState(false);
+  const [autoResult, setAutoResult] = useState<{ match: boolean; phone?: string; foundAddress?: string; searchUrl?: string } | null>(null);
+
+  const autoSearchOwner = async (ownerName: string, ownerAddress: string | null, setter: (v: string) => void) => {
+    const parsed = parseOwnerString(ownerName);
+    if (!parsed.lastName) return;
+
+    // Extract street info from owners_json or parsed address
+    let street = parsed.street;
+    let streetNumber = parsed.streetNumber;
+
+    // If no structured street from parsing, try to extract from owner_address
+    if (!street && ownerAddress) {
+      const addrMatch = ownerAddress.match(/^(.+?)\s+(\d+\w*)/);
+      if (addrMatch) {
+        street = addrMatch[1];
+        streetNumber = addrMatch[2];
+      }
+    }
+
+    if (!street) {
+      toast({ title: 'Keine Strasse vorhanden für Auto-Suche', variant: 'destructive' });
+      return;
+    }
+
+    setAutoSearching(true);
+    setAutoResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('tel-search', {
+        body: { lastName: parsed.lastName, firstName: parsed.firstName, street, streetNumber },
+      });
+
+      if (error) throw error;
+
+      setAutoResult(data);
+      if (data?.match && data.phone) {
+        setter(data.phone);
+        toast({ title: `✅ Nummer gefunden: ${data.phone}` });
+      } else {
+        toast({ title: 'Kein Treffer mit passender Strasse', description: data?.foundAddress || 'Keine Ergebnisse' });
+      }
+    } catch (err) {
+      toast({ title: 'Auto-Suche fehlgeschlagen', description: String(err), variant: 'destructive' });
+    } finally {
+      setAutoSearching(false);
+    }
+  };
 
   const allItems = (result?.data || []).filter(p => p.owner_name && !p.owner_phone);
   
@@ -41,7 +89,7 @@ export function TelefonSuche() {
       refetch();
       setCurrentIndex(0);
     }
-    setPhone1(''); setPhone2('');
+    setPhone1(''); setPhone2(''); setAutoResult(null);
   }, [currentIndex, items.length, refetch]);
 
   // Reset index on filter change
@@ -196,7 +244,13 @@ export function TelefonSuche() {
                 </p>
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
+              <Button size="sm" variant="default" className="gap-1.5"
+                disabled={autoSearching}
+                onClick={() => autoSearchOwner(current.owner_name || '', current.owner_address, setPhone1)}>
+                {autoSearching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+                Auto-Suche
+              </Button>
               <Button size="sm" variant="outline" className="gap-1"
                 onClick={() => window.open(telSearchUrlParsed(parsed1, ort), '_blank')}>
                 <Search className="h-3.5 w-3.5" /> tel.search.ch
@@ -208,6 +262,19 @@ export function TelefonSuche() {
                 <ExternalLink className="h-3 w-3" />
               </Button>
             </div>
+            {autoResult && (
+              <div className={`text-xs rounded-lg p-2 flex items-center gap-2 ${autoResult.match ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-muted text-muted-foreground'}`}>
+                {autoResult.match ? <CheckCircle className="h-3.5 w-3.5" /> : <Search className="h-3.5 w-3.5" />}
+                {autoResult.match
+                  ? `Treffer: ${autoResult.foundAddress}`
+                  : `Kein Treffer${autoResult.foundAddress ? ` (gefunden: ${autoResult.foundAddress})` : ''}`}
+                {autoResult.searchUrl && (
+                  <a href={autoResult.searchUrl} target="_blank" rel="noopener" className="ml-auto underline">
+                    Öffnen
+                  </a>
+                )}
+              </div>
+            )}
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Telefonnummer</Label>
               <Input placeholder="+41 ..." value={phone1} onChange={e => setPhone1(e.target.value)} className="h-10" autoFocus />
@@ -230,7 +297,13 @@ export function TelefonSuche() {
                   </p>
                 </div>
               </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
+              <Button size="sm" variant="default" className="gap-1.5"
+                disabled={autoSearching}
+                onClick={() => autoSearchOwner(current.owner_name_2 || '', current.owner_address_2, setPhone2)}>
+                {autoSearching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+                Auto-Suche
+              </Button>
               <Button size="sm" variant="outline" className="gap-1"
                 onClick={() => window.open(telSearchUrlParsed(parsed2, ort), '_blank')}>
                 <Search className="h-3.5 w-3.5" /> tel.search.ch
