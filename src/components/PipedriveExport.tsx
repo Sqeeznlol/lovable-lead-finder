@@ -63,6 +63,8 @@ export function PipedriveExport() {
           geschosse: p.geschosse ? Number(p.geschosse) : null,
           egrid: p.egrid,
           gwr_egid: p.gwr_egid,
+          parzelle: p.parzelle,
+          bfs_nr: p.bfs_nr,
           owner_name: p.owner_name,
           owner_address: p.owner_address,
           owner_phone: p.owner_phone,
