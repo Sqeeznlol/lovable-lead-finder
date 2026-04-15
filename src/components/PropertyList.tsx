@@ -83,13 +83,7 @@ export function PropertyList() {
   const totalPages = Math.ceil(totalCount / pageSize);
 
   const portalLink = (p: Property) => {
-    if (p.parzelle && p.bfs_nr) {
-      return `https://maps.zh.ch/?locate=parz&locations=${p.bfs_nr},${p.parzelle}&topic=OerebKatasterZH`;
-    }
-    if (p.egrid) {
-      return `https://maps.zh.ch/?topic=OerebKatasterZH&search=${p.egrid}`;
-    }
-    return null;
+    return getOerebParzelleUrl(p.parzelle, p.bfs_nr);
   };
 
   const handleSearchKeyDown = (e: React.KeyboardEvent) => {
@@ -365,11 +359,7 @@ function EditDialog({ property, onClose, onSave }: {
     notes: property.notes || '',
   });
 
-  const portalUrl = property.parzelle && property.bfs_nr
-    ? `https://maps.zh.ch/?locate=parz&locations=${property.bfs_nr},${property.parzelle}&topic=OerebKatasterZH`
-    : property.egrid
-      ? `https://maps.zh.ch/?topic=OerebKatasterZH&search=${property.egrid}`
-      : null;
+  const portalUrl = getOerebParzelleUrl(property.parzelle, property.bfs_nr);
 
   return (
     <Dialog open onOpenChange={onClose}>

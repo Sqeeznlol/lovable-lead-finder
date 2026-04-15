@@ -59,13 +59,7 @@ export function QueryQueue() {
 
   const getPortalUrl = (prop: typeof currentProp) => {
     if (!prop) return null;
-    if (prop.parzelle && prop.bfs_nr) {
-      return `https://maps.zh.ch/?locate=parz&locations=${prop.bfs_nr},${prop.parzelle}&topic=OerebKatasterZH`;
-    }
-    if (prop.egrid) {
-      return `https://maps.zh.ch/?topic=OerebKatasterZH&search=${prop.egrid}`;
-    }
-    return null;
+    return getOerebParzelleUrl(prop.parzelle, prop.bfs_nr);
   };
 
   const portalUrl = getPortalUrl(currentProp);

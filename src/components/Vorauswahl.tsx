@@ -574,18 +574,16 @@ export function Vorauswahl() {
                       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">GIS Zürich – ÖREB Kataster</span>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <a
-                        href={
-                          current.parzelle && current.bfs_nr
-                            ? `https://maps.zh.ch/?locate=parz&locations=${current.bfs_nr},${current.parzelle}&topic=OerebKatasterZH`
-                            : `https://maps.zh.ch/?topic=OerebKatasterZH&search=${encodeURIComponent(current.address + (current.plz_ort ? ' ' + current.plz_ort : ''))}`
-                        }
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 bg-primary text-primary-foreground rounded-lg px-4 py-2 text-sm font-semibold hover:bg-primary/90 transition-colors shadow-sm"
-                      >
-                        <ExternalLink className="h-4 w-4" /> ÖREB Kataster öffnen
-                      </a>
+                      {getOerebParzelleUrl(current.parzelle, current.bfs_nr) && (
+                        <a
+                          href={getOerebParzelleUrl(current.parzelle, current.bfs_nr) || undefined}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 bg-primary text-primary-foreground rounded-lg px-4 py-2 text-sm font-semibold hover:bg-primary/90 transition-colors shadow-sm"
+                        >
+                          <ExternalLink className="h-4 w-4" /> ÖREB Kataster öffnen
+                        </a>
+                      )}
                       {current.egrid && current.bfs_nr && (
                         <a
                           href={`https://maps.zh.ch/?topic=DLGOWfarbigZH&offlayers=bezirkslabels&scale=500&egrid=${current.egrid}&bfsnr=${current.bfs_nr}`}
