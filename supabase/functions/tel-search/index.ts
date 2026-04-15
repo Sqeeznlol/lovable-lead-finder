@@ -88,6 +88,13 @@ Deno.serve(async (req) => {
     });
 
     if (!res.ok) {
+      // 404 means no results found - return empty, not error
+      if (res.status === 404) {
+        return new Response(JSON.stringify({
+          success: true, match: false, phone: null, allPhones: [], resultCount: 0,
+          foundAddress: '', searchUrl, streetMatches: false,
+        }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
       return new Response(JSON.stringify({ error: `tel.search.ch returned ${res.status}` }), {
         status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
