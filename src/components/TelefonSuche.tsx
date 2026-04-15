@@ -235,6 +235,8 @@ export function TelefonSuche() {
             <div className="flex gap-2 mt-3 flex-wrap">
               {current.zone && <Badge variant="outline" className="text-xs">{current.zone}</Badge>}
               {current.baujahr && <Badge variant="outline" className="text-xs">Bj. {current.baujahr}</Badge>}
+              {current.parzelle && <Badge variant="outline" className="text-xs">Parz. {current.parzelle}</Badge>}
+              {current.egrid && <Badge variant="outline" className="text-xs">{current.egrid}</Badge>}
             </div>
 
             {/* Low chance warning */}
