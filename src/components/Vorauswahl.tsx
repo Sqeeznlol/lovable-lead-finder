@@ -37,7 +37,9 @@ export function Vorauswahl() {
   const { data: zones } = useZones();
   const { data: gemeinden } = useGemeinden();
   const { selectedListId } = useListFilter();
-  const { data: queue, refetch } = useUnqueriedProperties(200, selectedListId);
+  const { data: lists } = useLists();
+  const isPrioList = !!(selectedListId && lists?.find(l => l.id === selectedListId && l.priority < 0));
+  const { data: queue, refetch } = useUnqueriedProperties(200, selectedListId, isPrioList);
   const { data: stats, refetch: refetchStats } = useVorauswahlStats();
   const updateProp = useUpdateProperty();
   const { toast } = useToast();
