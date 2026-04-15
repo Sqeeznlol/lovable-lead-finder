@@ -49,7 +49,8 @@ export function Vorauswahl() {
   const [processing, setProcessing] = useState(false);
   const [sessionStats, setSessionStats] = useState({ interessant: 0, ausgeblendet: 0, skipped: 0 });
 
-  const baujahrMax = baujahrBis ? parseInt(baujahrBis, 10) : null;
+  const effectiveBaujahrBis = isPrioList ? '' : baujahrBis;
+  const baujahrMax = effectiveBaujahrBis ? parseInt(effectiveBaujahrBis, 10) : null;
   const baujahrMin = baujahrVon ? parseInt(baujahrVon, 10) : null;
   const maxWhgNum = maxWhg ? parseInt(maxWhg, 10) : null;
   const minWhgNum = minWhg ? parseInt(minWhg, 10) : null;
@@ -71,7 +72,7 @@ export function Vorauswahl() {
 
   const current = items[currentIndex];
   const score = current?._score ?? 0;
-  const hasFilters = zoneFilter !== 'Alle' || baujahrVon || baujahrBis !== '1980' || maxWhg || minWhg || gemeindeFilter || bezirkFilter || (kategorieFilter && kategorieFilter !== 'Alle');
+  const hasFilters = zoneFilter !== 'Alle' || baujahrVon || effectiveBaujahrBis !== '1980' || maxWhg || minWhg || gemeindeFilter || bezirkFilter || (kategorieFilter && kategorieFilter !== 'Alle');
 
   useEffect(() => { setCurrentIndex(0); }, [zoneFilter, baujahrBis, baujahrVon, maxWhg, minWhg, gemeindeFilter, bezirkFilter, kategorieFilter]);
 
@@ -258,7 +259,7 @@ export function Vorauswahl() {
           </Select>
           <div className="flex items-center gap-1">
             <Label className="text-[10px] text-muted-foreground">Bj.bis</Label>
-            <Input type="number" value={baujahrBis} onChange={e => setBaujahrBis(e.target.value)} className="w-20 h-8 text-xs" />
+            <Input type="number" value={effectiveBaujahrBis} onChange={e => setBaujahrBis(e.target.value)} className="w-20 h-8 text-xs" placeholder={isPrioList ? 'offen' : undefined} />
           </div>
           <div className="flex items-center gap-1">
             <Label className="text-[10px] text-muted-foreground">MaxWhg</Label>
