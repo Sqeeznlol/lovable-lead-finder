@@ -10,6 +10,7 @@ import { useUnqueriedProperties, useUpdateProperty } from '@/hooks/use-propertie
 import { usePhoneNumbers, useIncrementPhoneQuery } from '@/hooks/use-phones';
 import { useToast } from '@/hooks/use-toast';
 import { useListFilter } from '@/hooks/use-lists';
+import { getOerebParzelleUrl } from '@/lib/oereb';
 
 export function QueryQueue() {
   const { data: phones } = usePhoneNumbers();

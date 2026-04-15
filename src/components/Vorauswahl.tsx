@@ -19,6 +19,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { calculateDealScore, scoreColor, scoreBg } from '@/lib/deal-score';
 import { useListFilter, useLists } from '@/hooks/use-lists';
 import { ListSelector } from '@/components/ListSelector';
+import { getOerebParzelleUrl } from '@/lib/oereb';
 
 type ViewMode = 'card' | 'table';
 
