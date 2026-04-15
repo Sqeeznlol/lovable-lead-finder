@@ -231,6 +231,7 @@ export type Database = {
           kategorie: string | null
           last_export_at: string | null
           last_phone_search_at: string | null
+          list_id: string | null
           notes: string | null
           ortschaftsname: string | null
           owner_address: string | null
@@ -291,6 +292,7 @@ export type Database = {
           kategorie?: string | null
           last_export_at?: string | null
           last_phone_search_at?: string | null
+          list_id?: string | null
           notes?: string | null
           ortschaftsname?: string | null
           owner_address?: string | null
@@ -351,6 +353,7 @@ export type Database = {
           kategorie?: string | null
           last_export_at?: string | null
           last_phone_search_at?: string | null
+          list_id?: string | null
           notes?: string | null
           ortschaftsname?: string | null
           owner_address?: string | null
@@ -377,7 +380,15 @@ export type Database = {
           wohnungen?: number | null
           zone?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "properties_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: false
+            referencedRelation: "property_lists"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       property_decisions: {
         Row: {
@@ -425,6 +436,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      property_lists: {
+        Row: {
+          color: string | null
+          created_at: string
+          id: string
+          name: string
+          priority: number
+          property_count: number
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          priority?: number
+          property_count?: number
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          priority?: number
+          property_count?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {

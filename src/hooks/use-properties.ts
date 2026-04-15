@@ -19,14 +19,15 @@ interface UsePropertiesOptions {
   areaMax?: number;
   geschosseMin?: number;
   ownerFilter?: string;
+  listId?: string | null;
 }
 
 export function useProperties(options: UsePropertiesOptions = {}) {
   const { statusFilter, gemeindeFilter, zoneFilter, search, page = 0, pageSize = 50,
-    baujahrVon, baujahrBis, flaecheMin, flaecheMax, areaMin, areaMax, geschosseMin, ownerFilter } = options;
+    baujahrVon, baujahrBis, flaecheMin, flaecheMax, areaMin, areaMax, geschosseMin, ownerFilter, listId } = options;
   return useQuery({
     queryKey: ['properties', statusFilter, gemeindeFilter, zoneFilter, search, page, pageSize,
-      baujahrVon, baujahrBis, flaecheMin, flaecheMax, areaMin, areaMax, geschosseMin, ownerFilter],
+      baujahrVon, baujahrBis, flaecheMin, flaecheMax, areaMin, areaMax, geschosseMin, ownerFilter, listId],
     queryFn: async () => {
       let query = supabase
         .from('properties')
@@ -66,6 +67,7 @@ export function useProperties(options: UsePropertiesOptions = {}) {
       if (geschosseMin) query = query.gte('geschosse', geschosseMin);
       if (ownerFilter === 'mit') query = query.not('owner_name', 'is', null);
       if (ownerFilter === 'ohne') query = query.is('owner_name', null);
+      if (listId) query = query.eq('list_id', listId);
 
       const { data, error, count } = await query;
       if (error) throw error;
@@ -107,11 +109,11 @@ export function useZones() {
   });
 }
 
-export function useUnqueriedProperties(limit: number) {
+export function useUnqueriedProperties(limit: number, listId?: string | null) {
   return useQuery({
-    queryKey: ['properties', 'unqueried', limit],
+    queryKey: ['properties', 'unqueried', limit, listId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('properties')
         .select('*')
         .eq('is_queried', false)
@@ -122,17 +124,19 @@ export function useUnqueriedProperties(limit: number) {
         .order('gebaeudeflaeche', { ascending: false, nullsFirst: false })
         .order('area', { ascending: false, nullsFirst: false })
         .limit(limit);
+      if (listId) query = query.eq('list_id', listId);
+      const { data, error } = await query;
       if (error) throw error;
       return data as Property[];
     },
   });
 }
 
-export function usePreselectedProperties(limit: number) {
+export function usePreselectedProperties(limit: number, listId?: string | null) {
   return useQuery({
-    queryKey: ['properties', 'preselected', limit],
+    queryKey: ['properties', 'preselected', limit, listId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('properties')
         .select('*')
         .eq('status', 'Vorausgewählt')
@@ -140,11 +144,16 @@ export function usePreselectedProperties(limit: number) {
         .order('gebaeudeflaeche', { ascending: false, nullsFirst: false })
         .order('area', { ascending: false, nullsFirst: false })
         .limit(limit);
+      if (listId) query = query.eq('list_id', listId);
+      const { data, error } = await query;
       if (error) throw error;
       return data as Property[];
     },
   });
 }
+
+
+
 
 export function useInsertProperties() {
   const qc = useQueryClient();

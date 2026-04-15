@@ -9,12 +9,14 @@ import { Progress } from '@/components/ui/progress';
 import { useUnqueriedProperties, useUpdateProperty } from '@/hooks/use-properties';
 import { usePhoneNumbers, useIncrementPhoneQuery } from '@/hooks/use-phones';
 import { useToast } from '@/hooks/use-toast';
+import { useListFilter } from '@/hooks/use-lists';
 
 export function QueryQueue() {
   const { data: phones } = usePhoneNumbers();
   const availablePhones = (phones || []).filter(p => p.daily_queries_used < 5);
   const totalSlots = availablePhones.reduce((acc, p) => acc + (5 - p.daily_queries_used), 0);
-  const { data: queue, refetch } = useUnqueriedProperties(totalSlots || 5);
+  const { selectedListId } = useListFilter();
+  const { data: queue, refetch } = useUnqueriedProperties(totalSlots || 5, selectedListId);
   const updateProp = useUpdateProperty();
   const incrementPhone = useIncrementPhoneQuery();
   const { toast } = useToast();

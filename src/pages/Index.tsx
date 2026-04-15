@@ -10,6 +10,7 @@ import { TelefonSuche } from '@/components/TelefonSuche';
 import { PipedriveExport } from '@/components/PipedriveExport';
 import { Vorauswahl } from '@/components/Vorauswahl';
 import { AdminSettings } from '@/components/AdminSettings';
+import { ListSelector } from '@/components/ListSelector';
 
 type Tab = 'dashboard' | 'vorauswahl' | 'akquise' | 'telsuche' | 'properties' | 'import' | 'phones' | 'export' | 'admin';
 
@@ -37,6 +38,9 @@ export default function Index() {
             Sqeeztraum
           </h1>
           <p className="text-xs text-muted-foreground mt-1">Immobilien-Akquise CRM</p>
+          <div className="mt-3">
+            <ListSelector />
+          </div>
         </div>
         <nav className="p-3 space-y-1 flex-1">
           {tabs.map(t => (

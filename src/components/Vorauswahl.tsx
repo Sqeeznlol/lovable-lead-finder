@@ -17,6 +17,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { supabase } from '@/integrations/supabase/client';
 import { calculateDealScore, scoreColor, scoreBg } from '@/lib/deal-score';
+import { useListFilter } from '@/hooks/use-lists';
+import { ListSelector } from '@/components/ListSelector';
 
 type ViewMode = 'card' | 'table';
 
@@ -34,7 +36,8 @@ export function Vorauswahl() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const { data: zones } = useZones();
   const { data: gemeinden } = useGemeinden();
-  const { data: queue, refetch } = useUnqueriedProperties(200);
+  const { selectedListId } = useListFilter();
+  const { data: queue, refetch } = useUnqueriedProperties(200, selectedListId);
   const { data: stats, refetch: refetchStats } = useVorauswahlStats();
   const updateProp = useUpdateProperty();
   const { toast } = useToast();
@@ -233,6 +236,7 @@ export function Vorauswahl() {
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div className="flex items-center gap-2 flex-wrap">
           <h2 className="text-xl font-bold">Vorauswahl</h2>
+          <ListSelector />
           <div className="flex items-center border rounded-lg overflow-hidden">
             <Button variant={viewMode === 'card' ? 'default' : 'ghost'} size="sm" className="h-7 px-2 rounded-none" onClick={() => setViewMode('card')}>
               <LayoutGrid className="h-3.5 w-3.5" />
