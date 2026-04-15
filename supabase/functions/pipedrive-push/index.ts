@@ -435,6 +435,8 @@ Deno.serve(async (req) => {
         if (prop.parzelle) leadData[FIELD_PARZELLE] = prop.parzelle;
         if (prop.wohnungen) leadData[FIELD_WOHNUNGEN] = prop.wohnungen;
         if (prop.kategorie) leadData[FIELD_KATEGORIE] = prop.kategorie;
+        if (prop.denkmalschutz) leadData[FIELD_DENKMALSCHUTZ] = prop.denkmalschutz;
+        if (prop.isos) leadData[FIELD_ISOS] = prop.isos;
 
         // Google Maps link for Pipedrive
         const fullAddr = prop.address + (prop.plz_ort ? ', ' + prop.plz_ort : '');
