@@ -213,6 +213,7 @@ export type Database = {
           decided_at: string | null
           decided_by: string | null
           decision_source: string | null
+          denkmalschutz: string | null
           duplicate_flag: boolean | null
           duplicate_group_id: string | null
           egrid: string | null
@@ -228,6 +229,7 @@ export type Database = {
           hausnummer: string | null
           id: string
           is_queried: boolean
+          isos: string | null
           kategorie: string | null
           last_export_at: string | null
           last_phone_search_at: string | null
@@ -274,6 +276,7 @@ export type Database = {
           decided_at?: string | null
           decided_by?: string | null
           decision_source?: string | null
+          denkmalschutz?: string | null
           duplicate_flag?: boolean | null
           duplicate_group_id?: string | null
           egrid?: string | null
@@ -289,6 +292,7 @@ export type Database = {
           hausnummer?: string | null
           id?: string
           is_queried?: boolean
+          isos?: string | null
           kategorie?: string | null
           last_export_at?: string | null
           last_phone_search_at?: string | null
@@ -335,6 +339,7 @@ export type Database = {
           decided_at?: string | null
           decided_by?: string | null
           decision_source?: string | null
+          denkmalschutz?: string | null
           duplicate_flag?: boolean | null
           duplicate_group_id?: string | null
           egrid?: string | null
@@ -350,6 +355,7 @@ export type Database = {
           hausnummer?: string | null
           id?: string
           is_queried?: boolean
+          isos?: string | null
           kategorie?: string | null
           last_export_at?: string | null
           last_phone_search_at?: string | null
