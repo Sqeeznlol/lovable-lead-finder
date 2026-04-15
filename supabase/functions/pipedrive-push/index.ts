@@ -23,6 +23,9 @@ const FIELD_OWNER_3 = 'd312bedebdad79dfcdeacc7f3912ff3bfd8306a7';
 const FIELD_OWNER_4 = '00586e2f3149ab8f3d6cebb55b7ec626630cb9d0';
 const FIELD_OWNER_5 = '0c4c530966d09ae4874184dc0c4eef6f4532ff90';
 const FIELD_GOOGLE_PIPE = '8318ae128ecd86600b20dc02b3a72537f4c9fd8a';
+const FIELD_PARZELLE = '101c2348b81c4a6ea14b716fb3ce029becce0acd';
+const FIELD_WOHNUNGEN = '852785d9aff2e015382b7406bb6fc70c4fc783b0';
+const FIELD_KATEGORIE = '852785d9aff2e015382b7406bb6fc70c4fc783b0';
 
 const PropertySchema = z.object({
   id: z.string(),
@@ -425,6 +428,11 @@ Deno.serve(async (req) => {
         if (prop.parzelle && prop.bfs_nr) {
           leadData[FIELD_OEREB] = `https://maps.zh.ch/?locate=parz&locations=${prop.bfs_nr},${prop.parzelle}&topic=OerebKatasterZH`;
         }
+
+        // Parzelle, Wohnungen, Kategorie
+        if (prop.parzelle) leadData[FIELD_PARZELLE] = prop.parzelle;
+        if (prop.wohnungen) leadData[FIELD_WOHNUNGEN] = prop.wohnungen;
+        if (prop.kategorie) leadData[FIELD_KATEGORIE] = prop.kategorie;
 
         // Google Maps link for Pipedrive
         const fullAddr = prop.address + (prop.plz_ort ? ', ' + prop.plz_ort : '');
