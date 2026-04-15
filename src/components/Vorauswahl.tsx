@@ -592,6 +592,7 @@ export function Vorauswahl() {
                         >
                           <ExternalLink className="h-3 w-3" /> Eigentümer GIS
                         </a>
+                      )}
                     </div>
                     {current.parzelle && (
                       <p className="text-[10px] text-muted-foreground mt-1.5">Parzelle: {current.parzelle} {current.egrid ? `• EGRID: ${current.egrid}` : ''}</p>
