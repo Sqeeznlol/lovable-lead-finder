@@ -87,6 +87,69 @@ export function PropertyList() {
     return getOerebParzelleUrl(p.parzelle, p.bfs_nr);
   };
 
+  const exportExcel = async () => {
+    try {
+      const allRows = await fetchAllProperties({
+        statusFilter: filter,
+        gemeindeFilter,
+        zoneFilter,
+        search,
+        baujahrVon: baujahrVon ? Number(baujahrVon) : undefined,
+        baujahrBis: baujahrBis ? Number(baujahrBis) : undefined,
+        flaecheMin: flaecheMin ? Number(flaecheMin) : undefined,
+        flaecheMax: flaecheMax ? Number(flaecheMax) : undefined,
+        areaMin: areaMin ? Number(areaMin) : undefined,
+        areaMax: areaMax ? Number(areaMax) : undefined,
+        geschosseMin: geschosseMin ? Number(geschosseMin) : undefined,
+        ownerFilter,
+      });
+
+      const rows = allRows.map(p => ({
+        Adresse: p.address || '',
+        'PLZ / Ort': p.plz_ort || '',
+        Gemeinde: p.gemeinde || '',
+        Zone: p.zone || '',
+        Status: p.status || '',
+        Eigentümer: p.owner_name || '',
+        'Eigentümer 2': p.owner_name_2 || '',
+        Telefon: p.owner_phone || '',
+        'Telefon 2': p.owner_phone_2 || '',
+        'Eigentümer Adresse': p.owner_address || '',
+        'Eigentümer Adresse 2': p.owner_address_2 || '',
+        Parzelle: p.parzelle || '',
+        BFS: p.bfs_nr || '',
+        EGRID: p.egrid || '',
+        EGID: p.gwr_egid || '',
+        Baujahr: p.baujahr || '',
+        'HNF (m²)': p.gebaeudeflaeche ? Math.round(Number(p.gebaeudeflaeche)) : '',
+        'Grundstück (m²)': p.area ? Math.round(Number(p.area)) : '',
+        Geschosse: p.geschosse ? Number(p.geschosse) : '',
+        Wohnungen: p.wohnungen ? Number(p.wohnungen) : '',
+        Kategorie: p.kategorie || '',
+        'Google Maps': p.google_maps_url || '',
+        'Street View': p.streetview_url || '',
+        'ÖREB Kataster': getOerebParzelleUrl(p.parzelle, p.bfs_nr) || '',
+        Notizen: p.notes || '',
+      }));
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(rows);
+      ws['!autofilter'] = { ref: ws['!ref'] || 'A1' };
+      ws['!cols'] = [
+        { wch: 28 }, { wch: 18 }, { wch: 18 }, { wch: 10 }, { wch: 18 },
+        { wch: 28 }, { wch: 28 }, { wch: 16 }, { wch: 16 }, { wch: 30 },
+        { wch: 30 }, { wch: 14 }, { wch: 10 }, { wch: 22 }, { wch: 14 },
+        { wch: 10 }, { wch: 12 }, { wch: 16 }, { wch: 10 }, { wch: 10 },
+        { wch: 14 }, { wch: 32 }, { wch: 32 }, { wch: 42 }, { wch: 40 },
+      ];
+      XLSX.utils.book_append_sheet(wb, ws, 'Liegenschaften');
+      XLSX.writeFile(wb, `liegenschaften-gesamtliste-${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast({ title: `✅ Excel exportiert (${allRows.length})` });
+    } catch (error) {
+      toast({ title: 'Excel-Export fehlgeschlagen', description: String(error), variant: 'destructive' });
+    }
+  };
+
   const handleSearchKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       setSearch(searchInput);

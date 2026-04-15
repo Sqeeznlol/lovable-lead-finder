@@ -22,8 +22,8 @@ interface UsePropertiesOptions {
   listId?: string | null;
 }
 
-function applyPropertyFilters(
-  query: ReturnType<typeof supabase.from<'properties', Tables<'properties'>>>,
+function applyPropertyFilters<TQuery>(
+  query: TQuery,
   options: UsePropertiesOptions,
 ) {
   const {
