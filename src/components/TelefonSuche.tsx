@@ -130,10 +130,14 @@ export function TelefonSuche() {
     if (!current) return;
     setProcessing(true);
     try {
+      const mergedNotes = notes.trim()
+        ? (current.notes ? current.notes + '\n---\n' + notes.trim() : notes.trim())
+        : current.notes;
       const updates: Record<string, unknown> = {
         id: current.id,
         owner_phone: phone1 || null,
         status: phone1 ? 'Telefon gefunden' : 'Eigentümer ermittelt',
+        notes: mergedNotes,
       };
       if (phone2 && current.owner_name_2) {
         updates.owner_phone_2 = phone2;
