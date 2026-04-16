@@ -350,6 +350,22 @@ export function TelefonSuche() {
             </div>
           )}
 
+          {/* Notizen */}
+          <div className="p-6 space-y-2 border-b bg-muted/10">
+            <Label className="text-sm font-semibold flex items-center gap-1.5">
+              <FileText className="h-3.5 w-3.5" /> Notizen
+            </Label>
+            <Textarea
+              placeholder="z.B. Kontakt-Versuch, Rückruf gewünscht, Sprachbox..."
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              className="min-h-[70px] resize-none text-sm"
+            />
+            {current.notes && (
+              <p className="text-[11px] text-muted-foreground">Bisherige Notizen werden ergänzt, nicht überschrieben.</p>
+            )}
+          </div>
+
           {/* Actions */}
           <div className="px-6 py-5 bg-muted/30 flex gap-3 flex-wrap">
             <Button variant="ghost" disabled={processing} className="text-muted-foreground"
