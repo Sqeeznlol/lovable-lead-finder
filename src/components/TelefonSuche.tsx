@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Phone, Check, ArrowRight, SkipForward, ExternalLink, AlertTriangle, Building2, Landmark, EyeOff, Zap, Loader2, CheckCircle, Undo2 } from 'lucide-react';
+import { Search, Phone, Check, ArrowRight, SkipForward, ExternalLink, AlertTriangle, Building2, Landmark, EyeOff, Zap, Loader2, CheckCircle, Undo2, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useProperties, useUpdateProperty } from '@/hooks/use-properties';
@@ -17,6 +18,7 @@ export function TelefonSuche() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [phone1, setPhone1] = useState('');
   const [phone2, setPhone2] = useState('');
+  const [notes, setNotes] = useState('');
   const [processing, setProcessing] = useState(false);
   const [filter, setFilter] = useState<'all' | 'person' | 'ag' | 'stadt'>('all');
   const [autoSearching, setAutoSearching] = useState(false);
@@ -89,11 +91,11 @@ export function TelefonSuche() {
       refetch();
       setCurrentIndex(0);
     }
-    setPhone1(''); setPhone2(''); setAutoResult(null);
+    setPhone1(''); setPhone2(''); setNotes(''); setAutoResult(null);
   }, [currentIndex, items.length, refetch]);
 
   // Reset index on filter change
-  useEffect(() => { setCurrentIndex(0); setPhone1(''); setPhone2(''); setAutoResult(null); }, [filter]);
+  useEffect(() => { setCurrentIndex(0); setPhone1(''); setPhone2(''); setNotes(''); setAutoResult(null); }, [filter]);
 
   // Auto-search when current item changes
   useEffect(() => {
@@ -128,10 +130,14 @@ export function TelefonSuche() {
     if (!current) return;
     setProcessing(true);
     try {
+      const mergedNotes = notes.trim()
+        ? (current.notes ? current.notes + '\n---\n' + notes.trim() : notes.trim())
+        : current.notes;
       const updates: Record<string, unknown> = {
         id: current.id,
         owner_phone: phone1 || null,
         status: phone1 ? 'Telefon gefunden' : 'Eigentümer ermittelt',
+        notes: mergedNotes,
       };
       if (phone2 && current.owner_name_2) {
         updates.owner_phone_2 = phone2;
@@ -343,6 +349,22 @@ export function TelefonSuche() {
               </div>
             </div>
           )}
+
+          {/* Notizen */}
+          <div className="p-6 space-y-2 border-b bg-muted/10">
+            <Label className="text-sm font-semibold flex items-center gap-1.5">
+              <FileText className="h-3.5 w-3.5" /> Notizen
+            </Label>
+            <Textarea
+              placeholder="z.B. Kontakt-Versuch, Rückruf gewünscht, Sprachbox..."
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              className="min-h-[70px] resize-none text-sm"
+            />
+            {current.notes && (
+              <p className="text-[11px] text-muted-foreground">Bisherige Notizen werden ergänzt, nicht überschrieben.</p>
+            )}
+          </div>
 
           {/* Actions */}
           <div className="px-6 py-5 bg-muted/30 flex gap-3 flex-wrap">
