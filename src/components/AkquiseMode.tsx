@@ -230,26 +230,69 @@ export function AkquiseMode() {
     }
   };
 
+  const autoLookupPhone = async (ownerName: string, ownerAddress: string | null): Promise<string | null> => {
+    try {
+      const parsed = parseOwnerString(ownerName);
+      if (!parsed.lastName) return null;
+      let street = parsed.street;
+      let streetNumber = parsed.streetNumber;
+      if (!street && ownerAddress) {
+        const m = ownerAddress.match(/^(.+?)\s+(\d+\w*)/);
+        if (m) { street = m[1]; streetNumber = m[2]; }
+      }
+      if (!street) return null;
+      const { data, error } = await supabase.functions.invoke('tel-search', {
+        body: { lastName: parsed.lastName, firstName: parsed.firstName, street, streetNumber },
+      });
+      if (error) return null;
+      return data?.match && data.phone ? data.phone : null;
+    } catch { return null; }
+  };
+
   const handleSave = async () => {
     if (!current || !selectedPhone) return;
     setProcessing(true);
     try {
       await incrementPhone.mutateAsync(selectedPhone.id);
 
+      const o1 = owners[0];
+      const o2 = owners[1];
+
+      // Auto-Suche: Telefon via tel.search.ch versuchen wenn nicht manuell eingegeben
+      let autoPhone1: string | null = null;
+      let autoPhone2: string | null = null;
+      if (hasAnyOwner) {
+        setAutoStatus('🔍 Telefon-Auto-Suche...');
+        if (o1?.raw.trim() && !o1.phone) {
+          autoPhone1 = await autoLookupPhone(o1.parsed.fullName || o1.raw, o1.parsed.address);
+        }
+        if (o2?.raw.trim() && !o2.phone) {
+          autoPhone2 = await autoLookupPhone(o2.parsed.fullName || o2.raw, o2.parsed.address);
+        }
+        setAutoStatus(null);
+      }
+
+      const finalPhone1 = o1?.phone || autoPhone1 || null;
+      const finalPhone2 = o2?.phone || autoPhone2 || null;
+      const hasAnyPhone = !!(finalPhone1 || finalPhone2);
+
       // Build owners JSON for all owners
       const ownersJson = owners
         .filter(o => o.raw.trim())
-        .map(o => ({
+        .map((o, idx) => ({
           name: o.parsed.fullName || o.raw,
           address: o.parsed.address,
-          phone: o.phone,
+          phone: o.phone || (idx === 0 ? autoPhone1 : idx === 1 ? autoPhone2 : '') || '',
           ownershipType: o.parsed.ownershipType,
           type: o.parsed.type,
         }));
 
-      // First 2 owners go to flat fields for backward compat
-      const o1 = owners[0];
-      const o2 = owners[1];
+      // Status-Logik: bei Auto-Telefon direkt auf "Telefon gefunden" → überspringt TelefonSuche
+      const newStatus = !hasAnyOwner
+        ? 'Kein Ergebnis'
+        : hasAnyPhone
+          ? 'Telefon gefunden'
+          : 'Eigentümer ermittelt';
 
       await updateProp.mutateAsync({
         id: current.id,
@@ -258,17 +301,66 @@ export function AkquiseMode() {
         queried_by_phone: selectedPhone.number,
         owner_name: o1?.parsed.fullName || o1?.raw || null,
         owner_address: o1?.parsed.address || null,
-        owner_phone: o1?.phone || null,
+        owner_phone: finalPhone1,
         owner_name_2: o2?.parsed.fullName || o2?.raw || null,
         owner_address_2: o2?.parsed.address || null,
-        owner_phone_2: o2?.phone || null,
-        status: hasAnyOwner ? 'Eigentümer ermittelt' : 'Kein Ergebnis',
+        owner_phone_2: finalPhone2,
+        status: newStatus,
         owners_json: ownersJson as any,
       });
-      toast({ title: hasAnyOwner ? '✅ Eigentümer gespeichert' : '✅ Kein Ergebnis – weiter' });
+
+      // Bei Auto-Telefon-Treffer direkt zu Pipedrive pushen
+      if (hasAnyPhone && (autoPhone1 || autoPhone2)) {
+        try {
+          setAutoStatus('📤 Push zu Pipedrive...');
+          const batch = [{
+            id: current.id,
+            address: current.address,
+            plz_ort: current.plz_ort,
+            gemeinde: current.gemeinde,
+            zone: current.zone,
+            baujahr: current.baujahr,
+            gebaeudeflaeche: current.gebaeudeflaeche ? Number(current.gebaeudeflaeche) : null,
+            area: current.area ? Number(current.area) : null,
+            geschosse: current.geschosse ? Number(current.geschosse) : null,
+            egrid: current.egrid,
+            gwr_egid: current.gwr_egid,
+            parzelle: current.parzelle,
+            bfs_nr: current.bfs_nr,
+            owner_name: o1?.parsed.fullName || o1?.raw || null,
+            owner_address: o1?.parsed.address || null,
+            owner_phone: finalPhone1,
+            owner_name_2: o2?.parsed.fullName || o2?.raw || null,
+            owner_address_2: o2?.parsed.address || null,
+            owner_phone_2: finalPhone2,
+            owners_json: ownersJson,
+            notes: current.notes,
+            status: newStatus,
+            google_maps_url: current.google_maps_url,
+            kategorie: current.kategorie,
+            wohnungen: current.wohnungen ? Number(current.wohnungen) : null,
+            denkmalschutz: current.denkmalschutz,
+            isos: current.isos,
+          }];
+          const { data: pushData, error: pushErr } = await supabase.functions.invoke('pipedrive-push', { body: { properties: batch } });
+          if (!pushErr && pushData?.summary?.created > 0) {
+            await updateProp.mutateAsync({ id: current.id, status: 'Exportiert' });
+            toast({ title: `🚀 Auto-Pipeline: Telefon gefunden + Pipedrive Lead erstellt` });
+          } else {
+            toast({ title: `✅ Telefon auto-gefunden (Pipedrive: ${pushErr ? 'Fehler' : 'Duplikat'})` });
+          }
+        } catch (e) {
+          toast({ title: '✅ Telefon gefunden – Pipedrive-Push fehlgeschlagen', variant: 'destructive' });
+        } finally {
+          setAutoStatus(null);
+        }
+      } else {
+        toast({ title: hasAnyOwner ? (hasAnyPhone ? '✅ Mit Telefon gespeichert' : '✅ Eigentümer gespeichert') : '✅ Kein Ergebnis – weiter' });
+      }
       moveToNext();
     } catch {
       toast({ title: 'Fehler', variant: 'destructive' });
+      setAutoStatus(null);
     } finally {
       setProcessing(false);
     }
