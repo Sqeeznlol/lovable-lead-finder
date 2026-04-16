@@ -18,6 +18,7 @@ export function TelefonSuche() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [phone1, setPhone1] = useState('');
   const [phone2, setPhone2] = useState('');
+  const [notes, setNotes] = useState('');
   const [processing, setProcessing] = useState(false);
   const [filter, setFilter] = useState<'all' | 'person' | 'ag' | 'stadt'>('all');
   const [autoSearching, setAutoSearching] = useState(false);
