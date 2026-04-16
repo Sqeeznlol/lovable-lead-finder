@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { calculateDealScore, scoreColor, scoreBg } from '@/lib/deal-score';
 import { parseOwnerString, parseMultipleOwners, parsePortalOwnerText, isGroupHeader, classifyOwner, ownerTypeLabel, ownerTypeColor, telSearchUrlParsed, opendiUrlParsed, type ParsedOwner } from '@/lib/owner-utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { supabase } from '@/integrations/supabase/client';
 
 interface OwnerEntry {
   raw: string;
