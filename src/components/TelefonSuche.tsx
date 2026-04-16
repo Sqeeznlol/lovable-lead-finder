@@ -91,11 +91,11 @@ export function TelefonSuche() {
       refetch();
       setCurrentIndex(0);
     }
-    setPhone1(''); setPhone2(''); setAutoResult(null);
+    setPhone1(''); setPhone2(''); setNotes(''); setAutoResult(null);
   }, [currentIndex, items.length, refetch]);
 
   // Reset index on filter change
-  useEffect(() => { setCurrentIndex(0); setPhone1(''); setPhone2(''); setAutoResult(null); }, [filter]);
+  useEffect(() => { setCurrentIndex(0); setPhone1(''); setPhone2(''); setNotes(''); setAutoResult(null); }, [filter]);
 
   // Auto-search when current item changes
   useEffect(() => {
