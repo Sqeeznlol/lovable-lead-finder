@@ -98,22 +98,81 @@ export function TelefonSuche() {
   // Reset index on filter change
   useEffect(() => { setCurrentIndex(0); setPhone1(''); setPhone2(''); setNotes(''); setAutoResult(null); }, [filter]);
 
-  // Auto-search when current item changes
+  // Auto-search when current item changes; if a match is found → auto-save + auto-push to Pipedrive
   useEffect(() => {
     if (!current?.owner_name) return;
-    const parsed = parseOwnerString(current.owner_name);
-    const street = parsed.street || (current.owner_address?.match(/^(.+?)\s+(\d+\w*)/)?.[1] || '');
-    if (parsed.lastName && street) {
-      autoSearchOwner(current.owner_name, current.owner_address, setPhone1);
-    }
-    // Also auto-search owner 2
-    if (current.owner_name_2) {
-      const parsed2 = parseOwnerString(current.owner_name_2);
-      const street2 = parsed2.street || (current.owner_address_2?.match(/^(.+?)\s+(\d+\w*)/)?.[1] || '');
-      if (parsed2.lastName && street2) {
-        autoSearchOwner(current.owner_name_2, current.owner_address_2, setPhone2);
+    let cancelled = false;
+
+    const run = async () => {
+      const parsed = parseOwnerString(current.owner_name);
+      const street = parsed.street || (current.owner_address?.match(/^(.+?)\s+(\d+\w*)/)?.[1] || '');
+      let foundPhone1: string | null = null;
+      let foundPhone2: string | null = null;
+
+      if (parsed.lastName && street) {
+        try {
+          const { data } = await supabase.functions.invoke('tel-search', {
+            body: { lastName: parsed.lastName, firstName: parsed.firstName, street, streetNumber: parsed.streetNumber },
+          });
+          if (cancelled) return;
+          setAutoResult(data);
+          if (data?.match && data.phone) {
+            foundPhone1 = data.phone;
+            setPhone1(data.phone);
+          }
+        } catch { /* silent */ }
       }
-    }
+
+      if (current.owner_name_2) {
+        const parsed2 = parseOwnerString(current.owner_name_2);
+        const street2 = parsed2.street || (current.owner_address_2?.match(/^(.+?)\s+(\d+\w*)/)?.[1] || '');
+        if (parsed2.lastName && street2) {
+          try {
+            const { data: data2 } = await supabase.functions.invoke('tel-search', {
+              body: { lastName: parsed2.lastName, firstName: parsed2.firstName, street: street2, streetNumber: parsed2.streetNumber },
+            });
+            if (cancelled) return;
+            if (data2?.match && data2.phone) {
+              foundPhone2 = data2.phone;
+              setPhone2(data2.phone);
+            }
+          } catch { /* silent */ }
+        }
+      }
+
+      // Auto-export to Pipedrive if at least one phone was found
+      if (!cancelled && foundPhone1 && current?.id) {
+        setAutoExporting(true);
+        try {
+          await updateProp.mutateAsync({
+            id: current.id,
+            owner_phone: foundPhone1,
+            ...(foundPhone2 && current.owner_name_2 ? { owner_phone_2: foundPhone2 } : {}),
+            status: 'Telefon gefunden',
+            phone_search_status: 'found',
+          } as any);
+
+          const { data: pushData } = await supabase.functions.invoke('pipedrive-push', {
+            body: { properties: [{ ...current, owner_phone: foundPhone1, ...(foundPhone2 ? { owner_phone_2: foundPhone2 } : {}) }] },
+          });
+
+          if (pushData?.summary?.created > 0) {
+            await updateProp.mutateAsync({ id: current.id, status: 'Exportiert', export_status: 'exported' } as any);
+            toast({ title: '🚀 Auto-Export → Pipedrive', description: `${foundPhone1} gefunden und Lead erstellt` });
+            setTimeout(() => moveToNext(), 1200);
+          } else {
+            toast({ title: '✅ Nummer gefunden', description: foundPhone1 });
+          }
+        } catch (err) {
+          toast({ title: 'Auto-Export fehlgeschlagen', description: String(err), variant: 'destructive' });
+        } finally {
+          setAutoExporting(false);
+        }
+      }
+    };
+
+    run();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.id]);
 
