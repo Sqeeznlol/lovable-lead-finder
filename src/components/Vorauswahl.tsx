@@ -26,8 +26,26 @@ type ViewMode = 'card' | 'table';
 export function Vorauswahl() {
   const [viewMode, setViewMode] = useState<ViewMode>('card');
   const [zoneFilter, setZoneFilter] = useState<string>('Alle');
-  const [baujahrBis, setBaujahrBis] = useState<string>('1980');
-  const [baujahrVon, setBaujahrVon] = useState<string>('');
+  const { selectedListId } = useListFilter();
+  const { data: lists } = useLists();
+  const isPrioList = !!(selectedListId && lists?.find(l => l.id === selectedListId && l.priority < 0));
+
+  // Persistent baujahr filter per list (localStorage). Default empty (= no filter) so 184k Master-Liste shows all.
+  const baujahrStorageKey = `vorauswahl.baujahrBis.${selectedListId || 'all'}`;
+  const baujahrVonStorageKey = `vorauswahl.baujahrVon.${selectedListId || 'all'}`;
+  const [baujahrBis, setBaujahrBis] = useState<string>(() => localStorage.getItem(baujahrStorageKey) ?? '');
+  const [baujahrVon, setBaujahrVon] = useState<string>(() => localStorage.getItem(baujahrVonStorageKey) ?? '');
+
+  // Re-sync when list changes
+  useEffect(() => {
+    setBaujahrBis(localStorage.getItem(baujahrStorageKey) ?? '');
+    setBaujahrVon(localStorage.getItem(baujahrVonStorageKey) ?? '');
+  }, [baujahrStorageKey, baujahrVonStorageKey]);
+
+  // Persist on change
+  useEffect(() => { localStorage.setItem(baujahrStorageKey, baujahrBis); }, [baujahrBis, baujahrStorageKey]);
+  useEffect(() => { localStorage.setItem(baujahrVonStorageKey, baujahrVon); }, [baujahrVon, baujahrVonStorageKey]);
+
   const [maxWhg, setMaxWhg] = useState<string>('');
   const [minWhg, setMinWhg] = useState<string>('');
   const [gemeindeFilter, setGemeindeFilter] = useState<string>('');
@@ -37,9 +55,6 @@ export function Vorauswahl() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const { data: zones } = useZones();
   const { data: gemeinden } = useGemeinden();
-  const { selectedListId } = useListFilter();
-  const { data: lists } = useLists();
-  const isPrioList = !!(selectedListId && lists?.find(l => l.id === selectedListId && l.priority < 0));
   const { data: queue, refetch } = useUnqueriedProperties(200, selectedListId, isPrioList);
   const { data: stats, refetch: refetchStats } = useVorauswahlStats();
   const updateProp = useUpdateProperty();
