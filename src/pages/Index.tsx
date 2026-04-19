@@ -41,6 +41,7 @@ export default function Index() {
   const cantonName = cantons.find(c => c.id === current)?.name ?? '';
   const platform = usePlatform();
   const [showInstallHint, setShowInstallHint] = useState(false);
+  useMidnightReset();
 
   useEffect(() => {
     if (platform.shouldPromptInstall && !sessionStorage.getItem('bauraum-install-hint-dismissed')) {
