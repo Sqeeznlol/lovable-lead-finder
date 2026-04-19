@@ -23,6 +23,7 @@ export function TelefonSuche() {
   const [filter, setFilter] = useState<'all' | 'person' | 'ag' | 'stadt'>('all');
   const [autoSearching, setAutoSearching] = useState(false);
   const [autoResult, setAutoResult] = useState<{ match: boolean; phone?: string; foundAddress?: string; searchUrl?: string } | null>(null);
+  const [autoExporting, setAutoExporting] = useState(false);
 
   const autoSearchOwner = async (ownerName: string, ownerAddress: string | null, setter: (v: string) => void) => {
     const parsed = parseOwnerString(ownerName);
