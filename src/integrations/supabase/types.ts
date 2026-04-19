@@ -396,6 +396,96 @@ export type Database = {
           },
         ]
       }
+      properties_staging: {
+        Row: {
+          address: string | null
+          area: number | null
+          baujahr: number | null
+          bezirk: string | null
+          bfs_nr: string | null
+          denkmalschutz: string | null
+          egrid: string | null
+          geb_status: string | null
+          gebaeudeart: string | null
+          gebaeudeflaeche: number | null
+          gemeinde: string | null
+          geschosse: number | null
+          google_maps_url: string | null
+          gvz_nr: string | null
+          gwr_egid: string | null
+          hausnummer: string | null
+          isos: string | null
+          kategorie: string | null
+          ortschaftsname: string | null
+          parzelle: string | null
+          plot_number: string | null
+          plz: string | null
+          plz_ort: string | null
+          strassenname: string | null
+          streetview_url: string | null
+          wohnungen: number | null
+          zone: string | null
+        }
+        Insert: {
+          address?: string | null
+          area?: number | null
+          baujahr?: number | null
+          bezirk?: string | null
+          bfs_nr?: string | null
+          denkmalschutz?: string | null
+          egrid?: string | null
+          geb_status?: string | null
+          gebaeudeart?: string | null
+          gebaeudeflaeche?: number | null
+          gemeinde?: string | null
+          geschosse?: number | null
+          google_maps_url?: string | null
+          gvz_nr?: string | null
+          gwr_egid?: string | null
+          hausnummer?: string | null
+          isos?: string | null
+          kategorie?: string | null
+          ortschaftsname?: string | null
+          parzelle?: string | null
+          plot_number?: string | null
+          plz?: string | null
+          plz_ort?: string | null
+          strassenname?: string | null
+          streetview_url?: string | null
+          wohnungen?: number | null
+          zone?: string | null
+        }
+        Update: {
+          address?: string | null
+          area?: number | null
+          baujahr?: number | null
+          bezirk?: string | null
+          bfs_nr?: string | null
+          denkmalschutz?: string | null
+          egrid?: string | null
+          geb_status?: string | null
+          gebaeudeart?: string | null
+          gebaeudeflaeche?: number | null
+          gemeinde?: string | null
+          geschosse?: number | null
+          google_maps_url?: string | null
+          gvz_nr?: string | null
+          gwr_egid?: string | null
+          hausnummer?: string | null
+          isos?: string | null
+          kategorie?: string | null
+          ortschaftsname?: string | null
+          parzelle?: string | null
+          plot_number?: string | null
+          plz?: string | null
+          plz_ort?: string | null
+          strassenname?: string | null
+          streetview_url?: string | null
+          wohnungen?: number | null
+          zone?: string | null
+        }
+        Relationships: []
+      }
       property_decisions: {
         Row: {
           ai_recommendation: string | null
