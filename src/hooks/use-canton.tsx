@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
 
-export type CantonId = 'ZH' | 'BE' | 'AG' | 'LU' | 'SG' | 'BS';
+export type CantonId = 'ZH' | 'ZG' | 'AG' | 'LU';
 
 export interface Canton {
   id: CantonId;
@@ -10,11 +10,9 @@ export interface Canton {
 
 export const CANTONS: Canton[] = [
   { id: 'ZH', name: 'Zürich', active: true },
-  { id: 'BE', name: 'Bern', active: false },
+  { id: 'ZG', name: 'Zug', active: false },
   { id: 'AG', name: 'Aargau', active: false },
   { id: 'LU', name: 'Luzern', active: false },
-  { id: 'SG', name: 'St. Gallen', active: false },
-  { id: 'BS', name: 'Basel-Stadt', active: false },
 ];
 
 interface CantonCtx {
