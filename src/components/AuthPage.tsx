@@ -36,7 +36,7 @@ export function AuthPage() {
         <CardContent className="p-8 space-y-6">
           <div className="text-center space-y-2">
             <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              Sqeeztraum
+              Bauraum
             </h1>
             <p className="text-sm text-muted-foreground">Immobilien-Akquise</p>
           </div>
