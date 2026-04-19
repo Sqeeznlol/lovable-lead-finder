@@ -136,6 +136,33 @@
 @layer utilities {
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+  /* Safe-area helpers (iPhone notch / home indicator) */
+  .pt-safe { padding-top: env(safe-area-inset-top); }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+  .pl-safe { padding-left: env(safe-area-inset-left); }
+  .pr-safe { padding-right: env(safe-area-inset-right); }
+  .min-h-safe-screen { min-height: 100svh; }
+  .h-safe-screen { height: 100svh; }
+}
+
+/* iOS Safari + standalone PWA tweaks */
+html, body {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+input, textarea, select {
+  font-size: 16px; /* prevent iOS zoom on focus */
+}
+.pwa-standalone body {
+  /* Disable text selection callouts in installed mode */
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+.pwa-standalone input,
+.pwa-standalone textarea {
+  user-select: text;
 }
 
 @layer base {
