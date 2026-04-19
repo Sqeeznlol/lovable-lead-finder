@@ -15,6 +15,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { CantonTabs } from '@/components/CantonTabs';
 import { useCanton } from '@/hooks/use-canton';
 import { usePlatform } from '@/hooks/use-platform';
+import { useMidnightReset } from '@/hooks/use-phones';
 
 type Tab = 'dashboard' | 'vorauswahl' | 'akquise' | 'telsuche' | 'properties' | 'import' | 'phones' | 'export' | 'admin';
 
@@ -40,6 +41,7 @@ export default function Index() {
   const cantonName = cantons.find(c => c.id === current)?.name ?? '';
   const platform = usePlatform();
   const [showInstallHint, setShowInstallHint] = useState(false);
+  useMidnightReset();
 
   useEffect(() => {
     if (platform.shouldPromptInstall && !sessionStorage.getItem('bauraum-install-hint-dismissed')) {
