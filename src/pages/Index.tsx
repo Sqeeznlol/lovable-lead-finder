@@ -15,6 +15,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { CantonTabs } from '@/components/CantonTabs';
 import { useCanton } from '@/hooks/use-canton';
 import { usePlatform } from '@/hooks/use-platform';
+import { useMidnightReset } from '@/hooks/use-phones';
 
 type Tab = 'dashboard' | 'vorauswahl' | 'akquise' | 'telsuche' | 'properties' | 'import' | 'phones' | 'export' | 'admin';
 
