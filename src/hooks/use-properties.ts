@@ -39,10 +39,11 @@ function applyPropertyFilters(query: any, options: UsePropertiesOptions) {
     listId,
   } = options;
 
-  let nextQuery = query
-    .or('baujahr.lte.1980,baujahr.is.null')
-    .like('zone', 'W%')
-    .eq('geb_status', 'Bestehend');
+  let nextQuery = query.eq('geb_status', 'Bestehend');
+
+  if (zoneFilter && zoneFilter !== 'Alle') {
+    nextQuery = nextQuery.like('zone', 'W%');
+  }
 
   if (statusFilter && statusFilter !== 'Alle') {
     nextQuery = nextQuery.eq('status', statusFilter);
@@ -138,8 +139,7 @@ export function useZones() {
       const { data, error } = await supabase
         .from('properties')
         .select('zone')
-        .not('zone', 'is', null)
-        .like('zone', 'W%');
+        .not('zone', 'is', null);
       if (error) throw error;
       const unique = [...new Set(data.map(d => d.zone).filter(Boolean))].sort() as string[];
       return unique;
@@ -160,11 +160,9 @@ export function useUnqueriedProperties(limit: number, listId?: string | null, is
         .order('gebaeudeflaeche', { ascending: false, nullsFirst: false })
         .order('area', { ascending: false, nullsFirst: false })
         .limit(limit);
-      // For PRIO lists, skip zone/baujahr/geb_status filters
+      // For PRIO lists, skip status/baujahr filters entirely
       if (!isPrioList) {
-        query = query.like('zone', 'W%')
-          .or('baujahr.lte.1980,baujahr.is.null')
-          .eq('geb_status', 'Bestehend');
+        query = query.eq('geb_status', 'Bestehend');
       }
       if (listId) query = query.eq('list_id', listId);
       const { data, error } = await query;
@@ -244,8 +242,6 @@ export function usePropertyStats() {
         const { data, error } = await supabase
           .from('properties')
           .select('status, is_queried, owner_name, gemeinde')
-          .or('baujahr.lte.1980,baujahr.is.null')
-          .like('zone', 'W%')
           .eq('geb_status', 'Bestehend')
           .range(from, from + batchSize - 1);
         if (error) throw error;
