@@ -39,10 +39,11 @@ function applyPropertyFilters(query: any, options: UsePropertiesOptions) {
     listId,
   } = options;
 
-  let nextQuery = query
-    .or('baujahr.lte.1980,baujahr.is.null')
-    .like('zone', 'W%')
-    .eq('geb_status', 'Bestehend');
+  let nextQuery = query.eq('geb_status', 'Bestehend');
+
+  if (zoneFilter && zoneFilter !== 'Alle') {
+    nextQuery = nextQuery.like('zone', 'W%');
+  }
 
   if (statusFilter && statusFilter !== 'Alle') {
     nextQuery = nextQuery.eq('status', statusFilter);
