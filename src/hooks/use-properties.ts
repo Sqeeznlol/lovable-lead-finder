@@ -139,8 +139,7 @@ export function useZones() {
       const { data, error } = await supabase
         .from('properties')
         .select('zone')
-        .not('zone', 'is', null)
-        .like('zone', 'W%');
+        .not('zone', 'is', null);
       if (error) throw error;
       const unique = [...new Set(data.map(d => d.zone).filter(Boolean))].sort() as string[];
       return unique;
