@@ -31,26 +31,26 @@ export default function Index() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <div className="flex min-h-screen">
-      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-card border-r transform transition-transform lg:translate-x-0 lg:static ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="p-6 border-b">
-          <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+    <div className="flex min-h-screen bg-background">
+      <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-sidebar/95 backdrop-blur-xl border-r border-foreground/5 transform transition-transform lg:translate-x-0 lg:static ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="p-7 border-b border-foreground/5">
+          <h1 className="font-serif text-3xl italic tracking-tight text-foreground">
             Sqeeztraum
           </h1>
-          <p className="text-xs text-muted-foreground mt-1">Immobilien-Akquise CRM</p>
-          <div className="mt-3">
+          <p className="text-xs text-muted-foreground mt-2 tracking-wide">Immobilien-Akquise · Zürich</p>
+          <div className="mt-5">
             <ListSelector />
           </div>
         </div>
-        <nav className="p-3 space-y-1 flex-1">
+        <nav className="p-4 space-y-1 flex-1">
           {tabs.map(t => (
             <button
               key={t.id}
               onClick={() => { setActive(t.id); setMobileOpen(false); }}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-full text-sm font-medium transition-all duration-300
                 ${active === t.id
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  ? 'bg-card text-foreground shadow-ceramic ring-1 ring-foreground/5'
+                  : 'text-muted-foreground hover:bg-card/60 hover:text-foreground'
                 }`}
             >
               <t.icon className="h-4 w-4" />
@@ -60,16 +60,16 @@ export default function Index() {
         </nav>
       </aside>
 
-      {mobileOpen && <div className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm lg:hidden" onClick={() => setMobileOpen(false)} />}
+      {mobileOpen && <div className="fixed inset-0 z-40 bg-foreground/30 backdrop-blur-sm lg:hidden" onClick={() => setMobileOpen(false)} />}
 
       <main className="flex-1 min-w-0">
-        <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-sm border-b px-6 py-3 flex items-center gap-4 lg:hidden">
+        <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl border-b border-foreground/5 px-6 py-3 flex items-center gap-4 lg:hidden">
           <Button size="icon" variant="ghost" onClick={() => setMobileOpen(!mobileOpen)}>
             {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
-          <h1 className="font-bold text-lg bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Sqeeztraum</h1>
+          <h1 className="font-serif italic text-2xl tracking-tight text-foreground">Sqeeztraum</h1>
         </header>
-        <div className="p-6 lg:p-10 max-w-7xl">
+        <div className="p-6 lg:p-12 max-w-7xl animate-fade-in">
           {active === 'dashboard' && <Dashboard />}
           {active === 'vorauswahl' && <Vorauswahl />}
           {active === 'akquise' && <AkquiseMode />}
