@@ -10,9 +10,12 @@ import { useProperties, useUpdateProperty } from '@/hooks/use-properties';
 import { useToast } from '@/hooks/use-toast';
 import { classifyOwner, ownerTypeLabel, ownerTypeColor, parseOwnerString, telSearchUrlParsed, opendiUrlParsed } from '@/lib/owner-utils';
 import { supabase } from '@/integrations/supabase/client';
+import { useListFilter } from '@/hooks/use-lists';
+import { ListSelector } from '@/components/ListSelector';
 
 export function TelefonSuche() {
-  const { data: result, refetch } = useProperties({ statusFilter: 'Eigentümer ermittelt', pageSize: 200 });
+  const selectedListId = useListFilter(s => s.selectedListId);
+  const { data: result, refetch } = useProperties({ statusFilter: 'Eigentümer ermittelt', pageSize: 200, listId: selectedListId });
   const updateProp = useUpdateProperty();
   const { toast } = useToast();
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -257,12 +260,15 @@ export function TelefonSuche() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Telefonnummern-Suche</h2>
           <p className="text-muted-foreground text-sm">{allItems.length} Eigentümer ohne Telefonnummer</p>
         </div>
-        <Badge variant="outline">{currentIndex + 1} / {items.length}</Badge>
+        <div className="flex items-center gap-2">
+          <ListSelector />
+          <Badge variant="outline">{currentIndex + 1} / {items.length}</Badge>
+        </div>
       </div>
 
       {/* Filter chips */}
