@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Phone, Check, ArrowRight, SkipForward, ExternalLink, AlertTriangle, Building2, Landmark, EyeOff, Zap, Loader2, CheckCircle, Undo2, FileText } from 'lucide-react';
+import { Search, Phone, Check, ArrowRight, SkipForward, ExternalLink, AlertTriangle, Building2, Landmark, EyeOff, Zap, Loader2, CheckCircle, Undo2, FileText, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
