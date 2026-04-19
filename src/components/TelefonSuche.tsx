@@ -306,6 +306,14 @@ export function TelefonSuche() {
               {current.egrid && <Badge variant="outline" className="text-xs">{current.egrid}</Badge>}
             </div>
 
+            {/* Auto-Export indicator */}
+            {autoExporting && (
+              <div className="mt-3 rounded-lg bg-primary/10 border border-primary/30 p-3 flex items-center gap-2">
+                <Loader2 className="h-4 w-4 text-primary animate-spin" />
+                <p className="text-sm font-medium text-primary">Auto-Push zu Pipedrive läuft...</p>
+              </div>
+            )}
+
             {/* Low chance warning */}
             {isLowChance && (
               <div className="mt-3 rounded-lg bg-destructive/10 border border-destructive/20 p-3 flex items-start gap-2">
