@@ -1,0 +1,19 @@
+{
+  "name": "Bauraum — Immobilien-Akquise",
+  "short_name": "Bauraum",
+  "description": "Off-Market Immobilien-Akquise CRM für die Schweiz",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#EFECE7",
+  "theme_color": "#EFECE7",
+  "lang": "de-CH",
+  "icons": [
+    {
+      "src": "/placeholder.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
