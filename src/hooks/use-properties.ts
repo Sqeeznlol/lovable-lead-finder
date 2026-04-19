@@ -161,11 +161,9 @@ export function useUnqueriedProperties(limit: number, listId?: string | null, is
         .order('gebaeudeflaeche', { ascending: false, nullsFirst: false })
         .order('area', { ascending: false, nullsFirst: false })
         .limit(limit);
-      // For PRIO lists, skip zone/baujahr/geb_status filters
+      // For PRIO lists, skip status/baujahr filters entirely
       if (!isPrioList) {
-        query = query.like('zone', 'W%')
-          .or('baujahr.lte.1980,baujahr.is.null')
-          .eq('geb_status', 'Bestehend');
+        query = query.eq('geb_status', 'Bestehend');
       }
       if (listId) query = query.eq('list_id', listId);
       const { data, error } = await query;
