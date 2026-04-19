@@ -467,6 +467,27 @@ export function TelefonSuche() {
                 <AlertTriangle className="h-4 w-4 mr-2" /> Geringe Chance
               </Button>
             )}
+            <Button variant="outline" disabled={processing} className="text-blue-600 border-blue-300"
+              onClick={async () => {
+                if (!current) return;
+                setProcessing(true);
+                try {
+                  const mergedNotes = notes.trim()
+                    ? (current.notes ? current.notes + '\n---\n' + notes.trim() : notes.trim())
+                    : current.notes;
+                  await updateProp.mutateAsync({
+                    id: current.id,
+                    status: 'Post',
+                    phone_search_status: 'post',
+                    notes: mergedNotes,
+                  } as any);
+                  toast({ title: '📮 In Post verschoben' });
+                  moveToNext();
+                } catch { toast({ title: 'Fehler', variant: 'destructive' }); }
+                finally { setProcessing(false); }
+              }}>
+              <Mail className="h-4 w-4 mr-2" /> In Post
+            </Button>
             <Button variant="outline" onClick={moveToNext} disabled={processing}>
               <SkipForward className="h-4 w-4 mr-2" /> Überspringen
             </Button>
