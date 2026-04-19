@@ -46,16 +46,20 @@ export function usePhoneNumbers() {
  */
 export function useMidnightReset() {
   const qc = useQueryClient();
-  if (typeof window !== 'undefined') {
-    const now = new Date();
-    const next = new Date(now);
-    next.setHours(24, 0, 5, 0); // 00:00:05 next day
-    const ms = next.getTime() - now.getTime();
-    setTimeout(() => {
-      qc.invalidateQueries({ queryKey: ['phone_numbers'] });
-    }, ms);
-  }
-  return null;
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const schedule = () => {
+      const now = new Date();
+      const next = new Date(now);
+      next.setHours(24, 0, 5, 0); // 00:00:05 next day
+      timer = setTimeout(() => {
+        qc.invalidateQueries({ queryKey: ['phone_numbers'] });
+        schedule(); // re-arm for the following midnight
+      }, next.getTime() - now.getTime());
+    };
+    schedule();
+    return () => clearTimeout(timer);
+  }, [qc]);
 }
 
 export function useAddPhone() {
