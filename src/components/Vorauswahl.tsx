@@ -81,7 +81,15 @@ export function Vorauswahl() {
     .filter(p => !minWhgNum || (p.wohnungen && Number(p.wohnungen) >= minWhgNum))
     .filter(p => !gemeindeFilter || (p.gemeinde && p.gemeinde.toLowerCase().includes(gemeindeFilter.toLowerCase())))
     .filter(p => !bezirkFilter || (p.bezirk && p.bezirk.toLowerCase().includes(bezirkFilter.toLowerCase())))
-    .filter(p => !kategorieFilter || kategorieFilter === 'Alle' || p.kategorie === kategorieFilter)
+    .filter(p => {
+      if (!kategorieFilter || kategorieFilter === 'Alle') return true;
+      const k = (p.kategorie || '').toLowerCase();
+      const g = (p.gebaeudeart || '').toLowerCase();
+      if (kategorieFilter === 'EFH') return k.includes('einfamilien') || k === 'efh';
+      if (kategorieFilter === 'MFH') return k.includes('mehrfamilien') || k.includes('wohngebäude mit') || k === 'mfh';
+      if (kategorieFilter === 'Gewerbe') return k.includes('gewerbe') || k.includes('ohne wohn') || g.includes('gewerbe');
+      return k === kategorieFilter.toLowerCase();
+    })
     .map(p => ({ ...p, _score: calculateDealScore(p) }))
     .sort((a, b) => b._score - a._score),
     [queue, effectiveZoneFilter, baujahrMax, baujahrMin, maxWhgNum, minWhgNum, gemeindeFilter, bezirkFilter, kategorieFilter]
