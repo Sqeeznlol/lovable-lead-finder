@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useProperties, useUpdateProperty } from '@/hooks/use-properties';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useListFilter } from '@/hooks/use-lists';
+import { ListSelector } from '@/components/ListSelector';
 
 const EXPORT_STATUSES = ['Telefon gefunden', 'Eigentümer ermittelt', 'Kontaktiert', 'Interesse', 'Interessant'];
 
@@ -15,9 +17,11 @@ export function PipedriveExport() {
   const [exportStatus, setExportStatus] = useState('Telefon gefunden');
   const [showArchive, setShowArchive] = useState(false);
   const [archiveFilter, setArchiveFilter] = useState<'with-phone' | 'without-phone'>('with-phone');
+  const selectedListId = useListFilter(s => s.selectedListId);
   const { data: result, isLoading, refetch } = useProperties({
     statusFilter: showArchive ? 'Exportiert' : exportStatus,
     pageSize: 1000,
+    listId: selectedListId,
   });
   const updateProp = useUpdateProperty();
   const { toast } = useToast();
@@ -173,17 +177,20 @@ export function PipedriveExport() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Pipedrive Export</h2>
           <p className="text-muted-foreground text-sm mt-1">
             {showArchive ? 'Bereits exportierte Deals – bei Bedarf wiederherstellen' : 'Direkt zu Pipedrive pushen mit Custom Fields & Duplikat-Check'}
           </p>
         </div>
-        <Button variant={showArchive ? 'default' : 'outline'} size="sm" className="gap-1.5" onClick={() => { setShowArchive(!showArchive); setPushResult(null); }}>
-          {showArchive ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
-          {showArchive ? 'Zurück' : 'Archiv'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <ListSelector />
+          <Button variant={showArchive ? 'default' : 'outline'} size="sm" className="gap-1.5" onClick={() => { setShowArchive(!showArchive); setPushResult(null); }}>
+            {showArchive ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
+            {showArchive ? 'Zurück' : 'Archiv'}
+          </Button>
+        </div>
       </div>
 
       <Card className="border-none shadow-lg">
