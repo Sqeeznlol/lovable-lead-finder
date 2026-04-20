@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { usePreselectedProperties, useUpdateProperty, useZones } from '@/hooks/use-properties';
-import { useListFilter } from '@/hooks/use-lists';
+import { useListFilter, useLists } from '@/hooks/use-lists';
 import { ListSelector } from '@/components/ListSelector';
 import { usePhoneNumbers, useIncrementPhoneQuery } from '@/hooks/use-phones';
 import { useToast } from '@/hooks/use-toast';
@@ -38,6 +38,7 @@ export function AkquiseMode() {
   const [baujahrBis, setBaujahrBis] = useState<string>('1980');
   const { data: zones } = useZones();
   const { selectedListId } = useListFilter();
+  const { data: lists } = useLists();
 
   const { data: queue, refetch } = usePreselectedProperties(100, selectedListId);
   const updateProp = useUpdateProperty();
@@ -483,6 +484,22 @@ export function AkquiseMode() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-3 flex-wrap">
                   <Badge variant="outline" className="text-xs">#{currentIndex + 1} / {items.length}</Badge>
+                  {(() => {
+                    const list = lists?.find(l => l.id === current.list_id);
+                    if (!list) return null;
+                    return (
+                      <Badge
+                        className="text-xs font-semibold border"
+                        style={{
+                          backgroundColor: list.color ? `${list.color}20` : undefined,
+                          color: list.color || undefined,
+                          borderColor: list.color ? `${list.color}40` : undefined,
+                        }}
+                      >
+                        📋 {list.name}
+                      </Badge>
+                    );
+                  })()}
                   {current.zone && <Badge className="bg-primary/10 text-primary border-primary/20">{current.zone}</Badge>}
                   {current.gwr_egid && <Badge variant="outline" className="text-xs font-mono">EGID: {current.gwr_egid}</Badge>}
                   {current.bfs_nr && <Badge variant="outline" className="text-xs font-mono">BFS: {current.bfs_nr}</Badge>}
