@@ -178,22 +178,23 @@ export function CsvImport() {
         }
       }
 
-      // 5. Update existing properties → assign to this list (batched)
+      // 5. Update existing properties → assign to this list AND set to "Vorausgewählt" so they show in Akquise immediately
       let matchedCount = 0;
       for (let i = 0; i < matchedIds.length; i += batchSize) {
         const batch = matchedIds.slice(i, i + batchSize);
         const { error } = await supabase
           .from('properties')
-          .update({ list_id: listId })
+          .update({ list_id: listId, status: 'Vorausgewählt', is_queried: false })
           .in('id', batch);
         if (error) throw error;
         matchedCount += batch.length;
       }
 
-      // 6. Insert new properties (batched)
+      // 6. Insert new properties (batched) — directly as "Vorausgewählt"
       let createdCount = 0;
-      for (let i = 0; i < toInsert.length; i += 100) {
-        const batch = toInsert.slice(i, i + 100);
+      const toInsertPreselected = toInsert.map(r => ({ ...r, status: 'Vorausgewählt' }));
+      for (let i = 0; i < toInsertPreselected.length; i += 100) {
+        const batch = toInsertPreselected.slice(i, i + 100);
         const { error } = await supabase.from('properties').insert(batch as never);
         if (error) {
           // Likely EGRID conflict — try one-by-one to skip dupes
