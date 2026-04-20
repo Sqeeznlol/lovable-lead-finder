@@ -446,7 +446,6 @@ Deno.serve(async (req) => {
 
         // Owner custom fields (1-5), rest goes into notes
         const ownerFields = [FIELD_OWNER_1, FIELD_OWNER_2, FIELD_OWNER_3, FIELD_OWNER_4, FIELD_OWNER_5];
-        const owners = Array.isArray(prop.owners_json) ? prop.owners_json : [];
         // Build display strings for each owner
         const ownerDisplays: string[] = [];
         if (prop.owner_name) ownerDisplays.push(prop.owner_name);
