@@ -24,8 +24,6 @@ const FIELD_OWNER_4 = '00586e2f3149ab8f3d6cebb55b7ec626630cb9d0';
 const FIELD_OWNER_5 = '0c4c530966d09ae4874184dc0c4eef6f4532ff90';
 const FIELD_GOOGLE_PIPE = '8318ae128ecd86600b20dc02b3a72537f4c9fd8a';
 const FIELD_PARZELLE = '101c2348b81c4a6ea14b716fb3ce029becce0acd';
-const FIELD_WOHNUNGEN = '852785d9aff2e015382b7406bb6fc70c4fc783b0';
-const FIELD_KATEGORIE = '852785d9aff2e015382b7406bb6fc70c4fc783b0';
 const FIELD_DENKMALSCHUTZ = '61c1072a5b0e13a65eda73367f3575e559d5d3c9';
 const FIELD_ISOS = 'a08848e0744572436ab47ed520e8b1b980e6a19f';
 
@@ -435,8 +433,6 @@ Deno.serve(async (req) => {
 
         // Parzelle, Wohnungen, Kategorie
         if (prop.parzelle) leadData[FIELD_PARZELLE] = prop.parzelle;
-        if (prop.wohnungen) leadData[FIELD_WOHNUNGEN] = prop.wohnungen;
-        if (prop.kategorie) leadData[FIELD_KATEGORIE] = prop.kategorie;
         if (prop.denkmalschutz) leadData[FIELD_DENKMALSCHUTZ] = prop.denkmalschutz;
         if (prop.isos) leadData[FIELD_ISOS] = prop.isos;
 
