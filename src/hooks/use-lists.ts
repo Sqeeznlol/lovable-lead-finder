@@ -60,3 +60,61 @@ export function useListCounts() {
     staleTime: 30 * 1000,
   });
 }
+
+export interface ListStatusBreakdown {
+  total: number;
+  byStatus: Record<string, number>;
+  // Workflow buckets
+  offen: number;          // Neu, Vorausgewählt
+  inBearbeitung: number;  // Eigentümer ermittelt, Telefon gefunden, Post, Kontaktiert, Interesse, Interessant
+  exportiert: number;     // Exportiert
+  ausgeschlossen: number; // Nicht interessant, Ausgeblendet, Geringe Chance
+}
+
+export function useListStatusBreakdown(listId: string | null) {
+  return useQuery({
+    queryKey: ['property_lists', 'status-breakdown', listId],
+    queryFn: async (): Promise<ListStatusBreakdown> => {
+      let query = supabase.from('properties').select('status');
+      if (listId) {
+        query = query.eq('list_id', listId);
+      } else {
+        query = query.is('list_id', null);
+      }
+      // Pull up to 100k for accurate counts on big lists
+      const { data, error } = await query.limit(100000);
+      if (error) throw error;
+
+      const byStatus: Record<string, number> = {};
+      let offen = 0, inBearbeitung = 0, exportiert = 0, ausgeschlossen = 0;
+
+      const OFFEN = new Set(['Neu', 'Vorausgewählt']);
+      const PROGRESS = new Set([
+        'Eigentümer ermittelt', 'Telefon gefunden', 'Post',
+        'Kontaktiert', 'Interesse', 'Interessant',
+      ]);
+      const EXPORTED = new Set(['Exportiert']);
+      const EXCLUDED = new Set(['Nicht interessant', 'Ausgeblendet', 'Geringe Chance']);
+
+      for (const p of data || []) {
+        const s = p.status || 'Neu';
+        byStatus[s] = (byStatus[s] || 0) + 1;
+        if (OFFEN.has(s)) offen++;
+        else if (PROGRESS.has(s)) inBearbeitung++;
+        else if (EXPORTED.has(s)) exportiert++;
+        else if (EXCLUDED.has(s)) ausgeschlossen++;
+      }
+
+      return {
+        total: (data || []).length,
+        byStatus,
+        offen,
+        inBearbeitung,
+        exportiert,
+        ausgeschlossen,
+      };
+    },
+    staleTime: 15 * 1000,
+    refetchInterval: 30 * 1000,
+  });
+}
