@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useListFilter } from '@/hooks/use-lists';
 import { ListSelector } from '@/components/ListSelector';
+import { ListProgressOverview } from '@/components/ListProgressOverview';
 
 const EXPORT_STATUSES = ['Telefon gefunden', 'Post', 'Eigentümer ermittelt', 'Kontaktiert', 'Interesse', 'Interessant'];
 
@@ -195,6 +196,8 @@ export function PipedriveExport() {
 
       <Card className="border-none shadow-lg">
         <CardContent className="p-6 space-y-6">
+          <ListProgressOverview listId={selectedListId} />
+
           {!showArchive && (
             <div className="flex items-center gap-4">
               <div className="space-y-1 flex-1">
