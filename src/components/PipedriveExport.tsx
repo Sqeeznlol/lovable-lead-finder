@@ -11,7 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useListFilter } from '@/hooks/use-lists';
 import { ListSelector } from '@/components/ListSelector';
 
-const EXPORT_STATUSES = ['Telefon gefunden', 'Eigentümer ermittelt', 'Kontaktiert', 'Interesse', 'Interessant'];
+const EXPORT_STATUSES = ['Telefon gefunden', 'Post', 'Eigentümer ermittelt', 'Kontaktiert', 'Interesse', 'Interessant'];
 
 export function PipedriveExport() {
   const [exportStatus, setExportStatus] = useState('Telefon gefunden');
