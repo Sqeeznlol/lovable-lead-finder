@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Loader2, ExternalLink, MapPin, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ views';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useMasterProperties, useGemeindeStats, type MasterFilters } from '@/hooks/use-master';
 import { MasterFiltersBar } from './MasterFilters';
