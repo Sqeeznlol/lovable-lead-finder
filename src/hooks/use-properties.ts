@@ -236,30 +236,30 @@ export function usePropertyStats() {
   return useQuery({
     queryKey: ['properties', 'stats'],
     queryFn: async () => {
-      let allData: { status: string; is_queried: boolean; owner_name: string | null; gemeinde: string | null }[] = [];
-      let from = 0;
-      const batchSize = 1000;
-      while (true) {
-        const { data, error } = await supabase
+      const [{ count: total, error: totalError }, { count: withOwner, error: ownerError }] = await Promise.all([
+        supabase
           .from('properties')
-          .select('status, is_queried, owner_name, gemeinde')
+          .select('*', { count: 'exact', head: true })
+          .eq('geb_status', 'Bestehend'),
+        supabase
+          .from('properties')
+          .select('*', { count: 'exact', head: true })
           .eq('geb_status', 'Bestehend')
-          .range(from, from + batchSize - 1);
-        if (error) throw error;
-        allData = allData.concat(data);
-        if (data.length < batchSize) break;
-        from += batchSize;
-      }
-      const total = allData.length;
-      const queried = allData.filter(p => p.is_queried).length;
-      const withOwner = allData.filter(p => p.owner_name).length;
-      const statuses: Record<string, number> = {};
-      const gemeinden: Record<string, number> = {};
-      allData.forEach(p => {
-        statuses[p.status] = (statuses[p.status] || 0) + 1;
-        if (p.gemeinde) gemeinden[p.gemeinde] = (gemeinden[p.gemeinde] || 0) + 1;
-      });
-      return { total, queried, withOwner, pending: total - queried, statuses, gemeinden };
+          .not('owner_name', 'is', null),
+      ]);
+
+      if (totalError) throw totalError;
+      if (ownerError) throw ownerError;
+
+      return {
+        total: total || 0,
+        queried: 0,
+        withOwner: withOwner || 0,
+        pending: 0,
+        statuses: {},
+        gemeinden: {},
+      };
     },
+    staleTime: 30 * 1000,
   });
 }

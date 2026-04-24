@@ -41,21 +41,32 @@ export function useListCounts() {
   return useQuery({
     queryKey: ['property_lists', 'counts'],
     queryFn: async () => {
-      // Get actual counts per list
-      const { data, error } = await supabase
-        .from('properties')
-        .select('list_id');
-      if (error) throw error;
+      const [{ data: lists, error: listsError }, { count: noListCount, error: noListError }] = await Promise.all([
+        supabase
+          .from('property_lists')
+          .select('id, property_count'),
+        supabase
+          .from('properties')
+          .select('*', { count: 'exact', head: true })
+          .is('list_id', null),
+      ]);
+
+      if (listsError) throw listsError;
+      if (noListError) throw noListError;
+
       const counts: Record<string, number> = {};
-      let noList = 0;
-      data.forEach(p => {
-        if (p.list_id) {
-          counts[p.list_id] = (counts[p.list_id] || 0) + 1;
-        } else {
-          noList++;
-        }
+      let total = 0;
+
+      (lists || []).forEach(list => {
+        const propertyCount = list.property_count || 0;
+        counts[list.id] = propertyCount;
+        total += propertyCount;
       });
-      return { counts, noList, total: data.length };
+
+      const noList = noListCount || 0;
+      total += noList;
+
+      return { counts, noList, total };
     },
     staleTime: 30 * 1000,
   });
