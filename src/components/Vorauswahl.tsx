@@ -107,7 +107,7 @@ export function Vorauswahl() {
   const score = current?._score ?? 0;
   const hasFilters = effectiveZoneFilter !== 'Alle' || baujahrVon || effectiveBaujahrBis || maxWhg || minWhg || gemeindeFilter || bezirkFilter || (kategorieFilter && kategorieFilter !== 'Alle');
 
-  useEffect(() => { setCurrentIndex(0); }, [zoneFilter, baujahrBis, baujahrVon, maxWhg, minWhg, gemeindeFilter, bezirkFilter, kategorieFilter]);
+  useEffect(() => { setCurrentIndex(0); }, [zoneFilter, baujahrBis, baujahrVon, maxWhg, minWhg, gemeindeFilter, bezirkFilter, kategorieFilter, selectedGemeinde]);
 
   useEffect(() => {
     if (isPrioList && zoneFilter !== 'Alle') {
