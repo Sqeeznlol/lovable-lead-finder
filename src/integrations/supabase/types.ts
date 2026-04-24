@@ -48,33 +48,42 @@ export type Database = {
         Row: {
           created_at: string
           error_text: string | null
+          export_name: string | null
+          filters: Json | null
           id: string
           notes_content: string | null
           pipedrive_deal_id: string | null
           pipedrive_lead_id: string | null
           property_id: string
+          row_count: number | null
           status: string
           user_id: string | null
         }
         Insert: {
           created_at?: string
           error_text?: string | null
+          export_name?: string | null
+          filters?: Json | null
           id?: string
           notes_content?: string | null
           pipedrive_deal_id?: string | null
           pipedrive_lead_id?: string | null
           property_id: string
+          row_count?: number | null
           status?: string
           user_id?: string | null
         }
         Update: {
           created_at?: string
           error_text?: string | null
+          export_name?: string | null
+          filters?: Json | null
           id?: string
           notes_content?: string | null
           pipedrive_deal_id?: string | null
           pipedrive_lead_id?: string | null
           property_id?: string
+          row_count?: number | null
           status?: string
           user_id?: string | null
         }
@@ -84,6 +93,62 @@ export type Database = {
             columns: ["property_id"]
             isOneToOne: false
             referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_logs: {
+        Row: {
+          created_at: string
+          details: Json | null
+          file_name: string
+          id: string
+          list_id: string | null
+          list_name: string | null
+          new_gemeinden: number
+          rows_duplicates: number
+          rows_inserted: number
+          rows_invalid: number
+          rows_total: number
+          rows_updated: number
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          details?: Json | null
+          file_name: string
+          id?: string
+          list_id?: string | null
+          list_name?: string | null
+          new_gemeinden?: number
+          rows_duplicates?: number
+          rows_inserted?: number
+          rows_invalid?: number
+          rows_total?: number
+          rows_updated?: number
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          details?: Json | null
+          file_name?: string
+          id?: string
+          list_id?: string | null
+          list_name?: string | null
+          new_gemeinden?: number
+          rows_duplicates?: number
+          rows_inserted?: number
+          rows_invalid?: number
+          rows_total?: number
+          rows_updated?: number
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_logs_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: false
+            referencedRelation: "property_lists"
             referencedColumns: ["id"]
           },
         ]
@@ -206,35 +271,50 @@ export type Database = {
           ai_score: number | null
           ai_summary: string | null
           area: number | null
+          assigned_to: string | null
+          ausnuetzung: number | null
           baujahr: number | null
           bezirk: string | null
+          bezirksort: string | null
           bfs_nr: string | null
+          contact_attempts: number
           created_at: string
           decided_at: string | null
           decided_by: string | null
           decision_source: string | null
           denkmalschutz: string | null
+          denkmalschutz_titel: string | null
           duplicate_flag: boolean | null
           duplicate_group_id: string | null
           egrid: string | null
           export_status: string
+          follow_up_at: string | null
           geb_status: string | null
           gebaeudeart: string | null
           gebaeudeflaeche: number | null
           gemeinde: string | null
           geschosse: number | null
+          gis_url: string | null
           google_maps_url: string | null
           gvz_nr: string | null
           gwr_egid: string | null
           hausnummer: string | null
+          hnf_schaetzung: number | null
+          housing_stat_url: string | null
           id: string
+          imported_at: string
           is_queried: boolean
           isos: string | null
+          isos_titel: string | null
+          kanton: string | null
           kategorie: string | null
+          last_contact_at: string | null
           last_export_at: string | null
           last_phone_search_at: string | null
           list_id: string | null
           notes: string | null
+          nutzflaeche: number | null
+          objektadresse: string | null
           ortschaftsname: string | null
           owner_address: string | null
           owner_address_2: string | null
@@ -249,14 +329,20 @@ export type Database = {
           plot_number: string | null
           plz: string | null
           plz_ort: string | null
+          preselection_decided_at: string | null
+          preselection_note: string | null
+          preselection_status: string
           processing_error: string | null
           queried_at: string | null
           queried_by_phone: string | null
+          renovationsjahr: number | null
           review_status: string
+          source_file: string | null
           status: string
           strassenname: string | null
           streetview_url: string | null
           updated_at: string
+          wohnflaeche: number | null
           wohnungen: number | null
           zone: string | null
         }
@@ -269,35 +355,50 @@ export type Database = {
           ai_score?: number | null
           ai_summary?: string | null
           area?: number | null
+          assigned_to?: string | null
+          ausnuetzung?: number | null
           baujahr?: number | null
           bezirk?: string | null
+          bezirksort?: string | null
           bfs_nr?: string | null
+          contact_attempts?: number
           created_at?: string
           decided_at?: string | null
           decided_by?: string | null
           decision_source?: string | null
           denkmalschutz?: string | null
+          denkmalschutz_titel?: string | null
           duplicate_flag?: boolean | null
           duplicate_group_id?: string | null
           egrid?: string | null
           export_status?: string
+          follow_up_at?: string | null
           geb_status?: string | null
           gebaeudeart?: string | null
           gebaeudeflaeche?: number | null
           gemeinde?: string | null
           geschosse?: number | null
+          gis_url?: string | null
           google_maps_url?: string | null
           gvz_nr?: string | null
           gwr_egid?: string | null
           hausnummer?: string | null
+          hnf_schaetzung?: number | null
+          housing_stat_url?: string | null
           id?: string
+          imported_at?: string
           is_queried?: boolean
           isos?: string | null
+          isos_titel?: string | null
+          kanton?: string | null
           kategorie?: string | null
+          last_contact_at?: string | null
           last_export_at?: string | null
           last_phone_search_at?: string | null
           list_id?: string | null
           notes?: string | null
+          nutzflaeche?: number | null
+          objektadresse?: string | null
           ortschaftsname?: string | null
           owner_address?: string | null
           owner_address_2?: string | null
@@ -312,14 +413,20 @@ export type Database = {
           plot_number?: string | null
           plz?: string | null
           plz_ort?: string | null
+          preselection_decided_at?: string | null
+          preselection_note?: string | null
+          preselection_status?: string
           processing_error?: string | null
           queried_at?: string | null
           queried_by_phone?: string | null
+          renovationsjahr?: number | null
           review_status?: string
+          source_file?: string | null
           status?: string
           strassenname?: string | null
           streetview_url?: string | null
           updated_at?: string
+          wohnflaeche?: number | null
           wohnungen?: number | null
           zone?: string | null
         }
@@ -332,35 +439,50 @@ export type Database = {
           ai_score?: number | null
           ai_summary?: string | null
           area?: number | null
+          assigned_to?: string | null
+          ausnuetzung?: number | null
           baujahr?: number | null
           bezirk?: string | null
+          bezirksort?: string | null
           bfs_nr?: string | null
+          contact_attempts?: number
           created_at?: string
           decided_at?: string | null
           decided_by?: string | null
           decision_source?: string | null
           denkmalschutz?: string | null
+          denkmalschutz_titel?: string | null
           duplicate_flag?: boolean | null
           duplicate_group_id?: string | null
           egrid?: string | null
           export_status?: string
+          follow_up_at?: string | null
           geb_status?: string | null
           gebaeudeart?: string | null
           gebaeudeflaeche?: number | null
           gemeinde?: string | null
           geschosse?: number | null
+          gis_url?: string | null
           google_maps_url?: string | null
           gvz_nr?: string | null
           gwr_egid?: string | null
           hausnummer?: string | null
+          hnf_schaetzung?: number | null
+          housing_stat_url?: string | null
           id?: string
+          imported_at?: string
           is_queried?: boolean
           isos?: string | null
+          isos_titel?: string | null
+          kanton?: string | null
           kategorie?: string | null
+          last_contact_at?: string | null
           last_export_at?: string | null
           last_phone_search_at?: string | null
           list_id?: string | null
           notes?: string | null
+          nutzflaeche?: number | null
+          objektadresse?: string | null
           ortschaftsname?: string | null
           owner_address?: string | null
           owner_address_2?: string | null
@@ -375,14 +497,20 @@ export type Database = {
           plot_number?: string | null
           plz?: string | null
           plz_ort?: string | null
+          preselection_decided_at?: string | null
+          preselection_note?: string | null
+          preselection_status?: string
           processing_error?: string | null
           queried_at?: string | null
           queried_by_phone?: string | null
+          renovationsjahr?: number | null
           review_status?: string
+          source_file?: string | null
           status?: string
           strassenname?: string | null
           streetview_url?: string | null
           updated_at?: string
+          wohnflaeche?: number | null
           wohnungen?: number | null
           zone?: string | null
         }
@@ -470,6 +598,36 @@ export type Database = {
           priority?: number
           property_count?: number
           updated_at?: string
+        }
+        Relationships: []
+      }
+      saved_filters: {
+        Row: {
+          created_at: string
+          filters: Json
+          id: string
+          name: string
+          scope: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          filters?: Json
+          id?: string
+          name: string
+          scope?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          filters?: Json
+          id?: string
+          name?: string
+          scope?: string
+          updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }

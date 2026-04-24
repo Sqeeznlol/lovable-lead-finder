@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Building2, LayoutDashboard, Upload, Phone, Menu, X, Zap, Search, FileSpreadsheet, Eye, Shield, Share, Plus } from 'lucide-react';
+import { Building2, LayoutDashboard, Upload, Phone, Menu, X, Zap, Search, FileSpreadsheet, Eye, Shield, Share, Plus, Database } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dashboard } from '@/components/Dashboard';
 import { PropertyList } from '@/components/PropertyList';
 import { CsvImport } from '@/components/CsvImport';
+import { MasterImport } from '@/components/MasterImport';
+import { MasterList } from '@/components/MasterList';
 import { PhoneManager } from '@/components/PhoneManager';
 import { AkquiseMode } from '@/components/AkquiseMode';
 import { TelefonSuche } from '@/components/TelefonSuche';
@@ -17,16 +19,18 @@ import { useCanton } from '@/hooks/use-canton';
 import { usePlatform } from '@/hooks/use-platform';
 import { useMidnightReset } from '@/hooks/use-phones';
 
-type Tab = 'dashboard' | 'vorauswahl' | 'akquise' | 'telsuche' | 'properties' | 'import' | 'phones' | 'export' | 'admin';
+type Tab = 'dashboard' | 'master' | 'vorauswahl' | 'akquise' | 'telsuche' | 'properties' | 'import' | 'masterimport' | 'phones' | 'export' | 'admin';
 
 const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'master', label: 'Master-Liste', icon: Database },
+  { id: 'masterimport', label: 'Master-Import', icon: Upload },
   { id: 'vorauswahl', label: 'Vorauswahl', icon: Eye },
   { id: 'akquise', label: 'Akquise-Modus', icon: Zap },
   { id: 'telsuche', label: 'Telefon-Suche', icon: Search },
   { id: 'properties', label: 'Liegenschaften', icon: Building2 },
   { id: 'export', label: 'Pipedrive Export', icon: FileSpreadsheet },
-  { id: 'import', label: 'CSV Import', icon: Upload },
+  { id: 'import', label: 'Listen-Import (alt)', icon: Upload },
   { id: 'phones', label: 'Telefone', icon: Phone },
   { id: 'admin', label: 'Admin', icon: Shield },
 ];
@@ -126,6 +130,8 @@ export default function Index() {
 
         <div className="flex-1 p-4 lg:p-12 max-w-7xl pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-12 animate-fade-in">
           {active === 'dashboard' && <Dashboard />}
+          {active === 'master' && <MasterList />}
+          {active === 'masterimport' && <MasterImport />}
           {active === 'vorauswahl' && <Vorauswahl />}
           {active === 'akquise' && <AkquiseMode />}
           {active === 'telsuche' && <TelefonSuche />}
