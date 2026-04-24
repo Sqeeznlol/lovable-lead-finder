@@ -127,43 +127,30 @@ export function useGemeindeStats() {
   return useQuery({
     queryKey: ['master', 'gemeinde-stats'],
     queryFn: async () => {
-      const batchSize = 1000;
-      let from = 0;
-      const stats: Map<string, GemeindeStat> = new Map();
-      // Aggregate "global" too
-      let allTotal = 0, allOffen = 0, allGeprueft = 0, allInteressant = 0;
-
-      // Use a smaller projection to avoid huge payloads
-      while (true) {
-        const { data, error } = await supabase
-          .from('properties')
-          .select('gemeinde, status, preselection_status')
-          .range(from, from + batchSize - 1);
-        if (error) throw error;
-        if (!data || data.length === 0) break;
-        for (const r of data) {
-          const g = r.gemeinde || '— ohne Gemeinde —';
-          let s = stats.get(g);
-          if (!s) { s = { gemeinde: g, total: 0, offen: 0, geprueft: 0, interessant: 0 }; stats.set(g, s); }
-          s.total++;
-          allTotal++;
-          const isOffen = (r.preselection_status === 'Nicht geprüft') || (r.status === 'Neu' || r.status === 'In Prüfung');
-          if (isOffen) { s.offen++; allOffen++; } else { s.geprueft++; allGeprueft++; }
-          const isInteressant =
-            r.preselection_status === 'Sehr interessant' ||
-            r.preselection_status === 'Potenzial vorhanden' ||
-            r.status === 'Interessant' || r.status === 'Interesse vorhanden' || r.status === 'Termin vereinbart';
-          if (isInteressant) { s.interessant++; allInteressant++; }
-        }
-        if (data.length < batchSize) break;
-        from += batchSize;
-      }
-
-      const list = Array.from(stats.values()).sort((a, b) => b.total - a.total);
-      return {
-        gemeinden: list,
-        all: { total: allTotal, offen: allOffen, geprueft: allGeprueft, interessant: allInteressant },
-      };
+      // Server-seitige Aggregation via RPC — sehr schnell, auch bei 200k+ Zeilen.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any).rpc('gemeinde_stats');
+      if (error) throw error;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rows = (data || []) as any[];
+      const gemeinden: GemeindeStat[] = rows.map(r => ({
+        gemeinde: r.gemeinde,
+        total: Number(r.total) || 0,
+        offen: Number(r.offen) || 0,
+        geprueft: Number(r.geprueft) || 0,
+        interessant: Number(r.interessant) || 0,
+      }));
+      const all = gemeinden.reduce(
+        (acc, g) => {
+          acc.total += g.total;
+          acc.offen += g.offen;
+          acc.geprueft += g.geprueft;
+          acc.interessant += g.interessant;
+          return acc;
+        },
+        { total: 0, offen: 0, geprueft: 0, interessant: 0 },
+      );
+      return { gemeinden, all };
     },
     staleTime: 30 * 1000,
     refetchInterval: 60 * 1000,

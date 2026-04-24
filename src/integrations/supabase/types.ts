@@ -657,6 +657,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      gemeinde_stats: {
+        Args: never
+        Returns: {
+          gemeinde: string
+          geprueft: number
+          interessant: number
+          offen: number
+          total: number
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
