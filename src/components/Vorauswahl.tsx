@@ -266,7 +266,11 @@ export function Vorauswahl() {
     : null;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-4">
+    <div className="max-w-[1600px] mx-auto grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-4">
+      {/* Gemeinde sidebar */}
+      <GemeindeSidebar selected={selectedGemeinde} onSelect={setSelectedGemeinde} />
+
+      <div className="space-y-4 min-w-0">
       {/* Stats KPI bar */}
       <VorauswahlStatsBar
         stats={stats}
@@ -277,7 +281,10 @@ export function Vorauswahl() {
       {/* Top bar with filters and view toggle */}
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div className="flex items-center gap-2 flex-wrap">
-          <h2 className="text-xl font-bold">Vorauswahl</h2>
+          <h2 className="text-xl font-bold">
+            Vorauswahl
+            {selectedGemeinde && <span className="ml-2 text-sm font-normal text-muted-foreground">· {selectedGemeinde}</span>}
+          </h2>
           <ListSelector />
           <div className="flex items-center border rounded-lg overflow-hidden">
             <Button variant={viewMode === 'card' ? 'default' : 'ghost'} size="sm" className="h-7 px-2 rounded-none" onClick={() => setViewMode('card')}>
