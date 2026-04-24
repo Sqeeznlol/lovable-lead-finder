@@ -708,6 +708,7 @@ export function Vorauswahl() {
           )}
         </>
       )}
+      </div>
     </div>
   );
 }
