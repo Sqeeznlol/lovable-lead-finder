@@ -189,7 +189,7 @@ export function MasterImport() {
           for (const { id, row } of toUpdate) {
             const updates = masterRowToDbUpdate(row);
             if (Object.keys(updates).length) {
-              await supabase.from('properties').update(updates).eq('id', id);
+              await supabase.from('properties').update(updates as never).eq('id', id);
               summary.updated++;
             }
           }
