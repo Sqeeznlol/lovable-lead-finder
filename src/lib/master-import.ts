@@ -200,9 +200,9 @@ export function rowToMaster(
   for (const m of mapping) {
     const raw = row[m.sourceKey];
     if (numericFields.has(m.targetField)) {
-      (out as Record<string, unknown>)[m.targetField] = toNumber(raw);
+      (out as unknown as Record<string, unknown>)[m.targetField] = toNumber(raw);
     } else {
-      (out as Record<string, unknown>)[m.targetField] = toStr(raw);
+      (out as unknown as Record<string, unknown>)[m.targetField] = toStr(raw);
     }
   }
 
@@ -308,7 +308,7 @@ export function masterRowToDbUpdate(r: MasterRow): Record<string, unknown> {
     'google_maps_url', 'streetview_url', 'gis_url', 'housing_stat_url',
   ];
   for (const f of fields) {
-    const v = (r as Record<string, unknown>)[f];
+    const v = (r as unknown as Record<string, unknown>)[f];
     if (v !== null && v !== undefined && v !== '') u[f] = v;
   }
   return u;
