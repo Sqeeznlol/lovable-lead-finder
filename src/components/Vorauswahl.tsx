@@ -19,6 +19,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { calculateDealScore, scoreColor, scoreBg } from '@/lib/deal-score';
 import { useListFilter, useLists } from '@/hooks/use-lists';
 import { ListSelector } from '@/components/ListSelector';
+import { GemeindeSidebar } from '@/components/GemeindeSidebar';
 import { getOerebParzelleUrl } from '@/lib/oereb';
 
 type ViewMode = 'card' | 'table';
@@ -29,6 +30,13 @@ export function Vorauswahl() {
   const { selectedListId } = useListFilter();
   const { data: lists } = useLists();
   const isPrioList = !!(selectedListId && lists?.find(l => l.id === selectedListId && l.priority < 0));
+
+  // Selected Gemeinde from sidebar (null = alle Gemeinden)
+  const [selectedGemeinde, setSelectedGemeinde] = useState<string | null>(() => localStorage.getItem('vorauswahl.gemeinde') || null);
+  useEffect(() => {
+    if (selectedGemeinde) localStorage.setItem('vorauswahl.gemeinde', selectedGemeinde);
+    else localStorage.removeItem('vorauswahl.gemeinde');
+  }, [selectedGemeinde]);
 
   // Persistent baujahr filter per list (localStorage). Default empty (= no filter) so 184k Master-Liste shows all.
   const baujahrStorageKey = `vorauswahl.baujahrBis.${selectedListId || 'all'}`;
@@ -55,7 +63,7 @@ export function Vorauswahl() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const { data: zones } = useZones();
   const { data: gemeinden } = useGemeinden();
-  const { data: queue, refetch } = useUnqueriedProperties(200, selectedListId, isPrioList);
+  const { data: queue, refetch } = useUnqueriedProperties(200, selectedListId, isPrioList, selectedGemeinde);
   const { data: stats, refetch: refetchStats } = useVorauswahlStats();
   const updateProp = useUpdateProperty();
   const { toast } = useToast();
@@ -99,7 +107,7 @@ export function Vorauswahl() {
   const score = current?._score ?? 0;
   const hasFilters = effectiveZoneFilter !== 'Alle' || baujahrVon || effectiveBaujahrBis || maxWhg || minWhg || gemeindeFilter || bezirkFilter || (kategorieFilter && kategorieFilter !== 'Alle');
 
-  useEffect(() => { setCurrentIndex(0); }, [zoneFilter, baujahrBis, baujahrVon, maxWhg, minWhg, gemeindeFilter, bezirkFilter, kategorieFilter]);
+  useEffect(() => { setCurrentIndex(0); }, [zoneFilter, baujahrBis, baujahrVon, maxWhg, minWhg, gemeindeFilter, bezirkFilter, kategorieFilter, selectedGemeinde]);
 
   useEffect(() => {
     if (isPrioList && zoneFilter !== 'Alle') {
@@ -258,7 +266,11 @@ export function Vorauswahl() {
     : null;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-4">
+    <div className="max-w-[1600px] mx-auto grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-4">
+      {/* Gemeinde sidebar */}
+      <GemeindeSidebar selected={selectedGemeinde} onSelect={setSelectedGemeinde} />
+
+      <div className="space-y-4 min-w-0">
       {/* Stats KPI bar */}
       <VorauswahlStatsBar
         stats={stats}
@@ -269,7 +281,10 @@ export function Vorauswahl() {
       {/* Top bar with filters and view toggle */}
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div className="flex items-center gap-2 flex-wrap">
-          <h2 className="text-xl font-bold">Vorauswahl</h2>
+          <h2 className="text-xl font-bold">
+            Vorauswahl
+            {selectedGemeinde && <span className="ml-2 text-sm font-normal text-muted-foreground">· {selectedGemeinde}</span>}
+          </h2>
           <ListSelector />
           <div className="flex items-center border rounded-lg overflow-hidden">
             <Button variant={viewMode === 'card' ? 'default' : 'ghost'} size="sm" className="h-7 px-2 rounded-none" onClick={() => setViewMode('card')}>
@@ -693,6 +708,7 @@ export function Vorauswahl() {
           )}
         </>
       )}
+      </div>
     </div>
   );
 }

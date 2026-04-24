@@ -148,9 +148,9 @@ export function useZones() {
   });
 }
 
-export function useUnqueriedProperties(limit: number, listId?: string | null, isPrioList?: boolean) {
+export function useUnqueriedProperties(limit: number, listId?: string | null, isPrioList?: boolean, gemeinde?: string | null) {
   return useQuery({
-    queryKey: ['properties', 'unqueried', limit, listId, isPrioList],
+    queryKey: ['properties', 'unqueried', limit, listId, isPrioList, gemeinde],
     queryFn: async () => {
       let query = supabase
         .from('properties')
@@ -165,6 +165,7 @@ export function useUnqueriedProperties(limit: number, listId?: string | null, is
         query = query.eq('geb_status', 'Bestehend');
       }
       if (listId) query = query.eq('list_id', listId);
+      if (gemeinde) query = query.eq('gemeinde', gemeinde);
       const { data, error } = await query;
       if (error) throw error;
       return data as Property[];
