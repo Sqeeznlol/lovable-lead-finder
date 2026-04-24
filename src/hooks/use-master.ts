@@ -234,7 +234,7 @@ export function useMasterDashboardStats() {
   });
 }
 
-export function useDistinctValues(field: 'bezirk' | 'plz' | 'zone' | 'kategorie' | 'gebaeudeart' | 'source_file') {
+export function useDistinctValues(field: 'bezirk' | 'plz' | 'zone' | 'kategorie' | 'gebaeudeart' | 'source_file' | 'gemeinde') {
   return useQuery({
     queryKey: ['master', 'distinct', field],
     queryFn: async () => {

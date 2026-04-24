@@ -28,7 +28,7 @@ export function MasterFiltersBar({ filters, onChange, scope = 'master' }: Props)
   const update = (patch: Partial<Filters>) => onChange({ ...filters, ...patch, page: 0 });
   const { data: zones } = useDistinctValues('zone');
   const { data: kategorien } = useDistinctValues('kategorie');
-  const { data: bezirke } = useDistinctValues('bezirk');
+  const { data: gemeinden } = useDistinctValues('gemeinde');
   const { data: sources } = useDistinctValues('source_file');
 
   const reset = () => onChange({ page: 0, pageSize: filters.pageSize });
@@ -46,12 +46,12 @@ export function MasterFiltersBar({ filters, onChange, scope = 'master' }: Props)
         </div>
 
         <div className="space-y-1.5">
-          <Label className="text-xs">Bezirk</Label>
-          <Select value={filters.bezirk ?? 'all'} onValueChange={v => update({ bezirk: v === 'all' ? null : v })}>
+          <Label className="text-xs">Gemeinde</Label>
+          <Select value={filters.gemeinde ?? 'all'} onValueChange={v => update({ gemeinde: v === 'all' ? null : v })}>
             <SelectTrigger><SelectValue placeholder="Alle" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Alle</SelectItem>
-              {bezirke?.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+              {gemeinden?.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
