@@ -104,7 +104,7 @@ export function ListSelector() {
             <>
               <DropdownMenuSeparator />
               <div className="px-2 py-1">
-                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Bezirke</span>
+                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Listen</span>
               </div>
               {otherLists.map(list => (
                 <DropdownMenuItem
