@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { ThumbsUp, ThumbsDown, SkipForward, EyeOff, Keyboard, MapPin, Calendar, Home, Ruler, Layers, ExternalLink, Sparkles, Filter, ChevronDown, ChevronUp, LayoutGrid, Table2, CheckCheck, Wand2 } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, SkipForward, EyeOff, Keyboard, MapPin, Calendar, Home, Ruler, Layers, ExternalLink, Filter, ChevronDown, ChevronUp, LayoutGrid, Table2, CheckCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -130,14 +130,7 @@ export function Vorauswahl() {
     await supabase.from('property_decisions').insert({
       property_id: propertyId,
       user_id: user.id,
-      ai_score: prop.ai_score ? Number(prop.ai_score) : null,
-      ai_recommendation: prop.ai_recommendation,
-      ai_summary: prop.ai_summary,
       user_decision: decision,
-      decision_matches_ai: prop.ai_recommendation
-        ? (decision === 'interessant' && prop.ai_recommendation === 'interessant') ||
-          (decision === 'nicht_interessant' && prop.ai_recommendation === 'eher nicht interessant')
-        : null,
     });
   }, [user]);
 
@@ -192,15 +185,6 @@ export function Vorauswahl() {
       setProcessing(false);
     }
   }, [current, processing, updateProp, moveToNext, toast]);
-
-  const handleAdoptAI = useCallback(async () => {
-    if (!current || processing || !current.ai_recommendation) return;
-    if (current.ai_recommendation === 'interessant') {
-      await handleInteressant();
-    } else {
-      await handleNichtInteressant();
-    }
-  }, [current, processing, handleInteressant, handleNichtInteressant]);
 
   // Bulk actions
   const handleBulkAction = useCallback(async (action: 'approve' | 'reject') => {
