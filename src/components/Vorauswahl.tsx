@@ -235,7 +235,6 @@ export function Vorauswahl() {
       if (e.key === 'n' || e.key === 'N') { e.preventDefault(); handleNichtInteressant(); return; }
       if (e.key === 'ArrowRight' || e.key === 's' || e.key === 'S') { e.preventDefault(); handleSkip(); return; }
       if (e.key === 'h' || e.key === 'H') { e.preventDefault(); handleHide(); return; }
-      if (e.key === 'a' || e.key === 'A') { e.preventDefault(); handleAdoptAI(); return; }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -373,7 +372,6 @@ export function Vorauswahl() {
                   <TableHead className="text-xs">Bj.</TableHead>
                   <TableHead className="text-xs">Whg.</TableHead>
                   <TableHead className="text-xs">HNF</TableHead>
-                  <TableHead className="text-xs">KI</TableHead>
                   <TableHead className="text-xs">Aktion</TableHead>
                 </TableRow>
               </TableHeader>
@@ -400,18 +398,6 @@ export function Vorauswahl() {
                       <TableCell className="text-xs">{p.baujahr || '–'}</TableCell>
                       <TableCell className="text-xs">{p.wohnungen ? Number(p.wohnungen) : '–'}</TableCell>
                       <TableCell className="text-xs">{p.gebaeudeflaeche ? `${Math.round(Number(p.gebaeudeflaeche))}m²` : '–'}</TableCell>
-                      <TableCell>
-                        {p.ai_recommendation ? (
-                          <Tooltip>
-                            <TooltipTrigger>
-                              <Badge className={`text-[10px] gap-0.5 ${p.ai_recommendation === 'interessant' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : p.ai_recommendation === 'prüfen' ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' : 'bg-muted text-muted-foreground'}`}>
-                                <Sparkles className="h-2.5 w-2.5" /> {p.ai_recommendation}
-                              </Badge>
-                            </TooltipTrigger>
-                            <TooltipContent><p className="max-w-xs text-xs">{p.ai_summary || 'Keine Begründung'}</p></TooltipContent>
-                          </Tooltip>
-                        ) : <span className="text-xs text-muted-foreground">–</span>}
-                      </TableCell>
                       <TableCell>
                         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={async () => {
@@ -532,30 +518,6 @@ export function Vorauswahl() {
                     </div>
                   </div>
 
-                  {/* AI Recommendation box */}
-                  {current.ai_recommendation && (
-                    <div className="mx-5 mt-3 rounded-xl bg-primary/5 border border-primary/20 px-4 py-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Sparkles className="h-4 w-4 text-primary" />
-                          <span className="text-xs font-semibold text-primary uppercase">KI-Empfehlung</span>
-                          <Badge className={`text-[10px] ${current.ai_recommendation === 'interessant' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : current.ai_recommendation === 'prüfen' ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' : 'bg-muted text-muted-foreground'}`}>
-                            {current.ai_recommendation}
-                          </Badge>
-                          {current.ai_score && (
-                            <span className="text-xs text-muted-foreground">Score: {Number(current.ai_score).toFixed(0)}</span>
-                          )}
-                        </div>
-                        <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={handleAdoptAI}>
-                          <Wand2 className="h-3 w-3" /> Übernehmen
-                        </Button>
-                      </div>
-                      {current.ai_summary && (
-                        <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">{current.ai_summary}</p>
-                      )}
-                    </div>
-                  )}
-
                   {/* Owner info */}
                   {current.owner_name && (
                     <div className="mx-5 mt-2 rounded-lg bg-muted/50 px-3 py-2">
@@ -658,7 +620,6 @@ export function Vorauswahl() {
                       <span><kbd className="bg-muted px-1 rounded font-mono">N</kbd> Nein</span>
                       <span><kbd className="bg-muted px-1 rounded font-mono">→/S</kbd> Skip</span>
                       <span><kbd className="bg-muted px-1 rounded font-mono">H</kbd> Ausblenden</span>
-                      <span><kbd className="bg-muted px-1 rounded font-mono">A</kbd> KI übernehmen</span>
                     </div>
                   </div>
                 </CardContent>
@@ -678,11 +639,6 @@ export function Vorauswahl() {
                         <span className="truncate flex-1 text-sm font-medium">{p.address}</span>
                         {p.zone && <Badge variant="outline" className="text-[10px]">{p.zone}</Badge>}
                         {p.gebaeudeflaeche && <span className="text-xs text-muted-foreground">{Math.round(Number(p.gebaeudeflaeche))}m²</span>}
-                        {p.ai_recommendation && (
-                          <Badge className={`text-[10px] ${p.ai_recommendation === 'interessant' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-muted text-muted-foreground'}`}>
-                            <Sparkles className="h-2.5 w-2.5 mr-0.5" />{p.ai_recommendation}
-                          </Badge>
-                        )}
                       </div>
                     );
                   })}
