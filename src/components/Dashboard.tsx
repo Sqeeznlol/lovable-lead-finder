@@ -1,21 +1,15 @@
-import { Building2, Users, Search, Sparkles, Send, Phone, AlertTriangle, TrendingUp, CheckCircle, Eye, BarChart3, Clock } from 'lucide-react';
+import { Building2, Users, Search, Send, Phone, AlertTriangle, TrendingUp, CheckCircle, Eye } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Button } from '@/components/ui/button';
 import { usePropertyStats } from '@/hooks/use-properties';
 import { useVorauswahlStats } from '@/hooks/use-vorauswahl-stats';
 import { usePhoneNumbers } from '@/hooks/use-phones';
-import { supabase } from '@/integrations/supabase/client';
-import { useState } from 'react';
-import { useToast } from '@/hooks/use-toast';
 
 export function Dashboard() {
   const { data: stats } = usePropertyStats();
   const { data: vaStats } = useVorauswahlStats();
   const { data: phones } = usePhoneNumbers();
-  const { toast } = useToast();
-  const [analyzing, setAnalyzing] = useState(false);
 
   const totalCapacity = (phones || []).length * 5;
   const usedToday = (phones || []).reduce((acc, p) => acc + p.daily_queries_used, 0);
@@ -30,21 +24,6 @@ export function Dashboard() {
 
   const conversionRate = (from: number, to: number) => from > 0 ? Math.round((to / from) * 100) : 0;
 
-  const triggerAiAnalysis = async () => {
-    setAnalyzing(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('ai-analyze', {
-        body: { batch_mode: true },
-      });
-      if (error) throw error;
-      toast({ title: `✅ ${data?.analyzed || 0} Liegenschaften analysiert` });
-    } catch (err) {
-      toast({ title: 'KI-Analyse Fehler', description: String(err), variant: 'destructive' });
-    } finally {
-      setAnalyzing(false);
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -52,10 +31,6 @@ export function Dashboard() {
           <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
           <p className="text-muted-foreground mt-1">Überblick über deine Akquise-Pipeline</p>
         </div>
-        <Button onClick={triggerAiAnalysis} disabled={analyzing} variant="outline" className="gap-2">
-          <Sparkles className="h-4 w-4" />
-          {analyzing ? 'Analysiert...' : 'KI-Analyse starten'}
-        </Button>
       </div>
 
       {/* Vorauswahl stats - prominent */}

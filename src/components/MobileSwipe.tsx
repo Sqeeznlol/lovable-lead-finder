@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { ThumbsUp, ThumbsDown, Clock, MapPin, Calendar, Home, Ruler, Layers, Sparkles, LogOut, Wand2, RefreshCw } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, Clock, MapPin, Calendar, Home, Ruler, Layers, LogOut, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -76,14 +76,7 @@ export function MobileSwipe() {
       await supabase.from('property_decisions').insert({
         property_id: current.id,
         user_id: user?.id,
-        ai_score: current.ai_score ? Number(current.ai_score) : null,
-        ai_recommendation: current.ai_recommendation,
-        ai_summary: current.ai_summary,
         user_decision: decision,
-        decision_matches_ai: current.ai_recommendation
-          ? (decision === 'interessant' && current.ai_recommendation === 'interessant') ||
-            (decision === 'nicht_interessant' && current.ai_recommendation === 'eher nicht interessant')
-          : null,
       });
 
       setSessionStats(s => ({
@@ -99,12 +92,6 @@ export function MobileSwipe() {
       setProcessing(false);
     }
   }, [current, processing, updateProp, user, moveToNext, toast]);
-
-  const handleAdoptAI = useCallback(() => {
-    if (!current?.ai_recommendation) return;
-    if (current.ai_recommendation === 'interessant') handleDecision('interessant');
-    else handleDecision('nicht_interessant');
-  }, [current, handleDecision]);
 
   // Touch handlers
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -277,28 +264,6 @@ export function MobileSwipe() {
               </div>
             )}
           </div>
-
-          {/* AI recommendation */}
-          {current.ai_recommendation && (
-            <div className="mx-3 mb-2 rounded-lg bg-primary/5 border border-primary/20 px-3 py-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <Sparkles className="h-3 w-3 text-primary" />
-                  <span className="text-[9px] font-bold text-primary uppercase">KI</span>
-                  <Badge className={`text-[9px] h-4 ${current.ai_recommendation === 'interessant' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : current.ai_recommendation === 'prüfen' ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' : 'bg-muted text-muted-foreground'}`}>
-                    {current.ai_recommendation}
-                  </Badge>
-                  {current.ai_score && <span className="text-[9px] text-muted-foreground">{Number(current.ai_score).toFixed(0)}pts</span>}
-                </div>
-                <Button size="sm" variant="ghost" className="h-6 text-[9px] gap-0.5 px-1.5" onClick={handleAdoptAI}>
-                  <Wand2 className="h-2.5 w-2.5" /> Übernehmen
-                </Button>
-              </div>
-              {current.ai_summary && (
-                <p className="text-[10px] text-muted-foreground mt-1 leading-snug line-clamp-2">{current.ai_summary}</p>
-              )}
-            </div>
-          )}
 
           {/* Owner hint */}
           {current.owner_name && (
