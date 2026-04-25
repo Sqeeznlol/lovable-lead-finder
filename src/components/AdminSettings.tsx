@@ -158,10 +158,6 @@ export function AdminSettings() {
               <p className="text-sm font-medium">React + Supabase</p>
             </div>
             <div className="bg-muted/50 rounded-lg px-4 py-3">
-              <p className="text-xs text-muted-foreground">KI-Gateway</p>
-              <p className="text-sm font-medium">Lovable AI</p>
-            </div>
-            <div className="bg-muted/50 rounded-lg px-4 py-3">
               <p className="text-xs text-muted-foreground">Pipedrive</p>
               <p className="text-sm font-medium">Verbunden</p>
             </div>
