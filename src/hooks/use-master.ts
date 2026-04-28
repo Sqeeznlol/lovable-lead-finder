@@ -152,8 +152,7 @@ export function useGemeindeStats() {
       );
       return { gemeinden, all };
     },
-    staleTime: 30 * 1000,
-    refetchInterval: 60 * 1000,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
