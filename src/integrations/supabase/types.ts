@@ -654,7 +654,16 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      gemeinde_stats_mv: {
+        Row: {
+          gemeinde: string | null
+          geprueft: number | null
+          interessant: number | null
+          offen: number | null
+          total: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       gemeinde_stats: {
@@ -674,6 +683,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      refresh_gemeinde_stats: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "office" | "mobile_swipe"
