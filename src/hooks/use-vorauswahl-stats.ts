@@ -28,8 +28,9 @@ export function useVorauswahlStats() {
       weekStart.setDate(weekStart.getDate() - 7);
       weekStart.setHours(0, 0, 0, 0);
 
-      const buildQuery = (extra?: (q: ReturnType<typeof baseQuery>) => ReturnType<typeof baseQuery>) => {
-        const baseQuery = () => supabase.from('properties').select('*', { count: 'exact', head: true });
+      const baseQuery = () => supabase.from('properties').select('*', { count: 'exact', head: true });
+      type CountQuery = ReturnType<typeof baseQuery>;
+      const buildQuery = (extra?: (q: CountQuery) => CountQuery): CountQuery => {
         let q = baseQuery();
         if (!isPrio) {
           q = q.like('zone', 'W%').eq('geb_status', 'Bestehend');
