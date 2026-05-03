@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Shield, Trash2, Users, Activity, Zap } from 'lucide-react';
+import { Shield, Trash2, Users, Activity, Zap, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAutomationSettings, useUpdateAutomationSettings } from '@/hooks/use-app-settings';
+import { getMyPhone, setMyPhone } from '@/hooks/use-eigentuemer-lookup';
 
 interface UserWithRoles {
   user_id: string;
@@ -24,6 +25,7 @@ export function AdminSettings() {
   const { toast } = useToast();
   const { data: automation } = useAutomationSettings();
   const updateAutomation = useUpdateAutomationSettings();
+  const [myPhone, setMyPhoneState] = useState(getMyPhone());
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -103,8 +105,23 @@ export function AdminSettings() {
             <Zap className="h-5 w-5 text-primary" />
             <h3 className="text-lg font-semibold">Automatisierung</h3>
           </div>
+          <div className="p-3 rounded-lg bg-muted/30 space-y-1.5">
+            <div className="flex items-center gap-2">
+              <Phone className="h-4 w-4 text-primary" />
+              <p className="text-sm font-medium">Meine Telefonnummer</p>
+            </div>
+            <p className="text-xs text-muted-foreground">Wird automatisch ins ZH-Portal eingefüllt für SMS-Verifikation. Nur lokal gespeichert.</p>
+            <Input
+              type="tel"
+              placeholder="+41 79 123 45 67"
+              value={myPhone}
+              onChange={e => { setMyPhoneState(e.target.value); setMyPhone(e.target.value); }}
+              className="h-9"
+            />
+          </div>
           {[
             { key: 'auto_advance' as const, label: 'Smart Auto-Advance', desc: 'Nach Auto-Export automatisch zur nächsten Liegenschaft (2s Countdown)' },
+            { key: 'auto_eigentuemer_lookup' as const, label: 'Auto-Eigentümer-Lookup', desc: 'Bei Stage „Interessant" automatisch ZH-Portal öffnen und Eigentümer abrufen' },
             { key: 'sms_auto_confirm' as const, label: 'SMS-Bestätigung (Twilio)', desc: 'Sendet automatisch eine Bestätigungs-SMS nach Pipedrive-Push (benötigt Twilio-Connector)' },
             { key: 'daily_digest' as const, label: 'Tägliches Digest (08:00)', desc: 'Versendet morgens eine Zusammenfassung des Vortags' },
           ].map(item => (
@@ -114,7 +131,7 @@ export function AdminSettings() {
                 <p className="text-xs text-muted-foreground mt-0.5">{item.desc}</p>
               </div>
               <Switch
-                checked={!!automation?.[item.key]}
+                checked={!!(automation as Record<string, unknown>)?.[item.key]}
                 onCheckedChange={v => updateAutomation.mutate({ [item.key]: v })}
               />
             </div>
