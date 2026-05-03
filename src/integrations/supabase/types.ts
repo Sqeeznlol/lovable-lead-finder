@@ -14,6 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value?: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string
@@ -338,6 +356,7 @@ export type Database = {
           renovationsjahr: number | null
           review_status: string
           source_file: string | null
+          stage_changed_at: string | null
           status: string
           strassenname: string | null
           streetview_url: string | null
@@ -422,6 +441,7 @@ export type Database = {
           renovationsjahr?: number | null
           review_status?: string
           source_file?: string | null
+          stage_changed_at?: string | null
           status?: string
           strassenname?: string | null
           streetview_url?: string | null
@@ -506,6 +526,7 @@ export type Database = {
           renovationsjahr?: number | null
           review_status?: string
           source_file?: string | null
+          stage_changed_at?: string | null
           status?: string
           strassenname?: string | null
           streetview_url?: string | null
