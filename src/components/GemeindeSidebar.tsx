@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Building2, Search } from 'lucide-react';
+import { Building2, Search, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useGemeindeStats } from '@/hooks/use-master';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
 interface Props {
@@ -11,7 +12,7 @@ interface Props {
 }
 
 export function GemeindeSidebar({ selected, onSelect }: Props) {
-  const { data, isLoading } = useGemeindeStats();
+  const { data, isLoading, error } = useGemeindeStats();
   const [search, setSearch] = useState('');
 
   const filtered = useMemo(() => {
@@ -70,7 +71,27 @@ export function GemeindeSidebar({ selected, onSelect }: Props) {
           </button>
 
           {isLoading && (
-            <div className="text-xs text-muted-foreground p-3">Lade…</div>
+            <div className="space-y-1.5 p-2">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full rounded-lg" />
+              ))}
+            </div>
+          )}
+
+          {error && !isLoading && (
+            <div className="m-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold">Gemeinden konnten nicht geladen werden</p>
+                <p className="opacity-80 mt-0.5">{(error as Error).message}</p>
+              </div>
+            </div>
+          )}
+
+          {!isLoading && !error && filtered.length === 0 && search && (
+            <div className="text-xs text-muted-foreground p-4 text-center">
+              Keine Treffer für „{search}"
+            </div>
           )}
 
           {filtered.map(g => {
