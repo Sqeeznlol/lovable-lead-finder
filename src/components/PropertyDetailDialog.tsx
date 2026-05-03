@@ -7,11 +7,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ExternalLink, MapPin, Phone, User, Save, Loader2 } from 'lucide-react';
+import { ExternalLink, MapPin, Phone, User, Save, Loader2, Bot, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Tables } from '@/integrations/supabase/types';
+import { useStartEigentuemerLookup, useExtensionAvailable } from '@/hooks/use-eigentuemer-lookup';
 
 type Property = Tables<'properties'>;
 
@@ -37,6 +38,8 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
   const qc = useQueryClient();
+  const startLookup = useStartEigentuemerLookup();
+  const extensionAvailable = useExtensionAvailable();
 
   useEffect(() => {
     if (!id) { setData(null); return; }
@@ -124,6 +127,49 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
                   <a href={`https://tel.search.ch/?was=${encodeURIComponent(data.owner_name)}`} target="_blank" rel="noreferrer">
                     <Button size="sm" variant="outline"><Phone className="h-3.5 w-3.5 mr-1" /> Tel.search</Button>
                   </a>
+                )}
+              </div>
+
+              {/* Eigentümer (Portal-Lookup) */}
+              <div className="rounded-lg border p-3 space-y-2 bg-muted/30">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                    <Bot className="h-3.5 w-3.5" /> Eigentümer (ZH-Portal)
+                  </Label>
+                  <Button
+                    size="sm"
+                    variant={(data as Property & { eigentuemer_name?: string | null }).eigentuemer_name ? 'outline' : 'default'}
+                    className="h-7 text-xs gap-1"
+                    disabled={!data.egrid}
+                    onClick={() => startLookup({
+                      propertyId: data.id,
+                      egrid: data.egrid,
+                      bfsNr: data.bfs_nr,
+                      parzelle: data.parzelle,
+                      address: data.address,
+                      plzOrt: data.plz_ort || data.gemeinde,
+                    })}
+                  >
+                    {(data as Property & { eigentuemer_name?: string | null }).eigentuemer_name
+                      ? (<><RefreshCw className="h-3 w-3" /> Erneut abrufen</>)
+                      : (<><Bot className="h-3 w-3" /> Eigentümer abrufen</>)}
+                  </Button>
+                </div>
+                {(() => {
+                  const d = data as Property & { eigentuemer_name?: string | null; eigentuemer_adresse?: string | null; eigentuemer_plz_ort?: string | null };
+                  if (!d.eigentuemer_name && !d.eigentuemer_adresse) {
+                    return <p className="text-xs text-muted-foreground">Noch nicht abgerufen{!data.egrid && ' — keine EGRID vorhanden'}.</p>;
+                  }
+                  return (
+                    <div className="text-sm space-y-0.5">
+                      {d.eigentuemer_name && <p className="font-medium">{d.eigentuemer_name}</p>}
+                      {d.eigentuemer_adresse && <p className="text-muted-foreground">{d.eigentuemer_adresse}</p>}
+                      {d.eigentuemer_plz_ort && <p className="text-muted-foreground">{d.eigentuemer_plz_ort}</p>}
+                    </div>
+                  );
+                })()}
+                {!extensionAvailable && (
+                  <p className="text-[11px] text-muted-foreground">Chrome-Extension empfohlen für Auto-Speicherung.</p>
                 )}
               </div>
 
