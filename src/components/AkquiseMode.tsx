@@ -53,6 +53,8 @@ export function AkquiseMode() {
   const [extensionAvailable, setExtensionAvailable] = useState(false);
   const [autoStatus, setAutoStatus] = useState<string | null>(null);
   const ownerInputRef = useRef<HTMLInputElement>(null);
+  const [showSmsPicker, setShowSmsPicker] = useState(false);
+  const [smsChoice, setSmsChoice] = useState<string>('');
 
   const updateOwnerRaw = useCallback((index: number, raw: string) => {
     setOwners(prev => {
