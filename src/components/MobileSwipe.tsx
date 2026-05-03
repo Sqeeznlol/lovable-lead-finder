@@ -85,8 +85,8 @@ export function MobileSwipe() {
         nein: s.nein + (decision === 'nicht_interessant' ? 1 : 0),
       }));
       moveToNext();
-    } catch {
-      toast({ title: 'Fehler', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Speichern fehlgeschlagen', description: (err as Error)?.message || 'Unbekannter Fehler', variant: 'destructive' });
       setSwipeDirection(null);
     } finally {
       setProcessing(false);
