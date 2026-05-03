@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useProperties, useUpdateProperty } from '@/hooks/use-properties';
+import type { Tables } from '@/integrations/supabase/types';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useListFilter } from '@/hooks/use-lists';
@@ -45,8 +46,10 @@ const EXPORT_COLUMNS = [
 
 const DEFAULT_COLUMNS = EXPORT_COLUMNS.slice(0, 16).map(c => c.key);
 
-function formatCell(prop: any, key: string): string | number {
-  const v = prop[key];
+type PropertyRow = Tables<'properties'>;
+
+function formatCell(prop: PropertyRow, key: string): string | number {
+  const v = (prop as Record<string, unknown>)[key];
   if (v == null || v === '') return '';
   if (key === 'gebaeudeflaeche' || key === 'area') return Math.round(Number(v));
   if (key === 'geschosse' || key === 'wohnungen') return Number(v);
@@ -190,14 +193,14 @@ export function PipedriveExport() {
 
   const buildRows = () => properties.map(p => {
     const row: Record<string, unknown> = {};
-    for (const c of activeColumns) row[c.label] = formatCell(p as any, c.key);
+    for (const c of activeColumns) row[c.label] = formatCell(p as PropertyRow, c.key);
     return row;
   });
 
   const exportCsv = () => {
     if (properties.length === 0) return;
     const headers = activeColumns.map(c => c.label);
-    const rows = properties.map(p => activeColumns.map(c => formatCell(p as any, c.key)));
+    const rows = properties.map(p => activeColumns.map(c => formatCell(p as PropertyRow, c.key)));
     downloadCsv(`pipedrive-export_${exportTimestamp()}.csv`, headers, rows);
     toast({ title: `✅ ${properties.length} Einträge als CSV exportiert` });
   };

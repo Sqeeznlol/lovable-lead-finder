@@ -11,6 +11,7 @@ interface VorauswahlStats {
   weekProcessed: number;
   conversionRate: number;
   progressPercent: number;
+  pipedriveExported: number;
 }
 
 export function useVorauswahlStats() {
@@ -27,8 +28,10 @@ export function useVorauswahlStats() {
       weekStart.setDate(weekStart.getDate() - 7);
       weekStart.setHours(0, 0, 0, 0);
 
-      const buildQuery = (extra?: (q: any) => any) => {
-        let q = supabase.from('properties').select('*', { count: 'exact', head: true });
+      const baseQuery = () => supabase.from('properties').select('*', { count: 'exact', head: true });
+      type CountQuery = ReturnType<typeof baseQuery>;
+      const buildQuery = (extra?: (q: CountQuery) => CountQuery): CountQuery => {
+        let q = baseQuery();
         if (!isPrio) {
           q = q.like('zone', 'W%').eq('geb_status', 'Bestehend');
         }
@@ -62,6 +65,8 @@ export function useVorauswahlStats() {
         .select('*', { count: 'exact', head: true })
         .gte('created_at', weekStart.toISOString());
 
+      const { count: pipedriveExported } = await buildQuery(q => q.eq('export_status', 'exported'));
+
       const totalNum = total || 0;
       const approvedNum = approved || 0;
       const rejectedNum = rejected || 0;
@@ -78,6 +83,7 @@ export function useVorauswahlStats() {
         weekProcessed: weekProcessed || 0,
         conversionRate,
         progressPercent,
+        pipedriveExported: pipedriveExported || 0,
       };
     },
     staleTime: 10 * 1000,
