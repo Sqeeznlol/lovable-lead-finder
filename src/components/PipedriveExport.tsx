@@ -193,14 +193,14 @@ export function PipedriveExport() {
 
   const buildRows = () => properties.map(p => {
     const row: Record<string, unknown> = {};
-    for (const c of activeColumns) row[c.label] = formatCell(p as any, c.key);
+    for (const c of activeColumns) row[c.label] = formatCell(p as PropertyRow, c.key);
     return row;
   });
 
   const exportCsv = () => {
     if (properties.length === 0) return;
     const headers = activeColumns.map(c => c.label);
-    const rows = properties.map(p => activeColumns.map(c => formatCell(p as any, c.key)));
+    const rows = properties.map(p => activeColumns.map(c => formatCell(p as PropertyRow, c.key)));
     downloadCsv(`pipedrive-export_${exportTimestamp()}.csv`, headers, rows);
     toast({ title: `✅ ${properties.length} Einträge als CSV exportiert` });
   };
