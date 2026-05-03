@@ -5,6 +5,7 @@ export interface AutomationSettings {
   sms_auto_confirm: boolean;
   auto_advance: boolean;
   daily_digest: boolean;
+  auto_eigentuemer_lookup: boolean;
   follow_up_days: number;
   stagnation_days: number;
 }
@@ -13,6 +14,7 @@ const DEFAULTS: AutomationSettings = {
   sms_auto_confirm: false,
   auto_advance: true,
   daily_digest: false,
+  auto_eigentuemer_lookup: true,
   follow_up_days: 3,
   stagnation_days: 7,
 };
