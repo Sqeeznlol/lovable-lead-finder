@@ -21,8 +21,6 @@ import { useListFilter, useLists } from '@/hooks/use-lists';
 import { ListSelector } from '@/components/ListSelector';
 import { GemeindeSidebar } from '@/components/GemeindeSidebar';
 import { getOerebParzelleUrl } from '@/lib/oereb';
-import { useStartEigentuemerLookup } from '@/hooks/use-eigentuemer-lookup';
-import { useAutomationSettings } from '@/hooks/use-app-settings';
 
 type ViewMode = 'card' | 'table';
 
@@ -70,8 +68,6 @@ export function Vorauswahl() {
   const updateProp = useUpdateProperty();
   const { toast } = useToast();
   const { user } = useAuth();
-  const startLookup = useStartEigentuemerLookup();
-  const { data: automation } = useAutomationSettings();
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [processing, setProcessing] = useState(false);
@@ -146,26 +142,13 @@ export function Vorauswahl() {
       await logDecision(current.id, 'interessant', current);
       setSessionStats(s => ({ ...s, interessant: s.interessant + 1 }));
       toast({ title: '👍 Vorausgewählt' });
-      // Auto-trigger Eigentümer-Lookup wenn aktiviert und EGRID vorhanden
-      try {
-        if (automation?.auto_eigentuemer_lookup && current.egrid && !(current as { eigentuemer_name?: string | null }).eigentuemer_name) {
-          startLookup({
-            propertyId: current.id,
-            egrid: current.egrid,
-            bfsNr: current.bfs_nr,
-            parzelle: current.parzelle,
-            address: current.address,
-            plzOrt: current.plz_ort || current.gemeinde,
-          });
-        }
-      } catch { /* fallback silent */ }
       moveToNext();
     } catch (err) {
       toast({ title: 'Speichern fehlgeschlagen', description: (err as Error)?.message || 'Unbekannter Fehler', variant: 'destructive' });
     } finally {
       setProcessing(false);
     }
-  }, [current, processing, updateProp, moveToNext, toast, logDecision, user, automation, startLookup]);
+  }, [current, processing, updateProp, moveToNext, toast, logDecision, user]);
 
   const handleNichtInteressant = useCallback(async () => {
     if (!current || processing) return;

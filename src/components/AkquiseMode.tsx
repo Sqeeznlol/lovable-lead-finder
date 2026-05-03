@@ -16,6 +16,7 @@ import { calculateDealScore, scoreColor, scoreBg } from '@/lib/deal-score';
 import { parseOwnerString, parseMultipleOwners, parsePortalOwnerText, isGroupHeader, classifyOwner, ownerTypeLabel, ownerTypeColor, telSearchUrlParsed, opendiUrlParsed, type ParsedOwner } from '@/lib/owner-utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
+import { getMyPhone } from '@/hooks/use-eigentuemer-lookup';
 
 interface OwnerEntry {
   raw: string;
@@ -52,6 +53,8 @@ export function AkquiseMode() {
   const [extensionAvailable, setExtensionAvailable] = useState(false);
   const [autoStatus, setAutoStatus] = useState<string | null>(null);
   const ownerInputRef = useRef<HTMLInputElement>(null);
+  const [showSmsPicker, setShowSmsPicker] = useState(false);
+  const [smsChoice, setSmsChoice] = useState<string>('');
 
   const updateOwnerRaw = useCallback((index: number, raw: string) => {
     setOwners(prev => {
@@ -131,6 +134,8 @@ export function AkquiseMode() {
   useEffect(() => {
     setOwners([createEmptyOwner()]);
     setGisOpened(false);
+    setShowSmsPicker(false);
+    setSmsChoice('');
     setTimeout(() => ownerInputRef.current?.focus(), 100);
   }, [currentIndex]);
 
@@ -589,12 +594,49 @@ export function AkquiseMode() {
                 )}
 
                 {/* Auto-Recherche button (requires Chrome Extension) */}
-                {current?.egrid && selectedPhone && (
+                {current?.egrid && selectedPhone && (() => {
+                  const ownersList: Array<{ name?: string; address?: string; phone?: string }> = Array.isArray((current as { owners_json?: unknown }).owners_json)
+                    ? ((current as { owners_json?: Array<{ name?: string; address?: string; phone?: string }> }).owners_json || [])
+                    : [];
+                  const ownerPhoneOptions = ownersList
+                    .filter(o => o.phone && o.phone.trim())
+                    .map((o, i) => ({
+                      id: `owner-${i}`,
+                      number: o.phone!.trim(),
+                      label: [o.name, o.address].filter(Boolean).join(', '),
+                    }));
+                  const myPhone = getMyPhone();
+                  const options = [
+                    ...ownerPhoneOptions,
+                    ...(myPhone ? [{ id: 'mine', number: myPhone, label: 'Meine Nummer (Settings)' }] : []),
+                    { id: 'selected', number: selectedPhone.number, label: `Aktive Telefon-Nummer${selectedPhone.label ? ` (${selectedPhone.label})` : ''}` },
+                  ];
+                  const startWith = (phoneNumber: string) => {
+                    if (!current?.egrid) return;
+                    setAutoStatus('Starte...');
+                    window.dispatchEvent(new CustomEvent('akquise-start-lookup', {
+                      detail: {
+                        egrid: current.egrid,
+                        bfsNr: current.bfs_nr || '',
+                        parzelle: current.parzelle || '',
+                        phoneNumber,
+                        propertyId: current.id,
+                        appOrigin: window.location.hostname,
+                        address: current.address,
+                        plzOrt: current.plz_ort || current.gemeinde || '',
+                      },
+                    }));
+                    setGisOpened(true);
+                    setShowSmsPicker(false);
+                    setAutoStatus('Portal wird geöffnet...');
+                    setTimeout(() => setAutoStatus(null), 120000);
+                  };
+                  return (
                   <div className="rounded-lg bg-primary/10 border border-primary/30 px-4 py-3 space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Bot className="h-4 w-4 text-primary" />
-                        <p className="text-sm font-semibold text-primary">Auto-Recherche</p>
+                        <p className="text-sm font-semibold text-primary">Eigentümerauskunft</p>
                         {autoStatus && (
                           <Badge variant="outline" className="text-xs animate-pulse">{autoStatus}</Badge>
                         )}
@@ -625,34 +667,72 @@ export function AkquiseMode() {
                       )}
                     </div>
 
-                    <Button
-                      onClick={() => {
-                        if (!current?.egrid || !selectedPhone) return;
-                        setAutoStatus('Starte...');
-                        // Send message to extension via custom event
-                        window.dispatchEvent(new CustomEvent('akquise-start-lookup', {
-                          detail: {
-                            egrid: current.egrid,
-                            bfsNr: current.bfs_nr || '',
-                            parzelle: current.parzelle || '',
-                            phoneNumber: selectedPhone.number,
-                            propertyId: current.id,
-                            appOrigin: window.location.hostname,
-                            address: current.address,
-                            plzOrt: current.plz_ort || current.gemeinde || '',
-                          }
-                        }));
-                        setGisOpened(true);
-                        setAutoStatus('Portal wird geöffnet...');
-                        // Timeout fallback
-                        setTimeout(() => setAutoStatus(null), 120000);
-                      }}
-                      disabled={remaining <= 0 || !!autoStatus}
-                      className="w-full h-12 text-base gap-2"
-                    >
-                      <Bot className="h-5 w-5" />
-                      {autoStatus || 'Auto-Recherche starten'}
-                    </Button>
+                    {!showSmsPicker && (
+                      <Button
+                        onClick={() => {
+                          setSmsChoice(options[0]?.id || 'selected');
+                          setShowSmsPicker(true);
+                        }}
+                        disabled={remaining <= 0 || !!autoStatus}
+                        className="w-full h-12 text-base gap-2"
+                      >
+                        <Bot className="h-5 w-5" />
+                        {autoStatus || '👤 Eigentümerauskunft'}
+                      </Button>
+                    )}
+
+                    {showSmsPicker && (
+                      <div className="space-y-2 rounded-md bg-background/70 border border-border p-3">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                          Welche Nummer für SMS-Bestätigung?
+                        </p>
+                        <div className="space-y-1.5">
+                          {options.map(opt => (
+                            <label key={opt.id} className="flex items-center gap-2 text-sm rounded px-2 py-1.5 hover:bg-muted/50 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="sms-phone"
+                                value={opt.id}
+                                checked={smsChoice === opt.id}
+                                onChange={() => setSmsChoice(opt.id)}
+                                className="accent-primary"
+                              />
+                              <span className="font-mono text-xs font-semibold">{opt.number}</span>
+                              {opt.label && <span className="text-xs text-muted-foreground truncate">— {opt.label}</span>}
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                className="ml-auto h-6 px-2 text-[10px] gap-1"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  navigator.clipboard.writeText(opt.number);
+                                  toast({ title: '📋 Nummer kopiert' });
+                                }}
+                              >
+                                <Copy className="h-3 w-3" /> Kopieren
+                              </Button>
+                            </label>
+                          ))}
+                        </div>
+                        <div className="flex gap-2 pt-1">
+                          <Button
+                            onClick={() => {
+                              const chosen = options.find(o => o.id === smsChoice) || options[0];
+                              if (chosen) startWith(chosen.number);
+                            }}
+                            disabled={remaining <= 0 || !!autoStatus || options.length === 0}
+                            className="flex-1 h-10 gap-2"
+                          >
+                            <Bot className="h-4 w-4" />
+                            Eigentümerauskunft starten
+                          </Button>
+                          <Button variant="outline" className="h-10" onClick={() => setShowSmsPicker(false)}>
+                            Abbrechen
+                          </Button>
+                        </div>
+                      </div>
+                    )}
 
                     {!extensionAvailable && (
                       <p className="text-[11px] text-muted-foreground">
@@ -660,7 +740,8 @@ export function AkquiseMode() {
                       </p>
                     )}
                   </div>
-                )}
+                  );
+                })()}
 
                 <div className="rounded-lg bg-muted/50 border border-border px-4 py-3 space-y-1">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Manuell</p>
