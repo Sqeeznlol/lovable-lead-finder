@@ -28,15 +28,13 @@ export function useVorauswahlStats() {
       weekStart.setDate(weekStart.getDate() - 7);
       weekStart.setHours(0, 0, 0, 0);
 
-      type PropertiesCountQuery = ReturnType<typeof supabase.from<'properties'>>['select'] extends never
-        ? never
-        : ReturnType<ReturnType<typeof supabase.from<'properties'>>['select']>;
-      const buildQuery = (extra?: (q: PropertiesCountQuery) => PropertiesCountQuery) => {
-        let q = supabase.from('properties').select('*', { count: 'exact', head: true }) as PropertiesCountQuery;
+      type CountQuery = ReturnType<ReturnType<typeof supabase.from<'properties', any>>['select']>;
+      const buildQuery = (extra?: (q: CountQuery) => CountQuery): CountQuery => {
+        let q = supabase.from('properties').select('*', { count: 'exact', head: true }) as CountQuery;
         if (!isPrio) {
-          q = q.like('zone', 'W%').eq('geb_status', 'Bestehend') as PropertiesCountQuery;
+          q = q.like('zone', 'W%').eq('geb_status', 'Bestehend') as CountQuery;
         }
-        if (selectedListId) q = q.eq('list_id', selectedListId) as PropertiesCountQuery;
+        if (selectedListId) q = q.eq('list_id', selectedListId) as CountQuery;
         if (extra) q = extra(q);
         return q;
       };
