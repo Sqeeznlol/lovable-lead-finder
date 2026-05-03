@@ -28,13 +28,13 @@ export function useVorauswahlStats() {
       weekStart.setDate(weekStart.getDate() - 7);
       weekStart.setHours(0, 0, 0, 0);
 
-      type CountQuery = ReturnType<ReturnType<typeof supabase.from<'properties', any>>['select']>;
-      const buildQuery = (extra?: (q: CountQuery) => CountQuery): CountQuery => {
-        let q = supabase.from('properties').select('*', { count: 'exact', head: true }) as CountQuery;
+      const buildQuery = (extra?: (q: ReturnType<typeof baseQuery>) => ReturnType<typeof baseQuery>) => {
+        const baseQuery = () => supabase.from('properties').select('*', { count: 'exact', head: true });
+        let q = baseQuery();
         if (!isPrio) {
-          q = q.like('zone', 'W%').eq('geb_status', 'Bestehend') as CountQuery;
+          q = q.like('zone', 'W%').eq('geb_status', 'Bestehend');
         }
-        if (selectedListId) q = q.eq('list_id', selectedListId) as CountQuery;
+        if (selectedListId) q = q.eq('list_id', selectedListId);
         if (extra) q = extra(q);
         return q;
       };
@@ -64,9 +64,7 @@ export function useVorauswahlStats() {
         .select('*', { count: 'exact', head: true })
         .gte('created_at', weekStart.toISOString());
 
-      const { count: pipedriveExported } = await buildQuery(q =>
-        q.eq('export_status', 'exported') as typeof q
-      );
+      const { count: pipedriveExported } = await buildQuery(q => q.eq('export_status', 'exported'));
 
       const totalNum = total || 0;
       const approvedNum = approved || 0;
