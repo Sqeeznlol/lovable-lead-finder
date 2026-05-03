@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { CantonProvider } from "@/hooks/use-canton";
+import { useEigentuemerLookupListener } from "@/hooks/use-eigentuemer-lookup";
 const Index = lazy(() => import("./pages/Index.tsx"));
 const SwipePage = lazy(() => import("./pages/SwipePage.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
@@ -20,6 +21,11 @@ const queryClient = new QueryClient({
   },
 });
 
+function GlobalListeners() {
+  useEigentuemerLookupListener();
+  return null;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
@@ -29,6 +35,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <GlobalListeners />
           <Suspense fallback={<div className="min-h-screen bg-background" />}>
             <Routes>
               <Route path="/" element={<Index />} />

@@ -305,6 +305,10 @@ export type Database = {
           duplicate_flag: boolean | null
           duplicate_group_id: string | null
           egrid: string | null
+          eigentuemer_adresse: string | null
+          eigentuemer_fetched_at: string | null
+          eigentuemer_name: string | null
+          eigentuemer_plz_ort: string | null
           export_status: string
           follow_up_at: string | null
           geb_status: string | null
@@ -390,6 +394,10 @@ export type Database = {
           duplicate_flag?: boolean | null
           duplicate_group_id?: string | null
           egrid?: string | null
+          eigentuemer_adresse?: string | null
+          eigentuemer_fetched_at?: string | null
+          eigentuemer_name?: string | null
+          eigentuemer_plz_ort?: string | null
           export_status?: string
           follow_up_at?: string | null
           geb_status?: string | null
@@ -475,6 +483,10 @@ export type Database = {
           duplicate_flag?: boolean | null
           duplicate_group_id?: string | null
           egrid?: string | null
+          eigentuemer_adresse?: string | null
+          eigentuemer_fetched_at?: string | null
+          eigentuemer_name?: string | null
+          eigentuemer_plz_ort?: string | null
           export_status?: string
           follow_up_at?: string | null
           geb_status?: string | null
