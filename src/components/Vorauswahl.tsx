@@ -21,8 +21,6 @@ import { useListFilter, useLists } from '@/hooks/use-lists';
 import { ListSelector } from '@/components/ListSelector';
 import { GemeindeSidebar } from '@/components/GemeindeSidebar';
 import { getOerebParzelleUrl } from '@/lib/oereb';
-import { useStartEigentuemerLookup } from '@/hooks/use-eigentuemer-lookup';
-import { useAutomationSettings } from '@/hooks/use-app-settings';
 
 type ViewMode = 'card' | 'table';
 
@@ -70,8 +68,6 @@ export function Vorauswahl() {
   const updateProp = useUpdateProperty();
   const { toast } = useToast();
   const { user } = useAuth();
-  const startLookup = useStartEigentuemerLookup();
-  const { data: automation } = useAutomationSettings();
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [processing, setProcessing] = useState(false);
