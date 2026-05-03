@@ -1,6 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { TrendingUp, Clock, CheckCircle2, XCircle, BarChart3, Layers, CalendarDays, Target } from 'lucide-react';
+import { TrendingUp, Clock, CheckCircle2, XCircle, BarChart3, Layers, CalendarDays, Target, Send } from 'lucide-react';
 
 interface StatsData {
   total: number;
@@ -11,6 +11,7 @@ interface StatsData {
   weekProcessed: number;
   conversionRate: number;
   progressPercent: number;
+  pipedriveExported: number;
 }
 
 interface VorauswahlStatsBarProps {
@@ -63,6 +64,15 @@ export function VorauswahlStatsBar({ stats, filteredCount, showFiltered }: Vorau
             {stats?.conversionRate ?? 0}%
           </p>
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Conv.-Rate</p>
+        </div>
+        <div className="bg-card rounded-xl border px-3 py-2.5 text-center hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-center gap-1 mb-0.5">
+            <Send className="h-3.5 w-3.5 text-primary" />
+          </div>
+          <p className="text-xl font-bold tabular-nums text-primary">
+            {(stats?.pipedriveExported ?? 0).toLocaleString('de-CH')}
+          </p>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Pipedrive</p>
         </div>
         <div className="bg-card rounded-xl border px-3 py-2.5 text-center hover:shadow-md transition-shadow">
           <div className="flex items-center justify-center gap-1 mb-0.5">
