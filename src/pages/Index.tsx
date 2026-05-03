@@ -16,6 +16,7 @@ const AdminSettings = lazy(() => import('@/components/AdminSettings').then(m => 
 import { ListSelector } from '@/components/ListSelector';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CantonTabs } from '@/components/CantonTabs';
+import { KeyboardShortcutsOverlay } from '@/components/KeyboardShortcutsOverlay';
 import { useCanton } from '@/hooks/use-canton';
 import { usePlatform } from '@/hooks/use-platform';
 import { useMidnightReset } from '@/hooks/use-phones';
@@ -62,6 +63,7 @@ export default function Index() {
 
   return (
     <div className="flex min-h-safe-screen bg-background">
+      <KeyboardShortcutsOverlay />
       <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-sidebar/95 backdrop-blur-xl border-r border-foreground/5 transform transition-transform lg:translate-x-0 lg:static pt-safe pb-safe pl-safe ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-7 border-b border-foreground/5">
           <div className="flex items-center gap-2.5">
