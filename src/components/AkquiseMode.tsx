@@ -360,8 +360,8 @@ export function AkquiseMode() {
         toast({ title: hasAnyOwner ? (hasAnyPhone ? '✅ Mit Telefon gespeichert' : '✅ Eigentümer gespeichert') : '✅ Kein Ergebnis – weiter' });
       }
       moveToNext();
-    } catch {
-      toast({ title: 'Fehler', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Speichern fehlgeschlagen', description: (err as Error)?.message || 'Unbekannter Fehler', variant: 'destructive' });
       setAutoStatus(null);
     } finally {
       setProcessing(false);
@@ -377,8 +377,8 @@ export function AkquiseMode() {
       await updateProp.mutateAsync({ id: current.id, status: 'Ausgeblendet' });
       toast({ title: 'Ausgeblendet' });
       moveToNext();
-    } catch {
-      toast({ title: 'Fehler', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Ausblenden fehlgeschlagen', description: (err as Error)?.message || 'Unbekannter Fehler', variant: 'destructive' });
     } finally {
       setProcessing(false);
     }
