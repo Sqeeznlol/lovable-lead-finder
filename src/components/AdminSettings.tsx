@@ -131,7 +131,7 @@ export function AdminSettings() {
                 <p className="text-xs text-muted-foreground mt-0.5">{item.desc}</p>
               </div>
               <Switch
-                checked={!!(automation as Record<string, unknown>)?.[item.key]}
+                checked={!!(automation as unknown as Record<string, unknown>)?.[item.key]}
                 onCheckedChange={v => updateAutomation.mutate({ [item.key]: v })}
               />
             </div>
