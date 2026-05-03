@@ -1,17 +1,18 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Building2, LayoutDashboard, Upload, Phone, Menu, X, Zap, Search, FileSpreadsheet, Eye, Shield, Share, Plus, Database } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Dashboard } from '@/components/Dashboard';
-import { PropertyList } from '@/components/PropertyList';
-import { CsvImport } from '@/components/CsvImport';
-import { MasterImport } from '@/components/MasterImport';
-import { MasterList } from '@/components/MasterList';
-import { PhoneManager } from '@/components/PhoneManager';
-import { AkquiseMode } from '@/components/AkquiseMode';
-import { TelefonSuche } from '@/components/TelefonSuche';
-import { PipedriveExport } from '@/components/PipedriveExport';
-import { Vorauswahl } from '@/components/Vorauswahl';
-import { AdminSettings } from '@/components/AdminSettings';
+import { Skeleton } from '@/components/ui/skeleton';
+const Dashboard = lazy(() => import('@/components/Dashboard').then(m => ({ default: m.Dashboard })));
+const PropertyList = lazy(() => import('@/components/PropertyList').then(m => ({ default: m.PropertyList })));
+const CsvImport = lazy(() => import('@/components/CsvImport').then(m => ({ default: m.CsvImport })));
+const MasterImport = lazy(() => import('@/components/MasterImport').then(m => ({ default: m.MasterImport })));
+const MasterList = lazy(() => import('@/components/MasterList').then(m => ({ default: m.MasterList })));
+const PhoneManager = lazy(() => import('@/components/PhoneManager').then(m => ({ default: m.PhoneManager })));
+const AkquiseMode = lazy(() => import('@/components/AkquiseMode').then(m => ({ default: m.AkquiseMode })));
+const TelefonSuche = lazy(() => import('@/components/TelefonSuche').then(m => ({ default: m.TelefonSuche })));
+const PipedriveExport = lazy(() => import('@/components/PipedriveExport').then(m => ({ default: m.PipedriveExport })));
+const Vorauswahl = lazy(() => import('@/components/Vorauswahl').then(m => ({ default: m.Vorauswahl })));
+const AdminSettings = lazy(() => import('@/components/AdminSettings').then(m => ({ default: m.AdminSettings })));
 import { ListSelector } from '@/components/ListSelector';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CantonTabs } from '@/components/CantonTabs';
@@ -129,17 +130,25 @@ export default function Index() {
         </div>
 
         <div className="flex-1 p-4 lg:p-12 max-w-7xl pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-12 animate-fade-in">
-          {active === 'dashboard' && <Dashboard />}
-          {active === 'master' && <MasterList />}
-          {active === 'masterimport' && <MasterImport />}
-          {active === 'vorauswahl' && <Vorauswahl />}
-          {active === 'akquise' && <AkquiseMode />}
-          {active === 'telsuche' && <TelefonSuche />}
-          {active === 'properties' && <PropertyList />}
-          {active === 'export' && <PipedriveExport />}
-          {active === 'import' && <CsvImport />}
-          {active === 'phones' && <PhoneManager />}
-          {active === 'admin' && <AdminSettings />}
+          <Suspense fallback={
+            <div className="space-y-4">
+              <Skeleton className="h-10 w-1/3" />
+              <Skeleton className="h-32 w-full" />
+              <Skeleton className="h-64 w-full" />
+            </div>
+          }>
+            {active === 'dashboard' && <Dashboard />}
+            {active === 'master' && <MasterList />}
+            {active === 'masterimport' && <MasterImport />}
+            {active === 'vorauswahl' && <Vorauswahl />}
+            {active === 'akquise' && <AkquiseMode />}
+            {active === 'telsuche' && <TelefonSuche />}
+            {active === 'properties' && <PropertyList />}
+            {active === 'export' && <PipedriveExport />}
+            {active === 'import' && <CsvImport />}
+            {active === 'phones' && <PhoneManager />}
+            {active === 'admin' && <AdminSettings />}
+          </Suspense>
         </div>
 
         {/* iOS-style bottom tab bar (mobile only) */}
