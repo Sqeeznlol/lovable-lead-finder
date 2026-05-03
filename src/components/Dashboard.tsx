@@ -1,15 +1,21 @@
-import { Building2, Users, Search, Send, Phone, AlertTriangle, TrendingUp, CheckCircle, Eye } from 'lucide-react';
+import { useState } from 'react';
+import { Building2, Users, Search, Send, Phone, AlertTriangle, TrendingUp, CheckCircle, Eye, CalendarClock, ChevronDown, ChevronUp, Sunrise } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
 import { usePropertyStats } from '@/hooks/use-properties';
 import { useVorauswahlStats } from '@/hooks/use-vorauswahl-stats';
 import { usePhoneNumbers } from '@/hooks/use-phones';
+import { useFollowUpStats, useDailyDigest } from '@/hooks/use-follow-ups';
 
 export function Dashboard() {
   const { data: stats } = usePropertyStats();
   const { data: vaStats } = useVorauswahlStats();
   const { data: phones } = usePhoneNumbers();
+  const { data: followUps } = useFollowUpStats();
+  const { data: digest } = useDailyDigest();
+  const [digestOpen, setDigestOpen] = useState(true);
 
   const totalCapacity = (phones || []).length * 5;
   const usedToday = (phones || []).reduce((acc, p) => acc + p.daily_queries_used, 0);
@@ -32,6 +38,58 @@ export function Dashboard() {
           <p className="text-muted-foreground mt-1">Überblick über deine Akquise-Pipeline</p>
         </div>
       </div>
+
+      {/* Daily digest */}
+      <Card className="border-none shadow-md bg-gradient-to-br from-accent/5 to-primary/5">
+        <CardContent className="p-5">
+          <button onClick={() => setDigestOpen(o => !o)} className="w-full flex items-center justify-between gap-2">
+            <span className="font-semibold flex items-center gap-2">
+              <Sunrise className="h-4 w-4 text-primary" /> Heute
+            </span>
+            {digestOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+          </button>
+          {digestOpen && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
+              {[
+                { label: 'Bearbeitet (gestern)', value: digest?.decisionsYesterday ?? 0 },
+                { label: 'Pipedrive (gestern)', value: digest?.exportsYesterday ?? 0 },
+                { label: 'Follow-ups heute', value: followUps?.dueToday ?? 0 },
+                { label: 'Stagnierte Leads', value: followUps?.stagnant ?? 0 },
+              ].map(s => (
+                <div key={s.label} className="text-center bg-card/60 rounded-xl py-3">
+                  <p className="text-2xl font-bold">{s.value.toLocaleString('de-CH')}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{s.label}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Follow-ups */}
+      {(followUps?.dueToday || followUps?.dueWeek || followUps?.stagnant) ? (
+        <Card className="border-none shadow-md">
+          <CardContent className="p-5">
+            <h3 className="font-semibold mb-3 flex items-center gap-2">
+              <CalendarClock className="h-4 w-4 text-primary" /> Follow-ups
+            </h3>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-warning/10 rounded-xl p-3 text-center">
+                <p className="text-2xl font-bold text-warning">{followUps?.dueToday ?? 0}</p>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Fällig heute</p>
+              </div>
+              <div className="bg-primary/10 rounded-xl p-3 text-center">
+                <p className="text-2xl font-bold text-primary">{followUps?.dueWeek ?? 0}</p>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Diese Woche</p>
+              </div>
+              <div className="bg-destructive/10 rounded-xl p-3 text-center">
+                <p className="text-2xl font-bold text-destructive">{followUps?.stagnant ?? 0}</p>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Stagniert</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Vorauswahl stats - prominent */}
       <Card className="border-none shadow-md bg-gradient-to-br from-primary/5 to-accent/5">
