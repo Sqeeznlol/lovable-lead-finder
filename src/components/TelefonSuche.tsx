@@ -12,12 +12,14 @@ import { classifyOwner, ownerTypeLabel, ownerTypeColor, parseOwnerString, telSea
 import { supabase } from '@/integrations/supabase/client';
 import { useListFilter } from '@/hooks/use-lists';
 import { ListSelector } from '@/components/ListSelector';
+import { useAutomationSettings } from '@/hooks/use-app-settings';
 
 export function TelefonSuche() {
   const selectedListId = useListFilter(s => s.selectedListId);
   const { data: result, refetch } = useProperties({ statusFilter: 'Eigentümer ermittelt', pageSize: 200, listId: selectedListId });
   const updateProp = useUpdateProperty();
   const { toast } = useToast();
+  const { data: settings } = useAutomationSettings();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [phone1, setPhone1] = useState('');
   const [phone2, setPhone2] = useState('');
@@ -27,6 +29,7 @@ export function TelefonSuche() {
   const [autoSearching, setAutoSearching] = useState(false);
   const [autoResult, setAutoResult] = useState<{ match: boolean; phone?: string; foundAddress?: string; searchUrl?: string } | null>(null);
   const [autoExporting, setAutoExporting] = useState(false);
+  const [advanceCountdown, setAdvanceCountdown] = useState<number | null>(null);
 
   const autoSearchOwner = async (ownerName: string, ownerAddress: string | null, setter: (v: string) => void) => {
     const parsed = parseOwnerString(ownerName);
@@ -160,9 +163,34 @@ export function TelefonSuche() {
           });
 
           if (pushData?.summary?.created > 0) {
-            await updateProp.mutateAsync({ id: current.id, status: 'Exportiert', export_status: 'exported' } as any);
+            // Auto-schedule follow-up
+            const followUpDays = settings?.follow_up_days ?? 3;
+            const followUpAt = new Date();
+            followUpAt.setDate(followUpAt.getDate() + followUpDays);
+            await updateProp.mutateAsync({
+              id: current.id,
+              status: 'Exportiert',
+              export_status: 'exported',
+              follow_up_at: followUpAt.toISOString(),
+              last_export_at: new Date().toISOString(),
+            } as any);
             toast({ title: '🚀 Auto-Export → Pipedrive', description: `${foundPhone1} gefunden und Lead erstellt` });
-            setTimeout(() => moveToNext(), 1200);
+
+            // Optional SMS auto-confirmation (feature-flagged, defaults off)
+            if (settings?.sms_auto_confirm && foundPhone1) {
+              supabase.functions.invoke('sms-confirmation', {
+                body: {
+                  to: foundPhone1,
+                  address: current.address,
+                  ownerName: current.owner_name,
+                },
+              }).catch(() => {/* silent */});
+            }
+
+            // Smart auto-advance with cancellable countdown
+            if (settings?.auto_advance !== false) {
+              setAdvanceCountdown(2);
+            }
           } else {
             toast({ title: '✅ Nummer gefunden', description: foundPhone1 });
           }
@@ -178,6 +206,18 @@ export function TelefonSuche() {
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.id]);
+
+  // Auto-advance countdown ticker
+  useEffect(() => {
+    if (advanceCountdown === null) return;
+    if (advanceCountdown <= 0) {
+      setAdvanceCountdown(null);
+      moveToNext();
+      return;
+    }
+    const t = setTimeout(() => setAdvanceCountdown(c => (c === null ? null : c - 1)), 1000);
+    return () => clearTimeout(t);
+  }, [advanceCountdown, moveToNext]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -317,6 +357,18 @@ export function TelefonSuche() {
               <div className="mt-3 rounded-lg bg-primary/10 border border-primary/30 p-3 flex items-center gap-2">
                 <Loader2 className="h-4 w-4 text-primary animate-spin" />
                 <p className="text-sm font-medium text-primary">Auto-Push zu Pipedrive läuft...</p>
+              </div>
+            )}
+
+            {/* Smart auto-advance countdown */}
+            {advanceCountdown !== null && (
+              <div className="mt-3 rounded-lg bg-accent/10 border border-accent/30 p-3 flex items-center justify-between gap-2">
+                <p className="text-sm font-medium text-accent">
+                  Nächste Liegenschaft in {advanceCountdown}s …
+                </p>
+                <Button size="sm" variant="ghost" onClick={() => setAdvanceCountdown(null)}>
+                  Abbrechen
+                </Button>
               </div>
             )}
 
