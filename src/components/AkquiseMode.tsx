@@ -17,7 +17,6 @@ import { parseOwnerString, parseMultipleOwners, parsePortalOwnerText, isGroupHea
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
 import { getMyPhone } from '@/hooks/use-eigentuemer-lookup';
-import { User } from 'lucide-react';
 
 interface OwnerEntry {
   raw: string;
