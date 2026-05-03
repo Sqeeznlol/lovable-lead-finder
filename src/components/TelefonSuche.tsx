@@ -208,8 +208,8 @@ export function TelefonSuche() {
       await updateProp.mutateAsync(updates as any);
       toast({ title: phone1 ? '✅ Telefonnummer gespeichert' : '✅ Übersprungen' });
       moveToNext();
-    } catch {
-      toast({ title: 'Fehler', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Speichern fehlgeschlagen', description: (err as Error)?.message || 'Unbekannter Fehler', variant: 'destructive' });
     } finally {
       setProcessing(false);
     }
@@ -226,8 +226,8 @@ export function TelefonSuche() {
       });
       toast({ title: '⚠️ Als geringe Chance markiert' });
       moveToNext();
-    } catch {
-      toast({ title: 'Fehler', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Speichern fehlgeschlagen', description: (err as Error)?.message || 'Unbekannter Fehler', variant: 'destructive' });
     } finally {
       setProcessing(false);
     }

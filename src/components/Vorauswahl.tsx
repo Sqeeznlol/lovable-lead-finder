@@ -143,8 +143,8 @@ export function Vorauswahl() {
       setSessionStats(s => ({ ...s, interessant: s.interessant + 1 }));
       toast({ title: '👍 Vorausgewählt' });
       moveToNext();
-    } catch {
-      toast({ title: 'Fehler', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Speichern fehlgeschlagen', description: (err as Error)?.message || 'Unbekannter Fehler', variant: 'destructive' });
     } finally {
       setProcessing(false);
     }
@@ -159,8 +159,8 @@ export function Vorauswahl() {
       setSessionStats(s => ({ ...s, ausgeblendet: s.ausgeblendet + 1 }));
       toast({ title: '👎 Nicht interessant' });
       moveToNext();
-    } catch {
-      toast({ title: 'Fehler', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Speichern fehlgeschlagen', description: (err as Error)?.message || 'Unbekannter Fehler', variant: 'destructive' });
     } finally {
       setProcessing(false);
     }
@@ -179,8 +179,8 @@ export function Vorauswahl() {
       setSessionStats(s => ({ ...s, ausgeblendet: s.ausgeblendet + 1 }));
       toast({ title: 'Ausgeblendet' });
       moveToNext();
-    } catch {
-      toast({ title: 'Fehler', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Ausblenden fehlgeschlagen', description: (err as Error)?.message || 'Unbekannter Fehler', variant: 'destructive' });
     } finally {
       setProcessing(false);
     }

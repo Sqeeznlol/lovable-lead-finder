@@ -136,8 +136,8 @@ export function PipedriveExport() {
       await updateProp.mutateAsync({ id, status: 'Telefon gefunden' });
       toast({ title: '✅ Wiederhergestellt' });
       refetch();
-    } catch {
-      toast({ title: 'Fehler', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Wiederherstellen fehlgeschlagen', description: (err as Error)?.message || 'Unbekannter Fehler', variant: 'destructive' });
     } finally {
       setRestoring(null);
     }
