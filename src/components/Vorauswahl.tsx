@@ -70,6 +70,8 @@ export function Vorauswahl() {
   const updateProp = useUpdateProperty();
   const { toast } = useToast();
   const { user } = useAuth();
+  const startLookup = useStartEigentuemerLookup();
+  const { data: automation } = useAutomationSettings();
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [processing, setProcessing] = useState(false);
