@@ -344,14 +344,45 @@ export function PipedriveExport() {
 
           {/* Actions */}
           {!showArchive && (
-            <div className="flex gap-3">
-              <Button onClick={pushToPipedrive} disabled={isLoading || properties.length === 0 || pushing} className="flex-1 h-12 text-base gap-2" size="lg">
-                {pushing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-                {pushing ? 'Wird gepusht...' : `Zu Pipedrive pushen (${count})`}
-              </Button>
-              <Button onClick={exportCsv} disabled={isLoading || properties.length === 0} variant="outline" className="h-12 gap-2" size="lg">
-                <Download className="h-4 w-4" /> CSV
-              </Button>
+            <div className="space-y-2">
+              <div className="flex gap-2 flex-wrap">
+                <Button onClick={pushToPipedrive} disabled={isLoading || properties.length === 0 || pushing} className="flex-1 min-w-[200px] h-12 text-base gap-2" size="lg">
+                  {pushing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+                  {pushing ? 'Wird gepusht...' : `Zu Pipedrive pushen (${count})`}
+                </Button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="lg" className="h-12 gap-2">
+                      <Columns3 className="h-4 w-4" /> Spalten ({activeColumns.length})
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-72 p-3 max-h-96 overflow-y-auto" align="end">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase">Spalten wählen</p>
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2"
+                          onClick={() => setSelectedColumns(new Set(EXPORT_COLUMNS.map(c => c.key)))}>Alle</Button>
+                        <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2"
+                          onClick={() => setSelectedColumns(new Set(DEFAULT_COLUMNS))}>Standard</Button>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      {EXPORT_COLUMNS.map(col => (
+                        <label key={col.key} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted rounded px-2 py-1">
+                          <Checkbox checked={selectedColumns.has(col.key)} onCheckedChange={() => toggleColumn(col.key)} />
+                          <span>{col.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+                <Button onClick={exportCsv} disabled={isLoading || properties.length === 0 || activeColumns.length === 0} variant="outline" className="h-12 gap-2" size="lg">
+                  <Download className="h-4 w-4" /> CSV
+                </Button>
+                <Button onClick={exportExcel} disabled={isLoading || properties.length === 0 || activeColumns.length === 0} variant="outline" className="h-12 gap-2" size="lg">
+                  <FileSpreadsheet className="h-4 w-4" /> Excel
+                </Button>
+              </div>
             </div>
           )}
 
