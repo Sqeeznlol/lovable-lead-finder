@@ -114,8 +114,8 @@ export function QueryQueue() {
       });
       toast({ title: 'Übersprungen' });
       moveToNext();
-    } catch {
-      toast({ title: 'Fehler', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Speichern fehlgeschlagen', description: (err as Error)?.message || 'Unbekannter Fehler', variant: 'destructive' });
     } finally {
       setProcessing(false);
     }
