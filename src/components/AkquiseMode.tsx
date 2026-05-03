@@ -134,6 +134,8 @@ export function AkquiseMode() {
   useEffect(() => {
     setOwners([createEmptyOwner()]);
     setGisOpened(false);
+    setShowSmsPicker(false);
+    setSmsChoice('');
     setTimeout(() => ownerInputRef.current?.focus(), 100);
   }, [currentIndex]);
 
