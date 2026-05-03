@@ -1,6 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { TrendingUp, Clock, CheckCircle2, XCircle, BarChart3, Layers } from 'lucide-react';
+import { TrendingUp, Clock, CheckCircle2, XCircle, BarChart3, Layers, CalendarDays, Target } from 'lucide-react';
 
 interface StatsData {
   total: number;
@@ -8,6 +8,8 @@ interface StatsData {
   approved: number;
   rejected: number;
   todayProcessed: number;
+  weekProcessed: number;
+  conversionRate: number;
   progressPercent: number;
 }
 
@@ -28,7 +30,7 @@ const statItems = [
 export function VorauswahlStatsBar({ stats, filteredCount, showFiltered }: VorauswahlStatsBarProps) {
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
         {statItems.map(s => {
           const value = stats?.[s.key] ?? 0;
           const Icon = s.icon;
@@ -44,6 +46,24 @@ export function VorauswahlStatsBar({ stats, filteredCount, showFiltered }: Vorau
             </div>
           );
         })}
+        <div className="bg-card rounded-xl border px-3 py-2.5 text-center hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-center gap-1 mb-0.5">
+            <CalendarDays className="h-3.5 w-3.5 text-primary" />
+          </div>
+          <p className="text-xl font-bold tabular-nums text-primary">
+            {(stats?.weekProcessed ?? 0).toLocaleString('de-CH')}
+          </p>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">7 Tage</p>
+        </div>
+        <div className="bg-card rounded-xl border px-3 py-2.5 text-center hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-center gap-1 mb-0.5">
+            <Target className="h-3.5 w-3.5 text-emerald-500" />
+          </div>
+          <p className="text-xl font-bold tabular-nums text-emerald-500">
+            {stats?.conversionRate ?? 0}%
+          </p>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Conv.-Rate</p>
+        </div>
         <div className="bg-card rounded-xl border px-3 py-2.5 text-center hover:shadow-md transition-shadow">
           <div className="flex items-center justify-center gap-1 mb-0.5">
             <BarChart3 className="h-3.5 w-3.5 text-primary" />

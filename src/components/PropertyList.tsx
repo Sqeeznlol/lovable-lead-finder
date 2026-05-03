@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { fetchAllProperties, useProperties, useGemeinden, useZones, useUpdateProperty, useDeleteProperty, type Property } from '@/hooks/use-properties';
 import { useToast } from '@/hooks/use-toast';
 import { getOerebParzelleUrl } from '@/lib/oereb';
+import { exportTimestamp } from '@/lib/export-utils';
 
 const STATUSES = ['Alle', 'Neu', 'Eigentümer ermittelt', 'Kontaktiert', 'Interesse', 'Kein Interesse', 'Abgeschlossen', 'Ausgeblendet'];
 
@@ -143,7 +144,7 @@ export function PropertyList() {
         { wch: 14 }, { wch: 32 }, { wch: 32 }, { wch: 42 }, { wch: 40 },
       ];
       XLSX.utils.book_append_sheet(wb, ws, 'Liegenschaften');
-      XLSX.writeFile(wb, `liegenschaften-gesamtliste-${new Date().toISOString().split('T')[0]}.xlsx`);
+      XLSX.writeFile(wb, `liegenschaften-gesamtliste_${exportTimestamp()}.xlsx`);
       toast({ title: `✅ Excel exportiert (${allRows.length})` });
     } catch (error) {
       toast({ title: 'Excel-Export fehlgeschlagen', description: String(error), variant: 'destructive' });

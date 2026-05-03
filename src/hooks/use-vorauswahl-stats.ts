@@ -8,6 +8,8 @@ interface VorauswahlStats {
   approved: number;
   rejected: number;
   todayProcessed: number;
+  weekProcessed: number;
+  conversionRate: number;
   progressPercent: number;
 }
 
@@ -21,6 +23,9 @@ export function useVorauswahlStats() {
     queryFn: async (): Promise<VorauswahlStats> => {
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
+      const weekStart = new Date();
+      weekStart.setDate(weekStart.getDate() - 7);
+      weekStart.setHours(0, 0, 0, 0);
 
       const buildQuery = (extra?: (q: any) => any) => {
         let q = supabase.from('properties').select('*', { count: 'exact', head: true });
@@ -52,11 +57,17 @@ export function useVorauswahlStats() {
         .select('*', { count: 'exact', head: true })
         .gte('created_at', todayStart.toISOString());
 
+      const { count: weekProcessed } = await supabase
+        .from('property_decisions')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', weekStart.toISOString());
+
       const totalNum = total || 0;
       const approvedNum = approved || 0;
       const rejectedNum = rejected || 0;
       const processed = approvedNum + rejectedNum;
       const progressPercent = totalNum > 0 ? Math.round((processed / totalNum) * 100) : 0;
+      const conversionRate = processed > 0 ? Math.round((approvedNum / processed) * 100) : 0;
 
       return {
         total: totalNum,
@@ -64,6 +75,8 @@ export function useVorauswahlStats() {
         approved: approvedNum,
         rejected: rejectedNum,
         todayProcessed: todayProcessed || 0,
+        weekProcessed: weekProcessed || 0,
+        conversionRate,
         progressPercent,
       };
     },

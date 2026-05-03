@@ -1,9 +1,11 @@
 import { useState, useMemo } from 'react';
-import { Download, Send, CheckCircle, AlertCircle, Loader2, Users, SkipForward, ArchiveRestore, Archive, Phone, PhoneOff } from 'lucide-react';
+import { Download, Send, CheckCircle, AlertCircle, Loader2, Users, SkipForward, ArchiveRestore, Archive, Phone, PhoneOff, FileSpreadsheet, Columns3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useProperties, useUpdateProperty } from '@/hooks/use-properties';
 import { useToast } from '@/hooks/use-toast';
@@ -11,13 +13,51 @@ import { supabase } from '@/integrations/supabase/client';
 import { useListFilter } from '@/hooks/use-lists';
 import { ListSelector } from '@/components/ListSelector';
 import { ListProgressOverview } from '@/components/ListProgressOverview';
+import { exportTimestamp, downloadCsv, downloadXlsx } from '@/lib/export-utils';
 
 const EXPORT_STATUSES = ['Telefon gefunden', 'Post', 'Eigentümer ermittelt', 'Kontaktiert', 'Interesse', 'Interessant'];
+
+const EXPORT_COLUMNS = [
+  { key: 'owner_name', label: 'Eigentümer' },
+  { key: 'owner_phone', label: 'Telefon' },
+  { key: 'owner_address', label: 'Eigentümer Adresse' },
+  { key: 'owner_name_2', label: 'Eigentümer 2' },
+  { key: 'owner_phone_2', label: 'Telefon 2' },
+  { key: 'owner_address_2', label: 'Eigentümer Adresse 2' },
+  { key: 'address', label: 'Liegenschaft Adresse' },
+  { key: 'plz_ort', label: 'PLZ/Ort' },
+  { key: 'gemeinde', label: 'Gemeinde' },
+  { key: 'zone', label: 'Zone' },
+  { key: 'baujahr', label: 'Baujahr' },
+  { key: 'gebaeudeflaeche', label: 'HNF (m²)' },
+  { key: 'area', label: 'Grundstück (m²)' },
+  { key: 'geschosse', label: 'Geschosse' },
+  { key: 'wohnungen', label: 'Wohnungen' },
+  { key: 'egrid', label: 'EGRID' },
+  { key: 'gwr_egid', label: 'EGID' },
+  { key: 'parzelle', label: 'Parzelle' },
+  { key: 'bfs_nr', label: 'BFS' },
+  { key: 'kategorie', label: 'Kategorie' },
+  { key: 'status', label: 'Status' },
+  { key: 'notes', label: 'Notizen' },
+  { key: 'google_maps_url', label: 'Google Maps' },
+] as const;
+
+const DEFAULT_COLUMNS = EXPORT_COLUMNS.slice(0, 16).map(c => c.key);
+
+function formatCell(prop: any, key: string): string | number {
+  const v = prop[key];
+  if (v == null || v === '') return '';
+  if (key === 'gebaeudeflaeche' || key === 'area') return Math.round(Number(v));
+  if (key === 'geschosse' || key === 'wohnungen') return Number(v);
+  return v as string | number;
+}
 
 export function PipedriveExport() {
   const [exportStatus, setExportStatus] = useState('Telefon gefunden');
   const [showArchive, setShowArchive] = useState(false);
   const [archiveFilter, setArchiveFilter] = useState<'with-phone' | 'without-phone'>('with-phone');
+  const [selectedColumns, setSelectedColumns] = useState<Set<string>>(new Set(DEFAULT_COLUMNS));
   const selectedListId = useListFilter(s => s.selectedListId);
   const { data: result, isLoading, refetch } = useProperties({
     statusFilter: showArchive ? 'Exportiert' : exportStatus,
@@ -143,37 +183,41 @@ export function PipedriveExport() {
     }
   };
 
+  const activeColumns = useMemo(
+    () => EXPORT_COLUMNS.filter(c => selectedColumns.has(c.key)),
+    [selectedColumns],
+  );
+
+  const buildRows = () => properties.map(p => {
+    const row: Record<string, unknown> = {};
+    for (const c of activeColumns) row[c.label] = formatCell(p as any, c.key);
+    return row;
+  });
+
   const exportCsv = () => {
     if (properties.length === 0) return;
-    const headers = [
-      'Person - Name', 'Person - Phone', 'Person - Address',
-      'Person - Name 2', 'Person - Phone 2', 'Person - Address 2',
-      'Deal - Title', 'Organization - Name', 'Organization - Address',
-      'Note', 'Zone', 'Baujahr', 'HNF m2', 'Grundstück m2', 'Geschosse',
-      'EGRID', 'EGID', 'Gemeinde', 'Status',
-    ];
-    const rows = properties.map(p => [
-      p.owner_name || '', p.owner_phone || '', p.owner_address || '',
-      p.owner_name_2 || '', p.owner_phone_2 || '', p.owner_address_2 || '',
-      `Akquise: ${p.address}`, `Liegenschaft: ${p.address}`,
-      p.address + (p.plz_ort ? ', ' + p.plz_ort : ''),
-      p.notes || '', p.zone || '', p.baujahr?.toString() || '',
-      p.gebaeudeflaeche ? Math.round(Number(p.gebaeudeflaeche)).toString() : '',
-      p.area ? Math.round(Number(p.area)).toString() : '',
-      p.geschosse ? Number(p.geschosse).toString() : '',
-      p.egrid || '', p.gwr_egid || '', p.gemeinde || '', p.status,
-    ]);
-    const csvContent = [headers, ...rows]
-      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-      .join('\n');
-    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `pipedrive-export-${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-    toast({ title: `✅ ${properties.length} Einträge exportiert` });
+    const headers = activeColumns.map(c => c.label);
+    const rows = properties.map(p => activeColumns.map(c => formatCell(p as any, c.key)));
+    downloadCsv(`pipedrive-export_${exportTimestamp()}.csv`, headers, rows);
+    toast({ title: `✅ ${properties.length} Einträge als CSV exportiert` });
+  };
+
+  const exportExcel = async () => {
+    if (properties.length === 0) return;
+    try {
+      await downloadXlsx(`pipedrive-export_${exportTimestamp()}.xlsx`, 'Export', buildRows());
+      toast({ title: `✅ ${properties.length} Einträge als Excel exportiert` });
+    } catch (err) {
+      toast({ title: 'Excel-Export fehlgeschlagen', description: (err as Error)?.message, variant: 'destructive' });
+    }
+  };
+
+  const toggleColumn = (key: string) => {
+    setSelectedColumns(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
   };
 
   return (
@@ -300,14 +344,45 @@ export function PipedriveExport() {
 
           {/* Actions */}
           {!showArchive && (
-            <div className="flex gap-3">
-              <Button onClick={pushToPipedrive} disabled={isLoading || properties.length === 0 || pushing} className="flex-1 h-12 text-base gap-2" size="lg">
-                {pushing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-                {pushing ? 'Wird gepusht...' : `Zu Pipedrive pushen (${count})`}
-              </Button>
-              <Button onClick={exportCsv} disabled={isLoading || properties.length === 0} variant="outline" className="h-12 gap-2" size="lg">
-                <Download className="h-4 w-4" /> CSV
-              </Button>
+            <div className="space-y-2">
+              <div className="flex gap-2 flex-wrap">
+                <Button onClick={pushToPipedrive} disabled={isLoading || properties.length === 0 || pushing} className="flex-1 min-w-[200px] h-12 text-base gap-2" size="lg">
+                  {pushing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+                  {pushing ? 'Wird gepusht...' : `Zu Pipedrive pushen (${count})`}
+                </Button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="lg" className="h-12 gap-2">
+                      <Columns3 className="h-4 w-4" /> Spalten ({activeColumns.length})
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-72 p-3 max-h-96 overflow-y-auto" align="end">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase">Spalten wählen</p>
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2"
+                          onClick={() => setSelectedColumns(new Set(EXPORT_COLUMNS.map(c => c.key)))}>Alle</Button>
+                        <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2"
+                          onClick={() => setSelectedColumns(new Set(DEFAULT_COLUMNS))}>Standard</Button>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      {EXPORT_COLUMNS.map(col => (
+                        <label key={col.key} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted rounded px-2 py-1">
+                          <Checkbox checked={selectedColumns.has(col.key)} onCheckedChange={() => toggleColumn(col.key)} />
+                          <span>{col.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+                <Button onClick={exportCsv} disabled={isLoading || properties.length === 0 || activeColumns.length === 0} variant="outline" className="h-12 gap-2" size="lg">
+                  <Download className="h-4 w-4" /> CSV
+                </Button>
+                <Button onClick={exportExcel} disabled={isLoading || properties.length === 0 || activeColumns.length === 0} variant="outline" className="h-12 gap-2" size="lg">
+                  <FileSpreadsheet className="h-4 w-4" /> Excel
+                </Button>
+              </div>
             </div>
           )}
 
