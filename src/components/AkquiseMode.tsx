@@ -614,21 +614,36 @@ export function AkquiseMode() {
                   const startWith = (phoneNumber: string) => {
                     if (!current?.egrid) return;
                     setAutoStatus('Starte...');
-                    window.dispatchEvent(new CustomEvent('akquise-start-lookup', {
-                      detail: {
-                        egrid: current.egrid,
-                        bfsNr: current.bfs_nr || '',
-                        parzelle: current.parzelle || '',
-                        phoneNumber,
-                        propertyId: current.id,
-                        appOrigin: window.location.hostname,
-                        address: current.address,
-                        plzOrt: current.plz_ort || current.gemeinde || '',
-                      },
-                    }));
+                    const portalUrl = `https://portal.objektwesen.zh.ch/aks/detail?egrid=${encodeURIComponent(current.egrid)}&bfsNr=${encodeURIComponent(current.bfs_nr || '')}`;
+                    if (extensionAvailable) {
+                      window.dispatchEvent(new CustomEvent('akquise-start-lookup', {
+                        detail: {
+                          egrid: current.egrid,
+                          bfsNr: current.bfs_nr || '',
+                          parzelle: current.parzelle || '',
+                          phoneNumber,
+                          propertyId: current.id,
+                          appOrigin: window.location.hostname,
+                          address: current.address,
+                          plzOrt: current.plz_ort || current.gemeinde || '',
+                        },
+                      }));
+                      setAutoStatus('Portal wird geöffnet (Extension)...');
+                      toast({ title: '🤖 Portal wird geöffnet', description: 'SMS-Code im Portal-Tab eingeben — Daten werden automatisch gespeichert.' });
+                    } else {
+                      // Fallback: open portal manually + copy phone to clipboard
+                      try { navigator.clipboard.writeText(phoneNumber); } catch { /* noop */ }
+                      const win = window.open(portalUrl, '_blank', 'noopener,noreferrer');
+                      if (!win) {
+                        toast({ title: 'Popup blockiert', description: 'Bitte Popups für diese Seite erlauben.', variant: 'destructive' });
+                        setAutoStatus(null);
+                        return;
+                      }
+                      setAutoStatus('Portal manuell geöffnet');
+                      toast({ title: '📋 Nummer kopiert — Portal geöffnet', description: 'Extension nicht installiert. Telefonnummer ist im Clipboard.' });
+                    }
                     setGisOpened(true);
                     setShowSmsPicker(false);
-                    setAutoStatus('Portal wird geöffnet...');
                     setTimeout(() => setAutoStatus(null), 120000);
                   };
                   return (
