@@ -157,8 +157,8 @@ export function useUnqueriedProperties(limit: number, listId?: string | null, is
         .select('*')
         .eq('is_queried', false)
         .not('status', 'in', '("Ausgeblendet","Nicht interessant","Vorausgewählt")')
-        .order('gebaeudeflaeche', { ascending: false, nullsFirst: false })
-        .order('area', { ascending: false, nullsFirst: false })
+        .order('deal_score', { ascending: false, nullsFirst: false })
+        .order('hnf_delta', { ascending: false, nullsFirst: false })
         .limit(limit);
       // For PRIO lists, skip status/baujahr filters entirely
       if (!isPrioList) {
