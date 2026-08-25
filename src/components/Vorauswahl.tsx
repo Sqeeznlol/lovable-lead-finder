@@ -23,7 +23,7 @@ import { GemeindeSidebar } from '@/components/GemeindeSidebar';
 import { getOerebParzelleUrl } from '@/lib/oereb';
 import { PotenzialPanel } from '@/components/PotenzialPanel';
 import { Luftbild } from '@/components/Luftbild';
-import { potentialScore } from '@/lib/potential';
+import { potentialScore, istAusgeschlossen } from '@/lib/potential';
 
 type ViewMode = 'card' | 'table';
 
@@ -90,6 +90,9 @@ export function Vorauswahl() {
     .filter(p => !baujahrMin || !p.baujahr || p.baujahr >= baujahrMin)
     .filter(p => !maxWhgNum || !p.wohnungen || Number(p.wohnungen) <= maxWhgNum)
     .filter(p => !minWhgNum || (p.wohnungen && Number(p.wohnungen) >= minWhgNum))
+    // Landwirtschaftszone/Wald und geschützte Objekte gar nicht erst zeigen —
+    // die lassen sich weder kaufen noch weiterentwickeln.
+    .filter(p => !istAusgeschlossen(p))
     .filter(p => !gemeindeFilter || (p.gemeinde && p.gemeinde.toLowerCase().includes(gemeindeFilter.toLowerCase())))
     .filter(p => !bezirkFilter || (p.bezirk && p.bezirk.toLowerCase().includes(bezirkFilter.toLowerCase())))
     .filter(p => {

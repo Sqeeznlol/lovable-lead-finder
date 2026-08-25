@@ -6,6 +6,8 @@ import {
   resolveAz,
   parseZone,
   istVorhanden,
+  istAusgeschlossen,
+  ausschlussGrund,
   DEFAULT_POTENTIAL_CONFIG,
 } from './potential';
 
@@ -203,5 +205,20 @@ describe('istVorhanden', () => {
   it('markiert Nicht-Bauzonen als Killer', () => {
     const r = calculatePotential({ zone: 'Wald', area: 5000, gebaeudeflaeche: 100, geschosse: 1 });
     expect(r.killer).toContain('Keine Bauzone');
+  });
+});
+
+describe('istAusgeschlossen', () => {
+  it('schliesst Nicht-Bauzonen und geschützte Objekte aus', () => {
+    expect(istAusgeschlossen({ zone: 'Kantonale Landwirtschaftszone' })).toBe(true);
+    expect(istAusgeschlossen({ zone: 'Wald' })).toBe(true);
+    expect(istAusgeschlossen({ zone: 'Wohnzone 2.0', denkmalschutz: 'vorhanden' })).toBe(true);
+  });
+  it('lässt normale Wohnzonen drin', () => {
+    expect(istAusgeschlossen({ zone: 'Wohnzone 2.0', denkmalschutz: 'nicht vorhanden' })).toBe(false);
+  });
+  it('nennt den Grund', () => {
+    expect(ausschlussGrund({ zone: 'Wald' })).toBe('Keine Bauzone');
+    expect(ausschlussGrund({ zone: 'Wohnzone 2.0' })).toBeNull();
   });
 });

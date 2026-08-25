@@ -362,6 +362,22 @@ export function potentialScore(
   return Math.max(0, Math.min(100, Math.round(score)));
 }
 
+/**
+ * Harte Ausschlusskriterien: Objekte, die gar nicht erst in die Liste gehören.
+ * Landwirtschaftszone/Wald und geschützte Objekte lassen sich nicht kaufen und
+ * weiterentwickeln — sie werden ausgefiltert, nicht bloss schlechter bewertet.
+ */
+export function istAusgeschlossen(p: PotentialInput): boolean {
+  return parseZone(p.zone).keineBauzone || istVorhanden(p.denkmalschutz);
+}
+
+/** Grund des Ausschlusses, für die Anzeige. */
+export function ausschlussGrund(p: PotentialInput): string | null {
+  if (parseZone(p.zone).keineBauzone) return 'Keine Bauzone';
+  if (istVorhanden(p.denkmalschutz)) return 'Denkmalschutz';
+  return null;
+}
+
 export function potentialTier(score: number): 'A' | 'B' | 'C' | 'D' {
   if (score >= 70) return 'A';
   if (score >= 50) return 'B';

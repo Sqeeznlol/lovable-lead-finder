@@ -23,7 +23,9 @@ ALTER TABLE public.properties
   ADD COLUMN IF NOT EXISTS marge_chf       numeric,
   ADD COLUMN IF NOT EXISTS marge_quote     numeric,
   ADD COLUMN IF NOT EXISTS potenzial_score integer,
-  ADD COLUMN IF NOT EXISTS confidence      text;
+  ADD COLUMN IF NOT EXISTS confidence      text,
+  ADD COLUMN IF NOT EXISTS ausgeschlossen  boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS ausschluss_grund text;
 
 COMMENT ON COLUMN public.properties.gf_zulaessig    IS 'Zulässige anrechenbare Geschossfläche in m² (Grundstück × AZ)';
 COMMENT ON COLUMN public.properties.gf_bestand      IS 'Heute genutzte Geschossfläche in m² (Gebäudefläche × Geschosse)';
@@ -31,6 +33,7 @@ COMMENT ON COLUMN public.properties.reserve_gf      IS 'Ungenutzte Reserve in m�
 COMMENT ON COLUMN public.properties.reserve_quote   IS 'Reserve / zulässige aGF, 0–1';
 COMMENT ON COLUMN public.properties.potenzial_score IS 'Automatischer Potenzial-Score 0–100 (siehe src/lib/potential.ts)';
 COMMENT ON COLUMN public.properties.confidence      IS 'Verlässlichkeit der Rechnung: hoch | mittel | tief | keine';
+COMMENT ON COLUMN public.properties.ausgeschlossen  IS 'Nicht kauf-/entwickelbar (Nicht-Bauzone oder Denkmalschutz) — aus allen Arbeitslisten ausgeblendet';
 
 -- ---------------------------------------------------------------------
 -- 2. Konfigurationstabelle (Annahmen, zentral änderbar)
@@ -77,6 +80,37 @@ AS $$
       upper(btrim(z))
     )
   END
+$$;
+
+-- ---------------------------------------------------------------------
+-- 3b. Textfelder und Nicht-Bauzonen auswerten
+-- ---------------------------------------------------------------------
+-- Die Listen schreiben "nicht vorhanden" bzw. "Kein Denkmalschutzobjekt im
+-- Perimeter" statt leer zu lassen. Eine Prüfung auf "Feld gefüllt" würde
+-- deshalb fast jedes Objekt als geschützt aussortieren.
+CREATE OR REPLACE FUNCTION public.ist_vorhanden(v text)
+RETURNS boolean
+LANGUAGE sql IMMUTABLE
+SET search_path = public
+AS $$
+  SELECT CASE
+    WHEN v IS NULL THEN false
+    WHEN lower(btrim(v)) IN ('', 'none', 'null', '-') THEN false
+    WHEN lower(btrim(v)) ~ '^(nicht vorhanden|kein|keine|nein|no|n/a)' THEN false
+    ELSE true
+  END
+$$;
+
+-- Landwirtschaft, Wald, Freihalte-/Erholungszonen: nicht bebaubar.
+CREATE OR REPLACE FUNCTION public.ist_keine_bauzone(z text)
+RETURNS boolean
+LANGUAGE sql IMMUTABLE
+SET search_path = public
+AS $$
+  SELECT COALESCE(
+    z ~* 'landwirtschaftszone|wald|freihaltezone|erholungszone|gew(ä|ae)sser|reservezone|verkehrszone',
+    false
+  )
 $$;
 
 -- ---------------------------------------------------------------------
@@ -130,8 +164,11 @@ BEGIN
   SELECT * INTO cfg FROM public.potenzial_config WHERE id LIMIT 1;
   v_zone := public.norm_zone(p_zone);
 
-  -- Ausnützungsziffer: Objektwert vor Zonentabelle vor Geschoss-Heuristik
-  IF p_ausnuetzung IS NOT NULL AND p_ausnuetzung > 0 AND p_ausnuetzung < 5 THEN
+  -- Ausnützungsziffer: Objektwert vor Zonentabelle vor Geschoss-Heuristik.
+  -- Nicht-Bauzonen bekommen gar keine.
+  IF public.ist_keine_bauzone(p_zone) THEN
+    v_az := NULL;
+  ELSIF p_ausnuetzung IS NOT NULL AND p_ausnuetzung > 0 AND p_ausnuetzung < 5 THEN
     v_az := p_ausnuetzung;
     v_az_quelle := 'objekt';
   ELSIF v_zone IS NOT NULL AND cfg.az_by_zone ? v_zone THEN
@@ -179,11 +216,14 @@ BEGIN
   END IF;
 
   -- Killer-Kriterien
-  IF p_denkmalschutz IS NOT NULL AND btrim(p_denkmalschutz) <> '' THEN
+  IF public.ist_vorhanden(p_denkmalschutz) THEN
     v_killer := v_killer || 'Denkmalschutz'::text;
   END IF;
-  IF p_isos IS NOT NULL AND btrim(p_isos) <> '' THEN
+  IF public.ist_vorhanden(p_isos) THEN
     v_killer := v_killer || 'ISOS-Ortsbild'::text;
+  END IF;
+  IF public.ist_keine_bauzone(p_zone) THEN
+    v_killer := v_killer || 'Keine Bauzone'::text;
   END IF;
   IF v_reserve IS NOT NULL AND v_reserve < cfg.min_reserve_m2 THEN
     v_killer := v_killer || ('Reserve < ' || cfg.min_reserve_m2 || ' m²')::text;
@@ -285,6 +325,16 @@ BEGIN
                            WHEN (r ->> 'potenzial_score')::int >= 50 THEN 'B'
                            WHEN (r ->> 'potenzial_score')::int >= 30 THEN 'C'
                            ELSE 'D' END;
+  NEW.ausgeschlossen   := public.ist_keine_bauzone(NEW.zone) OR public.ist_vorhanden(NEW.denkmalschutz);
+  NEW.ausschluss_grund := CASE
+                            WHEN public.ist_keine_bauzone(NEW.zone) THEN 'Keine Bauzone'
+                            WHEN public.ist_vorhanden(NEW.denkmalschutz) THEN 'Denkmalschutz'
+                            ELSE NULL END;
+  -- Ausgeschlossene Objekte gar nicht erst in die Vorauswahl geben
+  IF NEW.ausgeschlossen AND NEW.preselection_status = 'Nicht geprüft' THEN
+    NEW.preselection_status := 'Ausschliessen';
+    NEW.preselection_note   := COALESCE(NEW.preselection_note, 'Automatisch: ' || NEW.ausschluss_grund);
+  END IF;
   NEW.scored_at       := now();
   RETURN NEW;
 END;
@@ -344,6 +394,15 @@ BEGIN
       confidence      = c.r ->> 'confidence',
       score_killers   = c.r -> 'killer',
       score_reasons   = c.r -> 'reasons',
+      ausgeschlossen  = public.ist_keine_bauzone(p.zone) OR public.ist_vorhanden(p.denkmalschutz),
+      ausschluss_grund = CASE
+                           WHEN public.ist_keine_bauzone(p.zone) THEN 'Keine Bauzone'
+                           WHEN public.ist_vorhanden(p.denkmalschutz) THEN 'Denkmalschutz'
+                           ELSE NULL END,
+      preselection_status = CASE
+                              WHEN (public.ist_keine_bauzone(p.zone) OR public.ist_vorhanden(p.denkmalschutz))
+                                   AND p.preselection_status = 'Nicht geprüft'
+                              THEN 'Ausschliessen' ELSE p.preselection_status END,
       score_tier      = CASE
                           WHEN (c.r ->> 'potenzial_score')::int >= 70 THEN 'A'
                           WHEN (c.r ->> 'potenzial_score')::int >= 50 THEN 'B'
@@ -364,6 +423,7 @@ $$;
 CREATE INDEX IF NOT EXISTS idx_properties_potenzial_score ON public.properties (potenzial_score DESC NULLS LAST);
 CREATE INDEX IF NOT EXISTS idx_properties_reserve_gf      ON public.properties (reserve_gf DESC NULLS LAST);
 CREATE INDEX IF NOT EXISTS idx_properties_score_tier      ON public.properties (score_tier);
+CREATE INDEX IF NOT EXISTS idx_properties_ausgeschlossen   ON public.properties (ausgeschlossen) WHERE NOT ausgeschlossen;
 
 -- Bestand einmalig durchrechnen
 SELECT public.recompute_potenzial();
