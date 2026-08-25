@@ -16,11 +16,14 @@ import { VorauswahlStatsBar } from '@/components/VorauswahlStats';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { supabase } from '@/integrations/supabase/client';
-import { calculateDealScore, scoreColor, scoreBg } from '@/lib/deal-score';
+import { scoreColor, scoreBg } from '@/lib/deal-score';
 import { useListFilter, useLists } from '@/hooks/use-lists';
 import { ListSelector } from '@/components/ListSelector';
 import { GemeindeSidebar } from '@/components/GemeindeSidebar';
 import { getOerebParzelleUrl } from '@/lib/oereb';
+import { PotenzialPanel } from '@/components/PotenzialPanel';
+import { Luftbild } from '@/components/Luftbild';
+import { potentialScore, istAusgeschlossen } from '@/lib/potential';
 
 type ViewMode = 'card' | 'table';
 
@@ -87,6 +90,9 @@ export function Vorauswahl() {
     .filter(p => !baujahrMin || !p.baujahr || p.baujahr >= baujahrMin)
     .filter(p => !maxWhgNum || !p.wohnungen || Number(p.wohnungen) <= maxWhgNum)
     .filter(p => !minWhgNum || (p.wohnungen && Number(p.wohnungen) >= minWhgNum))
+    // Landwirtschaftszone/Wald und geschützte Objekte gar nicht erst zeigen —
+    // die lassen sich weder kaufen noch weiterentwickeln.
+    .filter(p => !istAusgeschlossen(p))
     .filter(p => !gemeindeFilter || (p.gemeinde && p.gemeinde.toLowerCase().includes(gemeindeFilter.toLowerCase())))
     .filter(p => !bezirkFilter || (p.bezirk && p.bezirk.toLowerCase().includes(bezirkFilter.toLowerCase())))
     .filter(p => {
@@ -98,7 +104,9 @@ export function Vorauswahl() {
       if (kategorieFilter === 'Gewerbe') return k.includes('gewerbe') || k.includes('ohne wohn') || g.includes('gewerbe');
       return k === kategorieFilter.toLowerCase();
     })
-    .map(p => ({ ...p, _score: calculateDealScore(p) }))
+    // Sortierung nach Ausbaupotenzial: oben steht, wo am meisten ungenutzte
+    // Geschossfläche liegt — nicht mehr einfach das grösste Gebäude.
+    .map(p => ({ ...p, _score: potentialScore(p) }))
     .sort((a, b) => b._score - a._score),
     [queue, effectiveZoneFilter, baujahrMax, baujahrMin, maxWhgNum, minWhgNum, gemeindeFilter, bezirkFilter, kategorieFilter]
   );
@@ -377,7 +385,7 @@ export function Vorauswahl() {
               </TableHeader>
               <TableBody>
                 {items.slice(0, 50).map(p => {
-                  const s = calculateDealScore(p);
+                  const s = p._score;
                   return (
                     <TableRow key={p.id} className="group">
                       <TableCell>
@@ -526,6 +534,16 @@ export function Vorauswahl() {
                     </div>
                   )}
 
+                  {/* Potenzial-Rechnung + kostenloses Luftbild */}
+                  <div className="border-t mt-3 px-5 py-4 grid gap-3 lg:grid-cols-[1fr_260px]">
+                    <PotenzialPanel property={current} />
+                    <Luftbild
+                      address={current.address}
+                      plzOrt={current.plz_ort || current.gemeinde}
+                      className="min-h-[180px] lg:min-h-full"
+                    />
+                  </div>
+
                   {/* Google Maps embed or fallback */}
                   <div className="border-t mt-3">
                     {mapsEmbedUrl ? (
@@ -630,7 +648,7 @@ export function Vorauswahl() {
                 <div className="space-y-1.5">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Nächste</p>
                   {items.slice(currentIndex + 1, currentIndex + 4).map(p => {
-                    const s = calculateDealScore(p);
+                    const s = p._score;
                     return (
                       <div key={p.id} className="flex items-center gap-3 bg-card rounded-xl px-4 py-2 shadow-sm border">
                         <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold border ${scoreBg(s)}`}>
