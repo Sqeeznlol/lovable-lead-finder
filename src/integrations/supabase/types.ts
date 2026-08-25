@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.4"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -62,6 +62,69 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_shortlist: {
+        Row: {
+          assigned_phone: string | null
+          created_at: string
+          egrid: string | null
+          id: string
+          processed_at: string | null
+          property_id: string | null
+          rank: number
+          reasons: Json | null
+          reserve_gf: number | null
+          score: number | null
+          score_tier: string | null
+          shortlist_date: string
+          status: string
+        }
+        Insert: {
+          assigned_phone?: string | null
+          created_at?: string
+          egrid?: string | null
+          id?: string
+          processed_at?: string | null
+          property_id?: string | null
+          rank: number
+          reasons?: Json | null
+          reserve_gf?: number | null
+          score?: number | null
+          score_tier?: string | null
+          shortlist_date?: string
+          status?: string
+        }
+        Update: {
+          assigned_phone?: string | null
+          created_at?: string
+          egrid?: string | null
+          id?: string
+          processed_at?: string | null
+          property_id?: string | null
+          rank?: number
+          reasons?: Json | null
+          reserve_gf?: number | null
+          score?: number | null
+          score_tier?: string | null
+          shortlist_date?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_shortlist_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_shortlist_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "v_lookup_candidates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       export_logs: {
         Row: {
           created_at: string
@@ -111,6 +174,13 @@ export type Database = {
             columns: ["property_id"]
             isOneToOne: false
             referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "export_logs_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "v_lookup_candidates"
             referencedColumns: ["id"]
           },
         ]
@@ -171,9 +241,42 @@ export type Database = {
           },
         ]
       }
+      parcel_lookups: {
+        Row: {
+          bfs_nr: string | null
+          egrid: string
+          owner_count: number | null
+          owners_json: Json | null
+          queried_at: string
+          queried_by_phone: string | null
+          source: string | null
+        }
+        Insert: {
+          bfs_nr?: string | null
+          egrid: string
+          owner_count?: number | null
+          owners_json?: Json | null
+          queried_at?: string
+          queried_by_phone?: string | null
+          source?: string | null
+        }
+        Update: {
+          bfs_nr?: string | null
+          egrid?: string
+          owner_count?: number | null
+          owners_json?: Json | null
+          queried_at?: string
+          queried_by_phone?: string | null
+          source?: string | null
+        }
+        Relationships: []
+      }
       phone_numbers: {
         Row: {
+          active: boolean
+          cooldown_until: string | null
           created_at: string
+          daily_limit: number
           daily_queries_used: number
           id: string
           label: string | null
@@ -181,7 +284,10 @@ export type Database = {
           number: string
         }
         Insert: {
+          active?: boolean
+          cooldown_until?: string | null
           created_at?: string
+          daily_limit?: number
           daily_queries_used?: number
           id?: string
           label?: string | null
@@ -189,7 +295,10 @@ export type Database = {
           number: string
         }
         Update: {
+          active?: boolean
+          cooldown_until?: string | null
           created_at?: string
+          daily_limit?: number
           daily_queries_used?: number
           id?: string
           label?: string | null
@@ -250,6 +359,13 @@ export type Database = {
             referencedRelation: "properties"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "phone_search_logs_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "v_lookup_candidates"
+            referencedColumns: ["id"]
+          },
         ]
       }
       profiles: {
@@ -297,6 +413,8 @@ export type Database = {
           bfs_nr: string | null
           contact_attempts: number
           created_at: string
+          data_quality: number | null
+          deal_score: number | null
           decided_at: string | null
           decided_by: string | null
           decision_source: string | null
@@ -321,6 +439,10 @@ export type Database = {
           gvz_nr: string | null
           gwr_egid: string | null
           hausnummer: string | null
+          hnf_bestand: number | null
+          hnf_delta: number | null
+          hnf_faktor: number | null
+          hnf_neu: number | null
           hnf_schaetzung: number | null
           housing_stat_url: string | null
           id: string
@@ -358,13 +480,22 @@ export type Database = {
           queried_at: string | null
           queried_by_phone: string | null
           renovationsjahr: number | null
+          reserve_gf: number | null
+          reserve_quote: number | null
           review_status: string
+          score_input_hash: string | null
+          score_killers: Json | null
+          score_reasons: Json | null
+          score_tier: string | null
+          score_version: number | null
+          scored_at: string | null
           source_file: string | null
           stage_changed_at: string | null
           status: string
           strassenname: string | null
           streetview_url: string | null
           updated_at: string
+          vollgeschosse: number | null
           wohnflaeche: number | null
           wohnungen: number | null
           zone: string | null
@@ -386,6 +517,8 @@ export type Database = {
           bfs_nr?: string | null
           contact_attempts?: number
           created_at?: string
+          data_quality?: number | null
+          deal_score?: number | null
           decided_at?: string | null
           decided_by?: string | null
           decision_source?: string | null
@@ -410,6 +543,10 @@ export type Database = {
           gvz_nr?: string | null
           gwr_egid?: string | null
           hausnummer?: string | null
+          hnf_bestand?: number | null
+          hnf_delta?: number | null
+          hnf_faktor?: number | null
+          hnf_neu?: number | null
           hnf_schaetzung?: number | null
           housing_stat_url?: string | null
           id?: string
@@ -447,13 +584,22 @@ export type Database = {
           queried_at?: string | null
           queried_by_phone?: string | null
           renovationsjahr?: number | null
+          reserve_gf?: number | null
+          reserve_quote?: number | null
           review_status?: string
+          score_input_hash?: string | null
+          score_killers?: Json | null
+          score_reasons?: Json | null
+          score_tier?: string | null
+          score_version?: number | null
+          scored_at?: string | null
           source_file?: string | null
           stage_changed_at?: string | null
           status?: string
           strassenname?: string | null
           streetview_url?: string | null
           updated_at?: string
+          vollgeschosse?: number | null
           wohnflaeche?: number | null
           wohnungen?: number | null
           zone?: string | null
@@ -475,6 +621,8 @@ export type Database = {
           bfs_nr?: string | null
           contact_attempts?: number
           created_at?: string
+          data_quality?: number | null
+          deal_score?: number | null
           decided_at?: string | null
           decided_by?: string | null
           decision_source?: string | null
@@ -499,6 +647,10 @@ export type Database = {
           gvz_nr?: string | null
           gwr_egid?: string | null
           hausnummer?: string | null
+          hnf_bestand?: number | null
+          hnf_delta?: number | null
+          hnf_faktor?: number | null
+          hnf_neu?: number | null
           hnf_schaetzung?: number | null
           housing_stat_url?: string | null
           id?: string
@@ -536,13 +688,22 @@ export type Database = {
           queried_at?: string | null
           queried_by_phone?: string | null
           renovationsjahr?: number | null
+          reserve_gf?: number | null
+          reserve_quote?: number | null
           review_status?: string
+          score_input_hash?: string | null
+          score_killers?: Json | null
+          score_reasons?: Json | null
+          score_tier?: string | null
+          score_version?: number | null
+          scored_at?: string | null
           source_file?: string | null
           stage_changed_at?: string | null
           status?: string
           strassenname?: string | null
           streetview_url?: string | null
           updated_at?: string
+          vollgeschosse?: number | null
           wohnflaeche?: number | null
           wohnungen?: number | null
           zone?: string | null
@@ -600,6 +761,13 @@ export type Database = {
             columns: ["property_id"]
             isOneToOne: false
             referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_decisions_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "v_lookup_candidates"
             referencedColumns: ["id"]
           },
         ]
@@ -694,6 +862,34 @@ export type Database = {
           interessant: number | null
           offen: number | null
           total: number | null
+        }
+        Relationships: []
+      }
+      v_lookup_candidates: {
+        Row: {
+          address: string | null
+          area: number | null
+          baujahr: number | null
+          bfs_nr: string | null
+          data_quality: number | null
+          deal_score: number | null
+          egrid: string | null
+          gebaeudeflaeche: number | null
+          gemeinde: string | null
+          hnf_bestand: number | null
+          hnf_delta: number | null
+          hnf_faktor: number | null
+          hnf_neu: number | null
+          hnf_schaetzung: number | null
+          id: string | null
+          parzelle: string | null
+          plz_ort: string | null
+          reserve_gf: number | null
+          reserve_quote: number | null
+          score_reasons: Json | null
+          score_tier: string | null
+          wohnungen: number | null
+          zone: string | null
         }
         Relationships: []
       }
