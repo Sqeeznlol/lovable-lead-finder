@@ -14,7 +14,24 @@
 -- ---------------------------------------------------------------------
 -- 1. Zusätzliche Ergebnis-Spalten
 -- ---------------------------------------------------------------------
+-- Diese Kennzahlen-Spalten existierten in der Produktionsinstanz bereits von
+-- Hand; auf einer frischen Instanz gibt es sie nicht. Deshalb hier vollständig
+-- anlegen, damit das Skript auf einer leeren Datenbank durchläuft.
 ALTER TABLE public.properties
+  ADD COLUMN IF NOT EXISTS vollgeschosse   numeric,
+  ADD COLUMN IF NOT EXISTS geschosse       numeric,
+  ADD COLUMN IF NOT EXISTS nutzflaeche     numeric,
+  ADD COLUMN IF NOT EXISTS hnf_bestand     numeric,
+  ADD COLUMN IF NOT EXISTS hnf_neu         numeric,
+  ADD COLUMN IF NOT EXISTS hnf_delta       numeric,
+  ADD COLUMN IF NOT EXISTS hnf_faktor      numeric,
+  ADD COLUMN IF NOT EXISTS reserve_gf      numeric,
+  ADD COLUMN IF NOT EXISTS reserve_quote   numeric,
+  ADD COLUMN IF NOT EXISTS deal_score      numeric,
+  ADD COLUMN IF NOT EXISTS score_tier      text,
+  ADD COLUMN IF NOT EXISTS score_killers   jsonb,
+  ADD COLUMN IF NOT EXISTS score_reasons   jsonb,
+  ADD COLUMN IF NOT EXISTS scored_at       timestamptz,
   ADD COLUMN IF NOT EXISTS gf_zulaessig    numeric,
   ADD COLUMN IF NOT EXISTS gf_bestand      numeric,
   ADD COLUMN IF NOT EXISTS az_quelle       text,
@@ -50,8 +67,15 @@ CREATE TABLE IF NOT EXISTS public.potenzial_config (
   erloes_pro_m2_hnf  numeric NOT NULL DEFAULT 9500,
   min_reserve_m2     numeric NOT NULL DEFAULT 80,
   ziel_reserve_quote numeric NOT NULL DEFAULT 0.35,
+  -- Ziffer im Zonennamen ("Wohnzone 1.6"): Baumassenziffer oder Ausnützung?
+  ziffer_als_bmz     boolean NOT NULL DEFAULT true,
+  geschosshoehe      numeric NOT NULL DEFAULT 3.2,
   updated_at         timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER TABLE public.potenzial_config
+  ADD COLUMN IF NOT EXISTS ziffer_als_bmz boolean NOT NULL DEFAULT true,
+  ADD COLUMN IF NOT EXISTS geschosshoehe  numeric NOT NULL DEFAULT 3.2;
 
 INSERT INTO public.potenzial_config (id) VALUES (true) ON CONFLICT (id) DO NOTHING;
 
@@ -114,6 +138,49 @@ AS $$
 $$;
 
 -- ---------------------------------------------------------------------
+-- 3c. Zonen-Freitext auswerten
+-- ---------------------------------------------------------------------
+-- Die ZH-Listen liefern Zonen als Fliesstext, nicht als "W3":
+--   "Wohnzone 1.6 (rechtskräftig, 8460m², 95%)"  -> Ziffer 1.6
+--   "3-geschossige Wohnzone 2.5"                 -> 3 Geschosse, Ziffer 2.5
+--   "Wohnzone 2/50"                              -> 2 Geschosse, ÜZ 50%
+-- Der Klammerzusatz nennt Flächen der Zone, nicht des Grundstücks, und
+-- muss vor dem Parsen weg — sonst wird "8460" als Ziffer gelesen.
+CREATE OR REPLACE FUNCTION public.zone_parse(z text)
+RETURNS TABLE (ziffer numeric, geschosse numeric, ueberbauungsziffer numeric, kurz text)
+LANGUAGE plpgsql IMMUTABLE
+SET search_path = public
+AS $$
+DECLARE
+  t text;
+  m text[];
+BEGIN
+  ziffer := NULL; geschosse := NULL; ueberbauungsziffer := NULL; kurz := NULL;
+  IF z IS NULL OR btrim(z) = '' THEN RETURN NEXT; RETURN; END IF;
+
+  t := btrim(regexp_replace(z, '\([^)]*\)', ' ', 'g'));
+
+  -- Bereits normierte Kurzform, z.B. "W3" oder "W4G"
+  m := regexp_match(upper(regexp_replace(t, '\s+', '', 'g')), '^([WKZ]{1,2}G?[0-9]?G?)$');
+  IF m IS NOT NULL THEN kurz := m[1]; RETURN NEXT; RETURN; END IF;
+
+  m := regexp_match(t, '([0-9]+)\s*-?\s*geschossig', 'i');
+  IF m IS NOT NULL THEN geschosse := m[1]::numeric; END IF;
+
+  m := regexp_match(t, '([0-9]+)\s*/\s*([0-9]{2,3})');
+  IF m IS NOT NULL THEN
+    geschosse := COALESCE(geschosse, m[1]::numeric);
+    ueberbauungsziffer := m[2]::numeric;
+  ELSE
+    m := regexp_match(t, '([0-9]+[.,][0-9]+)');
+    IF m IS NOT NULL THEN ziffer := replace(m[1], ',', '.')::numeric; END IF;
+  END IF;
+
+  RETURN NEXT;
+END;
+$$;
+
+-- ---------------------------------------------------------------------
 -- 4. Kernrechnung — eine Zeile rein, alle Kennzahlen raus
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.calc_potenzial(
@@ -135,6 +202,7 @@ AS $$
 DECLARE
   cfg           public.potenzial_config%ROWTYPE;
   v_zone        text;
+  v_p           record;
   v_az          numeric;
   v_az_quelle   text;
   v_geschosse   numeric;
@@ -171,12 +239,28 @@ BEGIN
   ELSIF p_ausnuetzung IS NOT NULL AND p_ausnuetzung > 0 AND p_ausnuetzung < 5 THEN
     v_az := p_ausnuetzung;
     v_az_quelle := 'objekt';
-  ELSIF v_zone IS NOT NULL AND cfg.az_by_zone ? v_zone THEN
-    v_az := (cfg.az_by_zone ->> v_zone)::numeric;
-    v_az_quelle := 'zone';
-  ELSIF v_zone IS NOT NULL AND v_geschosse_zone ? v_zone THEN
-    v_az := (v_geschosse_zone ->> v_zone)::numeric * 0.3;
-    v_az_quelle := 'geschosse';
+  ELSE
+    SELECT * INTO v_p FROM public.zone_parse(p_zone);
+
+    IF v_p.ziffer IS NOT NULL AND v_p.ziffer > 0 THEN
+      -- Ziffer aus dem Zonennamen; als BMZ über die Geschosshöhe umrechnen
+      v_az := CASE WHEN cfg.ziffer_als_bmz
+                   THEN v_p.ziffer / NULLIF(cfg.geschosshoehe, 0)
+                   ELSE v_p.ziffer END;
+      v_az_quelle := 'zone';
+    ELSIF v_p.geschosse IS NOT NULL AND v_p.ueberbauungsziffer IS NOT NULL THEN
+      v_az := v_p.geschosse * (v_p.ueberbauungsziffer / 100);
+      v_az_quelle := 'zone';
+    ELSIF v_p.kurz IS NOT NULL AND cfg.az_by_zone ? v_p.kurz THEN
+      v_az := (cfg.az_by_zone ->> v_p.kurz)::numeric;
+      v_az_quelle := 'zone';
+    ELSIF v_p.geschosse IS NOT NULL THEN
+      v_az := v_p.geschosse * 0.3;
+      v_az_quelle := 'geschosse';
+    ELSIF v_p.kurz IS NOT NULL AND v_geschosse_zone ? v_p.kurz THEN
+      v_az := (v_geschosse_zone ->> v_p.kurz)::numeric * 0.3;
+      v_az_quelle := 'geschosse';
+    END IF;
   END IF;
 
   IF v_az IS NOT NULL AND p_area IS NOT NULL AND p_area > 0 THEN

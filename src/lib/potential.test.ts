@@ -150,6 +150,10 @@ describe('Parität zur SQL-Berechnung', () => {
     { p: { zone: 'W2', area: 500, gebaeudeflaeche: 200, geschosse: 3, baujahr: 1970 }, reserveGf: 0, score: 0 },
     { p: { zone: 'W3', area: 1000, gebaeudeflaeche: 100, baujahr: 1980 }, reserveGf: 400, score: 61 },
     { p: { zone: 'W4', area: 2000, gebaeudeflaeche: 200, geschosse: 2, baujahr: 1910, denkmalschutz: 'kantonal' }, reserveGf: 1100, score: 64 },
+    // ZH-Freitext: BMZ 1.6 : 3.2 m = AZ 0.5
+    { p: { zone: 'Wohnzone 1.6 (rechtskräftig, 8460m², 95%)', area: 1200, gebaeudeflaeche: 150, geschosse: 2, baujahr: 1955, denkmalschutz: 'nicht vorhanden' }, reserveGf: 300, score: 66 },
+    // Geschosse/Überbauungsziffer: 2 x 50% = AZ 1.0
+    { p: { zone: 'Wohnzone 2/50', area: 1200, gebaeudeflaeche: 150, geschosse: 2, baujahr: 1955, denkmalschutz: 'nicht vorhanden' }, reserveGf: 900, score: 82 },
   ];
 
   it.each(faelle)('stimmt mit Postgres überein: $p.zone', ({ p, reserveGf, score }) => {
