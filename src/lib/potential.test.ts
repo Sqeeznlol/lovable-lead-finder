@@ -4,19 +4,44 @@ import {
   potentialScore,
   potentialTier,
   resolveAz,
+  parseZone,
+  istVorhanden,
   DEFAULT_POTENTIAL_CONFIG,
 } from './potential';
 
+/** Zonentabellen-Modus: Ziffer im Namen als AZ lesen (für die W3-Kurzformen). */
+const ALS_AZ = { ...DEFAULT_POTENTIAL_CONFIG, zifferAlsBmz: false };
+
 describe('resolveAz', () => {
   it('bevorzugt die Ausnützungsziffer am Objekt', () => {
-    expect(resolveAz({ zone: 'W3', ausnuetzung: 0.9 })).toEqual({ az: 0.9, quelle: 'objekt' });
+    const r = resolveAz({ zone: 'W3', ausnuetzung: 0.9 });
+    expect(r.az).toBe(0.9);
+    expect(r.quelle).toBe('objekt');
   });
   it('fällt auf die Zonentabelle zurück', () => {
-    expect(resolveAz({ zone: 'W3' })).toEqual({ az: 0.6, quelle: 'zone' });
+    const r = resolveAz({ zone: 'W3' });
+    expect(r.az).toBe(0.6);
+    expect(r.quelle).toBe('zone');
   });
   it('normalisiert Zonen-Schreibweisen', () => {
     expect(resolveAz({ zone: 'w4g ' }).az).toBe(0.8);
     expect(resolveAz({ zone: 'W3 (3 Vollgeschosse)' }).az).toBe(0.6);
+  });
+
+  it('liest die Ziffer aus dem ZH-Freitext als BMZ', () => {
+    // "Wohnzone 1.6" -> BMZ 1.6 : 3.2 m Geschosshöhe = AZ 0.5
+    const r = resolveAz({ zone: 'Wohnzone 1.6 (rechtskräftig, 8460m², 95%)' });
+    expect(r.az).toBeCloseTo(0.5, 3);
+    expect(r.quelle).toBe('zone');
+  });
+
+  it('rechnet "Wohnzone 2/50" aus Geschossen und Überbauungsziffer', () => {
+    expect(resolveAz({ zone: 'Wohnzone 2/50' }).az).toBeCloseTo(1.0, 3);
+  });
+
+  it('vergibt für Nicht-Bauzonen keine Ausnützung', () => {
+    expect(resolveAz({ zone: 'Kantonale Landwirtschaftszone' }).az).toBeNull();
+    expect(resolveAz({ zone: 'Wald' }).az).toBeNull();
   });
   it('liefert null ohne Zone', () => {
     expect(resolveAz({}).az).toBeNull();
@@ -128,5 +153,55 @@ describe('Parität zur SQL-Berechnung', () => {
   it.each(faelle)('stimmt mit Postgres überein: $p.zone', ({ p, reserveGf, score }) => {
     expect(calculatePotential(p).reserveGf).toBe(reserveGf);
     expect(potentialScore(p)).toBe(score);
+  });
+});
+
+
+describe('parseZone (ZH-Freitext)', () => {
+  it('ignoriert den Klammerzusatz mit den Zonenflächen', () => {
+    // Das "8460m²" gehört zur Zone, nicht zum Grundstück — darf nicht als Ziffer gelesen werden.
+    expect(parseZone('Wohnzone 1.6 (rechtskräftig, 8460m², 95%)').ziffer).toBe(1.6);
+  });
+  it('erkennt Geschosse im Namen', () => {
+    expect(parseZone('3-geschossige Wohnzone 2.5').geschosse).toBe(3);
+    expect(parseZone('2-geschossige Wohnzone, dicht 1.9').ziffer).toBe(1.9);
+  });
+  it('erkennt Geschosse/Überbauungsziffer', () => {
+    const z = parseZone('Wohnzone 2/50');
+    expect(z.geschosse).toBe(2);
+    expect(z.ueberbauungsziffer).toBe(50);
+  });
+  it('markiert Nicht-Bauzonen', () => {
+    expect(parseZone('Kantonale Landwirtschaftszone').keineBauzone).toBe(true);
+    expect(parseZone('Wald').keineBauzone).toBe(true);
+    expect(parseZone('Wohnzone 2.0').keineBauzone).toBe(false);
+  });
+  it('erkennt die Kurzform weiterhin', () => {
+    expect(parseZone('W4G').kurz).toBe('W4G');
+  });
+});
+
+describe('istVorhanden', () => {
+  it('liest "nicht vorhanden" als leer', () => {
+    // 94% der Zeilen tragen diesen Text — sonst gälte fast jedes Objekt als geschützt.
+    expect(istVorhanden('nicht vorhanden')).toBe(false);
+    expect(istVorhanden('Kein Denkmalschutzobjekt im Perimeter')).toBe(false);
+    expect(istVorhanden(null)).toBe(false);
+    expect(istVorhanden('vorhanden')).toBe(true);
+    expect(istVorhanden('Kantonal geschützt')).toBe(true);
+  });
+
+  it('setzt kein Killer-Kriterium für "nicht vorhanden"', () => {
+    const r = calculatePotential({
+      zone: 'Wohnzone 2.0', area: 2000, gebaeudeflaeche: 200, geschosse: 2,
+      denkmalschutz: 'nicht vorhanden', isos: 'nicht vorhanden',
+    });
+    expect(r.killer).not.toContain('Denkmalschutz');
+    expect(r.killer).not.toContain('ISOS-Ortsbild');
+  });
+
+  it('markiert Nicht-Bauzonen als Killer', () => {
+    const r = calculatePotential({ zone: 'Wald', area: 5000, gebaeudeflaeche: 100, geschosse: 1 });
+    expect(r.killer).toContain('Keine Bauzone');
   });
 });

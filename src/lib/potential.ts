@@ -39,6 +39,73 @@ export const DEFAULT_GESCHOSSE_BY_ZONE: Record<string, number> = {
   WG: 2, WG2: 2, WG3: 3, WG4: 4, K: 4, Z: 3,
 };
 
+/**
+ * Zonen-Bezeichnungen der ZH-Listen sind Freitext, nicht "W3":
+ *   "Wohnzone 1.6 (rechtskräftig, 8460m², 95%)"   -> Ziffer 1.6
+ *   "3-geschossige Wohnzone 2.5"                  -> 3 Geschosse, Ziffer 2.5
+ *   "Wohnzone 2/50"                               -> 2 Geschosse, ÜZ 50%
+ *   "Kantonale Landwirtschaftszone" / "Wald"      -> keine Bauzone
+ *
+ * Der Parser holt aus dem Text heraus, was verwertbar ist.
+ */
+export interface ParsedZone {
+  /** Ziffer aus dem Zonennamen (je nach Gemeinde AZ oder BMZ — siehe zifferAlsBmz). */
+  ziffer: number | null;
+  /** Zulässige Vollgeschosse, wenn im Namen genannt. */
+  geschosse: number | null;
+  /** Überbauungsziffer in Prozent, z.B. "Wohnzone 2/50". */
+  ueberbauungsziffer: number | null;
+  /** Kurzform wie W3, falls ableitbar. */
+  kurz: string | null;
+  /** Nicht bebaubar (Landwirtschaft, Wald, Freihaltung, Gewässer). */
+  keineBauzone: boolean;
+}
+
+const NICHT_BAUZONE = /landwirtschaftszone|wald|freihaltezone|erholungszone|gew(ä|ae)sser|reservezone|verkehrszone/i;
+
+export function parseZone(raw?: string | null): ParsedZone {
+  const leer: ParsedZone = { ziffer: null, geschosse: null, ueberbauungsziffer: null, kurz: null, keineBauzone: false };
+  if (!raw) return leer;
+
+  // Klammerzusatz "(rechtskräftig, 8460m², 95%)" enthält Flächenangaben der
+  // Zone selbst, nicht des Grundstücks — vor dem Parsen entfernen.
+  const text = String(raw).replace(/\([^)]*\)/g, ' ').trim();
+  if (NICHT_BAUZONE.test(text)) return { ...leer, keineBauzone: true };
+
+  // Bereits normierte Kurzform ("W3", "W4G")
+  const kurzMatch = text.toUpperCase().replace(/\s+/g, '').match(/^([WKZ]{1,2}G?\d?G?)$/);
+  if (kurzMatch) return { ...leer, kurz: kurzMatch[1] };
+
+  let geschosse: number | null = null;
+  let ueberbauungsziffer: number | null = null;
+  let ziffer: number | null = null;
+
+  // "3-geschossige Wohnzone" / "Wohnzone 3-geschossig"
+  const geschossMatch = text.match(/(\d+)\s*-?\s*geschossig/i);
+  if (geschossMatch) geschosse = Number(geschossMatch[1]);
+
+  // "Wohnzone 2/50" -> 2 Geschosse, 50% Überbauung
+  const slashMatch = text.match(/(\d+)\s*\/\s*(\d{2,3})/);
+  if (slashMatch) {
+    geschosse = geschosse ?? Number(slashMatch[1]);
+    ueberbauungsziffer = Number(slashMatch[2]);
+  } else {
+    // Dezimalziffer im Namen: "Wohnzone 1.6", "Wohnzone G 2.9"
+    const zifferMatch = text.match(/(\d+[.,]\d+)/);
+    if (zifferMatch) ziffer = Number(zifferMatch[1].replace(',', '.'));
+  }
+
+  return { ziffer, geschosse, ueberbauungsziffer, kurz: null, keineBauzone: false };
+}
+
+/** Textfelder wie "nicht vorhanden" / "Kein Denkmalschutzobjekt..." bedeuten: kein Eintrag. */
+export function istVorhanden(v?: string | null): boolean {
+  if (!v) return false;
+  const t = String(v).trim().toLowerCase();
+  if (t === '' || t === 'none' || t === 'null' || t === '-') return false;
+  return !/^(nicht vorhanden|kein|keine|nein|no|n\/a)/.test(t);
+}
+
 export interface PotentialConfig {
   /** AZ-Tabelle pro Zone. */
   azByZone: Record<string, number>;
@@ -52,6 +119,14 @@ export interface PotentialConfig {
   minReserveM2: number;
   /** Reserve-Quote, ab der ein Objekt als klar interessant gilt (0–1). */
   zielReserveQuote: number;
+  /**
+   * Wie die Ziffer im Zonennamen ("Wohnzone 1.6") zu lesen ist:
+   * true  = Baumassenziffer m³/m² (in vielen ZH-Gemeinden üblich)
+   * false = Ausnützungsziffer
+   */
+  zifferAlsBmz: boolean;
+  /** Mittlere Geschosshöhe in m — rechnet BMZ in Geschossfläche um. */
+  geschosshoehe: number;
 }
 
 export const DEFAULT_POTENTIAL_CONFIG: PotentialConfig = {
@@ -61,6 +136,8 @@ export const DEFAULT_POTENTIAL_CONFIG: PotentialConfig = {
   erloesProM2HNF: 9500,
   minReserveM2: 80,
   zielReserveQuote: 0.35,
+  zifferAlsBmz: true,
+  geschosshoehe: 3.2,
 };
 
 /** Minimal-Interface — passt auf `properties`-Zeilen, ohne den DB-Typ zu importieren. */
@@ -117,30 +194,45 @@ function num(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function normZone(zone?: string | null): string | null {
-  if (!zone) return null;
-  // "W3 (2 Vollgeschosse)" -> "W3", "w4g" -> "W4G"
-  const m = String(zone).toUpperCase().replace(/\s+/g, '').match(/^([WKZ]{1,2}G?\d?G?)/);
-  return m ? m[1] : String(zone).toUpperCase().trim();
-}
 
-/** Ausnützungsziffer bestimmen — Objektwert vor Zonentabelle vor Geschoss-Heuristik. */
+/** Ausnützungsziffer bestimmen — Objektwert vor Zonenziffer vor Zonentabelle. */
 export function resolveAz(
   p: PotentialInput,
   cfg: PotentialConfig = DEFAULT_POTENTIAL_CONFIG,
-): { az: number | null; quelle: PotentialResult['azQuelle'] } {
+): { az: number | null; quelle: PotentialResult['azQuelle']; parsed: ParsedZone } {
+  const parsed = parseZone(p.zone);
+
+  // Nicht bebaubar -> gar keine Ausnützung
+  if (parsed.keineBauzone) return { az: null, quelle: null, parsed };
+
   const own = num(p.ausnuetzung);
-  if (own && own > 0 && own < 5) return { az: own, quelle: 'objekt' };
+  if (own && own > 0 && own < 5) return { az: own, quelle: 'objekt', parsed };
 
-  const zone = normZone(p.zone);
-  if (zone && cfg.azByZone[zone] != null) return { az: cfg.azByZone[zone], quelle: 'zone' };
-
-  // Fallback: aus zulässigen Vollgeschossen der Zone eine AZ ableiten
-  // (Annahme: rund 30% Überbauungsziffer pro Geschoss).
-  if (zone && DEFAULT_GESCHOSSE_BY_ZONE[zone] != null) {
-    return { az: DEFAULT_GESCHOSSE_BY_ZONE[zone] * 0.3, quelle: 'geschosse' };
+  // Ziffer aus dem Zonennamen ("Wohnzone 1.6")
+  if (parsed.ziffer != null && parsed.ziffer > 0) {
+    const az = cfg.zifferAlsBmz ? parsed.ziffer / cfg.geschosshoehe : parsed.ziffer;
+    return { az, quelle: 'zone', parsed };
   }
-  return { az: null, quelle: null };
+
+  // "Wohnzone 2/50": Geschosse x Überbauungsziffer
+  if (parsed.geschosse && parsed.ueberbauungsziffer) {
+    return { az: parsed.geschosse * (parsed.ueberbauungsziffer / 100), quelle: 'zone', parsed };
+  }
+
+  // Kurzform W3 aus der Zonentabelle
+  if (parsed.kurz && cfg.azByZone[parsed.kurz] != null) {
+    return { az: cfg.azByZone[parsed.kurz], quelle: 'zone', parsed };
+  }
+
+  // Nur Geschosszahl bekannt -> konservativ 30% Überbauung annehmen
+  if (parsed.geschosse) {
+    return { az: parsed.geschosse * 0.3, quelle: 'geschosse', parsed };
+  }
+  if (parsed.kurz && DEFAULT_GESCHOSSE_BY_ZONE[parsed.kurz] != null) {
+    return { az: DEFAULT_GESCHOSSE_BY_ZONE[parsed.kurz] * 0.3, quelle: 'geschosse', parsed };
+  }
+
+  return { az: null, quelle: null, parsed };
 }
 
 export function calculatePotential(
@@ -153,9 +245,16 @@ export function calculatePotential(
   const area = num(p.area);
   const gebFlaeche = num(p.gebaeudeflaeche);
   const geschosse = num(p.geschosse) ?? num(p.vollgeschosse);
-  const { az, quelle } = resolveAz(p, cfg);
+  const { az, quelle, parsed } = resolveAz(p, cfg);
 
-  if (quelle === 'zone') assumptions.push(`AZ ${az} aus Zonentabelle (${normZone(p.zone)})`);
+  if (parsed.keineBauzone) killer.push('Keine Bauzone');
+  if (quelle === 'zone') {
+    assumptions.push(
+      parsed.ziffer != null && cfg.zifferAlsBmz
+        ? `AZ ${az?.toFixed(2)} aus BMZ ${parsed.ziffer} ÷ ${cfg.geschosshoehe} m Geschosshöhe`
+        : `AZ ${az?.toFixed(2)} aus Zonenangabe`,
+    );
+  }
   if (quelle === 'geschosse') assumptions.push(`AZ ${az?.toFixed(2)} aus zulässigen Vollgeschossen geschätzt`);
   if (quelle === 'objekt') assumptions.push(`AZ ${az} aus Objektdaten`);
 
@@ -186,8 +285,10 @@ export function calculatePotential(
   const marge = erloes != null && investition != null ? erloes - investition : null;
   const margeQuote = marge != null && investition ? marge / investition : null;
 
-  if (p.denkmalschutz && String(p.denkmalschutz).trim() !== '') killer.push('Denkmalschutz');
-  if (p.isos && String(p.isos).trim() !== '') killer.push('ISOS-Ortsbild');
+  // Die Listen schreiben "nicht vorhanden" statt leer — Text auswerten, nicht
+  // bloss auf "gefüllt" prüfen, sonst gilt jedes Objekt als geschützt.
+  if (istVorhanden(p.denkmalschutz)) killer.push('Denkmalschutz');
+  if (istVorhanden(p.isos)) killer.push('ISOS-Ortsbild');
   if (reserveGf != null && reserveGf < cfg.minReserveM2) killer.push(`Reserve < ${cfg.minReserveM2} m²`);
   if (ueberbaut) killer.push('Bestand überschreitet Zone (Besitzstand)');
 
