@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { aggregateByParzelle, masterRowToImportJson, ParzellenSammler, type MasterRow } from './master-import';
+import { aggregateByParzelle, detectMapping, masterRowToImportJson, ParzellenSammler, type MasterRow } from './master-import';
 
 const zeile = (r: Partial<MasterRow>): MasterRow => ({ address: 'Teststrasse 1', ...r });
 
@@ -157,5 +157,27 @@ describe('ParzellenSammler', () => {
     sammler.add([zeile({ egrid: 'CH1', zone: 'Wohnzone 2.0' })]);
     sammler.add([zeile({ egrid: 'CH1', zone: 'Kernzone' })]);
     expect(sammler.ergebnis()[0].zone).toBe('Wohnzone 2.0');
+  });
+});
+
+describe('Spalten des Zusammenführungs-Werkzeugs', () => {
+  it('erkennt alle Spalten, die tools/listen-zusammenfuehren.html schreibt', () => {
+    // Die zusammengeführte Datei muss sich verlustfrei wieder einlesen
+    // lassen -- sonst gehen genau die Felder verloren, die das Werkzeug
+    // mühsam aus mehreren Listen zusammengetragen hat.
+    const kopfzeile = [
+      'egrid','address','strassenname','hausnummer','plz','plz_ort','gemeinde',
+      'ortschaftsname','bezirk','bezirksort','kanton','parzelle','plot_number',
+      'gwr_egid','gvz_nr','bfs_nr','area','gebaeudeflaeche','hnf_schaetzung',
+      'wohnflaeche','nutzflaeche','baujahr','renovationsjahr','geschosse',
+      'wohnungen','ausnuetzung','zone','kategorie','gebaeudeart','geb_status',
+      'denkmalschutz','denkmalschutz_titel','isos','isos_titel','google_maps_url',
+      'streetview_url','housing_stat_url','objektadresse','gebaeude_anzahl',
+      'quelldateien',
+    ];
+    const mapping = detectMapping(kopfzeile);
+    const erkannt = new Set(mapping.map(m => m.sourceKey));
+    const fehlend = kopfzeile.filter(k => !erkannt.has(k));
+    expect(fehlend).toEqual([]);
   });
 });
