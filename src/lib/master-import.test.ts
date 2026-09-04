@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { aggregateByParzelle, type MasterRow } from './master-import';
+import { aggregateByParzelle, masterRowToImportJson, type MasterRow } from './master-import';
 
 const zeile = (r: Partial<MasterRow>): MasterRow => ({ address: 'Teststrasse 1', ...r });
 
@@ -80,3 +80,30 @@ describe('aggregateByParzelle', () => {
     expect(out[0].wohnungen).toBeNull();
   });
 });
+
+describe('masterRowToImportJson', () => {
+  it('macht leere Strings zu null, damit sie gute Daten nicht überschreiben', () => {
+    const j = masterRowToImportJson(zeile({ egrid: 'CH1', gemeinde: '  ', zone: '' }));
+    expect(j.gemeinde).toBeNull();
+    expect(j.zone).toBeNull();
+  });
+
+  it('wandelt Zahlenfelder sauber um', () => {
+    const j = masterRowToImportJson(zeile({ area: '1200' as never, baujahr: 1955, geschosse: null }));
+    expect(j.area).toBe(1200);
+    expect(j.baujahr).toBe(1955);
+    expect(j.geschosse).toBeNull();
+  });
+
+  it('verwirft unbrauchbare Zahlen statt NaN zu senden', () => {
+    const j = masterRowToImportJson(zeile({ area: 'keine Angabe' as never }));
+    expect(j.area).toBeNull();
+  });
+
+  it('setzt Vorgaben für Kanton, Gebäudestatus und Adresse', () => {
+    const j = masterRowToImportJson({ address: '', parzelle: '914' });
+    expect(j.address).toBe('Parzelle 914');
+    expect(j.kanton).toBe('ZH');
+    expect(j.geb_status).toBe('Bestehend');
+  });
+})
