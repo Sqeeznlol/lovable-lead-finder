@@ -12,8 +12,8 @@ import {
   detectMapping,
   rowToMaster,
   isValidRow,
-  aggregateByParzelle,
   masterRowToImportJson,
+  ParzellenSammler,
   FIELD_LABELS,
   type ImportSummary,
   type MasterRow,
@@ -43,7 +43,7 @@ async function parseFile(file: File): Promise<{ rows: Record<string, unknown>[];
 // Zeitlimit, das Supabase pro Anfrage setzt -- jede eingefügte Zeile wird
 // vom Trigger durchgerechnet. Bei einem Fehler halbiert der Import den
 // Block und versucht es erneut, bis MIN_CHUNK erreicht ist.
-const CHUNK = 500;
+const CHUNK = 1000;
 const MIN_CHUNK = 50;
 const PARALLEL = 3;
 
@@ -105,135 +105,147 @@ export function MasterImport() {
     const existingGemeinden = new Set((existingGemeindenRows || []).map(r => r.gemeinde));
 
     let totalProcessed = 0;
-    const totalRowsAcrossFiles = await preCountRows(queue);
-    setProgressLabel(`0 / ${totalRowsAcrossFiles}`);
+
+    // ------------------------------------------------------------------
+    // Erste Phase: alle Dateien einlesen und lokal zu einer Zeile je
+    // Parzelle zusammenführen.
+    //
+    // Die Listen überschneiden sich stark -- teils enthält eine Datei eine
+    // andere vollständig. Würde jede Gebäudezeile einzeln hochgeladen,
+    // wären das über eine Million Anfragen-Nutzlast für einen Bruchteil an
+    // tatsächlichen Parzellen. Zusammenführen kostet lokal Sekunden und
+    // spart die Übertragung um ein Vielfaches.
+    // ------------------------------------------------------------------
+    const sammler = new ParzellenSammler();
+    const gesamt: ImportSummary = {
+      total: 0, inserted: 0, updated: 0, duplicates: 0, invalid: 0,
+      newGemeinden: 0, fieldsFilled: 0, fieldDetail: {}, errors: [],
+    };
+    const seenGemeinden = new Set<string>();
 
     for (let f = 0; f < queue.length; f++) {
       const item = queue[f];
-      if (item.status === 'done') continue;
-      setQueue(q => q.map((x, i) => i === f ? { ...x, status: 'parsing' } : x));
+      setQueue(q => q.map((x, i) => (i === f ? { ...x, status: 'parsing' } : x)));
+      setProgressLabel(`Lese ${item.file.name} …`);
 
       try {
         const { rows, headers } = await parseFile(item.file);
         const mapping = detectMapping(headers);
+        gesamt.total += rows.length;
 
-        const summary: ImportSummary = {
-          total: rows.length, inserted: 0, updated: 0, duplicates: 0, invalid: 0,
-          newGemeinden: 0, fieldsFilled: 0, fieldDetail: {}, errors: [],
-        };
-        const seenGemeinden = new Set<string>();
-
-        // Convert + validate
         const masterRows: MasterRow[] = [];
-        rows.forEach((r, idx) => {
+        for (const r of rows) {
           const m = rowToMaster(r, mapping, item.file.name);
           if (!isValidRow(m)) {
-            summary.invalid++;
-            return;
+            gesamt.invalid++;
+            continue;
           }
           masterRows.push(m);
           if (m.gemeinde && !existingGemeinden.has(m.gemeinde) && !seenGemeinden.has(m.gemeinde)) {
             seenGemeinden.add(m.gemeinde);
-            summary.newGemeinden++;
+            gesamt.newGemeinden++;
           }
-        });
-
-        // Mehrere Gebäude auf derselben Parzelle zu einer Zeile zusammenfassen.
-        // Ohne das verwirft die Datenbank die zweite Zeile als EGRID-Dublette
-        // und ihre Gebäudefläche fehlt im Bestand.
-        const parzellen = aggregateByParzelle(masterRows);
-        summary.duplicates += masterRows.length - parzellen.length;
-
-        setQueue(q => q.map((x, i) => i === f ? { ...x, status: 'importing', rowCount: rows.length } : x));
-
-        // Import blockweise über eine einzige DB-Funktion. Früher lief das
-        // zeilenweise: EGRID nachschlagen, dann Insert oder Update, bei
-        // gesetzter Liste noch ein drittes Update -- über 50'000 Roundtrips
-        // für eine Datei. Jetzt geht ein ganzer Block als JSON in einem
-        // Aufruf durch, und mehrere Blöcke laufen parallel.
-        const bloecke: MasterRow[][] = [];
-        for (let i = 0; i < parzellen.length; i += CHUNK) {
-          bloecke.push(parzellen.slice(i, i + CHUNK));
         }
+        sammler.add(masterRows);
 
-        const sendeBlock = async (block: MasterRow[]) => {
-          const payload = block.map(masterRowToImportJson);
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const { data, error } = await (supabase as any).rpc('import_properties', {
-            p_rows: payload,
-            p_list_id: listId,
-            p_update_existing: updateExisting,
-          });
-          if (error) throw error;
-          const r = Array.isArray(data) ? data[0] : data;
-          summary.inserted += Number(r?.eingefuegt ?? 0);
-          summary.updated += Number(r?.ergaenzt ?? 0);
-          summary.fieldsFilled += Number(r?.felder_gefuellt ?? 0);
-          for (const [feld, anzahl] of Object.entries(r?.felder_detail ?? {})) {
-            summary.fieldDetail[feld] = (summary.fieldDetail[feld] ?? 0) + Number(anzahl);
-          }
-        };
-
-        const meldeFortschritt = (anzahl: number) => {
-          totalProcessed += anzahl;
-          const pct = Math.min(99, Math.round((totalProcessed / Math.max(1, totalRowsAcrossFiles)) * 100));
-          setProgress(pct);
-          setProgressLabel(`${totalProcessed.toLocaleString('de-CH')} / ${totalRowsAcrossFiles.toLocaleString('de-CH')}`);
-        };
-
-        // Schlägt ein Block fehl, liegt das meist am Zeitlimit der Anfrage.
-        // Dann wird er halbiert und erneut versucht; erst wenn auch kleine
-        // Blöcke scheitern, ist es ein echter Fehler und wird gemeldet.
-        const importBlock = async (block: MasterRow[]) => {
-          try {
-            await sendeBlock(block);
-            meldeFortschritt(block.length);
-          } catch (err) {
-            if (block.length <= MIN_CHUNK) {
-              const msg = err instanceof Error ? err.message : String(err);
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const details = (err as any)?.details || (err as any)?.hint || '';
-              summary.errors.push({
-                row: totalProcessed,
-                reason: `${block.length} Zeilen ab «${block[0]?.address}»: ${msg}${details ? ` (${details})` : ''}`,
-              });
-              meldeFortschritt(block.length);
-              return;
-            }
-            const mitte = Math.ceil(block.length / 2);
-            await importBlock(block.slice(0, mitte));
-            await importBlock(block.slice(mitte));
-          }
-        };
-
-        // Begrenzte Parallelität: schnell, ohne die Verbindung zu überfahren.
-        for (let i = 0; i < bloecke.length; i += PARALLEL) {
-          await Promise.all(bloecke.slice(i, i + PARALLEL).map(importBlock));
-        }
-
-        // Log import
-        await supabase.from('import_logs').insert({
-          file_name: item.file.name,
-          list_id: listId,
-          list_name: listName.trim() || null,
-          rows_total: summary.total,
-          rows_inserted: summary.inserted,
-          rows_updated: summary.updated,
-          rows_duplicates: summary.duplicates,
-          rows_invalid: summary.invalid,
-          new_gemeinden: summary.newGemeinden,
-          details: { headers, mapping_count: mapping.length },
-        } as never);
-
-        // Add freshly seen gemeinden so subsequent files don't recount
-        seenGemeinden.forEach(g => existingGemeinden.add(g));
-
-        setQueue(q => q.map((x, i) => i === f ? { ...x, status: 'done', summary } : x));
-      } catch (err) {
-        const msg = String(err);
-        setQueue(q => q.map((x, i) => i === f ? { ...x, status: 'error', error: msg } : x));
-        toast({ title: `Fehler bei ${item.file.name}`, description: msg, variant: 'destructive' });
+        setQueue(q => q.map((x, i) => (i === f
+          ? { ...x, status: 'done', rowCount: rows.length }
+          : x)));
+        setProgressLabel(
+          `${sammler.eingelesen.toLocaleString('de-CH')} Zeilen gelesen → ` +
+          `${sammler.parzellen.toLocaleString('de-CH')} Parzellen`,
+        );
+        setProgress(Math.round(((f + 1) / queue.length) * 40));
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setQueue(q => q.map((x, i) => (i === f ? { ...x, status: 'error', error: msg } : x)));
       }
+    }
+
+    const parzellen = sammler.ergebnis();
+    gesamt.duplicates = sammler.eingelesen - parzellen.length;
+
+    // ------------------------------------------------------------------
+    // Zweite Phase: nur die zusammengeführten Parzellen übertragen.
+    // ------------------------------------------------------------------
+    const sendeBlock = async (block: MasterRow[]) => {
+      const payload = block.map(masterRowToImportJson);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any).rpc('import_properties', {
+        p_rows: payload,
+        p_list_id: listId,
+        p_update_existing: updateExisting,
+      });
+      if (error) throw error;
+      const r = Array.isArray(data) ? data[0] : data;
+      gesamt.inserted += Number(r?.eingefuegt ?? 0);
+      gesamt.updated += Number(r?.ergaenzt ?? 0);
+      gesamt.fieldsFilled += Number(r?.felder_gefuellt ?? 0);
+      for (const [feld, anzahl] of Object.entries(r?.felder_detail ?? {})) {
+        gesamt.fieldDetail[feld] = (gesamt.fieldDetail[feld] ?? 0) + Number(anzahl);
+      }
+    };
+
+    const meldeFortschritt = (anzahl: number) => {
+      totalProcessed += anzahl;
+      const pct = 40 + Math.min(59, Math.round((totalProcessed / Math.max(1, parzellen.length)) * 59));
+      setProgress(pct);
+      setProgressLabel(
+        `${totalProcessed.toLocaleString('de-CH')} / ${parzellen.length.toLocaleString('de-CH')} Parzellen`,
+      );
+    };
+
+    // Schlägt ein Block fehl, liegt das meist am Zeitlimit der Anfrage.
+    // Dann wird er halbiert und erneut versucht; erst wenn auch kleine
+    // Blöcke scheitern, ist es ein echter Fehler und wird gemeldet.
+    const importBlock = async (block: MasterRow[]) => {
+      try {
+        await sendeBlock(block);
+        meldeFortschritt(block.length);
+      } catch (err) {
+        if (block.length <= MIN_CHUNK) {
+          const msg = err instanceof Error ? err.message : String(err);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const details = (err as any)?.details || (err as any)?.hint || '';
+          gesamt.errors.push({
+            row: totalProcessed,
+            reason: `${block.length} Zeilen ab «${block[0]?.address}»: ${msg}${details ? ` (${details})` : ''}`,
+          });
+          meldeFortschritt(block.length);
+          return;
+        }
+        const mitte = Math.ceil(block.length / 2);
+        await importBlock(block.slice(0, mitte));
+        await importBlock(block.slice(mitte));
+      }
+    };
+
+    const bloecke: MasterRow[][] = [];
+    for (let i = 0; i < parzellen.length; i += CHUNK) {
+      bloecke.push(parzellen.slice(i, i + CHUNK));
+    }
+    for (let i = 0; i < bloecke.length; i += PARALLEL) {
+      await Promise.all(bloecke.slice(i, i + PARALLEL).map(importBlock));
+    }
+
+    setQueue(q => q.map(x => ({ ...x, summary: x.status === 'error' ? x.summary : gesamt })));
+
+    {
+      // Einen Log-Eintrag für den gesamten Lauf schreiben: die Zahlen
+      // beziehen sich auf alle Dateien zusammen, da über Dateigrenzen
+      // hinweg zusammengeführt wurde.
+      await supabase.from('import_logs').insert({
+        file_name: queue.map(q => q.file.name).join(', ').slice(0, 500),
+        list_id: listId,
+        list_name: listName.trim() || null,
+        rows_total: gesamt.total,
+        rows_inserted: gesamt.inserted,
+        rows_updated: gesamt.updated,
+        rows_duplicates: gesamt.duplicates,
+        rows_invalid: gesamt.invalid,
+        new_gemeinden: gesamt.newGemeinden,
+        details: { parzellen: parzellen.length, felder: gesamt.fieldDetail },
+      } as never);
     }
 
     // Refresh list count

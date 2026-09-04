@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { aggregateByParzelle, masterRowToImportJson, type MasterRow } from './master-import';
+import { aggregateByParzelle, masterRowToImportJson, ParzellenSammler, type MasterRow } from './master-import';
 
 const zeile = (r: Partial<MasterRow>): MasterRow => ({ address: 'Teststrasse 1', ...r });
 
@@ -82,22 +82,25 @@ describe('aggregateByParzelle', () => {
 });
 
 describe('masterRowToImportJson', () => {
-  it('macht leere Strings zu null, damit sie gute Daten nicht überschreiben', () => {
+  it('lässt leere Felder ganz weg, statt sie als null zu senden', () => {
+    // Fehlende Schlüssel liest die Datenbank als NULL. Bei über einer
+    // Million Zeilen spart das Weglassen die halbe Übertragungsmenge.
     const j = masterRowToImportJson(zeile({ egrid: 'CH1', gemeinde: '  ', zone: '' }));
-    expect(j.gemeinde).toBeNull();
-    expect(j.zone).toBeNull();
+    expect('gemeinde' in j).toBe(false);
+    expect('zone' in j).toBe(false);
+    expect(j.egrid).toBe('CH1');
   });
 
   it('wandelt Zahlenfelder sauber um', () => {
     const j = masterRowToImportJson(zeile({ area: '1200' as never, baujahr: 1955, geschosse: null }));
     expect(j.area).toBe(1200);
     expect(j.baujahr).toBe(1955);
-    expect(j.geschosse).toBeNull();
+    expect('geschosse' in j).toBe(false);
   });
 
   it('verwirft unbrauchbare Zahlen statt NaN zu senden', () => {
     const j = masterRowToImportJson(zeile({ area: 'keine Angabe' as never }));
-    expect(j.area).toBeNull();
+    expect('area' in j).toBe(false);
   });
 
   it('setzt Vorgaben für Kanton, Gebäudestatus und Adresse', () => {
@@ -107,3 +110,52 @@ describe('masterRowToImportJson', () => {
     expect(j.geb_status).toBe('Bestehend');
   });
 })
+
+
+describe('ParzellenSammler', () => {
+  it('führt dieselbe Parzelle über Dateigrenzen hinweg zusammen', () => {
+    // Genau der Fall der echten Listen: dieselbe Parzelle steht in mehreren
+    // Dateien, jede mit einem anderen Teil der Information.
+    const sammler = new ParzellenSammler();
+    sammler.add([zeile({ egrid: 'CH1', gebaeudeflaeche: 200, area: 3000 })]);
+    sammler.add([zeile({ egrid: 'CH1', zone: 'Wohnzone 2.0', baujahr: 1960 })]);
+    sammler.add([zeile({ egrid: 'CH1', gemeinde: 'Truttikon' })]);
+
+    const out = sammler.ergebnis();
+    expect(out).toHaveLength(1);
+    expect(out[0].zone).toBe('Wohnzone 2.0');
+    expect(out[0].baujahr).toBe(1960);
+    expect(out[0].gemeinde).toBe('Truttikon');
+    expect(out[0].area).toBe(3000);
+    expect(sammler.eingelesen).toBe(3);
+    expect(sammler.parzellen).toBe(1);
+  });
+
+  it('zählt Gebäude und addiert deren Flächen', () => {
+    const sammler = new ParzellenSammler();
+    sammler.add([
+      zeile({ egrid: 'CH1', gebaeudeflaeche: 200, wohnungen: 4 }),
+      zeile({ egrid: 'CH1', gebaeudeflaeche: 150, wohnungen: 3 }),
+    ]);
+    sammler.add([zeile({ egrid: 'CH1', gebaeudeflaeche: 100, wohnungen: 2 })]);
+
+    const out = sammler.ergebnis();
+    expect(out[0].gebaeudeflaeche).toBe(450);
+    expect(out[0].wohnungen).toBe(9);
+    expect(out[0].gebaeude_anzahl).toBe(3);
+  });
+
+  it('hält Zeilen ohne EGRID auseinander', () => {
+    const sammler = new ParzellenSammler();
+    sammler.add([zeile({ egrid: null }), zeile({ egrid: '' })]);
+    sammler.add([zeile({ egrid: undefined })]);
+    expect(sammler.ergebnis()).toHaveLength(3);
+  });
+
+  it('überschreibt nie einen bereits vorhandenen Wert', () => {
+    const sammler = new ParzellenSammler();
+    sammler.add([zeile({ egrid: 'CH1', zone: 'Wohnzone 2.0' })]);
+    sammler.add([zeile({ egrid: 'CH1', zone: 'Kernzone' })]);
+    expect(sammler.ergebnis()[0].zone).toBe('Wohnzone 2.0');
+  });
+});
