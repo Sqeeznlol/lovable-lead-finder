@@ -14,6 +14,14 @@
 -- Eigentümer, Telefonnummern) wird nie angefasst.
 -- =====================================================================
 
+-- Wird von der Import-Funktion geschrieben und trägt, wie viele Gebäude
+-- einer Parzelle in diese Zeile eingerechnet sind.
+ALTER TABLE public.properties
+  ADD COLUMN IF NOT EXISTS gebaeude_anzahl integer NOT NULL DEFAULT 1;
+
+COMMENT ON COLUMN public.properties.gebaeude_anzahl IS
+  'Anzahl Gebäude auf dieser Parzelle, die in diese Zeile eingerechnet sind';
+
 CREATE OR REPLACE FUNCTION public.import_properties(
   p_rows            jsonb,
   p_list_id         uuid    DEFAULT NULL,
