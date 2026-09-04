@@ -387,3 +387,68 @@ export function masterRowToDbUpdate(r: MasterRow): Record<string, unknown> {
   }
   return u;
 }
+
+/**
+ * Nutzlast für die DB-Funktion `import_properties`.
+ *
+ * Bewusst schlank und flach: die Funktion liest sie mit jsonb_to_recordset
+ * ein, deshalb müssen die Schlüssel exakt den dort deklarierten Spalten
+ * entsprechen. Leere Strings werden zu null, damit COALESCE in der Funktion
+ * greift und keine leeren Werte über gute Daten geschrieben werden.
+ */
+export function masterRowToImportJson(r: MasterRow): Record<string, unknown> {
+  const t = (v: unknown) => {
+    if (v === null || v === undefined) return null;
+    const s = String(v).trim();
+    return s === '' ? null : s;
+  };
+  const n = (v: unknown) => {
+    if (v === null || v === undefined || v === '') return null;
+    const x = Number(v);
+    return Number.isFinite(x) ? x : null;
+  };
+
+  return {
+    address: t(r.address) || `Parzelle ${r.parzelle || r.egrid || '?'}`,
+    egrid: t(r.egrid),
+    parzelle: t(r.parzelle),
+    plot_number: t(r.plot_number) ?? t(r.parzelle),
+    gwr_egid: t(r.gwr_egid),
+    gvz_nr: t(r.gvz_nr),
+    gebaeude_anzahl: r.gebaeude_anzahl ?? 1,
+    strassenname: t(r.strassenname),
+    hausnummer: t(r.hausnummer),
+    plz: t(r.plz),
+    plz_ort: t(r.plz_ort),
+    gemeinde: t(r.gemeinde),
+    ortschaftsname: t(r.ortschaftsname),
+    bezirk: t(r.bezirk),
+    bezirksort: t(r.bezirksort),
+    kanton: t(r.kanton) ?? 'ZH',
+    area: n(r.area),
+    gebaeudeflaeche: n(r.gebaeudeflaeche),
+    hnf_schaetzung: n(r.hnf_schaetzung),
+    wohnflaeche: n(r.wohnflaeche),
+    nutzflaeche: n(r.nutzflaeche),
+    baujahr: n(r.baujahr),
+    renovationsjahr: n(r.renovationsjahr),
+    geschosse: n(r.geschosse),
+    wohnungen: n(r.wohnungen),
+    ausnuetzung: n(r.ausnuetzung),
+    zone: t(r.zone),
+    kategorie: t(r.kategorie),
+    gebaeudeart: t(r.gebaeudeart),
+    geb_status: t(r.geb_status) ?? 'Bestehend',
+    denkmalschutz: t(r.denkmalschutz),
+    denkmalschutz_titel: t(r.denkmalschutz_titel),
+    isos: t(r.isos),
+    isos_titel: t(r.isos_titel),
+    google_maps_url: t(r.google_maps_url),
+    streetview_url: t(r.streetview_url),
+    housing_stat_url: t(r.housing_stat_url),
+    gis_url: t(r.gis_url),
+    objektadresse: t(r.objektadresse),
+    bfs_nr: t(r.bfs_nr),
+    source_file: t(r.source_file),
+  };
+}

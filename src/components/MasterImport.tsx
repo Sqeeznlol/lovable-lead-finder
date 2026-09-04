@@ -13,8 +13,7 @@ import {
   rowToMaster,
   isValidRow,
   aggregateByParzelle,
-  masterRowToDbInsert,
-  masterRowToDbUpdate,
+  masterRowToImportJson,
   type ImportSummary,
   type MasterRow,
 } from '@/lib/master-import';
@@ -38,7 +37,10 @@ async function parseFile(file: File): Promise<{ rows: Record<string, unknown>[];
   return { rows, headers };
 }
 
-const CHUNK = 500;
+// Ein Block geht als ein einziger DB-Aufruf durch, deshalb dürfen die
+// Blöcke gross sein. PARALLEL bestimmt, wie viele davon gleichzeitig laufen.
+const CHUNK = 2000;
+const PARALLEL = 4;
 
 export function MasterImport() {
   const [queue, setQueue] = useState<QueuedFile[]>([]);
@@ -139,72 +141,38 @@ export function MasterImport() {
 
         setQueue(q => q.map((x, i) => i === f ? { ...x, status: 'importing', rowCount: rows.length } : x));
 
-        // Process in chunks
+        // Import blockweise über eine einzige DB-Funktion. Früher lief das
+        // zeilenweise: EGRID nachschlagen, dann Insert oder Update, bei
+        // gesetzter Liste noch ein drittes Update -- über 50'000 Roundtrips
+        // für eine Datei. Jetzt geht ein ganzer Block als JSON in einem
+        // Aufruf durch, und mehrere Blöcke laufen parallel.
+        const bloecke: MasterRow[][] = [];
         for (let i = 0; i < parzellen.length; i += CHUNK) {
-          const chunk = parzellen.slice(i, i + CHUNK);
+          bloecke.push(parzellen.slice(i, i + CHUNK));
+        }
 
-          // 1. Lookup existing by EGRID
-          const egrids = chunk.map(r => r.egrid).filter(Boolean) as string[];
-          const existingByEgrid = new Map<string, string>();
-          if (egrids.length) {
-            for (let j = 0; j < egrids.length; j += 200) {
-              const batch = egrids.slice(j, j + 200);
-              const { data } = await supabase
-                .from('properties')
-                .select('id, egrid')
-                .in('egrid', batch);
-              data?.forEach(d => { if (d.egrid) existingByEgrid.set(d.egrid, d.id); });
-            }
-          }
+        const importBlock = async (block: MasterRow[]) => {
+          const payload = block.map(masterRowToImportJson);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { data, error } = await (supabase as any).rpc('import_properties', {
+            p_rows: payload,
+            p_list_id: listId,
+            p_update_existing: updateExisting,
+          });
+          if (error) throw error;
+          const r = Array.isArray(data) ? data[0] : data;
+          summary.inserted += Number(r?.eingefuegt ?? 0);
+          summary.updated += Number(r?.ergaenzt ?? 0);
 
-          // 2. Split: insert vs update
-          const toInsert: Record<string, unknown>[] = [];
-          const toUpdate: { id: string; row: MasterRow }[] = [];
-
-          for (const row of chunk) {
-            const matchId = row.egrid ? existingByEgrid.get(row.egrid) : undefined;
-            if (matchId) {
-              if (updateExisting) toUpdate.push({ id: matchId, row });
-              else summary.duplicates++;
-              if (listId) {
-                // Only assign list_id, don't touch acquisition state
-                await supabase.from('properties').update({ list_id: listId }).eq('id', matchId);
-              }
-            } else {
-              const payload = masterRowToDbInsert(row);
-              if (listId) payload.list_id = listId;
-              toInsert.push(payload);
-            }
-          }
-
-          // 3. Insert (handle EGRID conflicts gracefully)
-          if (toInsert.length) {
-            const { error } = await supabase.from('properties').insert(toInsert as never);
-            if (error) {
-              // Conflict — fallback to row-by-row
-              for (const row of toInsert) {
-                const { error: e2 } = await supabase.from('properties').insert(row as never);
-                if (e2) summary.duplicates++;
-                else summary.inserted++;
-              }
-            } else {
-              summary.inserted += toInsert.length;
-            }
-          }
-
-          // 4. Update existing — only enrich blank fields
-          for (const { id, row } of toUpdate) {
-            const updates = masterRowToDbUpdate(row);
-            if (Object.keys(updates).length) {
-              await supabase.from('properties').update(updates as never).eq('id', id);
-              summary.updated++;
-            }
-          }
-
-          totalProcessed += chunk.length;
+          totalProcessed += block.length;
           const pct = Math.min(99, Math.round((totalProcessed / Math.max(1, totalRowsAcrossFiles)) * 100));
           setProgress(pct);
           setProgressLabel(`${totalProcessed.toLocaleString('de-CH')} / ${totalRowsAcrossFiles.toLocaleString('de-CH')}`);
+        };
+
+        // Begrenzte Parallelität: schnell, ohne die Verbindung zu überfahren.
+        for (let i = 0; i < bloecke.length; i += PARALLEL) {
+          await Promise.all(bloecke.slice(i, i + PARALLEL).map(importBlock));
         }
 
         // Log import
