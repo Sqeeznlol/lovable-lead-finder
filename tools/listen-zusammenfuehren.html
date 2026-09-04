@@ -106,12 +106,16 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   <div class="card" id="result" hidden>
     <div class="stats" id="stats"></div>
     <div class="row">
-      <button id="dl-csv">Als CSV speichern</button>
-      <button id="dl-xlsx" class="ghost">Als Excel speichern</button>
+      <button id="dl-supabase">CSV für Supabase</button>
+      <button id="dl-excel" class="ghost">CSV für Excel</button>
+      <button id="dl-xlsx" class="ghost">Als Excel-Datei</button>
     </div>
     <p class="hint">
-      CSV empfehlen: die Datei ist kleiner und lässt sich schneller wieder
-      einlesen. Beide Formate versteht der Master-Import.
+      <b>CSV für Supabase</b> nimmt Komma als Trenner und lässt sich im
+      Table Editor direkt in die Tabelle <code>properties</code> importieren --
+      das ist der schnellste Weg, weil nichts durch die App muss.
+      <b>CSV für Excel</b> nimmt Semikolon, damit die Spalten beim Öffnen
+      stimmen. Beide versteht auch der Master-Import der App.
     </p>
   </div>
 
@@ -168,7 +172,7 @@ const AUSGABE = ['egrid','address','strassenname','hausnummer','plz','plz_ort',
   'nutzflaeche','baujahr','renovationsjahr','geschosse','wohnungen','ausnuetzung',
   'zone','kategorie','gebaeudeart','geb_status','denkmalschutz','denkmalschutz_titel',
   'isos','isos_titel','google_maps_url','streetview_url','housing_stat_url',
-  'objektadresse','gebaeude_anzahl','quelldateien'];
+  'objektadresse','gebaeude_anzahl','source_file'];
 
 const ZAHLEN = new Set(['area','gebaeudeflaeche','hnf_schaetzung','wohnflaeche',
   'nutzflaeche','baujahr','renovationsjahr','geschosse','wohnungen','ausnuetzung']);
@@ -214,7 +218,7 @@ function verarbeite(rows, headers, dateiname) {
     if (leer(zeile.egrid) && leer(zeile.address) && leer(zeile.parzelle)) continue;
     gelesen++;
     zeile.gebaeude_anzahl = 1;
-    zeile.quelldateien = dateiname;
+    zeile.source_file = dateiname;
 
     const key = zeile.egrid;
     if (leer(key)) { ohneEgrid.push(zeile); continue; }
@@ -239,14 +243,14 @@ function verarbeite(rows, headers, dateiname) {
     // Alles Übrige: nur Lücken füllen, nie überschreiben
     for (const [f, v] of Object.entries(zeile)) {
       if (ADDIEREN.includes(f) || f === 'baujahr' || f === 'geschosse') continue;
-      if (f === 'gebaeude_anzahl' || f === 'quelldateien') continue;
+      if (f === 'gebaeude_anzahl' || f === 'source_file') continue;
       if (leer(da[f]) && !leer(v)) {
         da[f] = v;
         beitrag[f] = (beitrag[f] ?? 0) + 1;
       }
     }
-    if (!String(da.quelldateien).includes(dateiname)) {
-      da.quelldateien = da.quelldateien + '; ' + dateiname;
+    if (!String(da.source_file).includes(dateiname)) {
+      da.source_file = da.source_file + '; ' + dateiname;
     }
   }
 }
@@ -356,32 +360,37 @@ function speichern(blob, name) {
 
 // CSV von Hand schreiben statt über SheetJS: bei über einer Million Zellen
 // braucht json_to_sheet Minuten, das direkte Zusammensetzen Sekunden.
-$('dl-csv').onclick = () => {
-  $('dl-csv').disabled = true;
+//
+// Der Trenner unterscheidet sich je nach Ziel: Supabase erwartet Komma,
+// Excel im deutschsprachigen Raum Semikolon. Mit dem falschen Trenner
+// landet entweder alles in einer Spalte oder der Import scheitert.
+function csvSchreiben(trenner, name) {
   $('log').textContent = 'CSV wird geschrieben …';
 
+  const muster = trenner === ';' ? /[;"\n\r]/ : /[,"\n\r]/;
   const zelle = v => {
     if (v === null || v === undefined) return '';
     const s = String(v);
-    return /[;"\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    return muster.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   };
 
   // In Teilen zusammensetzen, damit der Speicher nicht durch einen einzigen
   // riesigen String läuft.
-  const teile = ['\ufeff' + AUSGABE.join(';') + '\n'];
+  const teile = ['\ufeff' + AUSGABE.join(trenner) + '\n'];
   let puffer = '';
   for (let i = 0; i < ergebnis.length; i++) {
     const z = ergebnis[i];
-    puffer += AUSGABE.map(f => zelle(z[f])).join(';') + '\n';
+    puffer += AUSGABE.map(f => zelle(z[f])).join(trenner) + '\n';
     if (i % 5000 === 4999) { teile.push(puffer); puffer = ''; }
   }
   if (puffer) teile.push(puffer);
 
-  speichern(new Blob(teile, { type: 'text/csv;charset=utf-8' }),
-            'parzellen-zusammengefuehrt.csv');
+  speichern(new Blob(teile, { type: 'text/csv;charset=utf-8' }), name);
   $('log').textContent = `${ergebnis.length.toLocaleString('de-CH')} Parzellen gespeichert`;
-  $('dl-csv').disabled = false;
-};
+}
+
+$('dl-supabase').onclick = () => csvSchreiben(',', 'parzellen-fuer-supabase.csv');
+$('dl-excel').onclick = () => csvSchreiben(';', 'parzellen-fuer-excel.csv');
 
 // Excel-Export geht über SheetJS und ist bei sehr grossen Mengen deutlich
 // langsamer als CSV -- deshalb nur als Zweitweg angeboten.
