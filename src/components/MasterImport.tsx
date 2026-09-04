@@ -37,10 +37,14 @@ async function parseFile(file: File): Promise<{ rows: Record<string, unknown>[];
   return { rows, headers };
 }
 
-// Ein Block geht als ein einziger DB-Aufruf durch, deshalb dürfen die
-// Blöcke gross sein. PARALLEL bestimmt, wie viele davon gleichzeitig laufen.
-const CHUNK = 2000;
-const PARALLEL = 4;
+// Ein Block geht als ein einziger DB-Aufruf durch. Die Grösse ist ein
+// Kompromiss: grosse Blöcke sparen Roundtrips, laufen aber eher in das
+// Zeitlimit, das Supabase pro Anfrage setzt -- jede eingefügte Zeile wird
+// vom Trigger durchgerechnet. Bei einem Fehler halbiert der Import den
+// Block und versucht es erneut, bis MIN_CHUNK erreicht ist.
+const CHUNK = 500;
+const MIN_CHUNK = 50;
+const PARALLEL = 3;
 
 export function MasterImport() {
   const [queue, setQueue] = useState<QueuedFile[]>([]);
@@ -151,7 +155,7 @@ export function MasterImport() {
           bloecke.push(parzellen.slice(i, i + CHUNK));
         }
 
-        const importBlock = async (block: MasterRow[]) => {
+        const sendeBlock = async (block: MasterRow[]) => {
           const payload = block.map(masterRowToImportJson);
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const { data, error } = await (supabase as any).rpc('import_properties', {
@@ -163,11 +167,38 @@ export function MasterImport() {
           const r = Array.isArray(data) ? data[0] : data;
           summary.inserted += Number(r?.eingefuegt ?? 0);
           summary.updated += Number(r?.ergaenzt ?? 0);
+        };
 
-          totalProcessed += block.length;
+        const meldeFortschritt = (anzahl: number) => {
+          totalProcessed += anzahl;
           const pct = Math.min(99, Math.round((totalProcessed / Math.max(1, totalRowsAcrossFiles)) * 100));
           setProgress(pct);
           setProgressLabel(`${totalProcessed.toLocaleString('de-CH')} / ${totalRowsAcrossFiles.toLocaleString('de-CH')}`);
+        };
+
+        // Schlägt ein Block fehl, liegt das meist am Zeitlimit der Anfrage.
+        // Dann wird er halbiert und erneut versucht; erst wenn auch kleine
+        // Blöcke scheitern, ist es ein echter Fehler und wird gemeldet.
+        const importBlock = async (block: MasterRow[]) => {
+          try {
+            await sendeBlock(block);
+            meldeFortschritt(block.length);
+          } catch (err) {
+            if (block.length <= MIN_CHUNK) {
+              const msg = err instanceof Error ? err.message : String(err);
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const details = (err as any)?.details || (err as any)?.hint || '';
+              summary.errors.push({
+                row: totalProcessed,
+                reason: `${block.length} Zeilen ab «${block[0]?.address}»: ${msg}${details ? ` (${details})` : ''}`,
+              });
+              meldeFortschritt(block.length);
+              return;
+            }
+            const mitte = Math.ceil(block.length / 2);
+            await importBlock(block.slice(0, mitte));
+            await importBlock(block.slice(mitte));
+          }
         };
 
         // Begrenzte Parallelität: schnell, ohne die Verbindung zu überfahren.
@@ -303,7 +334,8 @@ export function MasterImport() {
 
             <div className="space-y-2">
               {queue.map((q, i) => (
-                <div key={i} className="flex items-center gap-3 rounded-lg border p-3 text-sm">
+                <div key={i} className="rounded-lg border text-sm">
+                  <div className="flex items-center gap-3 p-3">
                   <FileText className="h-4 w-4 text-muted-foreground" />
                   <span className="font-medium truncate flex-1">{q.file.name}</span>
                   <span className="text-xs text-muted-foreground">{(q.file.size / 1024 / 1024).toFixed(1)} MB</span>
@@ -318,6 +350,24 @@ export function MasterImport() {
                       <X className="h-4 w-4" />
                     </Button>
                   )}
+                  </div>
+                  {/* Fehlermeldungen ausschreiben: ohne den Text der Datenbank
+                      lässt sich ein fehlgeschlagener Import nicht einordnen. */}
+                  {q.error && (
+                    <p className="px-3 pb-2 text-xs text-destructive break-words">{q.error}</p>
+                  )}
+                  {q.summary?.errors?.length ? (
+                    <ul className="px-3 pb-2 space-y-1">
+                      {q.summary.errors.slice(0, 5).map((e, k) => (
+                        <li key={k} className="text-xs text-destructive break-words">· {e.reason}</li>
+                      ))}
+                      {q.summary.errors.length > 5 && (
+                        <li className="text-xs text-muted-foreground">
+                          … und {q.summary.errors.length - 5} weitere
+                        </li>
+                      )}
+                    </ul>
+                  ) : null}
                 </div>
               ))}
             </div>
