@@ -244,3 +244,35 @@ describe('Nicht-Bauzone: Wortgrenzen', () => {
     expect(parseZone('Kernzone Waldhof').keineBauzone).toBe(false);
   });
 });
+
+describe('Zonen ohne Wohnnutzung', () => {
+  // Das Geschäft besteht darin, Objekte neu zu erstellen und als Wohnraum
+  // zu verkaufen oder zu vermieten. Wo die Zone das nicht zulässt, hilft
+  // auch vorhandene bauliche Reserve nichts.
+  it('schliesst Gewerbe, Industrie und öffentliche Bauten aus', () => {
+    expect(istAusgeschlossen({ zone: 'Gewerbezone B (rechtskräftig)' })).toBe(true);
+    expect(istAusgeschlossen({ zone: 'Industriezone' })).toBe(true);
+    expect(istAusgeschlossen({ zone: 'Zone für öffentliche Bauten' })).toBe(true);
+    expect(istAusgeschlossen({ zone: 'Arbeitszone' })).toBe(true);
+  });
+
+  it('nennt den Grund getrennt von der Nicht-Bauzone', () => {
+    expect(ausschlussGrund({ zone: 'Gewerbezone B' })).toBe('Keine Wohnnutzung');
+    expect(ausschlussGrund({ zone: 'Kantonale Landwirtschaftszone' })).toBe('Keine Bauzone');
+  });
+
+  it('vergibt dort keine Ausnützung und kein Potenzial', () => {
+    const r = calculatePotential({
+      zone: 'Gewerbezone B', area: 5000, gebaeudeflaeche: 300, geschosse: 1, baujahr: 1960,
+    });
+    expect(r.az).toBeNull();
+    expect(r.reserveGf).toBeNull();
+    expect(r.killer).toContain('Keine Wohnnutzung');
+  });
+
+  it('lässt Wohn-, Kern-, Zentrums- und Quartiererhaltungszonen drin', () => {
+    for (const z of ['Wohnzone 2.0', 'Kernzone I', 'Zentrumszone', 'Quartiererhaltungszone']) {
+      expect(istAusgeschlossen({ zone: z }), z).toBe(false);
+    }
+  });
+});
