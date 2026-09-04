@@ -61,7 +61,9 @@ export interface ParsedZone {
   keineBauzone: boolean;
 }
 
-const NICHT_BAUZONE = /landwirtschaftszone|wald|freihaltezone|erholungszone|gew(ä|ae)sser|reservezone|verkehrszone/i;
+// "Wald" bewusst nur als eigenständiges Wort: es gibt die Gemeinde Wald (ZH)
+// und Flurnamen wie "Waldegg", die keine Waldzone sind.
+const NICHT_BAUZONE = /landwirtschaftszone|\bwald\b|waldzone|freihaltezone|erholungszone|gew(ä|ae)sser|reservezone|verkehrszone/i;
 
 export function parseZone(raw?: string | null): ParsedZone {
   const leer: ParsedZone = { ziffer: null, geschosse: null, ueberbauungsziffer: null, kurz: null, keineBauzone: false };
@@ -109,8 +111,18 @@ export function istVorhanden(v?: string | null): boolean {
 export interface PotentialConfig {
   /** AZ-Tabelle pro Zone. */
   azByZone: Record<string, number>;
-  /** Anteil HNF an anrechenbarer Geschossfläche (Verkehrsflächen/Konstruktion abgezogen). */
+  /**
+   * Anteil HNF an der Geschossfläche — zieht Konstruktion, Treppen und
+   * Verkehrsflächen ab. 0.77 ist der Erfahrungswert aus unseren Projekten.
+   */
   hnfFaktor: number;
+  /**
+   * Attikageschoss zählt nicht als volles Geschoss: es bringt nur 0.66 der
+   * Fläche eines Vollgeschosses, ist aber zusätzlich anrechenbar.
+   */
+  attikaFaktor: number;
+  /** Ob über den Vollgeschossen ein Attikageschoss angenommen wird. */
+  mitAttika: boolean;
   /** Baukosten pro m² neu erstellter Geschossfläche, CHF. */
   baukostenProM2GF: number;
   /** Erzielbarer Erlös pro m² HNF (Verkauf), CHF. */
@@ -131,7 +143,9 @@ export interface PotentialConfig {
 
 export const DEFAULT_POTENTIAL_CONFIG: PotentialConfig = {
   azByZone: DEFAULT_AZ_BY_ZONE,
-  hnfFaktor: 0.8,
+  hnfFaktor: 0.77,
+  attikaFaktor: 0.66,
+  mitAttika: true,
   baukostenProM2GF: 3200,
   erloesProM2HNF: 9500,
   minReserveM2: 80,
@@ -172,6 +186,10 @@ export interface PotentialResult {
   reserveQuote: number | null;
   /** Ob der Bestand die Zone bereits überschreitet (Besitzstand). */
   ueberbaut: boolean;
+  /** Zulässige Vollgeschosse, die der HNF-Rechnung zugrunde liegen. */
+  vollgeschosse: number | null;
+  /** Anrechenbare Geschosse total, inkl. Attika-Anteil. */
+  anrechenbareGeschosse: number | null;
   hnfBestand: number | null;
   hnfNeu: number | null;
   hnfDelta: number | null;
@@ -276,8 +294,29 @@ export function calculatePotential(
   const reserveGf = rawReserve != null ? Math.max(rawReserve, 0) : null;
   const reserveQuote = reserveGf != null && gfZulaessig ? reserveGf / gfZulaessig : null;
 
+  // HNF nach der Praxisformel:
+  //   Grundstück x Ausnutzung / Anzahl VG x (Anzahl VG + anrechenbare) x 0.77
+  // Die Division durch die Vollgeschosse ergibt die Fläche eines Geschosses;
+  // die Multiplikation mit (VG + Attika-Anteil) zählt das zusätzlich
+  // anrechenbare Attikageschoss dazu, das nur 0.66 eines Vollgeschosses bringt.
+  const vgZulaessig = parsed.geschosse ?? geschosse ?? 2;
+  if (parsed.geschosse == null) {
+    assumptions.push(
+      geschosse != null
+        ? `${geschosse} Vollgeschosse aus dem Bestand übernommen (Zone nennt keine)`
+        : 'Vollgeschosse unbekannt — 2 angenommen',
+    );
+  }
+  const anrechenbareGeschosse = vgZulaessig + (cfg.mitAttika ? cfg.attikaFaktor : 0);
+  if (cfg.mitAttika) {
+    assumptions.push(`Attika als ${cfg.attikaFaktor} Vollgeschoss angerechnet`);
+  }
+
   const hnfBestand = gfBestand != null ? gfBestand * cfg.hnfFaktor : null;
-  const hnfNeu = gfZulaessig != null ? gfZulaessig * cfg.hnfFaktor : null;
+  const hnfNeu =
+    gfZulaessig != null && vgZulaessig > 0
+      ? (gfZulaessig / vgZulaessig) * anrechenbareGeschosse * cfg.hnfFaktor
+      : null;
   const hnfDelta = hnfNeu != null && hnfBestand != null ? Math.max(hnfNeu - hnfBestand, 0) : null;
 
   const investition = reserveGf != null ? reserveGf * cfg.baukostenProM2GF : null;
@@ -310,6 +349,8 @@ export function calculatePotential(
     reserveGf: round(reserveGf),
     reserveQuote: round(reserveQuote, 3),
     ueberbaut,
+    vollgeschosse: vgZulaessig,
+    anrechenbareGeschosse: round(anrechenbareGeschosse, 2),
     hnfBestand: round(hnfBestand),
     hnfNeu: round(hnfNeu),
     hnfDelta: round(hnfDelta),
@@ -324,15 +365,15 @@ export function calculatePotential(
 }
 
 /**
- * Potenzial-Score 0–100 — ersetzt das reine "gross = gut" des alten Deal-Scores
- * durch "viel ungenutzte Reserve = gut".
+ * Potenzial-Score 0–100. Leitgrösse ist die zusätzlich erreichbare HNF —
+ * je mehr verkaufbare Fläche ein Objekt hergibt, desto interessanter.
  *
- *   Reserve absolut   0–35 Pt.   (Deckel bei 1500 m² aGF)
- *   Reserve-Quote     0–30 Pt.
- *   Marge-Quote       0–15 Pt.
- *   Baujahr/Alter     0–15 Pt.   (alt = eher Ersatzneubau)
- *   Zonenqualität     0–5 Pt.
- *   Killer            −25 Pt. je Killer
+ *   HNF-Zuwachs absolut  0–40 Pt.   (Deckel bei 1200 m² HNF)
+ *   HNF-Zuwachs relativ  0–25 Pt.   (Verdoppelung = voll)
+ *   Marge-Quote          0–15 Pt.
+ *   Baujahr/Alter        0–15 Pt.   (alt = eher Ersatzneubau)
+ *   Zonenqualität        0–5 Pt.
+ *   Killer               −25 Pt. je Killer
  */
 export function potentialScore(
   p: PotentialInput,
@@ -340,10 +381,15 @@ export function potentialScore(
   pre?: PotentialResult,
 ): number {
   const r = pre ?? calculatePotential(p, cfg);
-  if (r.reserveGf == null) return 0;
+  if (r.hnfDelta == null) return 0;
 
-  let score = Math.min(r.reserveGf / 1500, 1) * 35;
-  score += Math.min((r.reserveQuote ?? 0) / cfg.zielReserveQuote, 1) * 30;
+  let score = Math.min(r.hnfDelta / 1200, 1) * 40;
+
+  // Relativer Zuwachs: 1000 m² mehr auf einem kleinen Bestand wiegen schwerer
+  // als dieselben 1000 m² auf einem bereits grossen Haus.
+  const relativ = r.hnfBestand && r.hnfBestand > 0 ? r.hnfDelta / r.hnfBestand : 1;
+  score += Math.min(relativ, 1) * 25;
+
   score += Math.min(Math.max(r.margeQuote ?? 0, 0) / 0.5, 1) * 15;
 
   const bj = p.renovationsjahr ?? p.baujahr;
@@ -354,9 +400,7 @@ export function potentialScore(
     else if (bj <= 1990) score += 4;
   }
 
-  const az = r.az ?? 0;
-  score += Math.min(az / 1.3, 1) * 5;
-
+  score += Math.min((r.az ?? 0) / 1.3, 1) * 5;
   score -= r.killer.length * 25;
 
   return Math.max(0, Math.min(100, Math.round(score)));

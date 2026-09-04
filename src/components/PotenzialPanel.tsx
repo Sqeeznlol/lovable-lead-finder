@@ -83,15 +83,24 @@ export function PotenzialPanel({ property, config, compact }: Props) {
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Kennzahl label="Zulässig aGF" value={formatM2(r.gfZulaessig)} hint={r.az ? `AZ ${r.az}` : undefined} />
-        <Kennzahl label="Bestand aGF" value={formatM2(r.gfBestand)} />
         <Kennzahl
-          label="Reserve"
-          value={formatM2(r.reserveGf)}
-          hint={r.reserveQuote != null ? `${Math.round(r.reserveQuote * 100)}% ungenutzt` : undefined}
+          label="HNF erreichbar"
+          value={formatM2(r.hnfNeu)}
+          hint={r.vollgeschosse ? `${r.anrechenbareGeschosse} anrechenbare Gesch.` : undefined}
           highlight
         />
-        <Kennzahl label="HNF zusätzlich" value={formatM2(r.hnfDelta)} />
+        <Kennzahl label="HNF Bestand" value={formatM2(r.hnfBestand)} />
+        <Kennzahl
+          label="HNF zusätzlich"
+          value={formatM2(r.hnfDelta)}
+          hint={r.hnfBestand ? `+${Math.round((r.hnfDelta! / r.hnfBestand) * 100)}%` : undefined}
+          highlight
+        />
+        <Kennzahl
+          label="Reserve aGF"
+          value={formatM2(r.reserveGf)}
+          hint={r.az ? `AZ ${r.az.toFixed(2)}` : undefined}
+        />
       </div>
 
       <div className="grid grid-cols-3 gap-2 border-t pt-3">

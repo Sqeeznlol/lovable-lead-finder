@@ -60,10 +60,15 @@ describe('calculatePotential', () => {
     expect(r.gfBestand).toBe(300);
     expect(r.reserveGf).toBe(420);
     expect(r.reserveQuote).toBeCloseTo(0.583, 2);
-    expect(r.hnfDelta).toBe(336);          // 420 * 0.8
+    // HNF nach Praxisformel: 720 / 2 VG x 2.66 anrechenbare x 0.77 = 737 m²,
+    // abzüglich Bestand 300 x 0.77 = 231 m²
+    expect(r.hnfNeu).toBe(737);
+    expect(r.hnfBestand).toBe(231);
+    expect(r.hnfDelta).toBe(506);
     expect(r.investition).toBe(420 * 3200);
-    expect(r.erloes).toBe(336 * 9500);
-    expect(r.marge).toBe(336 * 9500 - 420 * 3200);
+    // Erlös und Marge rechnen mit der ungerundeten HNF (506.352 m²)
+    expect(r.erloes).toBeCloseTo(506.352 * 9500, 0);
+    expect(r.marge).toBeCloseTo(506.352 * 9500 - 420 * 3200, 0);
     expect(r.confidence).toBe('mittel');
     expect(r.killer).toHaveLength(0);
   });
@@ -100,7 +105,7 @@ describe('calculatePotential', () => {
 });
 
 describe('potentialScore', () => {
-  it('bewertet grosse ungenutzte Reserve hoch', () => {
+  it('bewertet grosse erreichbare HNF hoch', () => {
     const gut = potentialScore({ zone: 'W4', area: 3000, gebaeudeflaeche: 200, geschosse: 2, baujahr: 1950 });
     const schlecht = potentialScore({ zone: 'W2', area: 400, gebaeudeflaeche: 180, geschosse: 2, baujahr: 2015 });
     expect(gut).toBeGreaterThan(schlecht);
@@ -146,14 +151,14 @@ describe('Konfiguration', () => {
 // dieselben Zahlen liefern, sonst driften Liste und Karte auseinander.
 describe('Parität zur SQL-Berechnung', () => {
   const faelle = [
-    { p: { zone: 'W3 (3 Vollgeschosse)', area: 1200, gebaeudeflaeche: 150, geschosse: 2, baujahr: 1955 }, reserveGf: 420, score: 69 },
+    { p: { zone: 'W3 (3 Vollgeschosse)', area: 1200, gebaeudeflaeche: 150, geschosse: 2, baujahr: 1955 }, reserveGf: 420, score: 71 },
     { p: { zone: 'W2', area: 500, gebaeudeflaeche: 200, geschosse: 3, baujahr: 1970 }, reserveGf: 0, score: 0 },
-    { p: { zone: 'W3', area: 1000, gebaeudeflaeche: 100, baujahr: 1980 }, reserveGf: 400, score: 61 },
-    { p: { zone: 'W4', area: 2000, gebaeudeflaeche: 200, geschosse: 2, baujahr: 1910, denkmalschutz: 'kantonal' }, reserveGf: 1100, score: 64 },
+    { p: { zone: 'W3', area: 1000, gebaeudeflaeche: 100, baujahr: 1980 }, reserveGf: 400, score: 62 },
+    { p: { zone: 'W4', area: 2000, gebaeudeflaeche: 200, geschosse: 2, baujahr: 1910, denkmalschutz: 'kantonal' }, reserveGf: 1100, score: 73 },
     // ZH-Freitext: BMZ 1.6 : 3.2 m = AZ 0.5
-    { p: { zone: 'Wohnzone 1.6 (rechtskräftig, 8460m², 95%)', area: 1200, gebaeudeflaeche: 150, geschosse: 2, baujahr: 1955, denkmalschutz: 'nicht vorhanden' }, reserveGf: 300, score: 66 },
+    { p: { zone: 'Wohnzone 1.6 (rechtskräftig, 8460m², 95%)', area: 1200, gebaeudeflaeche: 150, geschosse: 2, baujahr: 1955, denkmalschutz: 'nicht vorhanden' }, reserveGf: 300, score: 67 },
     // Geschosse/Überbauungsziffer: 2 x 50% = AZ 1.0
-    { p: { zone: 'Wohnzone 2/50', area: 1200, gebaeudeflaeche: 150, geschosse: 2, baujahr: 1955, denkmalschutz: 'nicht vorhanden' }, reserveGf: 900, score: 82 },
+    { p: { zone: 'Wohnzone 2/50', area: 1200, gebaeudeflaeche: 150, geschosse: 2, baujahr: 1955, denkmalschutz: 'nicht vorhanden' }, reserveGf: 900, score: 89 },
   ];
 
   it.each(faelle)('stimmt mit Postgres überein: $p.zone', ({ p, reserveGf, score }) => {
@@ -224,5 +229,18 @@ describe('istAusgeschlossen', () => {
   it('nennt den Grund', () => {
     expect(ausschlussGrund({ zone: 'Wald' })).toBe('Keine Bauzone');
     expect(ausschlussGrund({ zone: 'Wohnzone 2.0' })).toBeNull();
+  });
+});
+
+describe('Nicht-Bauzone: Wortgrenzen', () => {
+  it('erkennt echte Waldzonen', () => {
+    expect(parseZone('Wald').keineBauzone).toBe(true);
+    expect(parseZone('Waldzone').keineBauzone).toBe(true);
+    expect(parseZone('Übriges Gebiet, Wald').keineBauzone).toBe(true);
+  });
+  it('lässt sich von Namen mit "wald" nicht täuschen', () => {
+    // Die Gemeinde Wald (ZH) und Flurnamen wie Waldegg sind keine Waldzonen.
+    expect(parseZone('Wohnzone 2.0 Waldegg').keineBauzone).toBe(false);
+    expect(parseZone('Kernzone Waldhof').keineBauzone).toBe(false);
   });
 });
