@@ -265,56 +265,91 @@ export function rowToMaster(
  * sicher zuordnen.
  */
 export function aggregateByParzelle(rows: MasterRow[]): MasterRow[] {
-  const byEgrid = new Map<string, MasterRow>();
-  const out: MasterRow[] = [];
+  const sammler = new ParzellenSammler();
+  sammler.add(rows);
+  return sammler.ergebnis();
+}
 
-  const summe = (a: number | null | undefined, b: number | null | undefined) =>
-    a == null && b == null ? null : (a ?? 0) + (b ?? 0);
+/**
+ * Sammelt Zeilen aus beliebig vielen Dateien und führt sie unterwegs zu
+ * einer Zeile je Parzelle zusammen.
+ *
+ * Der Grund ist Datenmenge: die Listen überschneiden sich stark -- teils
+ * enthält eine Datei eine andere vollständig. Wer jede Zeile einzeln zum
+ * Server schickt, überträgt ein Vielfaches dessen, was am Ende in der
+ * Datenbank landet. Über 1.7 Millionen Gebäudezeilen sind das Gigabytes,
+ * die über eine normale Leitung Stunden brauchen.
+ *
+ * Deshalb wird zuerst alles lokal zusammengelegt und erst danach
+ * übertragen. Die Zusammenführung folgt denselben Regeln wie innerhalb
+ * einer Datei: Flächen und Wohnungen addieren, ältestes Baujahr, höchste
+ * Geschosszahl, leere Felder auffüllen, vorhandene nie überschreiben.
+ */
+export class ParzellenSammler {
+  private byEgrid = new Map<string, MasterRow>();
+  private ohneEgrid: MasterRow[] = [];
+  private gesehen = 0;
 
-  for (const row of rows) {
-    const key = row.egrid?.trim();
-    if (!key) {
-      out.push(row);
-      continue;
-    }
-
-    const bestehend = byEgrid.get(key);
-    if (!bestehend) {
-      const kopie: MasterRow = { ...row, gebaeude_anzahl: 1 };
-      byEgrid.set(key, kopie);
-      out.push(kopie);
-      continue;
-    }
-
-    // Bestand aufaddieren
-    bestehend.gebaeudeflaeche = summe(bestehend.gebaeudeflaeche, row.gebaeudeflaeche);
-    bestehend.wohnungen = summe(bestehend.wohnungen, row.wohnungen);
-    bestehend.wohnflaeche = summe(bestehend.wohnflaeche, row.wohnflaeche);
-    bestehend.gebaeude_anzahl = (bestehend.gebaeude_anzahl ?? 1) + 1;
-
-    // Ältestes Baujahr, höchste Geschosszahl
-    if (row.baujahr != null && (bestehend.baujahr == null || row.baujahr < bestehend.baujahr)) {
-      bestehend.baujahr = row.baujahr;
-    }
-    if (row.geschosse != null && (bestehend.geschosse == null || row.geschosse > bestehend.geschosse)) {
-      bestehend.geschosse = row.geschosse;
-    }
-
-    // Alles Übrige: leere Felder aus der Geschwisterzeile auffüllen. Die
-    // Grundstücksfläche gilt für die ganze Parzelle und wird deshalb NICHT
-    // addiert, sondern nur ergänzt, wenn sie noch fehlt.
-    for (const [feld, wert] of Object.entries(row) as [keyof MasterRow, unknown][]) {
-      if (feld === 'gebaeudeflaeche' || feld === 'wohnungen' || feld === 'wohnflaeche') continue;
-      if (feld === 'baujahr' || feld === 'geschosse' || feld === 'gebaeude_anzahl') continue;
-      const vorhanden = (bestehend as unknown as Record<string, unknown>)[feld];
-      if ((vorhanden === null || vorhanden === undefined || vorhanden === '') &&
-          wert !== null && wert !== undefined && wert !== '') {
-        (bestehend as unknown as Record<string, unknown>)[feld] = wert;
+  /** Zeilen einer Datei aufnehmen. */
+  add(rows: MasterRow[]): void {
+    this.gesehen += rows.length;
+    for (const row of rows) {
+      const key = row.egrid?.trim();
+      if (!key) {
+        this.ohneEgrid.push({ ...row, gebaeude_anzahl: 1 });
+        continue;
+      }
+      const bestehend = this.byEgrid.get(key);
+      if (!bestehend) {
+        this.byEgrid.set(key, { ...row, gebaeude_anzahl: 1 });
+      } else {
+        mergeParzelle(bestehend, row);
       }
     }
   }
 
-  return out;
+  /** Eine Zeile je Parzelle, plus alle Zeilen ohne EGRID. */
+  ergebnis(): MasterRow[] {
+    return [...this.byEgrid.values(), ...this.ohneEgrid];
+  }
+
+  /** Wie viele Gebäudezeilen insgesamt eingelesen wurden. */
+  get eingelesen(): number {
+    return this.gesehen;
+  }
+
+  /** Wie viele Parzellen daraus geworden sind. */
+  get parzellen(): number {
+    return this.byEgrid.size + this.ohneEgrid.length;
+  }
+}
+
+/** Eine weitere Gebäudezeile in die bestehende Parzellen-Zeile einrechnen. */
+function mergeParzelle(bestehend: MasterRow, row: MasterRow): void {
+  const summe = (a: number | null | undefined, b: number | null | undefined) =>
+    a == null && b == null ? null : (a ?? 0) + (b ?? 0);
+
+  bestehend.gebaeudeflaeche = summe(bestehend.gebaeudeflaeche, row.gebaeudeflaeche);
+  bestehend.wohnungen = summe(bestehend.wohnungen, row.wohnungen);
+  bestehend.wohnflaeche = summe(bestehend.wohnflaeche, row.wohnflaeche);
+  bestehend.gebaeude_anzahl = (bestehend.gebaeude_anzahl ?? 1) + 1;
+
+  if (row.baujahr != null && (bestehend.baujahr == null || row.baujahr < bestehend.baujahr)) {
+    bestehend.baujahr = row.baujahr;
+  }
+  if (row.geschosse != null && (bestehend.geschosse == null || row.geschosse > bestehend.geschosse)) {
+    bestehend.geschosse = row.geschosse;
+  }
+
+  for (const [feld, wert] of Object.entries(row) as [keyof MasterRow, unknown][]) {
+    if (feld === 'gebaeudeflaeche' || feld === 'wohnungen' || feld === 'wohnflaeche') continue;
+    if (feld === 'baujahr' || feld === 'geschosse' || feld === 'gebaeude_anzahl') continue;
+    const vorhanden = (bestehend as unknown as Record<string, unknown>)[feld];
+    if ((vorhanden === null || vorhanden === undefined || vorhanden === '') &&
+        wert !== null && wert !== undefined && wert !== '') {
+      (bestehend as unknown as Record<string, unknown>)[feld] = wert;
+    }
+  }
 }
 
 export const isValidRow = (r: MasterRow): boolean => {
@@ -412,7 +447,7 @@ export function masterRowToImportJson(r: MasterRow): Record<string, unknown> {
     return Number.isFinite(x) ? x : null;
   };
 
-  return {
+  const roh: Record<string, unknown> = {
     address: t(r.address) || `Parzelle ${r.parzelle || r.egrid || '?'}`,
     egrid: t(r.egrid),
     parzelle: t(r.parzelle),
@@ -455,6 +490,15 @@ export function masterRowToImportJson(r: MasterRow): Record<string, unknown> {
     bfs_nr: t(r.bfs_nr),
     source_file: t(r.source_file),
   };
+
+  // Leere Felder gar nicht erst senden: bei über einer Million Zeilen macht
+  // das den Unterschied zwischen Minuten und Stunden Übertragungszeit.
+  // Fehlende Schlüssel liest jsonb_to_recordset ohnehin als NULL.
+  const kompakt: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(roh)) {
+    if (v !== null && v !== undefined) kompakt[k] = v;
+  }
+  return kompakt;
 }
 
 
