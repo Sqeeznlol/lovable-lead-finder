@@ -59,20 +59,36 @@ export interface ParsedZone {
   kurz: string | null;
   /** Nicht bebaubar (Landwirtschaft, Wald, Freihaltung, Gewässer). */
   keineBauzone: boolean;
+  /** Bebaubar, aber ohne Wohnnutzung (Gewerbe, Industrie, öffentliche Bauten). */
+  keineWohnnutzung: boolean;
 }
 
 // "Wald" bewusst nur als eigenständiges Wort: es gibt die Gemeinde Wald (ZH)
 // und Flurnamen wie "Waldegg", die keine Waldzone sind.
 const NICHT_BAUZONE = /landwirtschaftszone|\bwald\b|waldzone|freihaltezone|erholungszone|gew(ä|ae)sser|reservezone|verkehrszone/i;
 
+/**
+ * Zonen, in denen kein Wohnraum entstehen kann.
+ *
+ * Das Geschäft besteht darin, Eigentümer zum Verkauf zu bewegen, das Objekt
+ * neu zu erstellen und teurer zu verkaufen oder zu vermieten. Wo die Zone
+ * keine Wohnnutzung zulässt, geht das nicht -- die Objekte gehören deshalb
+ * gar nicht erst in die Arbeitsliste, auch wenn dort baulich Reserve läge.
+ */
+const KEINE_WOHNNUTZUNG = /gewerbezone|industriezone|arbeitszone|(zone f(ü|ue)r )?(ö|oe)ffentliche(n)? (bauten|zwecke)|(ö|oe)ffentliche bauten/i;
+
 export function parseZone(raw?: string | null): ParsedZone {
-  const leer: ParsedZone = { ziffer: null, geschosse: null, ueberbauungsziffer: null, kurz: null, keineBauzone: false };
+  const leer: ParsedZone = {
+    ziffer: null, geschosse: null, ueberbauungsziffer: null, kurz: null,
+    keineBauzone: false, keineWohnnutzung: false,
+  };
   if (!raw) return leer;
 
   // Klammerzusatz "(rechtskräftig, 8460m², 95%)" enthält Flächenangaben der
   // Zone selbst, nicht des Grundstücks — vor dem Parsen entfernen.
   const text = String(raw).replace(/\([^)]*\)/g, ' ').trim();
   if (NICHT_BAUZONE.test(text)) return { ...leer, keineBauzone: true };
+  if (KEINE_WOHNNUTZUNG.test(text)) return { ...leer, keineWohnnutzung: true };
 
   // Bereits normierte Kurzform ("W3", "W4G")
   const kurzMatch = text.toUpperCase().replace(/\s+/g, '').match(/^([WKZ]{1,2}G?\d?G?)$/);
@@ -97,7 +113,7 @@ export function parseZone(raw?: string | null): ParsedZone {
     if (zifferMatch) ziffer = Number(zifferMatch[1].replace(',', '.'));
   }
 
-  return { ziffer, geschosse, ueberbauungsziffer, kurz: null, keineBauzone: false };
+  return { ziffer, geschosse, ueberbauungsziffer, kurz: null, keineBauzone: false, keineWohnnutzung: false };
 }
 
 /** Textfelder wie "nicht vorhanden" / "Kein Denkmalschutzobjekt..." bedeuten: kein Eintrag. */
@@ -220,8 +236,8 @@ export function resolveAz(
 ): { az: number | null; quelle: PotentialResult['azQuelle']; parsed: ParsedZone } {
   const parsed = parseZone(p.zone);
 
-  // Nicht bebaubar -> gar keine Ausnützung
-  if (parsed.keineBauzone) return { az: null, quelle: null, parsed };
+  // Nicht bebaubar oder ohne Wohnnutzung -> gar keine Ausnützung
+  if (parsed.keineBauzone || parsed.keineWohnnutzung) return { az: null, quelle: null, parsed };
 
   const own = num(p.ausnuetzung);
   if (own && own > 0 && own < 5) return { az: own, quelle: 'objekt', parsed };
@@ -266,6 +282,7 @@ export function calculatePotential(
   const { az, quelle, parsed } = resolveAz(p, cfg);
 
   if (parsed.keineBauzone) killer.push('Keine Bauzone');
+  if (parsed.keineWohnnutzung) killer.push('Keine Wohnnutzung');
   if (quelle === 'zone') {
     assumptions.push(
       parsed.ziffer != null && cfg.zifferAlsBmz
@@ -412,12 +429,15 @@ export function potentialScore(
  * weiterentwickeln — sie werden ausgefiltert, nicht bloss schlechter bewertet.
  */
 export function istAusgeschlossen(p: PotentialInput): boolean {
-  return parseZone(p.zone).keineBauzone || istVorhanden(p.denkmalschutz);
+  const z = parseZone(p.zone);
+  return z.keineBauzone || z.keineWohnnutzung || istVorhanden(p.denkmalschutz);
 }
 
 /** Grund des Ausschlusses, für die Anzeige. */
 export function ausschlussGrund(p: PotentialInput): string | null {
-  if (parseZone(p.zone).keineBauzone) return 'Keine Bauzone';
+  const z = parseZone(p.zone);
+  if (z.keineBauzone) return 'Keine Bauzone';
+  if (z.keineWohnnutzung) return 'Keine Wohnnutzung';
   if (istVorhanden(p.denkmalschutz)) return 'Denkmalschutz';
   return null;
 }
