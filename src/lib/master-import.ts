@@ -151,8 +151,26 @@ const COLUMN_MAP: Record<string, keyof MasterRow> = {
   isostitel: 'isos_titel',
   // Links
   googlemaps: 'google_maps_url',
+  googlemapsurl: 'google_maps_url',
   streetview: 'streetview_url',
+  streetviewurl: 'streetview_url',
   dealkatasteronline: 'housing_stat_url',
+  housingstaturl: 'housing_stat_url',
+  gisurl: 'gis_url',
+  // Spalten, die das Zusammenführungs-Werkzeug schreibt
+  // (tools/listen-zusammenfuehren.html). Es verwendet die ASCII-Umschrift
+  // ae/oe/ue, die norm() nicht auf a/o/u zurückführt -- deshalb hier
+  // ausdrücklich, statt norm() zu erweitern und dabei Wörter wie
+  // "Quelldateien" zu zerstören.
+  gebaeudeflaeche: 'gebaeudeflaeche',
+  hnfschaetzung: 'hnf_schaetzung',
+  wohnflaeche: 'wohnflaeche',
+  nutzflaeche: 'nutzflaeche',
+  ausnuetzung: 'ausnuetzung',
+  gebaeudeart: 'gebaeudeart',
+  gebaudeanzahl: 'gebaeude_anzahl',
+  gebaeudeanzahl: 'gebaeude_anzahl',
+  quelldateien: 'source_file',
   // Meta
   bfs: 'bfs_nr',
   bfsnr: 'bfs_nr',
