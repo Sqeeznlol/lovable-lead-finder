@@ -69,6 +69,10 @@ export interface ImportSummary {
   duplicates: number;
   invalid: number;
   newGemeinden: number;
+  /** Wie viele bisher leere Felder dieser Import gefüllt hat. */
+  fieldsFilled: number;
+  /** Aufschlüsselung nach Feld: welche Lücken die Liste geschlossen hat. */
+  fieldDetail: Record<string, number>;
   errors: { row: number; reason: string }[];
 }
 
@@ -452,3 +456,34 @@ export function masterRowToImportJson(r: MasterRow): Record<string, unknown> {
     source_file: t(r.source_file),
   };
 }
+
+
+/** Deutsche Bezeichnungen für den Import-Bericht. */
+export const FIELD_LABELS: Record<string, string> = {
+  strassenname: 'Strasse',
+  hausnummer: 'Hausnummer',
+  plz: 'PLZ',
+  plz_ort: 'PLZ/Ort',
+  gemeinde: 'Gemeinde',
+  bezirk: 'Bezirk',
+  area: 'Grundstücksfläche',
+  gebaeudeflaeche: 'Gebäudefläche',
+  hnf_schaetzung: 'HNF',
+  wohnflaeche: 'Wohnfläche',
+  nutzflaeche: 'Nutzfläche',
+  baujahr: 'Baujahr',
+  renovationsjahr: 'Renovationsjahr',
+  geschosse: 'Geschosse',
+  wohnungen: 'Wohnungen',
+  ausnuetzung: 'Ausnützung',
+  zone: 'Zone',
+  kategorie: 'Kategorie',
+  gebaeudeart: 'Gebäudeart',
+  denkmalschutz: 'Denkmalschutz',
+  isos: 'ISOS',
+  google_maps_url: 'Google Maps',
+  streetview_url: 'Street View',
+  gis_url: 'GIS',
+  housing_stat_url: 'Gebäuderegister',
+  bfs_nr: 'BFS-Nr.',
+};

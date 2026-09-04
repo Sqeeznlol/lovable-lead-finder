@@ -14,6 +14,7 @@ import {
   isValidRow,
   aggregateByParzelle,
   masterRowToImportJson,
+  FIELD_LABELS,
   type ImportSummary,
   type MasterRow,
 } from '@/lib/master-import';
@@ -118,7 +119,7 @@ export function MasterImport() {
 
         const summary: ImportSummary = {
           total: rows.length, inserted: 0, updated: 0, duplicates: 0, invalid: 0,
-          newGemeinden: 0, errors: [],
+          newGemeinden: 0, fieldsFilled: 0, fieldDetail: {}, errors: [],
         };
         const seenGemeinden = new Set<string>();
 
@@ -167,6 +168,10 @@ export function MasterImport() {
           const r = Array.isArray(data) ? data[0] : data;
           summary.inserted += Number(r?.eingefuegt ?? 0);
           summary.updated += Number(r?.ergaenzt ?? 0);
+          summary.fieldsFilled += Number(r?.felder_gefuellt ?? 0);
+          for (const [feld, anzahl] of Object.entries(r?.felder_detail ?? {})) {
+            summary.fieldDetail[feld] = (summary.fieldDetail[feld] ?? 0) + Number(anzahl);
+          }
         };
 
         const meldeFortschritt = (anzahl: number) => {
@@ -260,9 +265,16 @@ export function MasterImport() {
       acc.duplicates += q.summary.duplicates;
       acc.invalid += q.summary.invalid;
       acc.newGemeinden += q.summary.newGemeinden;
+      acc.fieldsFilled += q.summary.fieldsFilled;
+      for (const [feld, anzahl] of Object.entries(q.summary.fieldDetail || {})) {
+        acc.fieldDetail[feld] = (acc.fieldDetail[feld] ?? 0) + anzahl;
+      }
       return acc;
     },
-    { total: 0, inserted: 0, updated: 0, duplicates: 0, invalid: 0, newGemeinden: 0 },
+    {
+      total: 0, inserted: 0, updated: 0, duplicates: 0, invalid: 0, newGemeinden: 0,
+      fieldsFilled: 0, fieldDetail: {} as Record<string, number>,
+    },
   );
 
   return (
@@ -342,7 +354,7 @@ export function MasterImport() {
                   <StatusBadge status={q.status} />
                   {q.summary && (
                     <span className="text-xs text-muted-foreground">
-                      +{q.summary.inserted} / ↻{q.summary.updated} / ⤬{q.summary.duplicates}
+                      +{q.summary.inserted} neu / ↻{q.summary.updated} ergänzt / ⊕{q.summary.fieldsFilled} Zellen
                     </span>
                   )}
                   {q.status === 'pending' && !importing && (
@@ -404,8 +416,32 @@ export function MasterImport() {
               <SummaryStat label="Aktualisiert" value={totalSummary.updated} color="text-primary" />
               <SummaryStat label="Duplikate" value={totalSummary.duplicates} color="text-muted-foreground" />
               <SummaryStat label="Fehlerhaft" value={totalSummary.invalid} color="text-destructive" />
-              <SummaryStat label="Neue Gemeinden" value={totalSummary.newGemeinden} color="text-foreground" />
+              <SummaryStat label="Zellen gefüllt" value={totalSummary.fieldsFilled} color="text-accent" />
             </div>
+
+            {/* Was die Listen tatsächlich beigetragen haben. "Ergänzt" allein
+                sagt nicht, ob eine Liste eine PLZ nachgetragen hat oder für
+                tausende Parzellen die fehlende Zone. */}
+            {Object.keys(totalSummary.fieldDetail).length > 0 && (
+              <div className="mt-5 border-t pt-4">
+                <p className="text-xs font-medium text-muted-foreground mb-2">
+                  Neu befüllte Felder
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {Object.entries(totalSummary.fieldDetail)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([feld, anzahl]) => (
+                      <span
+                        key={feld}
+                        className="rounded-full bg-accent/10 px-2.5 py-1 text-xs text-foreground"
+                      >
+                        {FIELD_LABELS[feld] ?? feld}{' '}
+                        <span className="font-semibold">{anzahl.toLocaleString('de-CH')}</span>
+                      </span>
+                    ))}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
