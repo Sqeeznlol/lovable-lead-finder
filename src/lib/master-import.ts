@@ -15,6 +15,8 @@ export interface MasterRow {
   parzelle?: string | null;
   plot_number?: string | null;
   gwr_egid?: string | null;
+  /** Wie viele Gebäudezeilen in diese Parzellen-Zeile eingerechnet wurden. */
+  gebaeude_anzahl?: number | null;
   gvz_nr?: string | null;
   // Adresse
   address: string;
@@ -240,6 +242,77 @@ export function rowToMaster(
   return out;
 }
 
+/**
+ * Fasst mehrere Gebäudezeilen derselben Parzelle zu einer Zeile zusammen.
+ *
+ * Die Listen liefern eine Zeile je Gebäude, aber die Grundstücksfläche an
+ * jeder dieser Zeilen ist die Fläche der GANZEN Parzelle. Ohne
+ * Zusammenfassung passiert zweierlei: die Datenbank verwirft die zweite
+ * Zeile als EGRID-Dublette (ihre Gebäudefläche geht verloren, der Bestand
+ * wird zu klein gerechnet), und das Ausbaupotenzial wird pro Gebäude einmal
+ * voll gerechnet statt einmal pro Parzelle.
+ *
+ * Zusammengefasst wird:
+ *   - Gebäudeflächen, Wohnungen und HNF werden addiert (= Bestand der Parzelle)
+ *   - ältestes Baujahr und höchste Geschosszahl gewinnen
+ *   - alle übrigen Felder werden aus der ersten Zeile genommen, die sie hat
+ *
+ * Zeilen ohne EGRID bleiben unangetastet — sie lassen sich keiner Parzelle
+ * sicher zuordnen.
+ */
+export function aggregateByParzelle(rows: MasterRow[]): MasterRow[] {
+  const byEgrid = new Map<string, MasterRow>();
+  const out: MasterRow[] = [];
+
+  const summe = (a: number | null | undefined, b: number | null | undefined) =>
+    a == null && b == null ? null : (a ?? 0) + (b ?? 0);
+
+  for (const row of rows) {
+    const key = row.egrid?.trim();
+    if (!key) {
+      out.push(row);
+      continue;
+    }
+
+    const bestehend = byEgrid.get(key);
+    if (!bestehend) {
+      const kopie: MasterRow = { ...row, gebaeude_anzahl: 1 };
+      byEgrid.set(key, kopie);
+      out.push(kopie);
+      continue;
+    }
+
+    // Bestand aufaddieren
+    bestehend.gebaeudeflaeche = summe(bestehend.gebaeudeflaeche, row.gebaeudeflaeche);
+    bestehend.wohnungen = summe(bestehend.wohnungen, row.wohnungen);
+    bestehend.wohnflaeche = summe(bestehend.wohnflaeche, row.wohnflaeche);
+    bestehend.gebaeude_anzahl = (bestehend.gebaeude_anzahl ?? 1) + 1;
+
+    // Ältestes Baujahr, höchste Geschosszahl
+    if (row.baujahr != null && (bestehend.baujahr == null || row.baujahr < bestehend.baujahr)) {
+      bestehend.baujahr = row.baujahr;
+    }
+    if (row.geschosse != null && (bestehend.geschosse == null || row.geschosse > bestehend.geschosse)) {
+      bestehend.geschosse = row.geschosse;
+    }
+
+    // Alles Übrige: leere Felder aus der Geschwisterzeile auffüllen. Die
+    // Grundstücksfläche gilt für die ganze Parzelle und wird deshalb NICHT
+    // addiert, sondern nur ergänzt, wenn sie noch fehlt.
+    for (const [feld, wert] of Object.entries(row) as [keyof MasterRow, unknown][]) {
+      if (feld === 'gebaeudeflaeche' || feld === 'wohnungen' || feld === 'wohnflaeche') continue;
+      if (feld === 'baujahr' || feld === 'geschosse' || feld === 'gebaeude_anzahl') continue;
+      const vorhanden = (bestehend as unknown as Record<string, unknown>)[feld];
+      if ((vorhanden === null || vorhanden === undefined || vorhanden === '') &&
+          wert !== null && wert !== undefined && wert !== '') {
+        (bestehend as unknown as Record<string, unknown>)[feld] = wert;
+      }
+    }
+  }
+
+  return out;
+}
+
 export const isValidRow = (r: MasterRow): boolean => {
   return Boolean((r.egrid && r.egrid.length > 0) || (r.address && r.address.length > 0) || r.parzelle);
 };
@@ -252,6 +325,7 @@ export function masterRowToDbInsert(r: MasterRow): Record<string, unknown> {
     parzelle: r.parzelle || null,
     plot_number: r.plot_number || r.parzelle || null,
     gwr_egid: r.gwr_egid || null,
+    gebaeude_anzahl: r.gebaeude_anzahl ?? 1,
     gvz_nr: r.gvz_nr || null,
     strassenname: r.strassenname || null,
     hausnummer: r.hausnummer || null,

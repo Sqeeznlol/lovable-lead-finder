@@ -12,6 +12,7 @@ import {
   detectMapping,
   rowToMaster,
   isValidRow,
+  aggregateByParzelle,
   masterRowToDbInsert,
   masterRowToDbUpdate,
   type ImportSummary,
@@ -130,11 +131,17 @@ export function MasterImport() {
           }
         });
 
+        // Mehrere Gebäude auf derselben Parzelle zu einer Zeile zusammenfassen.
+        // Ohne das verwirft die Datenbank die zweite Zeile als EGRID-Dublette
+        // und ihre Gebäudefläche fehlt im Bestand.
+        const parzellen = aggregateByParzelle(masterRows);
+        summary.duplicates += masterRows.length - parzellen.length;
+
         setQueue(q => q.map((x, i) => i === f ? { ...x, status: 'importing', rowCount: rows.length } : x));
 
         // Process in chunks
-        for (let i = 0; i < masterRows.length; i += CHUNK) {
-          const chunk = masterRows.slice(i, i + CHUNK);
+        for (let i = 0; i < parzellen.length; i += CHUNK) {
+          const chunk = parzellen.slice(i, i + CHUNK);
 
           // 1. Lookup existing by EGRID
           const egrids = chunk.map(r => r.egrid).filter(Boolean) as string[];
