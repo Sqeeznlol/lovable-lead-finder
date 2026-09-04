@@ -228,6 +228,42 @@ export function MasterImport() {
       await Promise.all(bloecke.slice(i, i + PARALLEL).map(importBlock));
     }
 
+    // ------------------------------------------------------------------
+    // Dritte Phase: Kennzahlen nachrechnen.
+    //
+    // Während des Imports überspringt der Trigger die Berechnung -- das
+    // halbiert die Importzeit. Jetzt werden die neuen Zeilen portionsweise
+    // durchgerechnet; jeder Aufruf meldet, wie viele er geschafft hat, und
+    // null bedeutet fertig.
+    // ------------------------------------------------------------------
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: offen } = await (supabase as any).rpc('potenzial_offen');
+      const gesamtOffen = Number(offen ?? 0);
+      let gerechnet = 0;
+
+      if (gesamtOffen > 0) {
+        setProgressLabel(`Kennzahlen werden berechnet: 0 / ${gesamtOffen.toLocaleString('de-CH')}`);
+        for (;;) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { data, error } = await (supabase as any).rpc('potenzial_nachrechnen', { p_batch: 2000 });
+          if (error) throw error;
+          const n = Number(data ?? 0);
+          if (n === 0) break;
+          gerechnet += n;
+          setProgress(Math.min(99, 40 + Math.round((gerechnet / gesamtOffen) * 59)));
+          setProgressLabel(
+            `Kennzahlen werden berechnet: ${gerechnet.toLocaleString('de-CH')} / ${gesamtOffen.toLocaleString('de-CH')}`,
+          );
+        }
+      }
+    } catch (err) {
+      // Der Import selbst ist durch; fehlende Kennzahlen lassen sich
+      // jederzeit nachholen, deshalb nur vermerken statt abbrechen.
+      const msg = err instanceof Error ? err.message : String(err);
+      gesamt.errors.push({ row: 0, reason: `Kennzahlen konnten nicht berechnet werden: ${msg}` });
+    }
+
     setQueue(q => q.map(x => ({ ...x, summary: x.status === 'error' ? x.summary : gesamt })));
 
     {
