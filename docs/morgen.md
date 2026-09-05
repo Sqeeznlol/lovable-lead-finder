@@ -65,32 +65,64 @@ nur der Zonenanteil.
 
 Erledigt: Konto ausgelesen, sechs leere Felder entfernt (Kategorie,
 Ortsbild nach ISOS, Denkmalschutz, Eigentümer 3 bis 5), Feld `Kanton`
-angelegt.
+angelegt. Ausserdem das Feld "Adresse" entfernt -- mit ihm die zwölf
+leeren Unterfelder, die sich einzeln nicht löschen liessen -- und
+dreizehn Deal-Titel richtiggestellt, die statt des Objekts seine
+Gebäudefläche nannten ("79m² · Affoltern am Albis"). Von einunddreissig
+eigenen Feldern sind zwölf übrig.
 
 Offen und in dieser Reihenfolge sinnvoll:
 
-**a) Das Feld "Adresse" entfernen.** Es bringt zwölf leere Unterfelder
-mit, die sich einzeln nicht löschen lassen. Die Adresse steht ohnehin
-im Deal-Titel. Betrifft dreizehn Deals mit Werten -- deshalb wartet der
-Schritt auf ein ausdrückliches Ja.
-
-**b) Die Deal-Titel in Ordnung bringen.** Sie lauten heute "79m² ·
-Affoltern am Albis". Ein Titel muss das Objekt benennen, nicht seine
-Gebäudefläche: "Seestrasse 42 · 8700 Küsnacht".
-
-**c) Die 377 nicht zuordenbaren Deals.** Von 390 liessen sich nur
+**a) Die 377 nicht zuordenbaren Deals.** Von 390 liessen sich nur
 dreizehn mit der Datenbank verbinden, alle über die EGRID. Den übrigen
 fehlen EGRID, Parzelle und eine brauchbare Adresse -- sie lassen sich
 nicht nachfüllen, solange nicht klar ist, welches Grundstück gemeint
 ist. Vorschlag: über Person und Telefonnummer suchen; was dann noch
 übrig bleibt, ist Altlast.
 
-**d) Phasen umbauen.** Die heutigen Phasen sind Ergebnisse, keine
+**b) Phasen umbauen.** Die heutigen Phasen sind Ergebnisse, keine
 Schritte -- "Nicht Erreichbar", "Nicht INTERESSIERT", "LW ZONE".
 Deshalb bleiben alle 259 offenen Deals liegen, im Mittel seit 458
 Tagen. Nicht erreicht ist ausdrücklich *kein* Verlust, sondern ein
 Zwischenstand mit Wiedervorlage; nur "nicht interessiert" schliesst
 einen Deal.
+
+Besprochen und entschieden am 5. September -- zwei Pipelines, weil der
+Brief ein Stapelprozess ist und einen anderen Rhythmus hat als das
+Telefonieren:
+
+    Akquise                        Faulzeit
+      1  Neu          nie angerufen, Warteschlange     14 Tage
+      2  Anrufen      Versuch läuft                    10 Tage
+      3  Gespräch     erreicht, Interesse offen        14 Tage
+      4  Unterlagen   Zahlen und Papiere raus          21 Tage
+
+    Post
+      1  Brief senden    fällig, Arbeitsliste           3 Tage
+      2  Brief versandt  Wartefrist                    21 Tage
+
+Übergänge: 3× nicht erreicht schiebt den Deal nach Post → Brief senden,
+mit seiner ganzen Historie. Meldet sich jemand, geht er zurück nach
+Akquise → Gespräch. Keine Antwort nach 21 Tagen: verloren mit dem Grund
+"Kein Kontakt möglich".
+
+Verlustgründe: Nicht interessiert · Bereits verkauft · Öffentliche Hand
+· Falsche Zone · Kein Kontakt möglich.
+
+Bewertung, Verhandlung und Kaufvertrag bleiben vorerst weg. Sie kommen,
+wenn der erste Deal so weit ist -- dann sind auch die Namen der Schritte
+aus der Praxis bekannt statt geraten.
+
+Offen dabei: Wechselt ein Deal die Pipeline, fehlt in der Auswertung der
+Akquise die Zahl "von hundert Neuen wurden zwölf erreicht", weil die
+Briefe herausfallen. Für den Alltag ohne Belang, für die Frage nach dem
+Wert der Kaltakquise nicht. Lässt sich später mit einem Bericht über
+beide Pipelines lösen.
+
+**c) Nächtlicher Lauf.** Zählt die Anrufversuche je Deal aus den
+Aktivitäten, schreibt sie ins Feld Kontaktversuche und verschiebt Deals
+ab drei Fehlversuchen nach Post. Läuft bei GitHub, unabhängig vom
+Pipedrive-Tarif.
 
 ## Zahlen, die den Stand beschreiben
 
