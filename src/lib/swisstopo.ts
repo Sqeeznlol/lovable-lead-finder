@@ -78,3 +78,47 @@ export function luftbildTileUrl(lat: number, lon: number, zoom = 19): string {
 export function swisstopoMapUrl(lat: number, lon: number, zoom = 12): string {
   return `https://map.geo.admin.ch/?swisssearch=${lat},${lon}&zoom=${zoom}&bgLayer=ch.swisstopo.swissimage`;
 }
+
+/**
+ * Bauzonen-Kachel (ch.are.bauzonen) für dieselbe Kachelposition wie das
+ * Luftbild — als halbtransparente Ebene darüber gelegt zeigt sie, wo die
+ * Zone endet.
+ *
+ * Das ist die schweizweite Bauzonenkarte des Bundes. Sie ist gröber als der
+ * ÖREB-Kataster des Kantons und ersetzt ihn nicht: für die verbindliche
+ * Auskunft führt der Link auf maps.zh.ch. Für die Frage "reicht die Bauzone
+ * über die ganze Parzelle oder nur über die Hälfte" genügt sie -- und sie ist
+ * frei und ohne Schlüssel abrufbar.
+ */
+export function bauzonenTileUrl(lat: number, lon: number, zoom = 19): string {
+  const { x, y } = tileIndex(lat, lon, zoom);
+  return `https://wmts.geo.admin.ch/1.0.0/ch.are.bauzonen/default/current/3857/${zoom}/${x}/${y}.png`;
+}
+
+/** ÖREB-Kataster des Kantons Zürich an dieser Stelle — die verbindliche Auskunft. */
+export function oerebUrl(lat: number, lon: number): string {
+  return `https://maps.zh.ch/?topic=OerebKatasterZH&x=${lon}&y=${lat}&scale=1120&srid=4326`;
+}
+
+/**
+ * Strassenansicht bei Google.
+ *
+ * Als Bild einbetten liesse sich das nur über die Maps Embed API, die einen
+ * Schlüssel verlangt (das Einbetten selbst ist kostenlos, der Schlüssel aber
+ * zwingend). Ohne Schlüssel bleibt der Link, der die Ansicht im neuen Tab
+ * öffnet. Steht VITE_GOOGLE_MAPS_KEY bereit, wird stattdessen eingebettet.
+ */
+export function streetViewLinkUrl(lat: number, lon: number): string {
+  return `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lon}`;
+}
+
+export function streetViewEmbedUrl(lat: number, lon: number): string | null {
+  const key = import.meta.env.VITE_GOOGLE_MAPS_KEY;
+  if (!key) return null;
+  return `https://www.google.com/maps/embed/v1/streetview?key=${key}&location=${lat},${lon}&heading=0&pitch=0&fov=90`;
+}
+
+/** Dreidimensionale Ansicht bei swisstopo -- Gelände und Gebäude, frei nutzbar. */
+export function swisstopo3dUrl(lat: number, lon: number): string {
+  return `https://map.geo.admin.ch/#/map?center=${lon},${lat}&z=17&3d=true&bgLayer=ch.swisstopo.swissimage`;
+}
