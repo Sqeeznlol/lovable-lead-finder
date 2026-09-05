@@ -51,6 +51,21 @@ export const DEFAULT_GESCHOSSE_BY_ZONE: Record<string, number> = {
 export interface ParsedZone {
   /** Ziffer aus dem Zonennamen (je nach Gemeinde AZ oder BMZ — siehe zifferAlsBmz). */
   ziffer: number | null;
+  /**
+   * Fläche in m², die diese Zone auf dieser Parzelle einnimmt.
+   *
+   * Der Klammerzusatz "(rechtskräftig, 1357m², 100%)" nennt nicht die Grösse
+   * der Zone im Allgemeinen, sondern ihren Anteil an genau dieser Parzelle.
+   * Geprüft an 24'279 Zeilen einer echten Liste: Klammerfläche geteilt durch
+   * den Prozentsatz ergibt bei 98.8% die Grundstücksfläche.
+   *
+   * Für die Rechnung ist das die verlässlichere Grösse: eine Parzelle kann
+   * zur Hälfte Wohnzone und zur Hälfte Landwirtschaft sein, bebauen lässt
+   * sich nur der Zonenanteil.
+   */
+  zonenflaeche: number | null;
+  /** Anteil dieser Zone an der Parzelle in Prozent. */
+  anteilProzent: number | null;
   /** Zulässige Vollgeschosse, wenn im Namen genannt. */
   geschosse: number | null;
   /** Überbauungsziffer in Prozent, z.B. "Wohnzone 2/50". */
@@ -79,20 +94,31 @@ const KEINE_WOHNNUTZUNG = /gewerbezone|industriezone|arbeitszone|(zone f(ü|ue)r
 
 export function parseZone(raw?: string | null): ParsedZone {
   const leer: ParsedZone = {
-    ziffer: null, geschosse: null, ueberbauungsziffer: null, kurz: null,
-    keineBauzone: false, keineWohnnutzung: false,
+    ziffer: null, zonenflaeche: null, anteilProzent: null, geschosse: null,
+    ueberbauungsziffer: null, kurz: null, keineBauzone: false, keineWohnnutzung: false,
   };
   if (!raw) return leer;
+
+  // Klammerzusatz auswerten, bevor er entfernt wird.
+  let zonenflaeche: number | null = null;
+  let anteilProzent: number | null = null;
+  const klammer = String(raw).match(/([\d'’.]+)\s*m²\s*,\s*(\d+)\s*%/);
+  if (klammer) {
+    const f = Number(klammer[1].replace(/['’]/g, ''));
+    if (Number.isFinite(f) && f > 0) zonenflaeche = f;
+    const p = Number(klammer[2]);
+    if (Number.isFinite(p) && p > 0) anteilProzent = p;
+  }
 
   // Klammerzusatz "(rechtskräftig, 8460m², 95%)" enthält Flächenangaben der
   // Zone selbst, nicht des Grundstücks — vor dem Parsen entfernen.
   const text = String(raw).replace(/\([^)]*\)/g, ' ').trim();
-  if (NICHT_BAUZONE.test(text)) return { ...leer, keineBauzone: true };
-  if (KEINE_WOHNNUTZUNG.test(text)) return { ...leer, keineWohnnutzung: true };
+  if (NICHT_BAUZONE.test(text)) return { ...leer, zonenflaeche, anteilProzent, keineBauzone: true };
+  if (KEINE_WOHNNUTZUNG.test(text)) return { ...leer, zonenflaeche, anteilProzent, keineWohnnutzung: true };
 
   // Bereits normierte Kurzform ("W3", "W4G")
   const kurzMatch = text.toUpperCase().replace(/\s+/g, '').match(/^([WKZ]{1,2}G?\d?G?)$/);
-  if (kurzMatch) return { ...leer, kurz: kurzMatch[1] };
+  if (kurzMatch) return { ...leer, zonenflaeche, anteilProzent, kurz: kurzMatch[1] };
 
   let geschosse: number | null = null;
   let ueberbauungsziffer: number | null = null;
@@ -113,7 +139,7 @@ export function parseZone(raw?: string | null): ParsedZone {
     if (zifferMatch) ziffer = Number(zifferMatch[1].replace(',', '.'));
   }
 
-  return { ziffer, geschosse, ueberbauungsziffer, kurz: null, keineBauzone: false, keineWohnnutzung: false };
+  return { ziffer, zonenflaeche, anteilProzent, geschosse, ueberbauungsziffer, kurz: null, keineBauzone: false, keineWohnnutzung: false };
 }
 
 /** Textfelder wie "nicht vorhanden" / "Kein Denkmalschutzobjekt..." bedeuten: kein Eintrag. */
@@ -276,7 +302,7 @@ export function calculatePotential(
   const assumptions: string[] = [];
   const killer: string[] = [];
 
-  const area = num(p.area);
+  const grundstueck = num(p.area);
   const gebFlaeche = num(p.gebaeudeflaeche);
   const geschosse = num(p.geschosse) ?? num(p.vollgeschosse);
   const { az, quelle, parsed } = resolveAz(p, cfg);
@@ -292,6 +318,22 @@ export function calculatePotential(
   }
   if (quelle === 'geschosse') assumptions.push(`AZ ${az?.toFixed(2)} aus zulässigen Vollgeschossen geschätzt`);
   if (quelle === 'objekt') assumptions.push(`AZ ${az} aus Objektdaten`);
+
+  // Bebaubar ist der Teil der Parzelle, der in dieser Zone liegt. Nur wo
+  // die Liste ihn nicht nennt, muss die ganze Grundstücksfläche herhalten.
+  let area = parsed.zonenflaeche ?? grundstueck;
+  if (parsed.zonenflaeche != null) {
+    if (grundstueck != null && Math.abs(parsed.zonenflaeche - grundstueck) / grundstueck > 0.1) {
+      assumptions.push(
+        `Bebaubar ${Math.round(parsed.zonenflaeche).toLocaleString('de-CH')} m² von ` +
+        `${Math.round(grundstueck).toLocaleString('de-CH')} m² Parzelle` +
+        (parsed.anteilProzent != null ? ` (${parsed.anteilProzent}% in dieser Zone)` : ''),
+      );
+    }
+  } else if (grundstueck != null) {
+    assumptions.push('Zonenanteil unbekannt — ganze Grundstücksfläche gerechnet');
+  }
+  if (area != null && area <= 0) area = null;
 
   const gfZulaessig = az != null && area != null ? area * az : null;
 
