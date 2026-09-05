@@ -328,6 +328,8 @@ export interface PotentialInput {
   denkmalschutz?: string | null;
   isos?: string | null;
   wohnungen?: number | string | null;
+  /** Bebaubarer Zonenanteil der Parzelle, aus der Datenbank. */
+  bebaubar_m2?: number | string | null;
 }
 
 export type Confidence = 'hoch' | 'mittel' | 'tief' | 'keine';
