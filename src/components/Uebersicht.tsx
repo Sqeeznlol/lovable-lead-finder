@@ -1,5 +1,5 @@
 import { PhoneCall, Search, Building2, MapPin, Map, Camera, Loader2, TrendingUp, UserSearch } from 'lucide-react';
-import { Luftbild } from '@/components/Luftbild';
+import { Objektansicht } from '@/components/Objektansicht';
 import { Card, CardContent } from '@/components/ui/card';
 import { useUebersicht, type Chance } from '@/hooks/use-uebersicht';
 import { EMPFEHLUNG_LABEL, type Empfehlung } from '@/lib/akquise';
@@ -91,16 +91,15 @@ export function Uebersicht() {
             <ul className="divide-y">
               {data.topChancen.map((c: Chance) => (
                 <li key={c.id} className="flex items-start gap-4 p-4 transition-colors hover:bg-muted/40">
-                  {/* Luftbild statt Google Street View: SWISSIMAGE von
-                      swisstopo ist frei nutzbar, Googles Bild-APIs werden pro
-                      Abruf verrechnet. Von oben sieht man ausserdem, worauf es
-                      hier ankommt -- Zuschnitt der Parzelle, Dachform,
-                      Nachbarschaft. Der Blick von der Strasse steht als Link
-                      daneben. */}
-                  <Luftbild
+                  {/* Drei Blicke auf dasselbe Grundstück, umschaltbar:
+                      von oben, mit den Bauzonen darüber, und von der
+                      Strasse. Die Zonenansicht beantwortet die Frage, an der
+                      die ganze Rechnung hängt -- reicht die Bauzone über die
+                      ganze Parzelle oder nur über einen Teil. */}
+                  <Objektansicht
                     address={c.address}
                     plzOrt={[c.plz, c.gemeinde].filter(Boolean).join(' ') || null}
-                    className="hidden h-24 w-32 shrink-0 sm:block"
+                    className="hidden h-36 w-52 shrink-0 sm:block"
                   />
 
                   <div className="min-w-0 flex-1">
