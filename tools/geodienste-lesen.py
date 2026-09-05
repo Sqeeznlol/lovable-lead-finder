@@ -57,10 +57,13 @@ def main() -> None:
     daten = json.load(sys.stdin)
 
     treffer: list[tuple[str, str, str]] = []
+    beispiel: dict | None = None
     for o, name in objekte(daten):
         kt = feld(o, KANTON_FELDER).upper()
         if kt != kanton:
             continue
+        if beispiel is None:
+            beispiel = o
         treffer.append((
             feld(o, NAME_FELDER) or name or '(ohne Namen)',
             feld(o, STATUS_FELDER) or '(ohne Status)',
@@ -73,6 +76,16 @@ def main() -> None:
     if treffer:
         print(f'{len(treffer)} Einträge gefunden.')
         print()
+        # Der Bezug steht je nach Fassung in einem anders benannten Feld.
+        # Ein vollständiger Eintrag zeigt, wie es hier heisst -- damit muss
+        # der nächste Schritt nicht geraten werden.
+        if beispiel is not None:
+            print('Ein vollständiger Eintrag:')
+            print()
+            print('```')
+            print(json.dumps(beispiel, ensure_ascii=False, indent=2)[:1500])
+            print('```')
+            print()
         print('| Datensatz | Bezug | Adresse |')
         print('|---|---|---|')
         # Doppelte zusammenfassen, die Liste ist sonst unlesbar.
