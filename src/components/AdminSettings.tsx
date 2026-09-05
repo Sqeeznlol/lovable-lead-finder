@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAutomationSettings, useUpdateAutomationSettings } from '@/hooks/use-app-settings';
+import { Neuberechnung } from '@/components/Neuberechnung';
 import { getMyPhone, setMyPhone } from '@/hooks/use-eigentuemer-lookup';
 
 interface UserWithRoles {
@@ -90,6 +91,7 @@ export function AdminSettings() {
 
   return (
     <div className="space-y-6">
+      <Neuberechnung />
       <div>
         <h2 className="text-3xl font-bold tracking-tight flex items-center gap-3">
           <Shield className="h-8 w-8 text-primary" />
