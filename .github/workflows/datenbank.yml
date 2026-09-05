@@ -1,0 +1,128 @@
+# =====================================================================
+# Datenbank-Aufgaben ausführen
+# =====================================================================
+# Warum es diesen Workflow gibt: Die Entwicklungsumgebung, in der an
+# diesem Projekt gearbeitet wird, hat keinen Netzzugang zu Supabase. Jede
+# Abfrage, jede Neuberechnung und jede Kontrolle musste deshalb von Hand
+# über den SQL-Editor laufen -- was den Fortschritt an eine Person band
+# und bei jedem Zwischenschritt Wartezeit erzeugte.
+#
+# Dieser Workflow läuft bei GitHub und hat Netzzugang. Er nimmt eine
+# Aufgabe entgegen, führt sie gegen die Datenbank aus und schreibt das
+# Ergebnis ins Protokoll, wo es sich abrufen lässt.
+#
+# Verwendet wird ausschliesslich der öffentliche anon-Schlüssel, der
+# ohnehin im Browser jedes Nutzers steckt. Er erlaubt, was die
+# Sicherheitsregeln der Tabellen erlauben -- lesen, schreiben, die
+# vorhandenen Funktionen aufrufen -- aber keine Schemaänderungen.
+# =====================================================================
+
+name: Datenbank
+
+on:
+  workflow_dispatch:
+    inputs:
+      aufgabe:
+        description: 'Was soll ausgeführt werden?'
+        required: true
+        default: 'uebersicht'
+        type: choice
+        options:
+          - uebersicht        # Zahlen zum Bestand
+          - nachrechnen       # Kennzahlen für alle offenen Zeilen
+          - stichprobe        # Zehn Objekte mit den grössten Werten
+          - zonen             # Verteilung nach Zonentyp
+      grenze:
+        description: 'Obergrenze für Durchläufe beim Nachrechnen'
+        required: false
+        default: '200'
+
+jobs:
+  ausfuehren:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Zugangsdaten aus .env lesen
+        id: env
+        run: |
+          # Die Datei liegt im Repository und enthält nur öffentliche Werte.
+          grep -E '^VITE_SUPABASE_(URL|PUBLISHABLE_KEY)=' .env \
+            | sed 's/VITE_SUPABASE_URL=/URL=/; s/VITE_SUPABASE_PUBLISHABLE_KEY=/KEY=/' \
+            | tr -d '"' >> "$GITHUB_ENV"
+
+      - name: Aufgabe ausführen
+        run: |
+          set -euo pipefail
+          AUFGABE="${{ inputs.aufgabe }}"
+          GRENZE="${{ inputs.grenze }}"
+
+          ruf() {   # ruf <funktion> <json-argumente>
+            curl -sS -X POST "$URL/rest/v1/rpc/$1" \
+              -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+              -H "Content-Type: application/json" \
+              -d "$2"
+          }
+
+          hole() {  # hole <pfad-mit-abfrage>
+            curl -sS "$URL/rest/v1/$1" \
+              -H "apikey: $KEY" -H "Authorization: Bearer $KEY"
+          }
+
+          zaehle() { # zaehle <filter>
+            curl -sS -o /dev/null -D - "$URL/rest/v1/properties?select=id&$1" \
+              -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+              -H "Prefer: count=exact" -H "Range: 0-0" \
+              | grep -i content-range | tr -d '\r' | sed 's|.*/||'
+          }
+
+          case "$AUFGABE" in
+            uebersicht)
+              echo "### Bestand" >> "$GITHUB_STEP_SUMMARY"
+              echo "| Kennzahl | Anzahl |" >> "$GITHUB_STEP_SUMMARY"
+              echo "|---|---:|" >> "$GITHUB_STEP_SUMMARY"
+              echo "| Objekte gesamt | $(zaehle '') |" >> "$GITHUB_STEP_SUMMARY"
+              echo "| ausgeschlossen | $(zaehle 'ausgeschlossen=eq.true') |" >> "$GITHUB_STEP_SUMMARY"
+              echo "| ohne Kennzahlen | $(zaehle 'scored_at=is.null') |" >> "$GITHUB_STEP_SUMMARY"
+              echo "| ohne Zone | $(zaehle 'zone=is.null') |" >> "$GITHUB_STEP_SUMMARY"
+              echo "| ohne Grundstücksfläche | $(zaehle 'area=is.null') |" >> "$GITHUB_STEP_SUMMARY"
+              echo "| mit Potenzial | $(zaehle 'hnf_delta=gt.0') |" >> "$GITHUB_STEP_SUMMARY"
+              cat "$GITHUB_STEP_SUMMARY"
+              ;;
+
+            nachrechnen)
+              offen=$(ruf potenzial_offen '{}' || echo 'null')
+              echo "Noch zu rechnen: $offen"
+              gesamt=0
+              for i in $(seq 1 "$GRENZE"); do
+                n=$(ruf potenzial_nachrechnen '{"p_batch":5000}')
+                # Antwort ist eine blosse Zahl; keine Zahl heisst Fehler.
+                case "$n" in
+                  ''|*[!0-9]*) echo "Antwort: $n"; break ;;
+                esac
+                [ "$n" -eq 0 ] && { echo "Fertig nach $i Durchläufen."; break; }
+                gesamt=$((gesamt + n))
+                echo "Durchlauf $i: $n Zeilen (gesamt $gesamt)"
+              done
+              echo "### Nachgerechnet: $gesamt Zeilen" >> "$GITHUB_STEP_SUMMARY"
+              ;;
+
+            stichprobe)
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
+              hole "properties?select=address,gemeinde,zone,area,bebaubar_m2,baujahr,owner_name,hnf_delta,marge_chf,score_tier,ausgeschlossen&ausgeschlossen=eq.false&hnf_delta=not.is.null&order=hnf_delta.desc&limit=10" \
+                | python3 -m json.tool >> "$GITHUB_STEP_SUMMARY"
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
+              cat "$GITHUB_STEP_SUMMARY"
+              ;;
+
+            zonen)
+              echo "### Objekte je Zonentyp" >> "$GITHUB_STEP_SUMMARY"
+              echo "| Zone | Anzahl |" >> "$GITHUB_STEP_SUMMARY"
+              echo "|---|---:|" >> "$GITHUB_STEP_SUMMARY"
+              for z in Wohnzone Kernzone Zentrumszone Quartiererhaltung Gewerbezone Industriezone Landwirtschaft Wald; do
+                echo "| $z | $(zaehle "zone=ilike.*${z}*") |" >> "$GITHUB_STEP_SUMMARY"
+              done
+              echo "| ohne Angabe | $(zaehle 'zone=is.null') |" >> "$GITHUB_STEP_SUMMARY"
+              cat "$GITHUB_STEP_SUMMARY"
+              ;;
+          esac
