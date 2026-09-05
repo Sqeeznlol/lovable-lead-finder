@@ -35,6 +35,7 @@ on:
           - diagnose          # Welche Spalten und Funktionen existieren
           - zonennamen        # Welche Zonen gelten noch als kaufbar?
           - bfs              # Ist die Gemeindenummer je Objekt vorhanden?
+          - geodaten         # Welche Geodaten gibt ein Kanton heraus?
           - tempo             # Laufzeit der Abfragen der Masterliste
       grenze:
         description: 'Obergrenze für Durchläufe beim Nachrechnen'
@@ -229,6 +230,51 @@ jobs:
               hole "properties?select=gemeinde,bfs_nr,parzelle,housing_stat_url,gis_url&limit=5" \
                 | python3 -m json.tool >> "$GITHUB_STEP_SUMMARY"
               echo '```' >> "$GITHUB_STEP_SUMMARY"
+              cat "$GITHUB_STEP_SUMMARY"
+              ;;
+
+            geodaten)
+              # Vor dem Bau eines Imports klären, was tatsächlich zu holen
+              # ist. Geprüft werden die drei Wege, über die sich Parzellen
+              # und Zonen eines Kantons beziehen lassen -- alle drei sind
+              # amtlich und frei, im Gegensatz zum Auslesen von Kartenbildern.
+              KANTON="${GRENZE:-TG}"
+              echo "### Geodaten $KANTON" >> "$GITHUB_STEP_SUMMARY"
+              echo "| Quelle | Antwort |" >> "$GITHUB_STEP_SUMMARY"
+              echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+
+              probe() { # probe <name> <url>
+                code=$(curl -sS -o /tmp/antwort -w '%{http_code}' -m 60 "$2" || echo 000)
+                groesse=$(wc -c < /tmp/antwort)
+                echo "| $1 | HTTP $code, $groesse Bytes |" >> "$GITHUB_STEP_SUMMARY"
+              }
+
+              probe "geodienste.ch Übersicht Nutzungsplanung" \
+                "https://geodienste.ch/services/av?REQUEST=GetCapabilities&SERVICE=WFS"
+              probe "geodienste.ch Verfügbarkeit" \
+                "https://geodienste.ch/info/services.json"
+              probe "TG WFS GetCapabilities" \
+                "https://ows.geo.tg.ch/geofy_access_proxy/oerebv2?SERVICE=WFS&REQUEST=GetCapabilities"
+              probe "TG Geodaten-Shop" \
+                "https://geoapps.tg.ch/geodatenshop/"
+              probe "Bund: Bauzonen Schweiz (Metadaten)" \
+                "https://api3.geo.admin.ch/rest/services/api/MapServer/ch.are.bauzonen"
+
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo "### Zuletzt geholte Antwort (Auszug)" >> "$GITHUB_STEP_SUMMARY"
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
+              head -c 1500 /tmp/antwort >> "$GITHUB_STEP_SUMMARY" || true
+              echo '' >> "$GITHUB_STEP_SUMMARY"
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+              # Das Verzeichnis von geodienste.ch nennt je Kanton, welche
+              # Datensätze frei, welche auf Anfrage und welche gar nicht
+              # verfügbar sind -- die eigentliche Antwort auf die Frage.
+              curl -sS -m 60 "https://geodienste.ch/info/services.json" -o /tmp/dienste.json || true
+              if [ -s /tmp/dienste.json ]; then
+                python3 tools/geodienste-lesen.py "$KANTON" < /tmp/dienste.json \
+                  >> "$GITHUB_STEP_SUMMARY" || true
+              fi
               cat "$GITHUB_STEP_SUMMARY"
               ;;
 
