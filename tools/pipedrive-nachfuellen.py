@@ -169,13 +169,52 @@ def main() -> None:
         if z.get('parzelle') and z.get('gemeinde'):
             nach_parzelle.setdefault((z['parzelle'], z['gemeinde']), z)
 
-    # Für Deals ohne Kennnummern bleibt die Adresse aus dem Titel.
-    gesuchte_adressen = [
-        (d.get('title') or '').split('·')[0].strip() for d in deals]
-    for z in hole_stapelweise('address', gesuchte_adressen):
+    # Für Deals ohne Kennnummern bleibt die Adresse. Sie steht an
+    # mehreren Stellen und in verschiedenen Formen -- im Titel, im Namen
+    # der Organisation, mit und ohne Ort. Gesucht wird mit allen
+    # Schreibweisen, die sich daraus ergeben.
+    def kandidaten(d: dict) -> list[str]:
+        roh: list[str] = []
+        titel = (d.get('title') or '').strip()
+        org = d.get('org_id') or {}
+        org_name = org.get('name', '') if isinstance(org, dict) else ''
+        org_name = re.sub(r'^\s*Liegenschaft:\s*', '', org_name)
+        org_name = re.sub(r'\s*\[[^\]]*\]\s*$', '', org_name).strip()
+
+        for text in (titel, org_name):
+            if not text:
+                continue
+            roh.append(text)
+            # Ort abtrennen, in beiden gebräuchlichen Schreibweisen.
+            for trenner in ('·', ',', ' - '):
+                if trenner in text:
+                    roh.append(text.split(trenner)[0].strip())
+            # Führende Postleitzahl entfernen ("8001 Bahnhofstrasse 3").
+            roh.append(re.sub(r'^\d{4}\s+', '', text).strip())
+        return [r for r in roh if r]
+
+    alle_kandidaten: list[str] = []
+    for d in deals:
+        alle_kandidaten.extend(kandidaten(d))
+
+    for z in hole_stapelweise('address', alle_kandidaten):
         if z.get('address') and z.get('gemeinde'):
             nach_adresse.setdefault(
                 (schluessel_adresse(z['address']), z['gemeinde']), z)
+
+    # Wenn nichts zusammenfindet, liegt es fast immer an der Schreibweise.
+    # Ein Blick auf beide Seiten sagt mehr als jede Vermutung.
+    print('### Wie die Adressen aussehen')
+    print()
+    print('| Aus Pipedrive | In der Datenbank |')
+    print('|---|---|')
+    beispiele_db = [z.get('address') for z in
+                    hole_stapelweise('address', alle_kandidaten[:80])][:8]
+    for i in range(8):
+        links = alle_kandidaten[i] if i < len(alle_kandidaten) else ''
+        rechts = beispiele_db[i] if i < len(beispiele_db) else ''
+        print(f'| {links} | {rechts} |')
+    print()
 
     print(f'Gefunden: {len(nach_egrid)} über EGRID, {len(nach_parzelle)} über Parzelle, {len(nach_adresse)} über Adresse.')
     print()
@@ -191,12 +230,23 @@ def main() -> None:
             t = nach_parzelle.get((d[parz_feld], gemeinde))
             if t:
                 return t, 'Parzelle'
-        titel = d.get('title') or ''
-        adresse = titel.split('·')[0].strip()
-        if adresse and gemeinde:
-            t = nach_adresse.get((schluessel_adresse(adresse), gemeinde))
-            if t:
-                return t, 'Adresse'
+        # Die Gemeinde steht bei den meisten Deals nicht; dann genügt
+        # die Adresse allein, sofern sie im Bestand nur einmal vorkommt.
+        nach_strasse: dict[str, list[dict]] = {}
+        for (schl, gem), z in nach_adresse.items():
+            nach_strasse.setdefault(schl, []).append(z)
+
+        for kandidat in kandidaten(d):
+            schl = schluessel_adresse(kandidat)
+            if gemeinde:
+                t = nach_adresse.get((schl, gemeinde))
+                if t:
+                    return t, 'Adresse und Gemeinde'
+            treffer = nach_strasse.get(schl) or []
+            if len(treffer) == 1:
+                return treffer[0], 'Adresse'
+            if len(treffer) > 1:
+                return None, f'mehrdeutig ({len(treffer)}×)'
         return None, '—'
 
     gefunden = 0
