@@ -60,6 +60,14 @@ export interface Uebersicht {
   nachEmpfehlung: Record<Empfehlung, number>;
   margeSumme: number;
   topChancen: Chance[];
+  /**
+   * Die Objekte, für die sich eine Grundbuchabfrage heute am meisten lohnt.
+   *
+   * Das Portal des Kantons verlangt eine Bestätigung per SMS und gibt fünf
+   * Auskünfte pro Tag frei. Diese fünf sollten die wertvollsten sein --
+   * grösste Marge, Eigentümer noch unbekannt.
+   */
+  nachschlagen: Chance[];
   topGemeinden: GemeindeChance[];
   ohneEigentuemer: number;
 }
@@ -193,6 +201,7 @@ export function useUebersicht() {
         nachEmpfehlung,
         margeSumme,
         topChancen: chancen.slice(0, 15),
+        nachschlagen: chancen.filter(c => !c.eigentuemer).slice(0, 5),
         topGemeinden,
         ohneEigentuemer,
       };
