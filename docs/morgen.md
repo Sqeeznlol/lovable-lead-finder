@@ -80,7 +80,7 @@ nicht nachfüllen, solange nicht klar ist, welches Grundstück gemeint
 ist. Vorschlag: über Person und Telefonnummer suchen; was dann noch
 übrig bleibt, ist Altlast.
 
-**d) Phasen umbauen.** Die heutigen Phasen sind Ergebnisse, keine
+**b) Phasen umbauen.** Die heutigen Phasen sind Ergebnisse, keine
 Schritte -- "Nicht Erreichbar", "Nicht INTERESSIERT", "LW ZONE".
 Deshalb bleiben alle 259 offenen Deals liegen, im Mittel seit 458
 Tagen. Nicht erreicht ist ausdrücklich *kein* Verlust, sondern ein
@@ -119,7 +119,7 @@ Briefe herausfallen. Für den Alltag ohne Belang, für die Frage nach dem
 Wert der Kaltakquise nicht. Lässt sich später mit einem Bericht über
 beide Pipelines lösen.
 
-**e) Nächtlicher Lauf.** Zählt die Anrufversuche je Deal aus den
+**c) Nächtlicher Lauf.** Zählt die Anrufversuche je Deal aus den
 Aktivitäten, schreibt sie ins Feld Kontaktversuche und verschiebt Deals
 ab drei Fehlversuchen nach Post. Läuft bei GitHub, unabhängig vom
 Pipedrive-Tarif.
