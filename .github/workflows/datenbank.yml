@@ -34,6 +34,7 @@ on:
           - zonen             # Verteilung nach Zonentyp
           - diagnose          # Welche Spalten und Funktionen existieren
           - zonennamen        # Welche Zonen gelten noch als kaufbar?
+          - bfs              # Ist die Gemeindenummer je Objekt vorhanden?
           - tempo             # Laufzeit der Abfragen der Masterliste
       grenze:
         description: 'Obergrenze für Durchläufe beim Nachrechnen'
@@ -213,6 +214,21 @@ jobs:
                 -H "Range: 0-999" >> /tmp/zonen.json
 
               python3 tools/zonen-auswerten.py < /tmp/zonen.json >> "$GITHUB_STEP_SUMMARY"
+              cat "$GITHUB_STEP_SUMMARY"
+              ;;
+
+            bfs)
+              echo "### Gemeindenummer (BFS)" >> "$GITHUB_STEP_SUMMARY"
+              echo "| Kennzahl | Anzahl |" >> "$GITHUB_STEP_SUMMARY"
+              echo "|---|---:|" >> "$GITHUB_STEP_SUMMARY"
+              echo "| ohne bfs_nr | $(zaehle 'bfs_nr=is.null') |" >> "$GITHUB_STEP_SUMMARY"
+              echo "| mit bfs_nr | $(zaehle 'bfs_nr=not.is.null') |" >> "$GITHUB_STEP_SUMMARY"
+              echo "| ohne housing_stat_url | $(zaehle 'housing_stat_url=is.null') |" >> "$GITHUB_STEP_SUMMARY"
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
+              hole "properties?select=gemeinde,bfs_nr,parzelle,housing_stat_url,gis_url&limit=5" \
+                | python3 -m json.tool >> "$GITHUB_STEP_SUMMARY"
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
               cat "$GITHUB_STEP_SUMMARY"
               ;;
 
