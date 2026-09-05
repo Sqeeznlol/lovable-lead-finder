@@ -36,11 +36,12 @@ on:
           - pruefen      # Nur nachsehen, was in den Dateien steckt
           - zonen        # Zonen umwandeln und als Datei bereitstellen
           - parzellen    # Amtliche Vermessung ansehen und umwandeln
+          - alles        # Zonen und Parzellen laden, verschneiden, ausgeben
 
 jobs:
   laden:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 180
 
     steps:
       - uses: actions/checkout@v4
@@ -50,10 +51,13 @@ jobs:
           sudo apt-get update -qq
           # GDAL kennt INTERLIS und rechnet die Kreisbögen der Grenzen
           # korrekt in Linienzüge um.
-          sudo apt-get install -y -qq gdal-bin python3-gdal unzip
+          # SpatiaLite bringt die Flächenrechnung mit, die für das
+          # Verschneiden nötig ist.
+          sudo apt-get install -y -qq gdal-bin python3-gdal unzip \
+            libsqlite3-mod-spatialite
 
       - name: Amtliche Vermessung ansehen
-        if: ${{ inputs.schritt == 'parzellen' }}
+        if: ${{ inputs.schritt == 'parzellen' || inputs.schritt == 'alles' }}
         env:
           KANTON: ${{ inputs.kanton }}
         run: |
@@ -164,7 +168,7 @@ jobs:
             | head -80
 
       - name: Zonen umwandeln
-        if: ${{ inputs.schritt == 'zonen' }}
+        if: ${{ inputs.schritt == 'zonen' || inputs.schritt == 'alles' }}
         run: |
           set -euo pipefail
           xtf=$(find /tmp/npl -name '*.xtf' | head -1)
@@ -214,4 +218,65 @@ jobs:
         with:
           name: parzellen-${{ inputs.kanton }}
           path: /tmp/parzellen.gpkg
+          if-no-files-found: warn
+
+      - name: Verschneiden
+        if: ${{ inputs.schritt == 'alles' }}
+        run: |
+          set -euo pipefail
+
+          # Die eigentliche Rechnung: welcher Anteil einer Parzelle liegt
+          # in welcher Zone. Genau daran hängt alles Weitere -- eine
+          # Parzelle kann zur Hälfte Wohnzone und zur Hälfte Wald sein,
+          # und bebauen lässt sich nur der Zonenanteil. In Zürich wurde
+          # das anfangs übersehen, mit dem Ergebnis von Margen in
+          # Milliardenhöhe.
+          #
+          # Ausgegeben wird dieselbe Form, die die Zürcher Liste im
+          # Klammerzusatz führt: Fläche und Prozentsatz je Zone.
+
+          ls -lh /tmp/zonen.gpkg /tmp/parzellen.gpkg
+
+          # Beide Quellen in eine Datei, damit sich darin rechnen lässt.
+          cp /tmp/parzellen.gpkg /tmp/arbeit.gpkg
+          ogr2ogr -f GPKG /tmp/arbeit.gpkg -append -nln zonen /tmp/zonen.gpkg zonen
+
+          echo "### Ebenen in der Arbeitsdatei"
+          ogrinfo -so -al /tmp/arbeit.gpkg 2>&1 \
+            | grep -E 'Layer name|Feature Count' | paste - -
+
+          echo
+          echo "### Verschneiden"
+          ogr2ogr -f CSV /tmp/verschnitten.csv /tmp/arbeit.gpkg \
+            -dialect sqlite -sql "
+              SELECT
+                p.EGRIS_EGRID          AS egrid,
+                p.Nummer               AS parzelle,
+                p.GrundstueckArt       AS art,
+                ROUND(ST_Area(f.geom))                    AS flaeche_m2,
+                z.Typ                                     AS zone_typ,
+                ROUND(ST_Area(ST_Intersection(f.geom, z.geom)))       AS zone_m2,
+                ROUND(100.0 * ST_Area(ST_Intersection(f.geom, z.geom))
+                      / NULLIF(ST_Area(f.geom), 0))       AS anteil_prozent
+              FROM flaechen f
+              JOIN parzellen p ON p.Grundstueck = f.Grundstueck
+              JOIN zonen z ON ST_Intersects(f.geom, z.geom)
+              WHERE ST_Area(ST_Intersection(f.geom, z.geom)) > 5
+            " || { echo "Verschneiden fehlgeschlagen"; exit 1; }
+
+          zeilen=$(( $(wc -l < /tmp/verschnitten.csv) - 1 ))
+          echo "Zeilen: $zeilen"
+          if [ "$zeilen" -lt 1000 ]; then
+            echo "Zu wenige Zeilen -- erwartet werden Zehntausende." >&2
+            head -5 /tmp/verschnitten.csv
+            exit 1
+          fi
+          head -5 /tmp/verschnitten.csv
+
+      - name: Verschnitt bereitstellen
+        if: ${{ inputs.schritt == 'alles' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: verschnitten-${{ inputs.kanton }}
+          path: /tmp/verschnitten.csv
           if-no-files-found: warn
