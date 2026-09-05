@@ -130,31 +130,54 @@ def main() -> None:
               if egrid_feld and d.get(egrid_feld)}
     print(f'{len(egrids)} Deals tragen bereits eine EGRID.')
 
-    # Die Datenbank in Seiten lesen und Verzeichnisse aufbauen.
+    # Nicht die ganze Tabelle lesen: 259'000 Zeilen seitenweise zu holen
+    # läuft in das Zeitlimit der Datenbank (belegt: HTTP 500). Gefragt
+    # wird stattdessen gezielt nach den Angaben, die in den Deals stehen
+    # -- ein paar hundert Werte statt einer Viertelmillion Zeilen.
     nach_egrid: dict[str, dict] = {}
     nach_parzelle: dict[tuple, dict] = {}
     nach_adresse: dict[tuple, dict] = {}
 
-    seite = 0
-    while True:
-        zeilen = sb_get(
-            f'properties?select={SPALTEN}&limit=1000&offset={seite * 1000}',
-            sb_url, sb_key)
-        if not zeilen:
-            break
-        for z in zeilen:
-            if z.get('egrid'):
-                nach_egrid.setdefault(z['egrid'], z)
-            if z.get('parzelle') and z.get('gemeinde'):
-                nach_parzelle.setdefault((z['parzelle'], z['gemeinde']), z)
-            if z.get('address') and z.get('gemeinde'):
-                nach_adresse.setdefault(
-                    (schluessel_adresse(z['address']), z['gemeinde']), z)
-        seite += 1
-        if len(zeilen) < 1000 or seite >= 60:
-            break
+    def in_liste(werte: list[str]) -> str:
+        """PostgREST erwartet die Werte in Klammern, mit Anführungszeichen."""
+        sauber = [str(w).replace('"', '') for w in werte if w]
+        return '(' + ','.join(f'"{w}"' for w in sauber) + ')'
 
-    print(f'{len(nach_egrid)} Objekte mit EGRID aus der Datenbank gelesen.')
+    def hole_stapelweise(spalte: str, werte: list[str]) -> list[dict]:
+        raus: list[dict] = []
+        einmalig = sorted({w for w in werte if w})
+        for i in range(0, len(einmalig), 80):
+            stapel = einmalig[i:i + 80]
+            try:
+                raus.extend(sb_get(
+                    f'properties?select={SPALTEN}&{spalte}=in.{in_liste(stapel)}'
+                    '&limit=500', sb_url, sb_key))
+            except Exception as e:
+                print(f'> Abfrage über {spalte} fehlgeschlagen: {type(e).__name__}')
+                break
+        return raus
+
+    gesuchte_egrids = [d[egrid_feld] for d in deals
+                       if egrid_feld and d.get(egrid_feld)]
+    for z in hole_stapelweise('egrid', gesuchte_egrids):
+        if z.get('egrid'):
+            nach_egrid.setdefault(z['egrid'], z)
+
+    gesuchte_parzellen = [d[parz_feld] for d in deals
+                          if parz_feld and d.get(parz_feld)]
+    for z in hole_stapelweise('parzelle', gesuchte_parzellen):
+        if z.get('parzelle') and z.get('gemeinde'):
+            nach_parzelle.setdefault((z['parzelle'], z['gemeinde']), z)
+
+    # Für Deals ohne Kennnummern bleibt die Adresse aus dem Titel.
+    gesuchte_adressen = [
+        (d.get('title') or '').split('·')[0].strip() for d in deals]
+    for z in hole_stapelweise('address', gesuchte_adressen):
+        if z.get('address') and z.get('gemeinde'):
+            nach_adresse.setdefault(
+                (schluessel_adresse(z['address']), z['gemeinde']), z)
+
+    print(f'Gefunden: {len(nach_egrid)} über EGRID, {len(nach_parzelle)} über Parzelle, {len(nach_adresse)} über Adresse.')
     print()
 
     def finde(d: dict) -> tuple[dict | None, str]:
