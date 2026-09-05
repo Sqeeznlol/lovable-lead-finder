@@ -60,6 +60,10 @@ export function MasterList() {
   // Der Filterblock ist gross und wird selten gebraucht -- die beiden Regler
   // darunter decken den Alltag ab.
   const [filterOffen, setFilterOffen] = useState(false);
+  // Die Gemeindeliste kostet ein Fünftel der Bildbreite. Wer die ganze
+  // Liste nach Potenzial durchgeht, braucht sie nicht -- wer eine Gemeinde
+  // abarbeitet, schaltet sie dazu.
+  const [gemeindenOffen, setGemeindenOffen] = useState(false);
 
   const { data, isLoading } = useMasterProperties(filters);
   const total = data?.total ?? 0;
@@ -71,11 +75,13 @@ export function MasterList() {
   }, [filters.gemeinde]);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
-      <GemeindeSidebar
-        selected={filters.gemeinde ?? null}
-        onSelect={(g) => setFilters(f => ({ ...f, gemeinde: g, page: 0 }))}
-      />
+    <div className={`grid grid-cols-1 gap-6 ${gemeindenOffen ? 'lg:grid-cols-[260px_1fr]' : ''}`}>
+      {gemeindenOffen && (
+        <GemeindeSidebar
+          selected={filters.gemeinde ?? null}
+          onSelect={(g) => setFilters(f => ({ ...f, gemeinde: g, page: 0 }))}
+        />
+      )}
 
       <div className="space-y-4 min-w-0">
         <div className="flex items-center justify-between">
@@ -95,6 +101,14 @@ export function MasterList() {
 
         {/* Sortierung und Tier -- die beiden Regler, die im Alltag zählen */}
         <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          <button
+            onClick={() => setGemeindenOffen(o => !o)}
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1 transition-colors ${
+              gemeindenOffen ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <MapPin className="h-3 w-3" /> Gemeinden
+          </button>
           <button
             onClick={() => setFilterOffen(o => !o)}
             className={`flex items-center gap-1.5 rounded-full px-3 py-1 transition-colors ${
