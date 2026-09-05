@@ -156,7 +156,7 @@ describe('Parität zur SQL-Berechnung', () => {
     { p: { zone: 'W3', area: 1000, gebaeudeflaeche: 100, baujahr: 1980 }, reserveGf: 400, score: 62 },
     { p: { zone: 'W4', area: 2000, gebaeudeflaeche: 200, geschosse: 2, baujahr: 1910, denkmalschutz: 'kantonal' }, reserveGf: 1100, score: 73 },
     // ZH-Freitext: BMZ 1.6 : 3.2 m = AZ 0.5
-    { p: { zone: 'Wohnzone 1.6 (rechtskräftig, 8460m², 95%)', area: 1200, gebaeudeflaeche: 150, geschosse: 2, baujahr: 1955, denkmalschutz: 'nicht vorhanden' }, reserveGf: 300, score: 67 },
+    { p: { zone: 'Wohnzone 1.6', area: 1200, gebaeudeflaeche: 150, geschosse: 2, baujahr: 1955, denkmalschutz: 'nicht vorhanden' }, reserveGf: 300, score: 67 },
     // Geschosse/Überbauungsziffer: 2 x 50% = AZ 1.0
     { p: { zone: 'Wohnzone 2/50', area: 1200, gebaeudeflaeche: 150, geschosse: 2, baujahr: 1955, denkmalschutz: 'nicht vorhanden' }, reserveGf: 900, score: 89 },
   ];
@@ -170,7 +170,8 @@ describe('Parität zur SQL-Berechnung', () => {
 
 describe('parseZone (ZH-Freitext)', () => {
   it('ignoriert den Klammerzusatz mit den Zonenflächen', () => {
-    // Das "8460m²" gehört zur Zone, nicht zum Grundstück — darf nicht als Ziffer gelesen werden.
+    // Das "8460m²" ist die Fläche der Zone auf dieser Parzelle — darf nicht
+    // als Ausnützungsziffer gelesen werden.
     expect(parseZone('Wohnzone 1.6 (rechtskräftig, 8460m², 95%)').ziffer).toBe(1.6);
   });
   it('erkennt Geschosse im Namen', () => {
@@ -274,5 +275,49 @@ describe('Zonen ohne Wohnnutzung', () => {
     for (const z of ['Wohnzone 2.0', 'Kernzone I', 'Zentrumszone', 'Quartiererhaltungszone']) {
       expect(istAusgeschlossen({ zone: z }), z).toBe(false);
     }
+  });
+});
+
+
+describe('Bebaubare Fläche aus dem Zonenanteil', () => {
+  // Der Klammerzusatz nennt die Fläche, die diese Zone auf dieser Parzelle
+  // einnimmt. Geprüft an 24'279 Zeilen einer echten Liste: Klammerfläche
+  // geteilt durch den Prozentsatz ergibt bei 98.8% die Grundstücksfläche.
+  it('liest Fläche und Anteil aus der Klammer', () => {
+    const z = parseZone('Wohnzone 1.6 (rechtskräftig, 8460m², 95%)');
+    expect(z.zonenflaeche).toBe(8460);
+    expect(z.anteilProzent).toBe(95);
+  });
+
+  it('versteht Tausendertrennzeichen', () => {
+    expect(parseZone("Kernzone (rechtskräftig, 15'920m², 60%)").zonenflaeche).toBe(15920);
+  });
+
+  it('rechnet mit dem Zonenanteil, nicht mit der ganzen Parzelle', () => {
+    // Genau der Fall aus den Echtdaten: eine riesige Parzelle, von der nur
+    // ein kleiner Teil in der Bauzone liegt.
+    const r = calculatePotential({
+      zone: 'Wohnzone dreigeschossig 2.7 BMZ (rechtskräftig, 1357m², 100%)',
+      area: 660936, gebaeudeflaeche: 200, geschosse: 2, baujahr: 1963,
+      denkmalschutz: 'nicht vorhanden',
+    });
+    // 1357 m² x AZ 0.84 = 1145 m² zulässig, nicht 660'936 x 0.84
+    expect(r.gfZulaessig).toBeLessThan(2000);
+    expect(r.assumptions.join(' ')).toContain('Bebaubar');
+  });
+
+  it('nimmt die Grundstücksfläche, wenn die Zone keinen Anteil nennt', () => {
+    const r = calculatePotential({ zone: 'Wohnzone 2.0', area: 1000, gebaeudeflaeche: 100, geschosse: 2 });
+    expect(r.gfZulaessig).toBe(625);
+    expect(r.assumptions.join(' ')).toContain('Zonenanteil unbekannt');
+  });
+
+  it('merkt den Unterschied nur an, wenn er ins Gewicht fällt', () => {
+    // Klammerfläche gleich Grundstück: keine Anmerkung nötig.
+    const r = calculatePotential({
+      zone: 'Wohnzone 2.0 (rechtskräftig, 1000m², 100%)',
+      area: 1000, gebaeudeflaeche: 100, geschosse: 2,
+    });
+    expect(r.assumptions.join(' ')).not.toContain('Bebaubar');
   });
 });
