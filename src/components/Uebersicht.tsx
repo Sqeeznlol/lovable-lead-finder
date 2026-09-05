@@ -1,5 +1,6 @@
 import { PhoneCall, Search, Building2, MapPin, Map, Camera, Loader2, TrendingUp, UserSearch } from 'lucide-react';
 import { Objektansicht } from '@/components/Objektansicht';
+import { Eigentuemersuche } from '@/components/Eigentuemersuche';
 import { Card, CardContent } from '@/components/ui/card';
 import { useUebersicht, type Chance } from '@/hooks/use-uebersicht';
 import { EMPFEHLUNG_LABEL, type Empfehlung } from '@/lib/akquise';
@@ -79,6 +80,9 @@ export function Uebersicht() {
           hinweis="Hier ist der nächste Schritt die Recherche"
         />
       </div>
+
+      {/* Die knappste Ressource im Ablauf: fünf Grundbuchabfragen am Tag. */}
+      <Eigentuemersuche objekte={data.nachschlagen} />
 
       <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
         {/* Konkrete Adressen */}
