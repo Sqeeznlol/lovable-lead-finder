@@ -299,12 +299,14 @@ jobs:
                 for fassung in "${dienst}_0" "${dienst}"; do
                   url="https://geodienste.ch/db/${fassung}/deu?SERVICE=WFS&REQUEST=GetCapabilities"
                   code=$(curl -sS -o /tmp/cap.xml -w '%{http_code}' -m 60 "$url" || echo 000)
-                  n=$(grep -o '<[a-zA-Z]*:\?Name>[^<]*</[a-zA-Z]*:\?Name>' /tmp/cap.xml 2>/dev/null | wc -l)
+                  # Ohne Treffer endet grep mit 1 und beendet unter set -e
+                  # das ganze Skript -- deshalb der Auffangzweig.
+                  n=$( { grep -o '<[a-zA-Z]*:\?Name>[^<]*</[a-zA-Z]*:\?Name>' /tmp/cap.xml || true; } 2>/dev/null | wc -l)
                   echo "- \`${fassung}\` — HTTP $code, $n Namen" >> /tmp/wfs.md
                   if [ "$code" = "200" ] && [ "$n" -gt 0 ]; then
                     echo "" >> /tmp/wfs.md
                     echo "  Ebenen:" >> /tmp/wfs.md
-                    grep -o '<[a-zA-Z]*:\?Name>[^<]*</[a-zA-Z]*:\?Name>' /tmp/cap.xml \
+                    { grep -o '<[a-zA-Z]*:\?Name>[^<]*</[a-zA-Z]*:\?Name>' /tmp/cap.xml || true; } \
                       | sed 's/<[^>]*>//g' | sort -u | head -40 \
                       | sed 's/^/    - /' >> /tmp/wfs.md
                     echo "" >> /tmp/wfs.md
