@@ -33,6 +33,7 @@ on:
           - stichprobe        # Zehn Objekte mit den grössten Werten
           - zonen             # Verteilung nach Zonentyp
           - diagnose          # Welche Spalten und Funktionen existieren
+          - zonennamen        # Welche Zonen gelten noch als kaufbar?
           - tempo             # Laufzeit der Abfragen der Masterliste
       grenze:
         description: 'Obergrenze für Durchläufe beim Nachrechnen'
@@ -189,6 +190,12 @@ jobs:
               miss "nach score_tier" "properties?select=id,score_tier&order=score_tier.asc&limit=50"
               miss "Filter Gemeinde" "properties?select=id&gemeinde=eq.Wetzikon%20(ZH)&limit=50"
               miss "nach id (Primärschlüssel)" "properties?select=id&order=id.asc&limit=50"
+              cat "$GITHUB_STEP_SUMMARY"
+              ;;
+
+            zonennamen)
+              hole "properties?select=zone,gemeinde&ausgeschlossen=eq.false&zone=not.is.null&limit=20000" \
+                | python3 tools/zonen-auswerten.py >> "$GITHUB_STEP_SUMMARY"
               cat "$GITHUB_STEP_SUMMARY"
               ;;
 
