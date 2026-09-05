@@ -98,11 +98,20 @@ def main() -> None:
     print(f'# Datenfelder — {len(eigene)} eigene, {len(deals)} Deals')
     print()
 
-    leer, gefuellt = [], []
+    leer, gefuellt, gebraucht_leer = [], [], []
     for f in eigene:
         k = f.get('key')
         n = sum(1 for d in deals if d.get(k) not in (None, '', 0))
-        (gefuellt if n else leer).append((f, n))
+        if n:
+            gefuellt.append((f, n))
+        elif f['name'] in GEBRAUCHT:
+            # Leer, aber gebraucht: Zone und Grundstücksfläche stehen im
+            # Konto ohne Werte, weil der bisherige Export sie nie gefüllt
+            # hat. Sie zu löschen und gleich wieder anzulegen wäre unsinnig
+            # -- sie bleiben stehen und werden künftig befüllt.
+            gebraucht_leer.append(f)
+        else:
+            leer.append((f, n))
 
     print('## Gefüllt — bleiben stehen')
     print()
@@ -115,7 +124,14 @@ def main() -> None:
         print('Kein einziges eigenes Feld trägt einen Wert.')
     print()
 
-    print(f'## Leer — {len(leer)} Felder ohne einen einzigen Wert')
+    if gebraucht_leer:
+        print('## Leer, aber gebraucht — bleiben stehen')
+        print()
+        for f in gebraucht_leer:
+            print(f'- {f["name"]} — wird künftig vom Abgleich gefüllt')
+        print()
+
+    print(f'## Leer und entbehrlich — {len(leer)} Felder')
     print()
     for f, _ in leer:
         print(f'- {f["name"]}')
