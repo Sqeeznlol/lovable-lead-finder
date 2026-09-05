@@ -404,6 +404,21 @@ export type Database = {
           ai_recommendation: string | null
           ai_score: number | null
           ai_summary: string | null
+          anrechenbare_geschosse: number | null
+          ausgeschlossen: boolean
+          ausschluss_grund: string | null
+          az_quelle: string | null
+          bebaubar_m2: number | null
+          confidence: string | null
+          erloes_chf: number | null
+          gebaeude_anzahl: number
+          gf_bestand: number | null
+          gf_zulaessig: number | null
+          investition_chf: number | null
+          marge_chf: number | null
+          marge_quote: number | null
+          potenzial_score: number | null
+          vollgeschosse_zulaessig: number | null
           area: number | null
           assigned_to: string | null
           ausnuetzung: number | null
@@ -508,6 +523,21 @@ export type Database = {
           ai_recommendation?: string | null
           ai_score?: number | null
           ai_summary?: string | null
+          anrechenbare_geschosse?: number | null
+          ausgeschlossen?: boolean
+          ausschluss_grund?: string | null
+          az_quelle?: string | null
+          bebaubar_m2?: number | null
+          confidence?: string | null
+          erloes_chf?: number | null
+          gebaeude_anzahl?: number
+          gf_bestand?: number | null
+          gf_zulaessig?: number | null
+          investition_chf?: number | null
+          marge_chf?: number | null
+          marge_quote?: number | null
+          potenzial_score?: number | null
+          vollgeschosse_zulaessig?: number | null
           area?: number | null
           assigned_to?: string | null
           ausnuetzung?: number | null
@@ -612,6 +642,21 @@ export type Database = {
           ai_recommendation?: string | null
           ai_score?: number | null
           ai_summary?: string | null
+          anrechenbare_geschosse?: number | null
+          ausgeschlossen?: boolean
+          ausschluss_grund?: string | null
+          az_quelle?: string | null
+          bebaubar_m2?: number | null
+          confidence?: string | null
+          erloes_chf?: number | null
+          gebaeude_anzahl?: number
+          gf_bestand?: number | null
+          gf_zulaessig?: number | null
+          investition_chf?: number | null
+          marge_chf?: number | null
+          marge_quote?: number | null
+          potenzial_score?: number | null
+          vollgeschosse_zulaessig?: number | null
           area?: number | null
           assigned_to?: string | null
           ausnuetzung?: number | null
@@ -735,6 +780,21 @@ export type Database = {
           ai_recommendation?: string | null
           ai_score?: number | null
           ai_summary?: string | null
+          anrechenbare_geschosse?: number | null
+          ausgeschlossen?: boolean
+          ausschluss_grund?: string | null
+          az_quelle?: string | null
+          bebaubar_m2?: number | null
+          confidence?: string | null
+          erloes_chf?: number | null
+          gebaeude_anzahl?: number
+          gf_bestand?: number | null
+          gf_zulaessig?: number | null
+          investition_chf?: number | null
+          marge_chf?: number | null
+          marge_quote?: number | null
+          potenzial_score?: number | null
+          vollgeschosse_zulaessig?: number | null
           created_at?: string
           decision_matches_ai?: boolean | null
           feedback_note?: string | null
@@ -747,6 +807,21 @@ export type Database = {
           ai_recommendation?: string | null
           ai_score?: number | null
           ai_summary?: string | null
+          anrechenbare_geschosse?: number | null
+          ausgeschlossen?: boolean
+          ausschluss_grund?: string | null
+          az_quelle?: string | null
+          bebaubar_m2?: number | null
+          confidence?: string | null
+          erloes_chf?: number | null
+          gebaeude_anzahl?: number
+          gf_bestand?: number | null
+          gf_zulaessig?: number | null
+          investition_chf?: number | null
+          marge_chf?: number | null
+          marge_quote?: number | null
+          potenzial_score?: number | null
+          vollgeschosse_zulaessig?: number | null
           created_at?: string
           decision_matches_ai?: boolean | null
           feedback_note?: string | null

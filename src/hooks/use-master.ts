@@ -34,7 +34,13 @@ export interface MasterFilters {
   hasNote?: 'all' | 'mit' | 'ohne';
   listId?: string | null;
   source?: string | null;
-  sortBy?: 'baujahr' | 'gebaeudeflaeche' | 'area' | 'gemeinde' | 'imported_at';
+  /** Ausgeschlossene Objekte (Nicht-Bauzone, keine Wohnnutzung, Denkmalschutz). */
+  ausgeschlossen?: 'ausblenden' | 'nur' | 'alle';
+  tier?: string | null;
+  hnfDeltaMin?: number | null;
+  reserveMin?: number | null;
+  sortBy?: 'hnf_delta' | 'potenzial_score' | 'marge_chf' | 'reserve_gf'
+         | 'baujahr' | 'gebaeudeflaeche' | 'area' | 'gemeinde' | 'imported_at';
   sortDir?: 'asc' | 'desc';
   page?: number;
   pageSize?: number;
@@ -71,6 +77,13 @@ function applyFilters<T>(
   if (f.gebFlaecheMax != null) q = q.lte('gebaeudeflaeche', f.gebFlaecheMax);
   if (f.hnfMin != null) q = q.gte('hnf_schaetzung', f.hnfMin);
   if (f.hnfMax != null) q = q.lte('hnf_schaetzung', f.hnfMax);
+  // Ausgeschlossene stehen standardmässig nicht in der Arbeitsliste: sie
+  // lassen sich weder kaufen noch zu Wohnraum entwickeln.
+  if (f.ausgeschlossen === 'nur') q = q.eq('ausgeschlossen', true);
+  else if (f.ausgeschlossen !== 'alle') q = q.eq('ausgeschlossen', false);
+  if (f.tier) q = q.eq('score_tier', f.tier);
+  if (f.hnfDeltaMin != null) q = q.gte('hnf_delta', f.hnfDeltaMin);
+  if (f.reserveMin != null) q = q.gte('reserve_gf', f.reserveMin);
   if (f.withOwner === 'mit') q = q.not('owner_name', 'is', null);
   if (f.withOwner === 'ohne') q = q.is('owner_name', null);
   if (f.withPhone === 'mit') q = q.not('owner_phone', 'is', null);
@@ -93,7 +106,10 @@ export function useMasterProperties(filters: MasterFilters) {
   return useQuery({
     queryKey: ['master', 'properties', filters],
     queryFn: async () => {
-      const sortBy = filters.sortBy ?? 'gebaeudeflaeche';
+      // Voreinstellung: die Objekte mit dem grössten erreichbaren Zuwachs an
+      // Hauptnutzfläche zuerst -- das ist die Grösse, an der sich entscheidet,
+      // ob sich ein Anruf lohnt.
+      const sortBy = filters.sortBy ?? 'hnf_delta';
       const sortDir = filters.sortDir ?? 'desc';
       let q = applyFilters(
         supabase
