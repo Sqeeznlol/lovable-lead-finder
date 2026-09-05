@@ -134,3 +134,26 @@ describe('Fälle, in denen die Punktzahl in die Irre führt', () => {
     expect(u.empfehlung).toBe('anrufen');
   });
 });
+
+describe('Plausibilität', () => {
+  // Beides stand in der echten Liste ganz oben und hätte zu Anrufen
+  // geführt, die niemand ernst nimmt.
+  it('stuft unplausibel grosse Bauzonenflächen auf Prüfen zurück', () => {
+    const u = beurteile({
+      zone: 'Wohnzone 2.4', area: 119105, gebaeudeflaeche: 300, geschosse: 2,
+      baujahr: 1960, gemeinde: 'Winterthur', owner_name: 'Hans Müller',
+      denkmalschutz: 'nicht vorhanden',
+    });
+    expect(u.empfehlung).toBe('pruefen');
+    expect(u.dagegen.join(' ')).toContain('unplausibel');
+  });
+
+  it('warnt bei sehr alter Bausubstanz vor dem Schutzstatus', () => {
+    const u = beurteile({
+      zone: 'Kernzone (rechtskräftig, 2000m², 100%)', area: 2000,
+      gebaeudeflaeche: 200, geschosse: 2, baujahr: 1786,
+      gemeinde: 'Elgg', owner_name: 'Hans Müller', denkmalschutz: 'nicht vorhanden',
+    });
+    expect(u.dagegen.join(' ')).toContain('Schutzstatus');
+  });
+});

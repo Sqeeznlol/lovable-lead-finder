@@ -174,6 +174,16 @@ export interface PotentialConfig {
   /** Reserve-Quote, ab der ein Objekt als klar interessant gilt (0–1). */
   zielReserveQuote: number;
   /**
+   * Ab dieser bebaubaren Fläche gilt die Zonenangabe als unsicher.
+   *
+   * Einzelne Parzellen mit mehreren Hektaren Bauzone gibt es praktisch
+   * nicht; solche Werte entstehen, wenn die Liste die ganze Parzelle
+   * ausweist, von der nur ein Bruchteil eingezont ist. Rechnerisch ergeben
+   * sich daraus Margen im dreistelligen Millionenbereich, die jede
+   * Prioritätenliste unbrauchbar machen.
+   */
+  maxBebaubarM2: number;
+  /**
    * Wie die Ziffer im Zonennamen ("Wohnzone 1.6") zu lesen ist:
    * true  = Baumassenziffer m³/m² (in vielen ZH-Gemeinden üblich)
    * false = Ausnützungsziffer
@@ -192,6 +202,7 @@ export const DEFAULT_POTENTIAL_CONFIG: PotentialConfig = {
   erloesProM2HNF: 9500,
   minReserveM2: 80,
   zielReserveQuote: 0.35,
+  maxBebaubarM2: 20000,
   zifferAlsBmz: true,
   geschosshoehe: 3.2,
 };
@@ -334,6 +345,17 @@ export function calculatePotential(
     assumptions.push('Zonenanteil unbekannt — ganze Grundstücksfläche gerechnet');
   }
   if (area != null && area <= 0) area = null;
+
+  // Unrealistisch grosse Bauzonenflächen kennzeichnen statt sie zu rechnen:
+  // sie stammen fast immer aus einer Parzelle, die nur teilweise eingezont
+  // ist, und würden die Liste mit Scheinriesen füllen.
+  if (area != null && area > cfg.maxBebaubarM2) {
+    killer.push('Bauzonenfläche unplausibel — Zonenanteil prüfen');
+    assumptions.push(
+      `${Math.round(area).toLocaleString('de-CH')} m² Bauzone auf einer Parzelle — ` +
+      'die Liste weist vermutlich die ganze Parzelle aus',
+    );
+  }
 
   const gfZulaessig = az != null && area != null ? area * az : null;
 

@@ -106,6 +106,14 @@ export function beurteile(p: AkquiseInput): AkquiseUrteil {
       erloesProM2: profil.erloesProM2, lage: profil.stufe, margeLagegerecht: null,
     };
   }
+  if (r.killer.some(k => k.startsWith('Bauzonenfläche unplausibel'))) {
+    return {
+      empfehlung: 'pruefen', punkte: 40,
+      dafuer: ['Grosse Fläche — falls die Zonenangabe stimmt, sehr interessant'],
+      dagegen: ['Bauzonenfläche unplausibel gross — vor dem Anruf im GIS prüfen'],
+      erloesProM2: profil.erloesProM2, lage: profil.stufe, margeLagegerecht: null,
+    };
+  }
   if (r.killer.includes('Denkmalschutz')) {
     return {
       empfehlung: 'nein', punkte: 0,
@@ -143,6 +151,12 @@ export function beurteile(p: AkquiseInput): AkquiseUrteil {
 
   // ---- 3. Anlass zum Verkauf (0-25) ----------------------------------
   const bj = p.renovationsjahr ?? p.baujahr;
+  if (p.baujahr && p.baujahr < 1850) {
+    // Vor 1850 gebaute Häuser stehen fast immer im Ortsbildschutz oder im
+    // kommunalen Inventar, auch wenn die Liste keinen Eintrag führt.
+    dagegen.push(`Baujahr ${p.baujahr} — Schutzstatus sehr wahrscheinlich, vorab abklären`);
+    punkte -= 20;
+  }
   if (bj) {
     const alter = new Date().getFullYear() - bj;
     if (alter >= 60) {
