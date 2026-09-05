@@ -23,7 +23,7 @@ import { GemeindeSidebar } from '@/components/GemeindeSidebar';
 import { getOerebParzelleUrl } from '@/lib/oereb';
 import { PotenzialPanel } from '@/components/PotenzialPanel';
 import { Luftbild } from '@/components/Luftbild';
-import { potentialScore, istAusgeschlossen } from '@/lib/potential';
+import { potentialScore, istAusgeschlossen, zoneKurzform } from '@/lib/potential';
 
 type ViewMode = 'card' | 'table';
 
@@ -85,7 +85,7 @@ export function Vorauswahl() {
 
   const items = useMemo(() => (queue || [])
     .filter(p => p.status === 'Neu' || p.status === 'Offen')
-    .filter(p => effectiveZoneFilter === 'Alle' || p.zone === effectiveZoneFilter)
+    .filter(p => effectiveZoneFilter === 'Alle' || zoneKurzform(p.zone) === effectiveZoneFilter)
     .filter(p => !baujahrMax || !p.baujahr || p.baujahr <= baujahrMax)
     .filter(p => !baujahrMin || !p.baujahr || p.baujahr >= baujahrMin)
     .filter(p => !maxWhgNum || !p.wohnungen || Number(p.wohnungen) <= maxWhgNum)
@@ -402,7 +402,7 @@ export function Vorauswahl() {
                           <p className="text-xs text-muted-foreground">{p.plz_ort || p.gemeinde || ''}</p>
                         </div>
                       </TableCell>
-                      <TableCell><Badge variant="outline" className="text-xs">{p.zone}</Badge></TableCell>
+                      <TableCell><Badge variant="outline" className="text-xs" title={p.zone ?? undefined}>{zoneKurzform(p.zone) ?? p.zone}</Badge></TableCell>
                       <TableCell className="text-xs">{p.baujahr || '–'}</TableCell>
                       <TableCell className="text-xs">{p.wohnungen ? Number(p.wohnungen) : '–'}</TableCell>
                       <TableCell className="text-xs">{p.gebaeudeflaeche ? `${Math.round(Number(p.gebaeudeflaeche))}m²` : '–'}</TableCell>
