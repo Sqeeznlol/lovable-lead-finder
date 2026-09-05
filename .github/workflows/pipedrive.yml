@@ -31,6 +31,8 @@ on:
           - felder-aufraeumen  # Leere Felder entfernen, fehlende anlegen
           - nachfuellen  # Leere Felder bestehender Deals aus der Datenbank
           - nachfuellen-schreiben  # dasselbe, aber tatsächlich schreiben
+          - ordnen       # Titel und Adressfeld prüfen (Probelauf)
+          - ordnen-schreiben  # Titel setzen, Adressfeld entfernen
       grenze:
         description: 'Höchstzahl Objekte beim Abgleich'
         required: false
@@ -89,6 +91,13 @@ jobs:
               ;;
             nachfuellen-schreiben)
               python3 tools/pipedrive-nachfuellen.py --schreiben \
+                | tee -a "$GITHUB_STEP_SUMMARY"
+              ;;
+            ordnen)
+              python3 tools/pipedrive-ordnen.py | tee -a "$GITHUB_STEP_SUMMARY"
+              ;;
+            ordnen-schreiben)
+              python3 tools/pipedrive-ordnen.py --schreiben \
                 | tee -a "$GITHUB_STEP_SUMMARY"
               ;;
             felder)
