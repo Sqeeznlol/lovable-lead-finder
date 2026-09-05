@@ -10,6 +10,7 @@ import {
   oerebParzelleUrl,
   streetViewLinkUrl,
   streetViewEmbedUrl,
+  gemeindeBfsNr,
   type GeoCoords,
 } from '@/lib/swisstopo';
 
@@ -28,6 +29,8 @@ interface Props {
   parzelle?: string | null;
   /** Gemeindenummer (BFS), grenzt die Suche nach der Parzelle ein. */
   bfsNr?: string | number | null;
+  /** Gemeindename -- daraus wird die Nummer geholt, wenn sie fehlt. */
+  gemeinde?: string | null;
   className?: string;
 }
 
@@ -44,13 +47,17 @@ interface Props {
  * kostet nichts, ohne Schlüssel bleibt aber nur der Link -- deshalb steht
  * dort eine Schaltfläche, solange VITE_GOOGLE_MAPS_KEY fehlt.
  */
-export function Objektansicht({ address, plzOrt, parzelle, bfsNr, className }: Props) {
+export function Objektansicht({ address, plzOrt, parzelle, bfsNr, gemeinde, className }: Props) {
   const [coords, setCoords] = useState<GeoCoords | null>(null);
   const [stand, setStand] = useState<'laden' | 'ok' | 'leer' | 'fehler'>('laden');
   const [modus, setModus] = useState<Modus>('luft');
   // Die Zonenkachel deckt nicht jeden Ort ab. Schlägt sie fehl, bleibt das
   // Luftbild darunter sichtbar statt einer kaputten Grafik.
   const [zoneFehlt, setZoneFehlt] = useState(false);
+  // In den importierten Daten fehlt die Gemeindenummer durchgehend. Ohne sie
+  // findet der Kataster die Parzelle nicht -- sie wird deshalb einmal je
+  // Gemeinde beim Bund nachgeschlagen.
+  const [bfsGeholt, setBfsGeholt] = useState<string | null>(null);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -71,6 +78,16 @@ export function Objektansicht({ address, plzOrt, parzelle, bfsNr, className }: P
 
     return () => ctrl.abort();
   }, [address, plzOrt]);
+
+  useEffect(() => {
+    if (bfsNr != null && String(bfsNr).trim() !== '') return;
+    if (!gemeinde || !parzelle) return;
+    const ctrl = new AbortController();
+    gemeindeBfsNr(gemeinde, ctrl.signal)
+      .then(nr => { if (!ctrl.signal.aborted) setBfsGeholt(nr); })
+      .catch(() => { /* Ohne Nummer bleibt der Link auf die Adresse. */ });
+    return () => ctrl.abort();
+  }, [gemeinde, parzelle, bfsNr]);
 
   const rahmen = `relative overflow-hidden rounded-2xl bg-muted/40 ${className || ''}`;
 
@@ -94,16 +111,19 @@ export function Objektansicht({ address, plzOrt, parzelle, bfsNr, className }: P
   }
 
   const { lat, lon } = coords;
+  const bfs = bfsNr != null && String(bfsNr).trim() !== '' ? bfsNr : bfsGeholt;
+  const parzellenLink = oerebParzelleUrl(parzelle, bfs);
   const einbettung = modus === 'strasse' ? streetViewEmbedUrl(lat, lon) : null;
 
   const weiterLink =
     modus === 'zone'
-      ? (parzelle ? oerebParzelleUrl(parzelle, bfsNr) : oerebUrl(lat, lon))
+      ? (parzellenLink ?? oerebUrl(lat, lon))
     : modus === 'strasse' ? streetViewLinkUrl(lat, lon)
     : swisstopoMapUrl(lat, lon);
 
   const weiterLabel =
-    modus === 'zone' ? 'ÖREB-Kataster'
+    modus === 'zone'
+      ? (parzellenLink ? 'Parzelle im Kataster' : 'ÖREB-Kataster')
     : modus === 'strasse' ? 'Street View'
     : 'swisstopo';
 

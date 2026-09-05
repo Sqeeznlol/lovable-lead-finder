@@ -100,18 +100,24 @@ export function bauzonenTileUrl(lat: number, lon: number, zoom = ZONEN_ZOOM): st
 /**
  * ÖREB-Kataster des Kantons Zürich mit ausgewählter Parzelle.
  *
- * Über Koordinaten zeigt die Karte nur die Stelle -- man sieht die Zonen,
- * aber nicht, welches Grundstück gemeint ist. Mit `locate=parz` und dem
- * Paar aus Gemeindenummer und Parzellennummer wird die Parzelle selbst
- * ausgewählt und rot umrandet; genau darum geht es, wenn die Frage lautet,
- * wie weit die Bauzone über dieses Grundstück reicht.
+ * `locate=parz` erwartet das Paar aus Gemeindenummer (BFS) und
+ * Parzellennummer: `locations=230,VE4739`. Die Gemeindenummer ist nicht
+ * optional -- Parzellennummern sind nur innerhalb einer Gemeinde eindeutig,
+ * "VE4739" gibt es im Kanton mehrfach. Ohne sie antwortet die Karte mit
+ * "parz nicht gefunden", und ein führendes Komma hilft nicht.
  *
- * Fehlt die Gemeindenummer, genügt der Kanton mit der blossen
- * Parzellennummer -- er sucht sie dann im ganzen Kanton.
+ * Fehlt die Gemeindenummer, gibt diese Funktion deshalb nichts zurück; der
+ * Aufrufer weicht dann auf die Karte an der Adresse aus, statt einen Link
+ * anzubieten, der in einer Fehlermeldung endet.
  */
-export function oerebParzelleUrl(parzelle: string, bfsNr?: string | number | null): string {
-  const ort = bfsNr != null && String(bfsNr).trim() !== '' ? String(bfsNr).trim() : '';
-  return `https://maps.zh.ch/?locate=parz&locations=${ort},${encodeURIComponent(parzelle)}&topic=OerebKatasterZH`;
+export function oerebParzelleUrl(
+  parzelle?: string | null,
+  bfsNr?: string | number | null,
+): string | null {
+  const nr = String(parzelle ?? '').trim();
+  const ort = String(bfsNr ?? '').trim();
+  if (!nr || !ort) return null;
+  return `https://maps.zh.ch/?locate=parz&locations=${encodeURIComponent(ort)},${encodeURIComponent(nr)}&topic=OerebKatasterZH`;
 }
 
 /** ÖREB-Kataster an einer Stelle, wenn keine Parzellennummer bekannt ist. */
@@ -140,4 +146,56 @@ export function streetViewEmbedUrl(lat: number, lon: number): string | null {
 /** Dreidimensionale Ansicht bei swisstopo -- Gelände und Gebäude, frei nutzbar. */
 export function swisstopo3dUrl(lat: number, lon: number): string {
   return `https://map.geo.admin.ch/#/map?center=${lon},${lat}&z=17&3d=true&bgLayer=ch.swisstopo.swissimage`;
+}
+
+/**
+ * Gemeindenummer (BFS) zu einem Gemeindenamen.
+ *
+ * Der Kataster des Kantons findet eine Parzelle nur zusammen mit dieser
+ * Nummer: Parzellennummern sind nur innerhalb einer Gemeinde eindeutig,
+ * "VE4739" gibt es im Kanton mehrfach. In den importierten Daten fehlt die
+ * Nummer durchgehend -- auch die mitgelieferten Kataster-Links tragen
+ * deshalb ein leeres Feld ("locations=,VE4739") und enden in "parz nicht
+ * gefunden".
+ *
+ * Die Nummer kommt vom Gemeindeverzeichnis des Bundes über denselben
+ * Suchdienst, der schon die Koordinaten liefert -- frei und ohne Schlüssel.
+ * Das Ergebnis wird lokal gespeichert, damit jede Gemeinde einmal
+ * abgefragt wird und nicht einmal pro Objekt.
+ */
+const BFS_CACHE = 'swisstopo.bfs.';
+
+export async function gemeindeBfsNr(
+  gemeinde: string,
+  signal?: AbortSignal,
+): Promise<string | null> {
+  // "Winterthur (ZH)" und "Küsnacht ZH" sind derselbe Ort wie "Winterthur".
+  const name = gemeinde.replace(/\s*\(?\bZH\b\)?\s*$/i, '').trim();
+  if (!name) return null;
+
+  try {
+    const gespeichert = localStorage.getItem(BFS_CACHE + name.toLowerCase());
+    if (gespeichert !== null) return gespeichert || null;
+  } catch {
+    /* Kein Speicher — dann eben jedes Mal abfragen. */
+  }
+
+  const url =
+    `${SEARCH_URL}?searchText=${encodeURIComponent(name)}` +
+    '&type=locations&origins=gg25&limit=1&sr=4326';
+  const res = await fetch(url, { signal });
+  if (!res.ok) return null;
+
+  const json = await res.json();
+  const treffer = json?.results?.[0];
+  // Im Gemeindeverzeichnis ist die featureId die BFS-Nummer.
+  const nr = treffer?.attrs?.featureId ?? treffer?.id;
+  const wert = nr != null && /^\d+$/.test(String(nr)) ? String(nr) : null;
+
+  try {
+    localStorage.setItem(BFS_CACHE + name.toLowerCase(), wert ?? '');
+  } catch {
+    /* siehe oben */
+  }
+  return wert;
 }
