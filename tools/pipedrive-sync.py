@@ -78,16 +78,24 @@ def anrufbereit(url: str, key: str, grenze: int) -> list[dict]:
     Ohne Nummer ist es Recherche, nicht Akquise -- solche Objekte
     gehören in die Grundbuchabfrage und nicht ins Telefon.
     """
+    # Nicht in der Datenbank sortieren: ohne Index über 259'000 Zeilen
+    # bricht die Abfrage im Zeitlimit ab (belegt: HTTP 500). Die Auswahl
+    # der anrufbaren Objekte ist klein genug, um sie hier zu ordnen.
     bedingungen = [
         f'select={SPALTEN}',
         'ausgeschlossen=eq.false',
-        'preselection_status=neq.Ausschliessen',
         'owner_phone=not.is.null',
-        'hnf_delta=gt.0',
-        'order=marge_chf.desc.nullslast',
-        f'limit={grenze}',
+        'limit=1000',
     ]
-    return sb_get('properties?' + '&'.join(bedingungen), url, key)
+    zeilen = sb_get('properties?' + '&'.join(bedingungen), url, key)
+
+    brauchbar = [
+        z for z in zeilen
+        if z.get('preselection_status') != 'Ausschliessen'
+        and (z.get('hnf_delta') or 0) > 0
+    ]
+    brauchbar.sort(key=lambda z: z.get('marge_chf') or 0, reverse=True)
+    return brauchbar[:grenze]
 
 
 # ------------------------------------------------------------- Felder
