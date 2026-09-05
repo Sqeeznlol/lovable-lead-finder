@@ -1,0 +1,113 @@
+# =====================================================================
+# Kanton laden
+# =====================================================================
+# Holt die amtlichen Geodaten eines Kantons und macht daraus Zeilen für
+# die Master-Liste: je Parzelle die Zone, ihr Flächenanteil und die
+# Angaben, die für die Potenzialrechnung nötig sind.
+#
+# Warum dieser Weg: Die Zonen stehen im Kartendienst des Kantons nur als
+# Bild. Aus Farben lassen sich weder Zonentyp noch Flächenanteil
+# zurückrechnen, und die EGRID -- ohne die sich nichts mit dem übrigen
+# Bestand verknüpfen lässt -- steht dort gar nicht. Die Kantone stellen
+# dieselben Daten über geodienste.ch als Datei bereit, frei und ohne
+# Anmeldung. Belegt am 5. September: Nutzungsplanung TG 41.5 MB,
+# Amtliche Vermessung TG 159.5 MB, beide HTTP 200 ohne Zugangsdaten.
+#
+# INTERLIS ist das amtliche Schweizer Format. Es von Hand zu lesen wäre
+# fehleranfällig -- besonders die Kreisbögen in den Grundstücksgrenzen.
+# Deshalb übernimmt GDAL die Umwandlung, das den Standard kennt.
+# =====================================================================
+
+name: Kanton laden
+
+on:
+  workflow_dispatch:
+    inputs:
+      kanton:
+        description: 'Kantonskürzel, z.B. TG'
+        required: true
+        default: 'TG'
+      schritt:
+        description: 'Was ausgeführt werden soll'
+        required: true
+        default: 'pruefen'
+        type: choice
+        options:
+          - pruefen      # Nur nachsehen, was in den Dateien steckt
+          - zonen        # Zonen umwandeln und als Datei bereitstellen
+
+jobs:
+  laden:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Werkzeuge einrichten
+        run: |
+          sudo apt-get update -qq
+          # GDAL kennt INTERLIS und rechnet die Kreisbögen der Grenzen
+          # korrekt in Linienzüge um.
+          sudo apt-get install -y -qq gdal-bin python3-gdal unzip
+
+      - name: Nutzungsplanung holen
+        env:
+          KANTON: ${{ inputs.kanton }}
+        run: |
+          set -euo pipefail
+          basis=https://geodienste.ch/downloads/interlis
+          datei="npl_nutzungsplanung_v1_2_${KANTON}_lv95.zip"
+          echo "Lade $datei"
+          curl -sSL -o /tmp/npl.zip \
+            "$basis/npl_nutzungsplanung/$KANTON/$datei"
+          ls -lh /tmp/npl.zip
+          mkdir -p /tmp/npl && unzip -o -q /tmp/npl.zip -d /tmp/npl
+          echo "Inhalt:"
+          find /tmp/npl -type f -printf '%p  %s Bytes\n' | head -20
+
+      - name: Modell holen
+        run: |
+          set -euo pipefail
+          # GDAL braucht das Datenmodell, um die Klassen zu benennen.
+          # Es liegt im offenen Modellverzeichnis des Bundes.
+          curl -sSL -o /tmp/Nutzungsplanung_V1_2.ili \
+            "https://models.geo.admin.ch/ARE/Nutzungsplanung_V1_2.ili" \
+            || curl -sSL -o /tmp/Nutzungsplanung_V1_2.ili \
+               "http://models.geo.admin.ch/ARE/Nutzungsplanung_V1_2.ili"
+          wc -c /tmp/Nutzungsplanung_V1_2.ili
+
+      - name: Nachsehen, was drinsteckt
+        run: |
+          set -euo pipefail
+          xtf=$(find /tmp/npl -name '*.xtf' | head -1)
+          echo "Datei: $xtf"
+          echo
+          echo "### Klassen und Objektzahlen"
+          # ogrinfo listet die Ebenen mit Geometrietyp und Anzahl.
+          ogrinfo -so -al "$xtf,/tmp/Nutzungsplanung_V1_2.ili" 2>&1 \
+            | grep -E 'Layer name|Feature Count|Geometry:|^[A-Za-z_]+: ' \
+            | head -80
+
+      - name: Zonen umwandeln
+        if: ${{ inputs.schritt == 'zonen' }}
+        run: |
+          set -euo pipefail
+          xtf=$(find /tmp/npl -name '*.xtf' | head -1)
+          # Nur die Grundnutzung: das sind die Zonen, in denen gebaut wird.
+          # Überlagernde Festlegungen (Lärm, Gefahren) sind eine eigene
+          # Frage und kämen später dazu.
+          ogr2ogr -f GPKG /tmp/zonen.gpkg \
+            "$xtf,/tmp/Nutzungsplanung_V1_2.ili" \
+            -nln zonen -skipfailures \
+            Grundnutzung_Zonenflaeche || true
+          ls -lh /tmp/zonen.gpkg || echo "Keine Ausgabe erzeugt"
+          ogrinfo -so -al /tmp/zonen.gpkg 2>&1 | head -40
+
+      - name: Ergebnis bereitstellen
+        if: ${{ inputs.schritt == 'zonen' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: zonen-${{ inputs.kanton }}
+          path: /tmp/zonen.gpkg
+          if-no-files-found: warn
