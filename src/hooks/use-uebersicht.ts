@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { beurteile, type Empfehlung } from '@/lib/akquise';
 import { calculatePotential } from '@/lib/potential';
 import { gemeindeprofil, LAGE_LABEL, type Lagestufe } from '@/lib/gemeinden-zh';
+import { verkauftNie, ARCHIV_STATUS } from '@/lib/grundbuch';
 
 /** Felder, die für die Beurteilung gebraucht werden. */
 const FELDER =
@@ -114,6 +115,11 @@ export function useUebersicht() {
         for (const roh of data) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const p = roh as any;
+          // Archiviertes und die öffentliche Hand gehören nicht auf die
+          // Anrufliste: das eine wurde entschieden, das andere verkauft nicht.
+          if (p.preselection_status === ARCHIV_STATUS) continue;
+          if (verkauftNie(p.owner_name ?? p.eigentuemer_name)) continue;
+
           const u = beurteile(p);
           // HNF und Marge müssen aus derselben Rechnung stammen. Der Wert in
           // der Datenbank kann älter sein als die aktuelle Formel; dann

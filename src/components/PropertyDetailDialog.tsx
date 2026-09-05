@@ -4,6 +4,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { grundbuchUrl, verkauftNie, ARCHIV_STATUS } from '@/lib/grundbuch';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -53,6 +54,39 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
   }, [id, toast]);
 
   const update = (patch: Partial<Property>) => setData(d => d ? { ...d, ...patch } : d);
+
+  /**
+   * Archivieren heisst: das Objekt verschwindet aus den Arbeitslisten,
+   * bleibt aber im Bestand. Verwendet wird dafür der bestehende Status
+   * "Ausschliessen" -- so braucht es kein zusätzliches Feld, und die
+   * Vorauswahl kennt ihn bereits.
+   */
+  const archivieren = async () => {
+    if (!data) return;
+    setSaving(true);
+    const grund = verkauftNie(data.owner_name)
+      ? 'Öffentliche Hand als Eigentümerin — verkauft nicht'
+      : 'Von Hand archiviert';
+    const { error } = await supabase
+      .from('properties')
+      .update({
+        preselection_status: ARCHIV_STATUS,
+        preselection_note: grund,
+        preselection_decided_at: new Date().toISOString(),
+      })
+      .eq('id', data.id);
+    setSaving(false);
+    if (error) {
+      toast({ title: 'Fehler', description: error.message, variant: 'destructive' });
+      return;
+    }
+    update({ preselection_status: ARCHIV_STATUS, preselection_note: grund });
+    toast({ title: '✓ Archiviert', description: grund });
+    qc.invalidateQueries({ queryKey: ['master'] });
+    qc.invalidateQueries({ queryKey: ['properties'] });
+    qc.invalidateQueries({ queryKey: ['uebersicht'] });
+    onClose();
+  };
 
   const save = async () => {
     if (!data) return;
@@ -121,6 +155,15 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
                 {data.housing_stat_url && (
                   <a href={data.housing_stat_url} target="_blank" rel="noreferrer">
                     <Button size="sm" variant="outline"><ExternalLink className="h-3.5 w-3.5 mr-1" /> Kataster</Button>
+                  </a>
+                )}
+                {grundbuchUrl(data.egrid, data.bfs_nr) && (
+                  /* Die Auskunft des Grundbuchamts nennt den eingetragenen
+                     Eigentümer -- genau die Angabe, die in den Listen fehlt.
+                     Führt der Link auf die Anmeldung, ist das die
+                     Identifikation des Portals und kein defekter Link. */
+                  <a href={grundbuchUrl(data.egrid, data.bfs_nr)!} target="_blank" rel="noreferrer">
+                    <Button size="sm" variant="outline"><ExternalLink className="h-3.5 w-3.5 mr-1" /> Grundbuch</Button>
                   </a>
                 )}
                 {data.owner_name && (
@@ -227,7 +270,32 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
               </div>
             </div>
 
+            {/* Die öffentliche Hand verkauft ihren Grundbesitz praktisch nie.
+                Steht ein solcher Eigentümer im Grundbuch, ist die Arbeit an
+                diesem Objekt beendet -- es gehört ins Archiv und nicht mehr
+                auf die Anrufliste. */}
+            {verkauftNie(data.owner_name) && data.preselection_status !== ARCHIV_STATUS && (
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
+                <p className="text-sm">
+                  <span className="font-medium">Öffentliche Hand als Eigentümerin.</span>{' '}
+                  Verkauft in aller Regel nicht — ins Archiv?
+                </p>
+                <Button size="sm" variant="outline" onClick={archivieren} disabled={saving}>
+                  Archivieren
+                </Button>
+              </div>
+            )}
+
             <div className="flex justify-end gap-2">
+              {data.preselection_status === ARCHIV_STATUS ? (
+                <Button variant="ghost" onClick={() => update({ preselection_status: 'Nicht geprüft' })}>
+                  Aus dem Archiv holen
+                </Button>
+              ) : (
+                <Button variant="ghost" onClick={archivieren} disabled={saving}>
+                  Archivieren
+                </Button>
+              )}
               <Button variant="ghost" onClick={onClose}>Abbrechen</Button>
               <Button onClick={save} disabled={saving}>
                 {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
