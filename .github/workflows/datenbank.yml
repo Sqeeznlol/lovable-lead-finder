@@ -71,10 +71,21 @@ jobs:
           }
 
           zaehle() { # zaehle <filter>
-            curl -sS -o /dev/null -D - "$URL/rest/v1/properties?select=id&$1" \
-              -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
-              -H "Prefer: count=exact" -H "Range: 0-0" \
-              | grep -i content-range | tr -d '\r' | sed 's|.*/||'
+            # count=exact laeuft bei 259'000 Zeilen ohne Index in den
+            # Timeout und liefert dann gar keinen Header -- die Zelle
+            # blieb leer. count=planned nutzt die Statistik der
+            # Datenbank: eine Naeherung, aber immer eine Antwort.
+            for modus in exact planned; do
+              n=$(curl -sS -o /dev/null -D - "$URL/rest/v1/properties?select=id&$1" \
+                -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+                -H "Prefer: count=$modus" -H "Range: 0-0" \
+                | grep -i content-range | tr -d '\r' | sed 's|.*/||')
+              case "$n" in
+                ''|'*') continue ;;
+                *) [ "$modus" = planned ] && echo "~$n" || echo "$n"; return ;;
+              esac
+            done
+            echo "?"
           }
 
           case "$AUFGABE" in
