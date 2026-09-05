@@ -26,3 +26,5 @@ dist-ssr
 # Lokale Prüf-Artefakte (Playwright, UI-Abzüge)
 .tmp-ui/
 test-results/
+.tmp-ui/
+test-results/
