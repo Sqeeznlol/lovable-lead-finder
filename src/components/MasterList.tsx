@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Loader2, MapPin, Users, SlidersHorizontal } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, MapPin, Users, SlidersHorizontal, Phone, Map } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -166,8 +166,9 @@ export function MasterList() {
                 <thead className="sticky top-0 z-10 bg-muted text-xs uppercase text-muted-foreground">
                   <tr>
                     <th className="whitespace-nowrap p-3 text-left font-medium">Empfehlung</th>
-                    <th className="text-left p-3 font-medium">Adresse</th>
-                    <th className="text-left p-3 font-medium">Gemeinde</th>
+                    <th className="text-left p-3 font-medium">Objekt</th>
+                    <th className="whitespace-nowrap p-3 text-left font-medium">Parzelle</th>
+                    <th className="text-left p-3 font-medium">Eigentümer</th>
                     <th className="whitespace-nowrap p-3 text-right font-medium">HNF&nbsp;+</th>
                     <th className="whitespace-nowrap p-3 text-right font-medium">Marge&nbsp;Mio</th>
                     <th className="whitespace-nowrap p-3 text-right font-medium">Bebaubar</th>
@@ -178,12 +179,12 @@ export function MasterList() {
                 </thead>
                 <tbody>
                   {isLoading && (
-                    <tr><td colSpan={8} className="text-center p-12 text-muted-foreground">
+                    <tr><td colSpan={10} className="text-center p-12 text-muted-foreground">
                       <Loader2 className="h-5 w-5 animate-spin inline" />
                     </td></tr>
                   )}
                   {!isLoading && data?.rows.length === 0 && (
-                    <tr><td colSpan={8} className="text-center p-12 text-muted-foreground">
+                    <tr><td colSpan={10} className="text-center p-12 text-muted-foreground">
                       Keine Datensätze gefunden.
                     </td></tr>
                   )}
@@ -200,15 +201,58 @@ export function MasterList() {
                           {EMPFEHLUNG_LABEL[urteil.empfehlung]}
                         </span>
                       </td>
-                      <td className="min-w-[200px] p-3">
-                        <div className="font-medium leading-tight">{p.address}</div>
-                        {p.owner_name && (
-                          <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                            <Users className="h-3 w-3" /> {p.owner_name}
+                      {/* Alles, was nötig ist, um das Objekt zu finden:
+                          Strasse, Ort und darunter die Gemeinde. Ohne den
+                          Ort lässt sich eine Adresse im Kanton nicht
+                          eindeutig zuordnen -- Bahnhofstrassen gibt es
+                          Dutzende. */}
+                      <td className="min-w-[210px] p-3">
+                        <div className="font-medium leading-tight">{p.address || '—'}</div>
+                        <div className="mt-0.5 text-xs text-muted-foreground">
+                          {[p.plz, p.gemeinde || p.ortschaftsname].filter(Boolean).join(' ') || '—'}
+                        </div>
+                      </td>
+
+                      {/* Die Parzellennummer ist die Nummer, unter der das
+                          Grundstück beim Grundbuchamt und im GIS geführt
+                          wird -- ohne sie lässt sich weder nachschlagen noch
+                          nachfragen. Die EGRID darunter ist die
+                          schweizweit eindeutige Kennung. */}
+                      <td className="whitespace-nowrap p-3">
+                        <div className="font-medium tabular-nums">
+                          {p.parzelle || p.plot_number || '—'}
+                        </div>
+                        {p.egrid && (
+                          <div className="mt-0.5 font-mono text-[11px] tabular-nums text-muted-foreground">
+                            {p.egrid}
                           </div>
                         )}
                       </td>
-                      <td className="whitespace-nowrap p-3 text-muted-foreground">{p.gemeinde || '—'}</td>
+
+                      {/* Wen man anruft und unter welcher Nummer. Fehlt die
+                          Nummer, ist das die nächste Arbeit -- deshalb steht
+                          es hier und nicht versteckt im Detail. */}
+                      <td className="min-w-[170px] p-3">
+                        {p.owner_name ? (
+                          <div className="flex items-start gap-1.5 leading-tight">
+                            <Users className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />
+                            <span>{p.owner_name}</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Eigentümer fehlt</span>
+                        )}
+                        {p.owner_phone ? (
+                          <a
+                            href={`tel:${p.owner_phone.replace(/\s/g, '')}`}
+                            onClick={e => e.stopPropagation()}
+                            className="mt-0.5 inline-flex items-center gap-1.5 text-xs tabular-nums text-primary hover:underline"
+                          >
+                            <Phone className="h-3 w-3" /> {p.owner_phone}
+                          </a>
+                        ) : p.owner_name ? (
+                          <div className="mt-0.5 text-xs text-muted-foreground">keine Nummer</div>
+                        ) : null}
+                      </td>
                       <td className="whitespace-nowrap p-3 text-right font-medium tabular-nums text-primary">{m2(p.hnf_delta)}</td>
                       <td className="whitespace-nowrap p-3 text-right tabular-nums" title={`Erlös in ${p.gemeinde || 'dieser Gemeinde'}: ${urteil.erloesProM2.toLocaleString('de-CH')} CHF/m² · ${LAGE_LABEL[urteil.lage]}`}>
                         {urteil.margeLagegerecht != null
@@ -226,14 +270,28 @@ export function MasterList() {
                           {vorwahlKurz(p.preselection_status)}
                         </Badge>
                       </td>
-                      <td className="p-3 text-right">
-                        {p.google_maps_url && (
-                          <a href={p.google_maps_url} target="_blank" rel="noreferrer"
-                             onClick={e => e.stopPropagation()}
-                             className="text-muted-foreground hover:text-foreground inline-flex">
-                            <MapPin className="h-3.5 w-3.5" />
-                          </a>
-                        )}
+                      {/* Zwei Karten, weil sie Verschiedenes zeigen: Google
+                          zeigt das Haus von der Strasse, das GIS des Kantons
+                          zeigt den Parzellenzuschnitt und die Zone. */}
+                      <td className="whitespace-nowrap p-3 text-right">
+                        <div className="inline-flex gap-2">
+                          {p.google_maps_url && (
+                            <a href={p.google_maps_url} target="_blank" rel="noreferrer"
+                               onClick={e => e.stopPropagation()}
+                               title="Bei Google Maps ansehen"
+                               className="inline-flex text-muted-foreground hover:text-foreground">
+                              <MapPin className="h-3.5 w-3.5" />
+                            </a>
+                          )}
+                          {p.gis_url && (
+                            <a href={p.gis_url} target="_blank" rel="noreferrer"
+                               onClick={e => e.stopPropagation()}
+                               title="Parzelle im GIS des Kantons Zürich"
+                               className="inline-flex text-muted-foreground hover:text-foreground">
+                              <Map className="h-3.5 w-3.5" />
+                            </a>
+                          )}
+                        </div>
                       </td>
                     </tr>
                     );

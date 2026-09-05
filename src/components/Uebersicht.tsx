@@ -1,7 +1,9 @@
-import { PhoneCall, Search, Building2, MapPin, Loader2, TrendingUp, UserSearch } from 'lucide-react';
+import { PhoneCall, Search, Building2, MapPin, Map, Camera, Loader2, TrendingUp, UserSearch } from 'lucide-react';
+import { Luftbild } from '@/components/Luftbild';
 import { Card, CardContent } from '@/components/ui/card';
 import { useUebersicht, type Chance } from '@/hooks/use-uebersicht';
 import { EMPFEHLUNG_LABEL, type Empfehlung } from '@/lib/akquise';
+import { zoneKurzform } from '@/lib/potential';
 
 const chf = (v: number | null | undefined, stellen = 1) =>
   v == null ? '—' : `${(v / 1e6).toFixed(stellen)} Mio`;
@@ -89,22 +91,122 @@ export function Uebersicht() {
             <ul className="divide-y">
               {data.topChancen.map((c: Chance) => (
                 <li key={c.id} className="flex items-start gap-4 p-4 transition-colors hover:bg-muted/40">
-                  <span className={`mt-0.5 shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${stil[c.empfehlung]}`}>
-                    {EMPFEHLUNG_LABEL[c.empfehlung]}
-                  </span>
+                  {/* Luftbild statt Google Street View: SWISSIMAGE von
+                      swisstopo ist frei nutzbar, Googles Bild-APIs werden pro
+                      Abruf verrechnet. Von oben sieht man ausserdem, worauf es
+                      hier ankommt -- Zuschnitt der Parzelle, Dachform,
+                      Nachbarschaft. Der Blick von der Strasse steht als Link
+                      daneben. */}
+                  <Luftbild
+                    address={c.address}
+                    plzOrt={[c.plz, c.gemeinde].filter(Boolean).join(' ') || null}
+                    className="hidden h-24 w-32 shrink-0 sm:block"
+                  />
+
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium leading-tight">{c.address}</p>
-                    <p className="mt-0.5 text-sm text-muted-foreground">
-                      {c.gemeinde}
-                      {c.baujahr ? ` · Baujahr ${c.baujahr}` : ''}
-                      {c.eigentuemer ? ` · ${c.eigentuemer}` : ' · Eigentümer unbekannt'}
+                    <div className="flex items-start gap-2">
+                      <span className={`mt-0.5 shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${stil[c.empfehlung]}`}>
+                        {EMPFEHLUNG_LABEL[c.empfehlung]}
+                      </span>
+                      <p className="min-w-0 font-medium leading-tight">{c.address}</p>
+                    </div>
+
+                    {/* Die Parzellennummer steht zuoberst, weil ohne sie weder
+                        das Grundbuch noch das GIS weiterhilft -- und ein Anruf
+                        ohne diese Nummer führt zu nichts. */}
+                    <p className="mt-1 text-sm">
+                      <span className="font-medium tabular-nums">
+                        {c.parzelle ? `Parzelle ${c.parzelle}` : 'Parzelle unbekannt'}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {' · '}{[c.plz, c.gemeinde].filter(Boolean).join(' ')}
+                        {c.baujahr ? ` · Baujahr ${c.baujahr}` : ''}
+                      </span>
                     </p>
+                    {c.egrid && (
+                      <p className="font-mono text-[11px] tabular-nums text-muted-foreground">{c.egrid}</p>
+                    )}
+
+                    <p className="mt-0.5 text-sm text-muted-foreground">
+                      {c.eigentuemer ?? 'Eigentümer unbekannt'}
+                      {c.telefon ? (
+                        <>
+                          {' · '}
+                          <a
+                            href={`tel:${c.telefon.replace(/\s/g, '')}`}
+                            className="tabular-nums text-primary hover:underline"
+                          >
+                            {c.telefon}
+                          </a>
+                        </>
+                      ) : (
+                        ' · keine Nummer'
+                      )}
+                    </p>
+
+                    {/* Die Zahlen, aus denen die Empfehlung entsteht. Ohne sie
+                        ist die Marge eine Behauptung; mit ihnen lässt sie sich
+                        am Telefon vertreten. */}
+                    <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      {c.zone && (
+                        <div className="flex gap-1"><dt>Zone</dt><dd className="text-foreground">{zoneKurzform(c.zone) ?? c.zone}</dd></div>
+                      )}
+                      {c.bebaubar != null && (
+                        <div className="flex gap-1"><dt>Bauzone</dt><dd className="tabular-nums text-foreground">{m2(c.bebaubar)}</dd></div>
+                      )}
+                      {c.az != null && (
+                        <div className="flex gap-1"><dt>AZ</dt><dd className="tabular-nums text-foreground">{c.az}</dd></div>
+                      )}
+                      {c.geschosse != null && (
+                        <div className="flex gap-1"><dt>Geschosse</dt><dd className="tabular-nums text-foreground">{c.geschosse}</dd></div>
+                      )}
+                      {c.hnfNeu != null && (
+                        <div className="flex gap-1">
+                          <dt>HNF</dt>
+                          <dd className="tabular-nums text-foreground">
+                            {m2(c.hnfBestand)} → {m2(c.hnfNeu)}
+                          </dd>
+                        </div>
+                      )}
+                      {c.kategorie && (
+                        <div className="flex gap-1"><dt>Art</dt><dd className="text-foreground">{c.kategorie}</dd></div>
+                      )}
+                    </dl>
+
                     {c.dafuer.length > 0 && (
-                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                      <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
                         {c.dafuer.slice(0, 2).join(' · ')}
                       </p>
                     )}
+
+                    {/* Drei Blicke auf dasselbe Grundstück: von der Strasse,
+                        von oben, und der amtliche Zonenplan. */}
+                    <div className="mt-2 flex flex-wrap gap-3 text-xs">
+                      <a
+                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                          [c.address, c.plz, c.gemeinde].filter(Boolean).join(' ') + ' Schweiz',
+                        )}&layer=c`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                      >
+                        <Camera className="h-3 w-3" /> Street View
+                      </a>
+                      {c.mapsUrl && (
+                        <a href={c.mapsUrl} target="_blank" rel="noreferrer"
+                           className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground">
+                          <MapPin className="h-3 w-3" /> Google Maps
+                        </a>
+                      )}
+                      {c.gisUrl && (
+                        <a href={c.gisUrl} target="_blank" rel="noreferrer"
+                           className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground">
+                          <Map className="h-3 w-3" /> GIS Kanton
+                        </a>
+                      )}
+                    </div>
                   </div>
+
                   <div className="shrink-0 text-right">
                     <p className="font-semibold tabular-nums">{chf(c.marge)}</p>
                     <p className="text-xs text-muted-foreground tabular-nums">+{m2(c.hnfDelta)} HNF</p>

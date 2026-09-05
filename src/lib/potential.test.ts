@@ -3,6 +3,7 @@ import {
   calculatePotential,
   potentialScore,
   potentialTier,
+  zoneKurzform,
   resolveAz,
   parseZone,
   istVorhanden,
@@ -319,5 +320,46 @@ describe('Bebaubare Fläche aus dem Zonenanteil', () => {
       area: 1000, gebaeudeflaeche: 100, geschosse: 2,
     });
     expect(r.assumptions.join(' ')).not.toContain('Bebaubar');
+  });
+});
+
+describe('zoneKurzform', () => {
+  it('fasst denselben Zonentyp trotz unterschiedlicher Flächenangabe zusammen', () => {
+    // Genau das war das Problem: der Klammerzusatz macht jede Parzelle zu
+    // einer eigenen Zeichenkette, und der Filter listete jede einzeln auf.
+    const a = zoneKurzform('3-geschossige Wohnzone (rechtskräftig, 8460m², 95%)');
+    const b = zoneKurzform('3-geschossige Wohnzone (rechtskräftig, 1357m², 100%)');
+    expect(a).toBe('W3');
+    expect(b).toBe('W3');
+  });
+
+  it('erkennt die bereits normierte Kurzform', () => {
+    expect(zoneKurzform('W3')).toBe('W3');
+    expect(zoneKurzform('W4G')).toBe('W4G');
+  });
+
+  it('beschriftet die Ausnützungsziffer als solche, nicht als Geschosszahl', () => {
+    // "Wohnzone 2.4" nennt die Ziffer, nicht 2.4 Geschosse -- die Kurzform
+    // darf daraus kein "W2" machen.
+    expect(zoneKurzform('Wohnzone 2.4 (rechtskräftig, 2400m², 100%)')).toBe('W AZ 2.4');
+  });
+
+  it('fasst alles Unbebaubare zu einer Gruppe zusammen', () => {
+    expect(zoneKurzform('Kantonale Landwirtschaftszone (rechtskräftig, 47904m², 91%)')).toBe('Nicht-Bauzone');
+    expect(zoneKurzform('Wald')).toBe('Nicht-Bauzone');
+  });
+
+  it('trennt Zonen ohne Wohnnutzung ab', () => {
+    expect(zoneKurzform('Gewerbezone (rechtskräftig, 5000m², 100%)')).toBe('Gewerbe / Industrie');
+  });
+
+  it('kennt Kern- und Zentrumszonen', () => {
+    expect(zoneKurzform('Kernzone Dorf (rechtskräftig, 900m², 100%)')).toBe('K');
+    expect(zoneKurzform('3-geschossige Zentrumszone')).toBe('Z3');
+  });
+
+  it('liefert für leere Angaben nichts', () => {
+    expect(zoneKurzform(null)).toBeNull();
+    expect(zoneKurzform('')).toBeNull();
   });
 });

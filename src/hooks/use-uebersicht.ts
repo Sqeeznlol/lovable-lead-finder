@@ -6,7 +6,9 @@ import { gemeindeprofil, LAGE_LABEL, type Lagestufe } from '@/lib/gemeinden-zh';
 
 /** Felder, die für die Beurteilung gebraucht werden. */
 const FELDER =
-  'id, address, gemeinde, zone, ausnuetzung, area, gebaeudeflaeche, geschosse, ' +
+  'id, address, gemeinde, plz, parzelle, plot_number, egrid, owner_phone, ' +
+  'google_maps_url, gis_url, streetview_url, bebaubar_m2, kategorie, ' +
+  'zone, ausnuetzung, area, gebaeudeflaeche, geschosse, ' +
   'vollgeschosse, baujahr, renovationsjahr, denkmalschutz, isos, wohnungen, ' +
   'owner_name, eigentuemer_name, gebaeude_anzahl, hnf_delta, marge_chf, ' +
   'score_tier, potenzial_score, preselection_status, ausgeschlossen';
@@ -22,6 +24,22 @@ export interface Chance {
   lage: Lagestufe;
   baujahr: number | null;
   eigentuemer: string | null;
+  /** Ohne Parzellennummer lässt sich das Grundstück nicht nachschlagen. */
+  parzelle: string | null;
+  egrid: string | null;
+  plz: string | null;
+  telefon: string | null;
+  /** Links auf die Karten -- ohne Bild vom Ort bleibt eine Zeile abstrakt. */
+  mapsUrl: string | null;
+  gisUrl: string | null;
+  /** Die Zahlen hinter der Empfehlung, damit sie nachvollziehbar ist. */
+  zone: string | null;
+  kategorie: string | null;
+  bebaubar: number | null;
+  az: number | null;
+  geschosse: number | null;
+  hnfBestand: number | null;
+  hnfNeu: number | null;
   dafuer: string[];
 }
 
@@ -57,7 +75,7 @@ export interface Uebersicht {
  * nichts bei und würde die Abfrage unnötig gross machen.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const potenzialVon = (p: any) => calculatePotential(p).hnfDelta;
+const potenzialVon = (p: any) => calculatePotential(p);
 
 export function useUebersicht() {
   return useQuery({
@@ -122,11 +140,24 @@ export function useUebersicht() {
               gemeinde: p.gemeinde,
               empfehlung: u.empfehlung,
               punkte: u.punkte,
-              hnfDelta: gerechnet,
+              hnfDelta: gerechnet.hnfDelta,
               marge: u.margeLagegerecht,
               lage: u.lage,
               baujahr: p.baujahr,
               eigentuemer: p.owner_name ?? p.eigentuemer_name ?? null,
+              parzelle: p.parzelle ?? p.plot_number ?? null,
+              egrid: p.egrid ?? null,
+              plz: p.plz ?? null,
+              telefon: p.owner_phone ?? null,
+              mapsUrl: p.google_maps_url ?? null,
+              gisUrl: p.gis_url ?? null,
+              zone: p.zone ?? null,
+              kategorie: p.kategorie ?? null,
+              bebaubar: p.bebaubar_m2 ?? p.area ?? null,
+              az: gerechnet.az,
+              geschosse: gerechnet.vollgeschosse,
+              hnfBestand: gerechnet.hnfBestand,
+              hnfNeu: gerechnet.hnfNeu,
               dafuer: u.dafuer,
             });
           }

@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Lokale Prüf-Artefakte (Playwright, UI-Abzüge)
+.tmp-ui/
+test-results/
+.tmp-ui/
+test-results/

@@ -32,6 +32,8 @@ on:
           - nachrechnen       # Kennzahlen für alle offenen Zeilen
           - stichprobe        # Zehn Objekte mit den grössten Werten
           - zonen             # Verteilung nach Zonentyp
+          - diagnose          # Welche Spalten und Funktionen existieren
+          - tempo             # Laufzeit der Abfragen der Masterliste
       grenze:
         description: 'Obergrenze für Durchläufe beim Nachrechnen'
         required: false
@@ -70,10 +72,21 @@ jobs:
           }
 
           zaehle() { # zaehle <filter>
-            curl -sS -o /dev/null -D - "$URL/rest/v1/properties?select=id&$1" \
-              -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
-              -H "Prefer: count=exact" -H "Range: 0-0" \
-              | grep -i content-range | tr -d '\r' | sed 's|.*/||'
+            # count=exact laeuft bei 259'000 Zeilen ohne Index in den
+            # Timeout und liefert dann gar keinen Header -- die Zelle
+            # blieb leer. count=planned nutzt die Statistik der
+            # Datenbank: eine Naeherung, aber immer eine Antwort.
+            for modus in exact planned; do
+              n=$(curl -sS -o /dev/null -D - "$URL/rest/v1/properties?select=id&$1" \
+                -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+                -H "Prefer: count=$modus" -H "Range: 0-0" \
+                | grep -i content-range | tr -d '\r' | sed 's|.*/||')
+              case "$n" in
+                ''|'*') continue ;;
+                *) [ "$modus" = planned ] && echo "~$n" || echo "$n"; return ;;
+              esac
+            done
+            echo "?"
           }
 
           case "$AUFGABE" in
@@ -112,6 +125,70 @@ jobs:
               hole "properties?select=address,gemeinde,zone,area,bebaubar_m2,baujahr,owner_name,hnf_delta,marge_chf,score_tier,ausgeschlossen&ausgeschlossen=eq.false&hnf_delta=not.is.null&order=hnf_delta.desc&limit=10" \
                 | python3 -m json.tool >> "$GITHUB_STEP_SUMMARY"
               echo '```' >> "$GITHUB_STEP_SUMMARY"
+              cat "$GITHUB_STEP_SUMMARY"
+              ;;
+
+            diagnose)
+              # Prüft einzeln, was in der Datenbank tatsächlich vorhanden
+              # ist. So lässt sich ohne Zugang zum SQL-Editor feststellen,
+              # welche Migration noch fehlt.
+              echo "### Spalten" >> "$GITHUB_STEP_SUMMARY"
+              echo "| Spalte | Status |" >> "$GITHUB_STEP_SUMMARY"
+              echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+              for sp in area zone baujahr owner_name hnf_bestand hnf_neu hnf_delta marge_chf score score_tier ausgeschlossen ausschluss_grund scored_at bebaubar_m2 reserve_gf vollgeschosse gebaeude_anzahl quelldateien; do
+                a=$(hole "properties?select=${sp}&limit=1")
+                case "$a" in
+                  '['*) echo "| $sp | vorhanden |" >> "$GITHUB_STEP_SUMMARY" ;;
+                  *)    echo "| $sp | FEHLT -- $(echo "$a" | head -c 160) |" >> "$GITHUB_STEP_SUMMARY" ;;
+                esac
+              done
+
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo "### Funktionen" >> "$GITHUB_STEP_SUMMARY"
+              echo "| Funktion | Antwort |" >> "$GITHUB_STEP_SUMMARY"
+              echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+              pruefe() { echo "| $1 | $(ruf "$1" "$2" | head -c 200 | tr -d '\n|') |" >> "$GITHUB_STEP_SUMMARY"; }
+              pruefe potenzial_offen '{}'
+              pruefe potenzial_nachrechnen '{"p_batch":1}'
+              pruefe recompute_potenzial '{}'
+              pruefe zone_parse '{"p_zone":"Wohnzone 1.6 (rechtskraeftig, 8460m2, 95%)"}'
+              pruefe ist_keine_wohnnutzung '{"p_zone":"Gewerbezone"}'
+              pruefe ausschluss_grund_von '{"p_zone":"Landwirtschaftszone","p_denkmalschutz":null}'
+
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo "### Beispielzeile" >> "$GITHUB_STEP_SUMMARY"
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
+              hole "properties?select=*&limit=1" | python3 -m json.tool >> "$GITHUB_STEP_SUMMARY"
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
+              cat "$GITHUB_STEP_SUMMARY"
+              ;;
+
+            tempo)
+              # Die Masterliste sortiert nach hnf_delta. Bei 259'000
+              # Zeilen entscheidet sich hier, ob die Seite in einer
+              # Sekunde steht oder in den Timeout läuft. Gemessen wird
+              # jede Variante einzeln, damit sichtbar wird, welcher
+              # Teil der Abfrage die Zeit kostet.
+              echo "### Laufzeiten" >> "$GITHUB_STEP_SUMMARY"
+              echo "| Abfrage | Sekunden | Ergebnis |" >> "$GITHUB_STEP_SUMMARY"
+              echo "|---|---:|---|" >> "$GITHUB_STEP_SUMMARY"
+              miss() { # miss <beschreibung> <pfad>
+                start=$(date +%s.%N)
+                a=$(hole "$2" || true)
+                dauer=$(echo "$(date +%s.%N) - $start" | bc)
+                case "$a" in
+                  '['*) erg="$(echo "$a" | grep -o '{' | wc -l) Zeilen" ;;
+                  *)    erg="$(echo "$a" | head -c 90 | tr -d '\n|')" ;;
+                esac
+                printf '| %s | %.1f | %s |\n' "$1" "$dauer" "$erg" >> "$GITHUB_STEP_SUMMARY"
+              }
+              miss "ohne Sortierung, 50 Zeilen" "properties?select=id,address&limit=50"
+              miss "nach hnf_delta, 50 Zeilen" "properties?select=id,hnf_delta&order=hnf_delta.desc&limit=50"
+              miss "nach hnf_delta, nur nicht ausgeschlossen" "properties?select=id,hnf_delta&ausgeschlossen=eq.false&order=hnf_delta.desc&limit=50"
+              miss "nach marge_chf" "properties?select=id,marge_chf&order=marge_chf.desc&limit=50"
+              miss "nach score_tier" "properties?select=id,score_tier&order=score_tier.asc&limit=50"
+              miss "Filter Gemeinde" "properties?select=id&gemeinde=eq.Wetzikon%20(ZH)&limit=50"
+              miss "nach id (Primärschlüssel)" "properties?select=id&order=id.asc&limit=50"
               cat "$GITHUB_STEP_SUMMARY"
               ;;
 

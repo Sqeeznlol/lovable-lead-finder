@@ -142,6 +142,50 @@ export function parseZone(raw?: string | null): ParsedZone {
   return { ziffer, zonenflaeche, anteilProzent, geschosse, ueberbauungsziffer, kurz: null, keineBauzone: false, keineWohnnutzung: false };
 }
 
+/**
+ * Kurzform einer Zone für Filter und Listen.
+ *
+ * Die Zonenangaben kommen als Fliesstext aus dem Kataster und enthalten den
+ * Flächenanteil der Zone am Grundstück -- "Wohnzone 2.4 (rechtskräftig,
+ * 8460m², 95%)". Dadurch ist praktisch jede Zeile eine eigene Zeichenkette,
+ * und eine Filterliste daraus hätte Zehntausende Einträge, einen pro
+ * Grundstück. Was man tatsächlich filtern will, sind die zwei Dutzend
+ * Zonentypen dahinter: W2, W3, K, Z.
+ *
+ * Rückgabe ist deshalb der Typ ohne alles Grundstücksspezifische.
+ */
+export function zoneKurzform(raw?: string | null): string | null {
+  if (!raw) return null;
+  const p = parseZone(raw);
+  if (p.keineBauzone) return 'Nicht-Bauzone';
+  if (p.keineWohnnutzung) return 'Gewerbe / Industrie';
+  if (p.kurz) return p.kurz;
+
+  const text = String(raw).replace(/\([^)]*\)/g, ' ').trim();
+
+  // Der Buchstabe steht für die Art der Zone, die Zahl für die Geschosse.
+  // "Wohnzone 2.4" heisst dabei Ausnützungsziffer 2.4, nicht 2.4 Geschosse --
+  // beides kommt vor und wird deshalb getrennt beschriftet.
+  const art =
+    /wohnzone|\bW\d/i.test(text) ? 'W' :
+    /kernzone/i.test(text) ? 'K' :
+    /zentrumszone/i.test(text) ? 'Z' :
+    /quartiererhaltung/i.test(text) ? 'QE' :
+    /zentrums?ergänzung|zentrumserg/i.test(text) ? 'ZE' :
+    null;
+
+  if (art) {
+    if (p.geschosse != null) return `${art}${p.geschosse}`;
+    if (p.ziffer != null) return `${art} AZ ${p.ziffer}`;
+    return art;
+  }
+
+  // Unbekannter Typ: erstes Wort, damit wenigstens gruppiert wird statt
+  // jede Zeile einzeln aufzulisten.
+  const wort = text.split(/[\s,;]+/)[0];
+  return wort || null;
+}
+
 /** Textfelder wie "nicht vorhanden" / "Kein Denkmalschutzobjekt..." bedeuten: kein Eintrag. */
 export function istVorhanden(v?: string | null): boolean {
   if (!v) return false;

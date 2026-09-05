@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { zoneKurzform } from '@/lib/potential';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 
 export type Property = Tables<'properties'>;
@@ -132,17 +133,44 @@ export function useGemeinden() {
   });
 }
 
+/**
+ * Die Zonentypen für den Filter -- W2, W3, K, Z und so weiter.
+ *
+ * Im Kataster steht die Zone als Fliesstext mit dem Flächenanteil an genau
+ * dieser Parzelle: "Wohnzone 2.4 (rechtskräftig, 8460m², 95%)". Ungefiltert
+ * ergäbe das für jedes Grundstück einen eigenen Eintrag -- eine Auswahlliste
+ * mit Zehntausenden Zeilen, in der nichts zu finden ist. Gruppiert wird
+ * deshalb auf den Zonentyp, und genau danach filtert die Vorauswahl.
+ */
 export function useZones() {
   return useQuery({
     queryKey: ['zones'],
     queryFn: async () => {
+      // Eine Stichprobe genügt: es gibt rund zwei Dutzend Zonentypen, die in
+      // den ersten Tausenden Zeilen alle vorkommen. Der ganze Bestand wäre
+      // eine Abfrage über Hunderttausende Zeilen für dieselbe Antwort.
       const { data, error } = await supabase
         .from('properties')
         .select('zone')
-        .not('zone', 'is', null);
+        .not('zone', 'is', null)
+        .limit(20000);
       if (error) throw error;
-      const unique = [...new Set(data.map(d => d.zone).filter(Boolean))].sort() as string[];
-      return unique;
+
+      const typen = new Set<string>();
+      for (const d of data) {
+        const kurz = zoneKurzform(d.zone);
+        if (kurz) typen.add(kurz);
+      }
+
+      // Wohnzonen zuerst und nach Geschosszahl geordnet -- so wird die Liste
+      // gelesen. Alles Übrige alphabetisch dahinter.
+      return [...typen].sort((a, b) => {
+        const wa = /^W(\d)/.exec(a), wb = /^W(\d)/.exec(b);
+        if (wa && wb) return Number(wa[1]) - Number(wb[1]);
+        if (wa) return -1;
+        if (wb) return 1;
+        return a.localeCompare(b, 'de-CH');
+      });
     },
     staleTime: 5 * 60 * 1000,
   });
