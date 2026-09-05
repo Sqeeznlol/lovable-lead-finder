@@ -27,6 +27,8 @@ on:
         options:
           - ansehen      # Aufbau des Kontos zusammenfassen
           - probelauf    # Zeigen, was übertragen würde
+          - felder       # Datenfelder prüfen (Probelauf)
+          - felder-aufraeumen  # Leere Felder entfernen, fehlende anlegen
       grenze:
         description: 'Höchstzahl Objekte beim Abgleich'
         required: false
@@ -77,6 +79,15 @@ jobs:
                   | tr -d '"')
               set +a
               python3 tools/pipedrive-sync.py --grenze "${{ inputs.grenze }}" \
+                | tee -a "$GITHUB_STEP_SUMMARY"
+              ;;
+            felder)
+              python3 tools/pipedrive-felder.py | tee -a "$GITHUB_STEP_SUMMARY"
+              ;;
+            felder-aufraeumen)
+              # Entfernt ausschliesslich Felder, die bei keinem Deal einen
+              # Wert tragen -- dabei geht nichts verloren.
+              python3 tools/pipedrive-felder.py --schreiben \
                 | tee -a "$GITHUB_STEP_SUMMARY"
               ;;
             *)
