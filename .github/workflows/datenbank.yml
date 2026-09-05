@@ -38,6 +38,7 @@ on:
           - geodaten         # Welche Geodaten gibt ein Kanton heraus?
           - wfs              # Welche Ebenen bieten die Dienste an?
           - thema            # Katalogeintrag eines Themas (Adressen)
+          - download         # Lässt sich der Datensatz herunterladen?
           - tempo             # Laufzeit der Abfragen der Masterliste
       grenze:
         description: 'Obergrenze für Durchläufe beim Nachrechnen'
@@ -287,6 +288,38 @@ jobs:
                 python3 tools/geodienste-lesen.py "$KANTON" < /tmp/dienste.json \
                   >> "$GITHUB_STEP_SUMMARY" || true
               fi
+              cat "$GITHUB_STEP_SUMMARY"
+              ;;
+
+            download)
+              # Der Katalog nennt für die Nutzungsplanung eine direkte
+              # Download-Adresse, in der das Kantonskürzel steckt:
+              #   .../npl_nutzungsplanung/AG/npl_nutzungsplanung_v1_2_AG_lv95.zip
+              # Hier wird geprüft, ob es die Thurgauer Fassung gibt und ob
+              # die Amtliche Vermessung demselben Muster folgt.
+              K="${GRENZE:-TG}"
+              echo "### Direkter Bezug für $K" >> "$GITHUB_STEP_SUMMARY"
+              echo "| Datei | Antwort | Grösse |" >> "$GITHUB_STEP_SUMMARY"
+              echo "|---|---|---:|" >> "$GITHUB_STEP_SUMMARY"
+
+              kopf() { # kopf <name> <url>
+                zeile=$(curl -sSL -o /dev/null -m 90 \
+                  -w '%{http_code} %{size_download} %{url_effective}' -r 0-1024 "$2" || echo '000 0 -')
+                code=${zeile%% *}
+                rest=${zeile#* }
+                groesse=${rest%% *}
+                echo "| $1 | HTTP $code | $groesse |" >> "$GITHUB_STEP_SUMMARY"
+              }
+
+              basis=https://geodienste.ch/downloads/interlis
+              kopf "Nutzungsplanung $K (v1_2)" \
+                "$basis/npl_nutzungsplanung/$K/npl_nutzungsplanung_v1_2_${K}_lv95.zip"
+              kopf "Nutzungsplanung $K (v1_1)" \
+                "$basis/npl_nutzungsplanung/$K/npl_nutzungsplanung_v1_1_${K}_lv95.zip"
+              kopf "Amtliche Vermessung $K" \
+                "$basis/av/$K/av_${K}_lv95.zip"
+              kopf "Verzeichnis Nutzungsplanung $K" \
+                "$basis/npl_nutzungsplanung/$K/"
               cat "$GITHUB_STEP_SUMMARY"
               ;;
 
