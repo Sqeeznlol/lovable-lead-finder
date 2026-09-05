@@ -22,13 +22,30 @@ Pipedrive und das Nachfüllen der Deals, alle mit Zeitüberschreitung.
 Wer es lieber von Hand macht: der SQL-Block steht in
 `supabase/migrations/20260905130000_indizes_masterliste.sql`.
 
-**2. Offene Migrationen.** Zwei liegen bereit und sind noch nicht
+**2. Offene Migrationen.** Drei liegen bereit und sind noch nicht
 angewendet:
 
+- `20260905230000_zugang_beschraenken.sql` -- die dringendste. Bisher
+  darf jeder mit dem öffentlichen Schlüssel alle 259'057 Datensätze
+  lesen, ändern und löschen, und dieser Schlüssel steckt im JavaScript
+  der Webseite. Die Anmeldemaske davor nützt nichts, solange die Regel
+  gilt. In der Tabelle stehen Namen, Adressen und Telefonnummern von
+  Menschen, die nie um ihre Aufnahme gebeten haben.
 - `20260905130000_indizes_masterliste.sql` -- Indizes, siehe oben
 - `20260905200000_zonen_kuerzel.sql` -- schliesst Winterthurs Kürzel
   (Oe, Wa, Gw, F, G, I1, I2), das Bahnareal und die 3'092 Zeilen mit
   dem Wert "zarchivat" aus
+
+Nach der ersten Migration brauchen die Abläufe bei GitHub, die heute mit
+dem öffentlichen Schlüssel auf die Objekte zugreifen, selbst eine
+Anmeldung -- Abgleich nach Pipedrive und Nachfüllen. Das ist in der
+Migration vermerkt und beim Einspielen gleich mitzurichten.
+
+**3. Konto anlegen.** In Supabase unter Authentication → Users:
+scamo@wohntraums.life mit einem neuen Passwort, Auto Confirm gesetzt.
+Bei der Anmeldung genügt "Scamo", die Maske ergänzt die Domain. Das im
+Gespräch genannte Passwort gilt als kompromittiert und darf nicht
+verwendet werden.
 
 Solange sie fehlen, wirken die Zonenausschlüsse nur in der Übersicht
 (die im Browser rechnet), nicht in der Masterliste (die die Spalte
@@ -49,15 +66,25 @@ Beide antworten ohne Anmeldung. GDAL liest die Nutzungsplanung sauber:
 56'810 Zonenflächen, Ausdehnung über den ganzen Kanton, dazu 134
 Zonentypen mit Code und Bezeichnung.
 
+Ehrlicher Stand am Abend des 5. September: Der Schritt "zonen" lief
+durch, hat aber nichts erzeugt -- die Ausgabedatei war zwei Kilobyte
+gross, also leer. Der Ebenenname im Aufruf traf nichts, und ein
+angehängtes "|| true" verschluckte den Fehler. Beides ist behoben: der
+Name wird jetzt aus dem Dienst geholt, und der Ablauf bricht ab, wenn
+weniger als tausend Zonenflächen herauskommen.
+
+Damit steht Thurgau bei Schritt eins von fünf, nicht bei zweieinhalb.
+
 Offen:
 
-1. Parzellen aus der Amtlichen Vermessung laden und umwandeln
-2. Parzellen mit Zonen verschneiden -- je Parzelle Zone und
+1. Zonen umwandeln -- Aufruf korrigiert, Lauf noch ausstehend
+2. Parzellen aus der Amtlichen Vermessung laden und umwandeln
+3. Parzellen mit Zonen verschneiden -- je Parzelle Zone und
    Flächenanteil, so wie es die Zürcher Liste im Klammerzusatz führt
-3. Adressen und Gebäudedaten dazunehmen
-4. In die Datenbank schreiben, `kanton = TG`
+4. Adressen und Gebäudedaten dazunehmen
+5. In die Datenbank schreiben, `kanton = TG`
 
-Schritt 2 ist der aufwendige. Die Rechnung hängt daran: eine Parzelle
+Schritt 3 ist der aufwendige. Die Rechnung hängt daran: eine Parzelle
 kann zur Hälfte Wohnzone und zur Hälfte Wald sein, bebauen lässt sich
 nur der Zonenanteil.
 

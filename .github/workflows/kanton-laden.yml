@@ -94,15 +94,37 @@ jobs:
         run: |
           set -euo pipefail
           xtf=$(find /tmp/npl -name '*.xtf' | head -1)
+
+          # Der Ebenenname trägt den vollen Pfad im Modell. Ein blosses
+          # "Grundnutzung_Zonenflaeche" trifft nichts -- der erste Versuch
+          # lieferte deshalb eine leere Datei von zwei Kilobyte, und das
+          # angehängte "|| true" verschluckte den Fehler. Der Name wird
+          # jetzt aus dem Dienst selbst geholt.
+          ebene=$(ogrinfo -so "$xtf,/tmp/Nutzungsplanung_V1_2.ili" 2>/dev/null \
+            | grep -o '[A-Za-z_0-9.]*Grundnutzung_Zonenflaeche' | head -1)
+          echo "Ebene: ${ebene:-nicht gefunden}"
+          if [ -z "$ebene" ]; then
+            echo "Die Ebene mit den Zonen liess sich nicht finden." >&2
+            exit 1
+          fi
+
           # Nur die Grundnutzung: das sind die Zonen, in denen gebaut wird.
           # Überlagernde Festlegungen (Lärm, Gefahren) sind eine eigene
           # Frage und kämen später dazu.
           ogr2ogr -f GPKG /tmp/zonen.gpkg \
             "$xtf,/tmp/Nutzungsplanung_V1_2.ili" \
-            -nln zonen -skipfailures \
-            Grundnutzung_Zonenflaeche || true
-          ls -lh /tmp/zonen.gpkg || echo "Keine Ausgabe erzeugt"
-          ogrinfo -so -al /tmp/zonen.gpkg 2>&1 | head -40
+            -nln zonen "$ebene"
+
+          ls -lh /tmp/zonen.gpkg
+          # Ohne Zeilen ist die Umwandlung gescheitert, gleich was der
+          # Rückgabewert sagt.
+          n=$(ogrinfo -so -al /tmp/zonen.gpkg 2>/dev/null \
+            | grep -oP 'Feature Count: \K[0-9]+' | head -1)
+          echo "Zonenflächen: ${n:-0}"
+          if [ "${n:-0}" -lt 1000 ]; then
+            echo "Zu wenige Zonenflächen -- erwartet werden Zehntausende." >&2
+            exit 1
+          fi
 
       - name: Ergebnis bereitstellen
         if: ${{ inputs.schritt == 'zonen' }}
