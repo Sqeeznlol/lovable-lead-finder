@@ -18,6 +18,19 @@ name: Pipedrive ansehen
 
 on:
   workflow_dispatch:
+    inputs:
+      aufgabe:
+        description: 'Was ausgeführt werden soll'
+        required: true
+        default: 'ansehen'
+        type: choice
+        options:
+          - ansehen      # Aufbau des Kontos zusammenfassen
+          - probelauf    # Zeigen, was übertragen würde
+      grenze:
+        description: 'Höchstzahl Objekte beim Abgleich'
+        required: false
+        default: '50'
 
 jobs:
   ansehen:
@@ -54,4 +67,19 @@ jobs:
             exit 1
           fi
 
-          python3 tools/pipedrive-analyse.py | tee -a "$GITHUB_STEP_SUMMARY"
+          case "${{ inputs.aufgabe }}" in
+            probelauf)
+              # Zugang zur Datenbank aus der Datei im Repository; sie
+              # enthält nur den öffentlichen Schlüssel.
+              set -a
+              . <(grep -E '^VITE_SUPABASE_(URL|PUBLISHABLE_KEY)=' .env \
+                  | sed 's/VITE_SUPABASE_URL=/URL=/; s/VITE_SUPABASE_PUBLISHABLE_KEY=/KEY=/' \
+                  | tr -d '"')
+              set +a
+              python3 tools/pipedrive-sync.py --grenze "${{ inputs.grenze }}" \
+                | tee -a "$GITHUB_STEP_SUMMARY"
+              ;;
+            *)
+              python3 tools/pipedrive-analyse.py | tee -a "$GITHUB_STEP_SUMMARY"
+              ;;
+          esac
