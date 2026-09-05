@@ -363,3 +363,47 @@ describe('zoneKurzform', () => {
     expect(zoneKurzform('')).toBeNull();
   });
 });
+
+describe('Zonen-Kürzel der Gemeinden', () => {
+  // Alle Wortlaute stammen aus dem echten Bestand (Aufgabe "zonennamen",
+  // 11'000 Zeilen); Winterthur führt seine Zonenordnung in Kürzeln.
+  it('schliesst die Zone für öffentliche Bauten aus', () => {
+    expect(parseZone('Oe').keineWohnnutzung).toBe(true);
+    expect(ausschlussGrund({ zone: 'Oe' })).toBe('Keine Wohnnutzung');
+  });
+
+  it('schliesst Wald, Gewässer und Freihaltung aus', () => {
+    expect(parseZone('Wa').keineBauzone).toBe(true);
+    expect(parseZone('Gw').keineBauzone).toBe(true);
+    expect(parseZone('F').keineBauzone).toBe(true);
+  });
+
+  it('schliesst Gewerbe und Industrie aus', () => {
+    expect(parseZone('G').keineWohnnutzung).toBe(true);
+    expect(parseZone('I1').keineWohnnutzung).toBe(true);
+    expect(parseZone('I2').keineWohnnutzung).toBe(true);
+  });
+
+  it('lässt die Wohn-, Kern- und Zentrumszonen Winterthurs stehen', () => {
+    // Diese Kürzel sind kaufbar und dürfen nicht mit ausgeschlossen werden.
+    for (const z of ['W2/2.0', 'W3/2.6', 'W4G', 'KIII', 'QEZ3', 'Z4']) {
+      const p = parseZone(z);
+      expect([z, p.keineBauzone || p.keineWohnnutzung]).toEqual([z, false]);
+    }
+  });
+
+  it('lässt ein Kürzel nicht in einem längeren Namen anschlagen', () => {
+    // "F" darf nicht in "Wohnzone mit Gewerbeanteil" treffen.
+    const p = parseZone('Wohnzone mit Gewerbeanteil WG 3.2');
+    expect(p.keineBauzone).toBe(false);
+    expect(p.keineWohnnutzung).toBe(false);
+  });
+
+  it('behandelt eine unbrauchbare Angabe als fehlend, nicht als Zone', () => {
+    // "zarchivat" stand in 3'092 von 11'000 Zeilen -- ein Fehler der Quelle.
+    const p = parseZone('zarchivat');
+    expect(p.unbrauchbar).toBe(true);
+    expect(ausschlussGrund({ zone: 'zarchivat' })).toBe('Zonenangabe fehlt');
+    expect(zoneKurzform('zarchivat')).toBe('Zonenangabe fehlt');
+  });
+});

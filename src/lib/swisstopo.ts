@@ -90,12 +90,31 @@ export function swisstopoMapUrl(lat: number, lon: number, zoom = 12): string {
  * über die ganze Parzelle oder nur über die Hälfte" genügt sie -- und sie ist
  * frei und ohne Schlüssel abrufbar.
  */
-export function bauzonenTileUrl(lat: number, lon: number, zoom = 19): string {
+export const ZONEN_ZOOM = 17;
+
+export function bauzonenTileUrl(lat: number, lon: number, zoom = ZONEN_ZOOM): string {
   const { x, y } = tileIndex(lat, lon, zoom);
   return `https://wmts.geo.admin.ch/1.0.0/ch.are.bauzonen/default/current/3857/${zoom}/${x}/${y}.png`;
 }
 
-/** ÖREB-Kataster des Kantons Zürich an dieser Stelle — die verbindliche Auskunft. */
+/**
+ * ÖREB-Kataster des Kantons Zürich mit ausgewählter Parzelle.
+ *
+ * Über Koordinaten zeigt die Karte nur die Stelle -- man sieht die Zonen,
+ * aber nicht, welches Grundstück gemeint ist. Mit `locate=parz` und dem
+ * Paar aus Gemeindenummer und Parzellennummer wird die Parzelle selbst
+ * ausgewählt und rot umrandet; genau darum geht es, wenn die Frage lautet,
+ * wie weit die Bauzone über dieses Grundstück reicht.
+ *
+ * Fehlt die Gemeindenummer, genügt der Kanton mit der blossen
+ * Parzellennummer -- er sucht sie dann im ganzen Kanton.
+ */
+export function oerebParzelleUrl(parzelle: string, bfsNr?: string | number | null): string {
+  const ort = bfsNr != null && String(bfsNr).trim() !== '' ? String(bfsNr).trim() : '';
+  return `https://maps.zh.ch/?locate=parz&locations=${ort},${encodeURIComponent(parzelle)}&topic=OerebKatasterZH`;
+}
+
+/** ÖREB-Kataster an einer Stelle, wenn keine Parzellennummer bekannt ist. */
 export function oerebUrl(lat: number, lon: number): string {
   return `https://maps.zh.ch/?topic=OerebKatasterZH&x=${lon}&y=${lat}&scale=1120&srid=4326`;
 }
