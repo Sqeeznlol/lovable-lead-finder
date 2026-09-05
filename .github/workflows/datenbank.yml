@@ -37,6 +37,7 @@ on:
           - bfs              # Ist die Gemeindenummer je Objekt vorhanden?
           - geodaten         # Welche Geodaten gibt ein Kanton heraus?
           - wfs              # Welche Ebenen bieten die Dienste an?
+          - thema            # Katalogeintrag eines Themas (Adressen)
           - tempo             # Laufzeit der Abfragen der Masterliste
       grenze:
         description: 'Obergrenze für Durchläufe beim Nachrechnen'
@@ -287,6 +288,14 @@ jobs:
                   >> "$GITHUB_STEP_SUMMARY" || true
               fi
               cat "$GITHUB_STEP_SUMMARY"
+              ;;
+
+            thema)
+              # Die Dienstadressen stehen im Katalog; der Suchbegriff kommt
+              # über das Feld "grenze".
+              curl -sS -m 60 "https://geodienste.ch/info/services.json" -o /tmp/dienste.json
+              python3 tools/geodienste-thema.py "${GRENZE:-Nutzungsplanung}" \
+                < /tmp/dienste.json | tee -a "$GITHUB_STEP_SUMMARY"
               ;;
 
             wfs)
