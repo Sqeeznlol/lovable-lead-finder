@@ -32,6 +32,7 @@ on:
           - nachrechnen       # Kennzahlen für alle offenen Zeilen
           - stichprobe        # Zehn Objekte mit den grössten Werten
           - zonen             # Verteilung nach Zonentyp
+          - diagnose          # Welche Spalten und Funktionen existieren
       grenze:
         description: 'Obergrenze für Durchläufe beim Nachrechnen'
         required: false
@@ -111,6 +112,41 @@ jobs:
               echo '```' >> "$GITHUB_STEP_SUMMARY"
               hole "properties?select=address,gemeinde,zone,area,bebaubar_m2,baujahr,owner_name,hnf_delta,marge_chf,score_tier,ausgeschlossen&ausgeschlossen=eq.false&hnf_delta=not.is.null&order=hnf_delta.desc&limit=10" \
                 | python3 -m json.tool >> "$GITHUB_STEP_SUMMARY"
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
+              cat "$GITHUB_STEP_SUMMARY"
+              ;;
+
+            diagnose)
+              # Prüft einzeln, was in der Datenbank tatsächlich vorhanden
+              # ist. So lässt sich ohne Zugang zum SQL-Editor feststellen,
+              # welche Migration noch fehlt.
+              echo "### Spalten" >> "$GITHUB_STEP_SUMMARY"
+              echo "| Spalte | Status |" >> "$GITHUB_STEP_SUMMARY"
+              echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+              for sp in area zone baujahr owner_name hnf_bestand hnf_neu hnf_delta marge_chf score score_tier ausgeschlossen ausschluss_grund scored_at bebaubar_m2 reserve_gf vollgeschosse gebaeude_anzahl quelldateien; do
+                a=$(hole "properties?select=${sp}&limit=1")
+                case "$a" in
+                  '['*) echo "| $sp | vorhanden |" >> "$GITHUB_STEP_SUMMARY" ;;
+                  *)    echo "| $sp | FEHLT -- $(echo "$a" | head -c 160) |" >> "$GITHUB_STEP_SUMMARY" ;;
+                esac
+              done
+
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo "### Funktionen" >> "$GITHUB_STEP_SUMMARY"
+              echo "| Funktion | Antwort |" >> "$GITHUB_STEP_SUMMARY"
+              echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+              pruefe() { echo "| $1 | $(ruf "$1" "$2" | head -c 200 | tr -d '\n|') |" >> "$GITHUB_STEP_SUMMARY"; }
+              pruefe potenzial_offen '{}'
+              pruefe potenzial_nachrechnen '{"p_batch":1}'
+              pruefe recompute_potenzial '{}'
+              pruefe zone_parse '{"p_zone":"Wohnzone 1.6 (rechtskraeftig, 8460m2, 95%)"}'
+              pruefe ist_keine_wohnnutzung '{"p_zone":"Gewerbezone"}'
+              pruefe ausschluss_grund_von '{"p_zone":"Landwirtschaftszone","p_denkmalschutz":null}'
+
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo "### Beispielzeile" >> "$GITHUB_STEP_SUMMARY"
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
+              hole "properties?select=*&limit=1" | python3 -m json.tool >> "$GITHUB_STEP_SUMMARY"
               echo '```' >> "$GITHUB_STEP_SUMMARY"
               cat "$GITHUB_STEP_SUMMARY"
               ;;
