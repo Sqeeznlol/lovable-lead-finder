@@ -35,6 +35,7 @@ on:
         options:
           - pruefen      # Nur nachsehen, was in den Dateien steckt
           - zonen        # Zonen umwandeln und als Datei bereitstellen
+          - parzellen    # Amtliche Vermessung ansehen und umwandeln
 
 jobs:
   laden:
@@ -51,7 +52,36 @@ jobs:
           # korrekt in Linienzüge um.
           sudo apt-get install -y -qq gdal-bin python3-gdal unzip
 
+      - name: Amtliche Vermessung ansehen
+        if: ${{ inputs.schritt == 'parzellen' }}
+        env:
+          KANTON: ${{ inputs.kanton }}
+        run: |
+          set -euo pipefail
+          # 159 MB für Thurgau; das Herunterladen dauert.
+          basis=https://geodienste.ch/downloads/interlis
+          curl -sSL -o /tmp/av.zip "$basis/av/$KANTON/av_${KANTON}_lv95.zip"
+          ls -lh /tmp/av.zip
+          mkdir -p /tmp/av && unzip -o -q /tmp/av.zip -d /tmp/av
+
+          echo "### Was in der Datei steckt"
+          find /tmp/av -type f -printf '%f  %s Bytes\n' | sort | head -30
+          echo
+          echo "Dateien insgesamt: $(find /tmp/av -type f | wc -l)"
+          echo
+
+          # Die amtliche Vermessung folgt einem eigenen Modell. Welches,
+          # steht in der Datei selbst -- raten hat bei den Zonen schon
+          # eine leere Ausgabe erzeugt.
+          erste=$(find /tmp/av -name '*.xtf' -o -name '*.itf' | head -1)
+          echo "Erste Datenfile: $erste"
+          echo
+          echo "### Modellangabe im Kopf der Datei"
+          head -c 2000 "$erste" | tr '>' '>\n' \
+            | grep -iE 'MODEL|HEADERSECTION|xmlns' | head -10
+
       - name: Nutzungsplanung holen
+        if: ${{ inputs.schritt != 'parzellen' }}
         env:
           KANTON: ${{ inputs.kanton }}
         run: |
@@ -67,6 +97,7 @@ jobs:
           find /tmp/npl -type f -printf '%p  %s Bytes\n' | head -20
 
       - name: Modell holen
+        if: ${{ inputs.schritt != 'parzellen' }}
         run: |
           set -euo pipefail
           # GDAL braucht das Datenmodell, um die Klassen zu benennen.
@@ -78,6 +109,7 @@ jobs:
           wc -c /tmp/Nutzungsplanung_V1_2.ili
 
       - name: Nachsehen, was drinsteckt
+        if: ${{ inputs.schritt != 'parzellen' }}
         run: |
           set -euo pipefail
           xtf=$(find /tmp/npl -name '*.xtf' | head -1)
