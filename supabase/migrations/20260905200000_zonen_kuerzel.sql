@@ -27,6 +27,10 @@
 --
 -- Die Kürzel werden gegen den ganzen Zonentext geprüft, nicht als
 -- Teilwort: sonst schlüge "F" in jeder "Wohnzone mit Gewerbeanteil" an.
+--
+-- Ebenfalls ausgeschlossen wird das Bahnareal. Auch hier nur als eigenes
+-- Wort -- eine Kernzone an einer Bahnhofstrasse gehört zum Besten, was
+-- der Bestand hergibt, und darf nicht mit herausfallen.
 -- =====================================================================
 
 -- Zonentext ohne Klammerzusatz und ohne Leerzeichen, in Grossbuchstaben.
@@ -61,8 +65,11 @@ AS $$
   SELECT COALESCE(
     public.ist_zone_unbrauchbar(z)
     OR public.zone_code(z) IN ('WA', 'WALD', 'GW', 'GEW', 'F', 'FR', 'FH',
-                               'L', 'LW', 'E', 'E1', 'E2', 'E3', 'R')
-    OR z ~* 'landwirtschaftszone|wald|freihaltezone|erholungszone|gew(ä|ae)sser|reservezone|verkehrszone',
+                               'L', 'LW', 'E', 'E1', 'E2', 'E3', 'R',
+                               'BA', 'BAHN', 'EB')
+    -- Bahnareal nur als eigenes Wort: eine Bahnhofstrasse liegt meist in
+    -- der Kernzone und ist sehr wohl kaufbar.
+    OR z ~* 'landwirtschaftszone|wald|freihaltezone|erholungszone|gew(ä|ae)sser|reservezone|verkehrszone|\ybahnareal\y|\ybahngebiet\y|\ybahnzone\y|\ygleisareal\y|eisenbahn',
     false
   )
 $$;

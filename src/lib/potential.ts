@@ -81,8 +81,10 @@ export interface ParsedZone {
 }
 
 // "Wald" bewusst nur als eigenständiges Wort: es gibt die Gemeinde Wald (ZH)
-// und Flurnamen wie "Waldegg", die keine Waldzone sind.
-const NICHT_BAUZONE = /landwirtschaftszone|\bwald\b|waldzone|freihaltezone|erholungszone|gew(ä|ae)sser|reservezone|verkehrszone/i;
+// und Flurnamen wie "Waldegg", die keine Waldzone sind. Beim Bahnareal
+// dasselbe -- eine Bahnhofstrasse liegt meist in der Kernzone und ist sehr
+// wohl kaufbar, das Areal der Bahn selbst nicht.
+const NICHT_BAUZONE = /landwirtschaftszone|\bwald\b|waldzone|freihaltezone|erholungszone|gew(ä|ae)sser|reservezone|verkehrszone|\bbahnareal\b|\bbahngebiet\b|\bbahnzone\b|\bgleisareal\b|eisenbahn/i;
 
 /**
  * Zonen, in denen kein Wohnraum entstehen kann.
@@ -114,6 +116,7 @@ const KURZ_NICHT_BAUZONE = new Set([
   'L', 'LW',
   'E', 'E1', 'E2', 'E3',
   'R',
+  'BA', 'BAHN', 'EB',
 ]);
 
 const KURZ_KEINE_WOHNNUTZUNG = new Set([

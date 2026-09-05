@@ -407,3 +407,20 @@ describe('Zonen-Kürzel der Gemeinden', () => {
     expect(zoneKurzform('zarchivat')).toBe('Zonenangabe fehlt');
   });
 });
+
+describe('Bahnareal', () => {
+  it('schliesst Bahnareal und Gleisareal aus', () => {
+    expect(parseZone('Bahnareal (rechtskräftig, 12000m², 100%)').keineBauzone).toBe(true);
+    expect(parseZone('Gleisareal').keineBauzone).toBe(true);
+    expect(parseZone('Eisenbahnareal').keineBauzone).toBe(true);
+    expect(parseZone('Ba').keineBauzone).toBe(true);
+  });
+
+  it('lässt eine Bahnhofstrasse in der Kernzone stehen', () => {
+    // Die Adresse ist nicht die Zone -- Kernzonen an Bahnhofstrassen sind
+    // oft die interessantesten Objekte überhaupt.
+    const p = parseZone('Kernzone Bahnhofstrasse (rechtskräftig, 900m², 100%)');
+    expect(p.keineBauzone).toBe(false);
+    expect(p.keineWohnnutzung).toBe(false);
+  });
+});
