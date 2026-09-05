@@ -70,15 +70,31 @@ jobs:
           echo "Dateien insgesamt: $(find /tmp/av -type f | wc -l)"
           echo
 
-          # Die amtliche Vermessung folgt einem eigenen Modell. Welches,
-          # steht in der Datei selbst -- raten hat bei den Zonen schon
-          # eine leere Ausgabe erzeugt.
-          erste=$(find /tmp/av -name '*.xtf' -o -name '*.itf' | head -1)
+          # Eine Datei je Gemeinde, Format ITF, Modell DM01AVCH24LV95D --
+          # das ist die amtliche Vermessung nach INTERLIS 1.
+          erste=$(find /tmp/av -name '*.itf' | head -1)
           echo "Erste Datenfile: $erste"
           echo
-          echo "### Modellangabe im Kopf der Datei"
-          head -c 2000 "$erste" | tr '>' '>\n' \
-            | grep -iE 'MODEL|HEADERSECTION|xmlns' | head -10
+
+          # Das Modell liegt manchmal der Lieferung bei; sonst im offenen
+          # Verzeichnis des Bundes.
+          modell=$(find /tmp/av -name '*.ili' | head -1)
+          if [ -z "$modell" ]; then
+            modell=/tmp/DM01AVCH24LV95D.ili
+            curl -sSL -o "$modell" \
+              "https://models.geo.admin.ch/V_D/DM01AVCH24LV95D.ili" \
+              || curl -sSL -o "$modell" \
+                 "https://models.geo.admin.ch/DM01AVCH24LV95D.ili"
+          fi
+          echo "Modell: $modell ($(wc -c < "$modell") Bytes)"
+          echo
+
+          echo "### Ebenen in einer Gemeindedatei"
+          # Nur die Namen und Anzahlen; die ganze Beschreibung wäre
+          # seitenlang.
+          ogrinfo -so -al "$erste,$modell" 2>&1 \
+            | grep -E 'Layer name|Feature Count' \
+            | paste - - | head -40
 
       - name: Nutzungsplanung holen
         if: ${{ inputs.schritt != 'parzellen' }}
