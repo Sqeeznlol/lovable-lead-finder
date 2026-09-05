@@ -89,12 +89,38 @@ jobs:
           echo "Modell: $modell ($(wc -c < "$modell") Bytes)"
           echo
 
-          echo "### Ebenen in einer Gemeindedatei"
-          # Nur die Namen und Anzahlen; die ganze Beschreibung wäre
-          # seitenlang.
+          echo "### Ebenen zu den Grundstücken"
+          # Nur die, um die es geht -- die Liste ist sonst hundert Zeilen
+          # lang und die Grundstücke stehen ganz unten.
           ogrinfo -so -al "$erste,$modell" 2>&1 \
-            | grep -E 'Layer name|Feature Count' \
-            | paste - - | head -40
+            | grep -E 'Layer name|Feature Count' | paste - - \
+            | grep -i 'liegenschaft\|grundstueck' || true
+          echo
+
+          echo "### Alle Gemeinden umwandeln"
+          # Eine Datei je Gemeinde, rund achtzig Stück. Sie werden
+          # nacheinander an dieselbe Ausgabe angehängt.
+          rm -f /tmp/parzellen.gpkg
+          n=0
+          for f in /tmp/av/*.itf; do
+            n=$((n + 1))
+            # -append ab der zweiten Datei; die erste legt die Ausgabe an.
+            zusatz=""
+            [ "$n" -gt 1 ] && zusatz="-append"
+            ogr2ogr -f GPKG /tmp/parzellen.gpkg $zusatz \
+              "$f,$modell" -nln parzellen -skipfailures \
+              Liegenschaften__Grundstueck 2>/dev/null || true
+            ogr2ogr -f GPKG /tmp/parzellen.gpkg -append \
+              "$f,$modell" -nln flaechen -skipfailures \
+              Liegenschaften__Liegenschaft 2>/dev/null || true
+            [ $((n % 20)) -eq 0 ] && echo "  $n Gemeinden ..."
+          done
+          echo "$n Gemeinden verarbeitet."
+          echo
+
+          ls -lh /tmp/parzellen.gpkg || { echo "Keine Ausgabe."; exit 1; }
+          ogrinfo -so -al /tmp/parzellen.gpkg 2>&1 \
+            | grep -E 'Layer name|Feature Count|^[A-Za-z_]+: ' | head -30
 
       - name: Nutzungsplanung holen
         if: ${{ inputs.schritt != 'parzellen' }}
@@ -180,4 +206,12 @@ jobs:
         with:
           name: zonen-${{ inputs.kanton }}
           path: /tmp/zonen.gpkg
+          if-no-files-found: warn
+
+      - name: Parzellen bereitstellen
+        if: ${{ inputs.schritt == 'parzellen' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: parzellen-${{ inputs.kanton }}
+          path: /tmp/parzellen.gpkg
           if-no-files-found: warn
