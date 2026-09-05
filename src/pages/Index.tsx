@@ -23,10 +23,12 @@ import { useMidnightReset } from '@/hooks/use-phones';
 
 type Tab = 'dashboard' | 'master' | 'vorauswahl' | 'akquise' | 'telsuche' | 'properties' | 'import' | 'masterimport' | 'phones' | 'export' | 'admin';
 
+// Master-Import ist bewusst nicht in der Navigation: die Daten stehen, und
+// ein Import gehört zu den Dingen, die man selten und bewusst macht. Der
+// Reiter lässt sich über den Admin-Bereich öffnen.
 const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'master', label: 'Master-Liste', icon: Database },
-  { id: 'masterimport', label: 'Master-Import', icon: Upload },
   { id: 'vorauswahl', label: 'Vorauswahl', icon: Eye },
   { id: 'akquise', label: 'Akquise-Modus', icon: Zap },
   { id: 'telsuche', label: 'Telefon-Suche', icon: Search },
@@ -149,7 +151,25 @@ export default function Index() {
             {active === 'export' && <PipedriveExport />}
             {active === 'import' && <CsvImport />}
             {active === 'phones' && <PhoneManager />}
-            {active === 'admin' && <AdminSettings />}
+            {active === 'admin' && (
+              <div className="space-y-6">
+                <AdminSettings />
+                <div className="rounded-2xl border border-dashed p-5">
+                  <p className="text-sm font-medium">Master-Import</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Weitere Listen einlesen. Bestehende Parzellen werden nur
+                    ergänzt, nie überschrieben.
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="mt-3 gap-2"
+                    onClick={() => setActive('masterimport')}
+                  >
+                    <Upload className="h-4 w-4" /> Import öffnen
+                  </Button>
+                </div>
+              </div>
+            )}
           </Suspense>
         </div>
 

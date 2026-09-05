@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Loader2, ExternalLink, MapPin, Users } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, MapPin, Users, SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -12,7 +12,19 @@ const m2 = (v: number | null | undefined) =>
   v == null ? '—' : `${Math.round(Number(v)).toLocaleString('de-CH')} m²`;
 
 const mio = (v: number | null | undefined) =>
-  v == null ? '—' : `${(Number(v) / 1e6).toFixed(1)} Mio`;
+  v == null ? '—' : (Number(v) / 1e6).toFixed(1);
+
+/** Kurzform des Vorwahl-Status; die Langform steht im Detail. */
+const vorwahlKurz = (v: string | null | undefined) => {
+  switch (v) {
+    case 'Sehr interessant':   return 'sehr int.';
+    case 'Potenzial vorhanden': return 'Potenzial';
+    case 'Später prüfen':      return 'später';
+    case 'Kein Potenzial':     return 'kein Pot.';
+    case 'Ausschliessen':      return 'raus';
+    default:                   return 'offen';
+  }
+};
 
 const tierStil = (t: string | null | undefined) =>
   t === 'A' ? 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30'
@@ -38,6 +50,9 @@ export function MasterList() {
     ausgeschlossen: 'ausblenden',
   });
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Der Filterblock ist gross und wird selten gebraucht -- die beiden Regler
+  // darunter decken den Alltag ab.
+  const [filterOffen, setFilterOffen] = useState(false);
 
   const { data, isLoading } = useMasterProperties(filters);
   const total = data?.total ?? 0;
@@ -60,16 +75,28 @@ export function MasterList() {
           <div>
             <h2 className="text-2xl font-bold tracking-tight">Master-Liste {titleSuffix}</h2>
             <p className="text-sm text-muted-foreground">
-              {isLoading ? 'Lade…' : `${total.toLocaleString('de-CH')} Datensätze`}
+              {isLoading
+                ? 'Lade…'
+                : `${total.toLocaleString('de-CH')} Objekte` +
+                  (filters.tier ? ` in Tier ${filters.tier}` : '') +
+                  (filters.ausgeschlossen === 'alle' ? ' · inklusive ausgeschlossener' : '')}
             </p>
           </div>
         </div>
 
-        <MasterFiltersBar filters={filters} onChange={setFilters} />
+        {filterOffen && <MasterFiltersBar filters={filters} onChange={setFilters} />}
 
         {/* Sortierung und Tier -- die beiden Regler, die im Alltag zählen */}
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span className="text-muted-foreground">Sortieren:</span>
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          <button
+            onClick={() => setFilterOffen(o => !o)}
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1 transition-colors ${
+              filterOffen ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <SlidersHorizontal className="h-3 w-3" /> Filter
+          </button>
+          <span className="ml-2 text-muted-foreground">Sortieren:</span>
           {SORTIERUNG.map(o => (
             <button
               key={o.wert}
@@ -115,30 +142,27 @@ export function MasterList() {
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
+                <thead className="sticky top-0 z-10 bg-muted text-xs uppercase text-muted-foreground">
                   <tr>
                     <th className="text-center p-3 font-medium">Tier</th>
                     <th className="text-left p-3 font-medium">Adresse</th>
                     <th className="text-left p-3 font-medium">Gemeinde</th>
-                    <th className="text-right p-3 font-medium">HNF möglich</th>
-                    <th className="text-right p-3 font-medium">HNF Zuwachs</th>
-                    <th className="text-right p-3 font-medium">Marge</th>
-                    <th className="text-right p-3 font-medium">Bebaubar</th>
-                    <th className="text-right p-3 font-medium">Baujahr</th>
-                    <th className="text-left p-3 font-medium">Zone</th>
-                    <th className="text-left p-3 font-medium">Vorwahl</th>
-                    <th className="text-left p-3 font-medium">Akquise</th>
+                    <th className="whitespace-nowrap p-3 text-right font-medium">HNF&nbsp;+</th>
+                    <th className="whitespace-nowrap p-3 text-right font-medium">Marge&nbsp;Mio</th>
+                    <th className="whitespace-nowrap p-3 text-right font-medium">Bebaubar</th>
+                    <th className="whitespace-nowrap p-3 text-right font-medium">Bj.</th>
+                    <th className="p-3 text-left font-medium">Vorwahl</th>
                     <th className="p-3 font-medium" />
                   </tr>
                 </thead>
                 <tbody>
                   {isLoading && (
-                    <tr><td colSpan={10} className="text-center p-12 text-muted-foreground">
+                    <tr><td colSpan={8} className="text-center p-12 text-muted-foreground">
                       <Loader2 className="h-5 w-5 animate-spin inline" />
                     </td></tr>
                   )}
                   {!isLoading && data?.rows.length === 0 && (
-                    <tr><td colSpan={10} className="text-center p-12 text-muted-foreground">
+                    <tr><td colSpan={8} className="text-center p-12 text-muted-foreground">
                       Keine Datensätze gefunden.
                     </td></tr>
                   )}
@@ -150,23 +174,28 @@ export function MasterList() {
                           {p.score_tier || '–'}
                         </span>
                       </td>
-                      <td className="p-3">
-                        <div className="font-medium">{p.address}</div>
+                      <td className="min-w-[200px] p-3">
+                        <div className="font-medium leading-tight">{p.address}</div>
                         {p.owner_name && (
                           <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                             <Users className="h-3 w-3" /> {p.owner_name}
                           </div>
                         )}
                       </td>
-                      <td className="p-3">{p.gemeinde || '—'}</td>
-                      <td className="p-3 text-right tabular-nums">{m2(p.hnf_neu)}</td>
-                      <td className="p-3 text-right tabular-nums font-medium text-primary">{m2(p.hnf_delta)}</td>
-                      <td className="p-3 text-right tabular-nums">{mio(p.marge_chf)}</td>
-                      <td className="p-3 text-right tabular-nums text-muted-foreground">{m2(p.bebaubar_m2 ?? p.area)}</td>
-                      <td className="p-3 text-right">{p.baujahr || '—'}</td>
-                      <td className="p-3 text-xs max-w-[140px] truncate">{p.zone || '—'}</td>
-                      <td className="p-3"><Badge variant="outline" className="text-[10px]">{p.preselection_status || 'Nicht geprüft'}</Badge></td>
-                      <td className="p-3"><Badge variant="secondary" className="text-[10px]">{p.status}</Badge></td>
+                      <td className="whitespace-nowrap p-3 text-muted-foreground">{p.gemeinde || '—'}</td>
+                      <td className="whitespace-nowrap p-3 text-right font-medium tabular-nums text-primary">{m2(p.hnf_delta)}</td>
+                      <td className="whitespace-nowrap p-3 text-right tabular-nums">{mio(p.marge_chf)}</td>
+                      <td className="whitespace-nowrap p-3 text-right tabular-nums text-muted-foreground">{m2(p.bebaubar_m2 ?? p.area)}</td>
+                      <td className="whitespace-nowrap p-3 text-right tabular-nums">{p.baujahr || '—'}</td>
+                      <td className="p-3">
+                        <Badge
+                          variant="outline"
+                          className="whitespace-nowrap text-[10px]"
+                          title={p.preselection_status || 'Nicht geprüft'}
+                        >
+                          {vorwahlKurz(p.preselection_status)}
+                        </Badge>
+                      </td>
                       <td className="p-3 text-right">
                         {p.google_maps_url && (
                           <a href={p.google_maps_url} target="_blank" rel="noreferrer"
