@@ -124,6 +124,40 @@ Aktivitäten, schreibt sie ins Feld Kontaktversuche und verschiebt Deals
 ab drei Fehlversuchen nach Post. Läuft bei GitHub, unabhängig vom
 Pipedrive-Tarif.
 
+## Die Kette, die den Handaufwand ersetzt
+
+Das eigentliche Ziel, besprochen am 5. September. Sobald zu einer
+Parzelle ein Eigentümer feststeht, soll ohne weiteres Zutun ein
+anrufbarer Deal entstehen:
+
+    Grundbuchabfrage    Eigentümer zur Parzelle gefunden
+            ↓
+    tel.search.ch       Nummer suchen
+            ↓
+    eigenes Programm    von Julian geschrieben, noch einzubauen
+            ↓
+    wohntraums.life     Datensatz vervollständigen
+            ↓
+    Pipedrive           fertiger Deal in Akquise, Phase "Neu"
+
+Offene Punkte dazu:
+
+**Der Name der Pipeline.** Angelegt wurde sie als "Akquise". Julian
+schreibt "Akquise 🏡" -- vor dem ersten automatischen Anlegen klären, wie
+sie tatsächlich heisst, sonst laufen die Deals ins Leere.
+
+**Die Nummernsuche.** search.ch bietet eine offizielle Schnittstelle
+(api.search.ch/tel) mit kostenlosem Schlüssel für massvolle Nutzung. Die
+Webseite abzugreifen verstösst gegen die Nutzungsbedingungen und fliegt
+früher oder später auf -- der Schlüssel ist der Weg. Eintragen nur, wenn
+das Ergebnis eindeutig ist: eine falsche Nummer im Datensatz kostet mehr
+als eine fehlende, weil dann jemand Fremdes angerufen wird.
+
+**Das eigene Programm.** Was es tut und in welcher Sprache es
+geschrieben ist, ist noch nicht bekannt. Nötig ist der Zugriff darauf --
+am einfachsten im Repository unter tools/, dann lässt es sich in den
+nächtlichen Ablauf einhängen.
+
 ## Zahlen, die den Stand beschreiben
 
 | | |
