@@ -1,0 +1,57 @@
+# =====================================================================
+# Pipedrive ansehen
+# =====================================================================
+# Liest den Aufbau des Pipedrive-Kontos aus und fasst ihn zusammen:
+# Pipelines, Phasen, Deals, Leads, eigene Felder und ihr Füllgrad,
+# Personen und Organisationen, Aktivitäten.
+#
+# Ausschliesslich lesend. Es wird nichts angelegt, geändert oder
+# gelöscht -- die Frage ist, ob die vorhandene Struktur zum Geschäft
+# passt, nicht wie sie sich schnell umbauen lässt.
+#
+# Der Token liegt als Secret im Repository und erscheint weder im
+# Protokoll noch in der Zusammenfassung. Weil die Schreibweise des
+# Secret-Namens je nach Anlage abweicht, werden mehrere geprüft.
+# =====================================================================
+
+name: Pipedrive ansehen
+
+on:
+  workflow_dispatch:
+
+jobs:
+  ansehen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Analyse
+        env:
+          A: ${{ secrets.PIPEDRIVE_API_TOKEN }}
+          B: ${{ secrets.PIPEDRIVEAPITOKEN }}
+          C: ${{ secrets.PIPEDRIVE_TOKEN }}
+          D: ${{ secrets.PIPEDRIVETOKEN }}
+          E: ${{ secrets.PIPEDRIVE }}
+        run: |
+          set -euo pipefail
+          # Die erste nicht leere Schreibweise gewinnt.
+          for kandidat in "$A" "$B" "$C" "$D" "$E"; do
+            if [ -n "$kandidat" ]; then
+              export PIPEDRIVE_TOKEN="$kandidat"
+              break
+            fi
+          done
+
+          if [ -z "${PIPEDRIVE_TOKEN:-}" ]; then
+            {
+              echo "Kein Token gefunden."
+              echo ""
+              echo "Geprüft wurden die Namen PIPEDRIVE_API_TOKEN,"
+              echo "PIPEDRIVEAPITOKEN, PIPEDRIVE_TOKEN, PIPEDRIVETOKEN"
+              echo "und PIPEDRIVE."
+            } >> "$GITHUB_STEP_SUMMARY"
+            cat "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          python3 tools/pipedrive-analyse.py | tee -a "$GITHUB_STEP_SUMMARY"
