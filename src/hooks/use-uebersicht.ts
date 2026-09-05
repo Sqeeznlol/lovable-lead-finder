@@ -6,7 +6,7 @@ import { gemeindeprofil, LAGE_LABEL, type Lagestufe } from '@/lib/gemeinden-zh';
 
 /** Felder, die für die Beurteilung gebraucht werden. */
 const FELDER =
-  'id, address, gemeinde, plz, parzelle, plot_number, egrid, owner_phone, ' +
+  'id, address, gemeinde, plz, parzelle, plot_number, egrid, owner_phone, bfs_nr, ' +
   'google_maps_url, gis_url, streetview_url, bebaubar_m2, kategorie, ' +
   'zone, ausnuetzung, area, gebaeudeflaeche, geschosse, ' +
   'vollgeschosse, baujahr, renovationsjahr, denkmalschutz, isos, wohnungen, ' +
@@ -26,6 +26,7 @@ export interface Chance {
   eigentuemer: string | null;
   /** Ohne Parzellennummer lässt sich das Grundstück nicht nachschlagen. */
   parzelle: string | null;
+  bfsNr: string | null;
   egrid: string | null;
   plz: string | null;
   telefon: string | null;
@@ -146,6 +147,7 @@ export function useUebersicht() {
               baujahr: p.baujahr,
               eigentuemer: p.owner_name ?? p.eigentuemer_name ?? null,
               parzelle: p.parzelle ?? p.plot_number ?? null,
+              bfsNr: p.bfs_nr ?? null,
               egrid: p.egrid ?? null,
               plz: p.plz ?? null,
               telefon: p.owner_phone ?? null,

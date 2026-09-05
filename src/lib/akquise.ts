@@ -99,6 +99,14 @@ export function beurteile(p: AkquiseInput): AkquiseUrteil {
       : null;
 
   // ---- Ausschluss ----------------------------------------------------
+  if (r.killer.includes('Zonenangabe fehlt')) {
+    return {
+      empfehlung: 'nein', punkte: 0,
+      dafuer: [],
+      dagegen: ['Zonenangabe in den Daten unbrauchbar — ohne Zone keine Rechnung'],
+      erloesProM2: profil.erloesProM2, lage: profil.stufe, margeLagegerecht: null,
+    };
+  }
   if (r.killer.includes('Keine Bauzone') || r.killer.includes('Keine Wohnnutzung')) {
     return {
       empfehlung: 'nein', punkte: 0,

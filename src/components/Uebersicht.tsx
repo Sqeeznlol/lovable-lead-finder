@@ -99,6 +99,8 @@ export function Uebersicht() {
                   <Objektansicht
                     address={c.address}
                     plzOrt={[c.plz, c.gemeinde].filter(Boolean).join(' ') || null}
+                    parzelle={c.parzelle}
+                    bfsNr={c.bfsNr}
                     className="hidden h-36 w-52 shrink-0 sm:block"
                   />
 

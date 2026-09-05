@@ -4,8 +4,10 @@ import {
   geocode,
   luftbildTileUrl,
   bauzonenTileUrl,
+  ZONEN_ZOOM,
   swisstopoMapUrl,
   oerebUrl,
+  oerebParzelleUrl,
   streetViewLinkUrl,
   streetViewEmbedUrl,
   type GeoCoords,
@@ -22,6 +24,10 @@ const REITER: { wert: Modus; label: string }[] = [
 interface Props {
   address: string;
   plzOrt?: string | null;
+  /** Parzellennummer -- damit der Kataster die Parzelle auswählt statt nur die Stelle zu zeigen. */
+  parzelle?: string | null;
+  /** Gemeindenummer (BFS), grenzt die Suche nach der Parzelle ein. */
+  bfsNr?: string | number | null;
   className?: string;
 }
 
@@ -38,7 +44,7 @@ interface Props {
  * kostet nichts, ohne Schlüssel bleibt aber nur der Link -- deshalb steht
  * dort eine Schaltfläche, solange VITE_GOOGLE_MAPS_KEY fehlt.
  */
-export function Objektansicht({ address, plzOrt, className }: Props) {
+export function Objektansicht({ address, plzOrt, parzelle, bfsNr, className }: Props) {
   const [coords, setCoords] = useState<GeoCoords | null>(null);
   const [stand, setStand] = useState<'laden' | 'ok' | 'leer' | 'fehler'>('laden');
   const [modus, setModus] = useState<Modus>('luft');
@@ -91,7 +97,8 @@ export function Objektansicht({ address, plzOrt, className }: Props) {
   const einbettung = modus === 'strasse' ? streetViewEmbedUrl(lat, lon) : null;
 
   const weiterLink =
-    modus === 'zone' ? oerebUrl(lat, lon)
+    modus === 'zone'
+      ? (parzelle ? oerebParzelleUrl(parzelle, bfsNr) : oerebUrl(lat, lon))
     : modus === 'strasse' ? streetViewLinkUrl(lat, lon)
     : swisstopoMapUrl(lat, lon);
 
@@ -105,7 +112,7 @@ export function Objektansicht({ address, plzOrt, className }: Props) {
       {modus !== 'strasse' && (
         <>
           <img
-            src={luftbildTileUrl(lat, lon)}
+            src={luftbildTileUrl(lat, lon, modus === 'zone' ? ZONEN_ZOOM : 19)}
             alt={`Luftbild ${address}`}
             loading="lazy"
             className="h-full w-full object-cover"

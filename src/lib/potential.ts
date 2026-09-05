@@ -76,6 +76,8 @@ export interface ParsedZone {
   keineBauzone: boolean;
   /** Bebaubar, aber ohne Wohnnutzung (Gewerbe, Industrie, öffentliche Bauten). */
   keineWohnnutzung: boolean;
+  /** Die Angabe benennt keine Zone, sondern ist ein Fehler aus der Quelle. */
+  unbrauchbar: boolean;
 }
 
 // "Wald" bewusst nur als eigenständiges Wort: es gibt die Gemeinde Wald (ZH)
@@ -92,10 +94,50 @@ const NICHT_BAUZONE = /landwirtschaftszone|\bwald\b|waldzone|freihaltezone|erhol
  */
 const KEINE_WOHNNUTZUNG = /gewerbezone|industriezone|arbeitszone|(zone f(ü|ue)r )?(ö|oe)ffentliche(n)? (bauten|zwecke)|(ö|oe)ffentliche bauten/i;
 
+/**
+ * Zonen-Kürzel, wie sie einzelne Gemeinden führen -- Winterthur schreibt
+ * die ganze Bau- und Zonenordnung in Kürzeln: "Oe" für Zone für öffentliche
+ * Bauten, "Wa" für Wald, "Gw" für Gewässer, "F" für Freihaltezone.
+ *
+ * Belegt am Bestand (Aufgabe "zonennamen", 11'000 Zeilen): in Winterthur
+ * standen Objekte in Oe, Wa, Gw, F, G und I als kaufbar in der Liste, weil
+ * die Regeln nur auf ausgeschriebene Namen wie "Zone für öffentliche Bauten"
+ * passten.
+ *
+ * Geprüft wird gegen den ganzen Zonentext, nicht als Teilwort: sonst würde
+ * "F" in jeder "Wohnzone mit Gewerbeanteil" anschlagen.
+ */
+const KURZ_NICHT_BAUZONE = new Set([
+  'WA', 'W A', 'WALD',
+  'GW', 'GEW',
+  'F', 'FR', 'FH',
+  'L', 'LW',
+  'E', 'E1', 'E2', 'E3',
+  'R',
+]);
+
+const KURZ_KEINE_WOHNNUTZUNG = new Set([
+  'OE', 'OEB', 'OED', 'ÖB',
+  'G', 'G1', 'G2', 'G3',
+  'I', 'I1', 'I2', 'I3',
+  'A', 'A1', 'A2',
+]);
+
+/**
+ * Werte, die keine Zone benennen, sondern einen Fehler aus der Quelle.
+ *
+ * "zarchivat" stand in 3'092 von 11'000 geprüften Zeilen -- rund ein
+ * Viertel des kaufbaren Bestands. Ohne verwertbare Zonenangabe lässt sich
+ * kein Potenzial rechnen; solche Objekte gehören nicht in die Anrufliste,
+ * sondern auf die Nachbesserung der Daten.
+ */
+const ZONE_UNBRAUCHBAR = /^(zarchivat|unbekannt|k\.?a\.?|n\/a|-+)$/i;
+
 export function parseZone(raw?: string | null): ParsedZone {
   const leer: ParsedZone = {
     ziffer: null, zonenflaeche: null, anteilProzent: null, geschosse: null,
-    ueberbauungsziffer: null, kurz: null, keineBauzone: false, keineWohnnutzung: false,
+    ueberbauungsziffer: null, kurz: null, keineBauzone: false,
+    keineWohnnutzung: false, unbrauchbar: false,
   };
   if (!raw) return leer;
 
@@ -113,6 +155,21 @@ export function parseZone(raw?: string | null): ParsedZone {
   // Klammerzusatz "(rechtskräftig, 8460m², 95%)" enthält Flächenangaben der
   // Zone selbst, nicht des Grundstücks — vor dem Parsen entfernen.
   const text = String(raw).replace(/\([^)]*\)/g, ' ').trim();
+
+  // Eine unbrauchbare Angabe ist keine Bauzone: ohne Zone keine Rechnung.
+  if (ZONE_UNBRAUCHBAR.test(text)) {
+    return { ...leer, zonenflaeche, anteilProzent, unbrauchbar: true, keineBauzone: true };
+  }
+
+  // Kürzel gegen den ganzen Text prüfen, bevor die Wortlaute drankommen.
+  const code = text.toUpperCase().replace(/\s+/g, '');
+  if (KURZ_NICHT_BAUZONE.has(code)) {
+    return { ...leer, zonenflaeche, anteilProzent, keineBauzone: true };
+  }
+  if (KURZ_KEINE_WOHNNUTZUNG.has(code)) {
+    return { ...leer, zonenflaeche, anteilProzent, keineWohnnutzung: true };
+  }
+
   if (NICHT_BAUZONE.test(text)) return { ...leer, zonenflaeche, anteilProzent, keineBauzone: true };
   if (KEINE_WOHNNUTZUNG.test(text)) return { ...leer, zonenflaeche, anteilProzent, keineWohnnutzung: true };
 
@@ -139,7 +196,10 @@ export function parseZone(raw?: string | null): ParsedZone {
     if (zifferMatch) ziffer = Number(zifferMatch[1].replace(',', '.'));
   }
 
-  return { ziffer, zonenflaeche, anteilProzent, geschosse, ueberbauungsziffer, kurz: null, keineBauzone: false, keineWohnnutzung: false };
+  return {
+    ziffer, zonenflaeche, anteilProzent, geschosse, ueberbauungsziffer,
+    kurz: null, keineBauzone: false, keineWohnnutzung: false, unbrauchbar: false,
+  };
 }
 
 /**
@@ -157,6 +217,7 @@ export function parseZone(raw?: string | null): ParsedZone {
 export function zoneKurzform(raw?: string | null): string | null {
   if (!raw) return null;
   const p = parseZone(raw);
+  if (p.unbrauchbar) return 'Zonenangabe fehlt';
   if (p.keineBauzone) return 'Nicht-Bauzone';
   if (p.keineWohnnutzung) return 'Gewerbe / Industrie';
   if (p.kurz) return p.kurz;
@@ -362,7 +423,10 @@ export function calculatePotential(
   const geschosse = num(p.geschosse) ?? num(p.vollgeschosse);
   const { az, quelle, parsed } = resolveAz(p, cfg);
 
-  if (parsed.keineBauzone) killer.push('Keine Bauzone');
+  // Eine fehlerhafte Angabe getrennt benennen: hier ist nicht die Zone das
+  // Problem, sondern die Datenquelle -- das ist nachbesserbar.
+  if (parsed.unbrauchbar) killer.push('Zonenangabe fehlt');
+  else if (parsed.keineBauzone) killer.push('Keine Bauzone');
   if (parsed.keineWohnnutzung) killer.push('Keine Wohnnutzung');
   if (quelle === 'zone') {
     assumptions.push(
@@ -544,6 +608,7 @@ export function istAusgeschlossen(p: PotentialInput): boolean {
 /** Grund des Ausschlusses, für die Anzeige. */
 export function ausschlussGrund(p: PotentialInput): string | null {
   const z = parseZone(p.zone);
+  if (z.unbrauchbar) return 'Zonenangabe fehlt';
   if (z.keineBauzone) return 'Keine Bauzone';
   if (z.keineWohnnutzung) return 'Keine Wohnnutzung';
   if (istVorhanden(p.denkmalschutz)) return 'Denkmalschutz';
