@@ -194,8 +194,25 @@ jobs:
               ;;
 
             zonennamen)
-              hole "properties?select=zone,gemeinde&ausgeschlossen=eq.false&zone=not.is.null&limit=20000" \
-                | python3 tools/zonen-auswerten.py >> "$GITHUB_STEP_SUMMARY"
+              # PostgREST liefert höchstens 1000 Zeilen je Abfrage. Für eine
+              # belastbare Liste der Wortlaute werden deshalb mehrere Seiten
+              # geholt und zusammengehängt.
+              : > /tmp/zonen.json
+              for seite in 0 1 2 3 4 5 6 7 8 9; do
+                von=$((seite * 1000))
+                bis=$((von + 999))
+                curl -sS "$URL/rest/v1/properties?select=zone,gemeinde&ausgeschlossen=eq.false&zone=not.is.null&order=id.asc" \
+                  -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+                  -H "Range: ${von}-${bis}" >> /tmp/zonen.json
+                echo >> /tmp/zonen.json
+              done
+
+              # Winterthur gesondert, sonst geht es in der Menge unter.
+              curl -sS "$URL/rest/v1/properties?select=zone,gemeinde&ausgeschlossen=eq.false&zone=not.is.null&gemeinde=ilike.*Winterthur*" \
+                -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+                -H "Range: 0-999" >> /tmp/zonen.json
+
+              python3 tools/zonen-auswerten.py < /tmp/zonen.json >> "$GITHUB_STEP_SUMMARY"
               cat "$GITHUB_STEP_SUMMARY"
               ;;
 
