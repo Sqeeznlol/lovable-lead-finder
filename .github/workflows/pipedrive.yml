@@ -29,6 +29,8 @@ on:
           - probelauf    # Zeigen, was übertragen würde
           - felder       # Datenfelder prüfen (Probelauf)
           - felder-aufraeumen  # Leere Felder entfernen, fehlende anlegen
+          - nachfuellen  # Leere Felder bestehender Deals aus der Datenbank
+          - nachfuellen-schreiben  # dasselbe, aber tatsächlich schreiben
       grenze:
         description: 'Höchstzahl Objekte beim Abgleich'
         required: false
@@ -69,16 +71,24 @@ jobs:
             exit 1
           fi
 
+          # Zugang zur Datenbank aus der Datei im Repository; sie enthält
+          # nur den öffentlichen Schlüssel.
+          set -a
+          . <(grep -E '^VITE_SUPABASE_(URL|PUBLISHABLE_KEY)=' .env \
+              | sed 's/VITE_SUPABASE_URL=/URL=/; s/VITE_SUPABASE_PUBLISHABLE_KEY=/KEY=/' \
+              | tr -d '"')
+          set +a
+
           case "${{ inputs.aufgabe }}" in
             probelauf)
-              # Zugang zur Datenbank aus der Datei im Repository; sie
-              # enthält nur den öffentlichen Schlüssel.
-              set -a
-              . <(grep -E '^VITE_SUPABASE_(URL|PUBLISHABLE_KEY)=' .env \
-                  | sed 's/VITE_SUPABASE_URL=/URL=/; s/VITE_SUPABASE_PUBLISHABLE_KEY=/KEY=/' \
-                  | tr -d '"')
-              set +a
               python3 tools/pipedrive-sync.py --grenze "${{ inputs.grenze }}" \
+                | tee -a "$GITHUB_STEP_SUMMARY"
+              ;;
+            nachfuellen)
+              python3 tools/pipedrive-nachfuellen.py | tee -a "$GITHUB_STEP_SUMMARY"
+              ;;
+            nachfuellen-schreiben)
+              python3 tools/pipedrive-nachfuellen.py --schreiben \
                 | tee -a "$GITHUB_STEP_SUMMARY"
               ;;
             felder)
