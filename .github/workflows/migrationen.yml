@@ -1,0 +1,94 @@
+# =====================================================================
+# Migrationen einspielen
+# =====================================================================
+# Der öffentliche Schlüssel der Datenbank darf lesen und schreiben, aber
+# keine Indizes oder Funktionen anlegen. Genau daran hängen mehrere
+# Aufgaben: die Sortierung der Masterliste bricht ohne Index im
+# Zeitlimit ab, ebenso der Abgleich nach Pipedrive und das Nachfüllen.
+#
+# Dieser Ablauf verbindet sich mit der Datenbank und spielt die
+# Migrationen ein, die noch nicht angewendet wurden. Welche das sind,
+# steht in der Datenbank selbst -- so führt ein zweiter Lauf nichts
+# doppelt aus.
+#
+# Die Verbindungsangabe liegt als Secret im Repository und erscheint
+# nirgends im Protokoll.
+# =====================================================================
+
+name: Migrationen
+
+on:
+  workflow_dispatch:
+    inputs:
+      schritt:
+        description: 'Was ausgeführt werden soll'
+        required: true
+        default: 'zeigen'
+        type: choice
+        options:
+          - zeigen      # Nur auflisten, was offen ist
+          - einspielen  # Offene Migrationen anwenden
+
+jobs:
+  migrieren:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Werkzeuge
+        run: sudo apt-get install -y -qq postgresql-client
+
+      - name: Migrationen
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${DB:-}" ]; then
+            {
+              echo "### Kein Datenbankzugang hinterlegt"
+              echo ""
+              echo "Erwartet wird das Secret \`SUPABASE_DB_URL\`."
+              echo ""
+              echo "Der Wert steht in Supabase unter"
+              echo "Project Settings → Database → Connection string → URI."
+              echo "Anzulegen unter Settings → Secrets and variables → Actions."
+            } >> "$GITHUB_STEP_SUMMARY"
+            cat "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          # Welche Migrationen schon liefen, steht in der Datenbank.
+          psql "$DB" -v ON_ERROR_STOP=1 -q -c "create table if not exists public.schema_migrationen (datei text primary key, angewendet timestamptz not null default now());"
+
+          echo "### Migrationen" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Datei | Zustand |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+
+          for f in supabase/migrations/*.sql; do
+            name=$(basename "$f")
+            schon=$(psql "$DB" -t -A -c "select 1 from public.schema_migrationen where datei = '$name';")
+
+            if [ "$schon" = "1" ]; then
+              echo "| $name | bereits eingespielt |" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            if [ "${{ inputs.schritt }}" != "einspielen" ]; then
+              echo "| $name | offen |" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            # Jede Migration in einer eigenen Transaktion: schlägt eine
+            # fehl, bleiben die vorherigen bestehen und die fehlerhafte
+            # hinterlässt keinen halben Zustand.
+            if fehler=$(psql "$DB" -v ON_ERROR_STOP=1 -q --single-transaction -f "$f" 2>&1); then
+              psql "$DB" -q -c "insert into public.schema_migrationen (datei) values ('$name');"
+              echo "| $name | eingespielt |" >> "$GITHUB_STEP_SUMMARY"
+            else
+              kurz=$(echo "$fehler" | head -c 200 | tr -d '\n|')
+              echo "| $name | FEHLER — $kurz |" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+
+          cat "$GITHUB_STEP_SUMMARY"
