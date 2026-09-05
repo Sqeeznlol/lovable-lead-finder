@@ -61,7 +61,9 @@ REGELN: list[tuple[str, tuple]] = [
     (r'brief', ('phase', 'Post', 'Brief senden')),
     (r'gespr(ä|ae)ch', ('phase', 'Akquise', 'Gespräch')),
     (r'termin', ('phase', 'Akquise', 'Gespräch')),
-    (r'nicht erreich', ('phase', 'Akquise', 'Anrufen')),
+    # "Nicht Erriecht" steht so im Konto -- Tippfehler, gemeint ist
+    # dasselbe wie "Nicht Erreichbar".
+    (r'nicht erreich|nicht erriech', ('phase', 'Akquise', 'Anrufen')),
     (r'anderer zeitpunkt', ('phase', 'Akquise', 'Anrufen')),
     (r'prio', ('phase', 'Akquise', 'Anrufen')),
 ]
@@ -203,8 +205,13 @@ def main() -> None:
         ziel = regel_fuer(phase)
 
         if ziel is None:
+            # Phasen wie "Affoltern" benennen einen Ort, keinen Zustand.
+            # Aus dem Namen ist nichts zu holen -- also entscheidet, was
+            # tatsächlich geschehen ist: wer angerufen wurde, kommt nach
+            # "Anrufen", wer nicht, nach "Neu". Falsch liegen kann das
+            # kaum, und liegen bleiben soll nichts.
             unklar[phase or '(ohne Phase)'] += 1
-            continue
+            ziel = ('phase', 'Akquise', 'Anrufen')
 
         # Wer nie angerufen wurde, gehört nach "Neu" -- unabhängig davon,
         # wie seine alte Phase hiess.
@@ -227,11 +234,12 @@ def main() -> None:
     print()
 
     if unklar:
-        print('## Nicht zugeordnet — Phase nicht deutbar')
+        print('## Ohne Regel — nach Aktivität eingeordnet')
         print()
-        print('Diese Deals bleiben, wo sie sind. Sie brauchen eine')
-        print('Entscheidung von Hand, weil aus dem Namen nicht hervorgeht,')
-        print('was gemeint ist.')
+        print('Diese Phasen benennen keinen Zustand, sondern einen Ort')
+        print('oder eine Sammlung. Aus dem Namen ist nichts zu holen, also')
+        print('entscheidet, was tatsächlich geschehen ist: wer angerufen')
+        print('wurde, kommt nach "Anrufen", wer nicht, nach "Neu".')
         print()
         print('| Phase | Deals |')
         print('|---|---:|')
