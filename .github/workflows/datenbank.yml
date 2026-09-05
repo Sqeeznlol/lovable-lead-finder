@@ -36,6 +36,7 @@ on:
           - zonennamen        # Welche Zonen gelten noch als kaufbar?
           - bfs              # Ist die Gemeindenummer je Objekt vorhanden?
           - geodaten         # Welche Geodaten gibt ein Kanton heraus?
+          - wfs              # Welche Ebenen bieten die Dienste an?
           - tempo             # Laufzeit der Abfragen der Masterliste
       grenze:
         description: 'Obergrenze für Durchläufe beim Nachrechnen'
@@ -286,6 +287,33 @@ jobs:
                   >> "$GITHUB_STEP_SUMMARY" || true
               fi
               cat "$GITHUB_STEP_SUMMARY"
+              ;;
+
+            wfs)
+              # Die Ebenennamen stehen im Fähigkeiten-Dokument des Dienstes.
+              # Sie zu raten hat zwei Läufe gekostet; hier werden sie
+              # ausgelesen. Ausgegeben wird nur das Nötige, damit die
+              # Antwort im Protokoll auffindbar bleibt.
+              : > /tmp/wfs.md
+              for dienst in av npl nutzungsplanung oereb; do
+                for fassung in "${dienst}_0" "${dienst}"; do
+                  url="https://geodienste.ch/db/${fassung}/deu?SERVICE=WFS&REQUEST=GetCapabilities"
+                  code=$(curl -sS -o /tmp/cap.xml -w '%{http_code}' -m 60 "$url" || echo 000)
+                  n=$(grep -o '<[a-zA-Z]*:\?Name>[^<]*</[a-zA-Z]*:\?Name>' /tmp/cap.xml 2>/dev/null | wc -l)
+                  echo "- \`${fassung}\` — HTTP $code, $n Namen" >> /tmp/wfs.md
+                  if [ "$code" = "200" ] && [ "$n" -gt 0 ]; then
+                    echo "" >> /tmp/wfs.md
+                    echo "  Ebenen:" >> /tmp/wfs.md
+                    grep -o '<[a-zA-Z]*:\?Name>[^<]*</[a-zA-Z]*:\?Name>' /tmp/cap.xml \
+                      | sed 's/<[^>]*>//g' | sort -u | head -40 \
+                      | sed 's/^/    - /' >> /tmp/wfs.md
+                    echo "" >> /tmp/wfs.md
+                  fi
+                done
+              done
+              echo "### Dienste und Ebenen" >> "$GITHUB_STEP_SUMMARY"
+              cat /tmp/wfs.md >> "$GITHUB_STEP_SUMMARY"
+              cat /tmp/wfs.md
               ;;
 
             zonen)
