@@ -245,6 +245,17 @@ jobs:
           ogrinfo -so -al /tmp/arbeit.gpkg 2>&1 \
             | grep -E 'Layer name|Feature Count' | paste - -
 
+          # Die Feldnamen stehen nicht im Modell-Handbuch, sondern in den
+          # Daten. Sie hier auszugeben kostet nichts und erspart einen
+          # zweiten halbstündigen Lauf, falls die Abfrage danebengreift.
+          echo
+          echo "### Felder"
+          for e in parzellen flaechen zonen; do
+            echo "-- $e"
+            ogrinfo -so /tmp/arbeit.gpkg "$e" 2>&1 \
+              | sed -n '/^[A-Za-z_0-9]*: /p' | head -40
+          done
+
           echo
           echo "### Verschneiden"
           ogr2ogr -f CSV /tmp/verschnitten.csv /tmp/arbeit.gpkg \
