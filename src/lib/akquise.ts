@@ -191,6 +191,48 @@ export function beurteile(p: AkquiseInput): AkquiseUrteil {
     dafuer.push(`${p.gebaeude_anzahl} Gebäude auf einer Parzelle — Arealentwicklung möglich`);
   }
 
+  // ---- 4. Woran man das Potenzial im Gespräch festmacht ---------------
+  // Die Marge ist eine Zahl, die niemand am Telefon glaubt. Was überzeugt,
+  // sind die zwei Beobachtungen dahinter: es fehlt ein Geschoss, und das
+  // Haus steht verloren auf einer grossen Parzelle. Beide werden ohnehin
+  // gerechnet -- sie standen bloss nirgends.
+
+  const gebautGeschosse = Number(p.geschosse) || null;
+  if (r.vollgeschosse != null && gebautGeschosse != null) {
+    const fehlend = r.vollgeschosse - gebautGeschosse;
+    if (fehlend >= 1) {
+      // Ein ganzes ungenutztes Geschoss ist das greifbarste Argument
+      // überhaupt und lässt sich in einem Satz erklären.
+      punkte += Math.min(fehlend, 2) * 8;
+      dafuer.push(
+        fehlend === 1
+          ? `${gebautGeschosse} Geschosse gebaut, ${r.vollgeschosse} erlaubt — ein Geschoss ungenutzt`
+          : `${gebautGeschosse} Geschosse gebaut, ${r.vollgeschosse} erlaubt — ${fehlend} Geschosse ungenutzt`,
+      );
+    }
+  }
+
+  const bebaubar = Number(p.bebaubar_m2 ?? p.area) || null;
+  const fussabdruck = Number(p.gebaeudeflaeche) || null;
+  if (bebaubar != null && fussabdruck != null && bebaubar > 0) {
+    const belegt = fussabdruck / bebaubar;
+    if (belegt < 0.12 && bebaubar >= 800) {
+      punkte += 10;
+      dafuer.push(
+        `Gebäude belegt nur ${Math.round(belegt * 100)} % der Parzelle — viel ungenutztes Land`,
+      );
+    } else if (belegt < 0.2 && bebaubar >= 600) {
+      punkte += 5;
+      dafuer.push(`Gebäude belegt ${Math.round(belegt * 100)} % der Parzelle`);
+    }
+  }
+
+  if (r.reserveQuote != null && r.reserveQuote >= 0.4) {
+    dafuer.push(
+      `Nur ${Math.round((1 - r.reserveQuote) * 100)} % der zulässigen Fläche genutzt`,
+    );
+  }
+
   if (r.confidence === 'tief' || r.confidence === 'keine') {
     dagegen.push('Datenlage dünn — Angaben vor dem Anruf prüfen');
   }

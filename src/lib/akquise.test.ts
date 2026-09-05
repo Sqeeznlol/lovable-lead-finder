@@ -157,3 +157,57 @@ describe('Plausibilität', () => {
     expect(u.dagegen.join(' ')).toContain('Schutzstatus');
   });
 });
+
+describe('Woran man das Potenzial festmacht', () => {
+  const basis = {
+    zone: '3-geschossige Wohnzone (rechtskräftig, 2000m², 100%)',
+    area: 2000, bebaubar_m2: 2000, gebaeudeflaeche: 120,
+    geschosse: 2, baujahr: 1960, gemeinde: 'Küsnacht',
+    owner_name: 'Hans Müller', denkmalschutz: 'nicht vorhanden',
+    isos: 'nicht vorhanden', wohnungen: 2,
+  };
+
+  it('nennt das ungenutzte Geschoss beim Namen', () => {
+    // Das greifbarste Argument am Telefon: es fehlt ein ganzes Geschoss.
+    const u = beurteile(basis);
+    expect(u.dafuer.some(t => /Geschoss ungenutzt/.test(t))).toBe(true);
+    expect(u.dafuer.some(t => /2 Geschosse gebaut, 3 erlaubt/.test(t))).toBe(true);
+  });
+
+  it('nennt das ungenutzte Land, wenn das Haus verloren darauf steht', () => {
+    const u = beurteile(basis);
+    expect(u.dafuer.some(t => /% der Parzelle/.test(t))).toBe(true);
+  });
+
+  it('schweigt, wo nichts ungenutzt ist', () => {
+    // Drei Geschosse gebaut, drei erlaubt, Parzelle dicht bebaut.
+    const u = beurteile({ ...basis, geschosse: 3, gebaeudeflaeche: 700 });
+    expect(u.dafuer.some(t => /ungenutzt/.test(t))).toBe(false);
+    expect(u.dafuer.some(t => /% der Parzelle/.test(t))).toBe(false);
+  });
+
+  it('bewertet ein ungenutztes Geschoss höher als keines', () => {
+    // An einem Objekt, das nicht ohnehin am Anschlag steht: in einer
+    // günstigen Lage und mit einem Eigentümertyp, der zurückhaltender
+    // ist, bleibt Raum nach oben.
+    const knapp = {
+      ...basis, gemeinde: 'Bauma', owner_name: 'Muster AG',
+      area: 900, bebaubar_m2: 900, gebaeudeflaeche: 150, baujahr: 1975,
+    };
+    const mit = beurteile(knapp);
+    const ohne = beurteile({ ...knapp, geschosse: 3 });
+    expect(mit.punkte).toBeGreaterThan(ohne.punkte);
+  });
+
+  it('sättigt bei hundert -- dort sortiert nur noch die Marge', () => {
+    // Festgehalten, nicht behoben: die Skala endet bei hundert, und in
+    // Spitzenlagen erreichen viele Objekte diesen Wert. Die Reihenfolge
+    // entsteht dort über die Marge, nicht über die Punkte. Für die Frage
+    // "welche fünf schlage ich heute nach" reicht das nicht; eine feinere
+    // Skala wäre der nächste Schritt.
+    const a = beurteile(basis);
+    const b = beurteile({ ...basis, geschosse: 3 });
+    expect(a.punkte).toBe(100);
+    expect(b.punkte).toBe(100);
+  });
+});
