@@ -10,6 +10,7 @@ Der neue Aufbau trennt zwei Rhythmen:
 
     Akquise   Neu · Anrufen · Gespräch · Unterlagen
     Post      Brief senden · Brief versandt
+    Extern    Studer · Tim
 
 Wohin ein Deal kommt, entscheidet nicht seine alte Phase allein, sondern
 was tatsächlich passiert ist. Ob jemand angerufen wurde, steht in den
@@ -24,6 +25,7 @@ Ohne --schreiben verändert der Lauf nichts.
 import argparse
 import json
 import os
+import re
 import sys
 import urllib.parse
 import urllib.request
@@ -34,23 +36,34 @@ PIPEDRIVE = 'https://api.pipedrive.com/v1'
 # name, Faulzeit in Tagen
 AKQUISE = [('Neu', 14), ('Anrufen', 10), ('Gespräch', 14), ('Unterlagen', 21)]
 POST = [('Brief senden', 3), ('Brief versandt', 21)]
+# Übergaben an Dritte sind kein Schritt des eigenen Prozesses. Sie gehören
+# nicht in die Akquise, sonst verdecken sie dort die eigene Arbeit -- und
+# eine Faulzeit wäre sinnlos, weil die Zeit bei jemand anderem läuft.
+EXTERN = [('Studer', 0), ('Tim', 0)]
 
-# Alte Phase (Teilwort, klein) -> was daraus wird.
+# Alte Phase (Suchmuster, klein) -> was daraus wird.
 # ('phase', 'Pipeline', 'Phase')  oder  ('verloren', 'Grund')
+#
+# Die Reihenfolge entscheidet: "Unterlagen Verschickt" enthält beide
+# Wörter und gehört zu den Unterlagen, nicht zur Post. Kurze Namen wie
+# "tim" stehen mit Wortgrenze, damit sie nicht in längeren Wörtern
+# anschlagen.
 REGELN: list[tuple[str, tuple]] = [
-    ('nicht interessiert', ('verloren', 'Nicht interessiert')),
-    ('kein interesse', ('verloren', 'Nicht interessiert')),
-    ('lw zone', ('verloren', 'Falsche Zone')),
-    ('landwirtschaft', ('verloren', 'Falsche Zone')),
-    ('verkauft', ('verloren', 'Bereits verkauft')),
-    ('unterlagen', ('phase', 'Akquise', 'Unterlagen')),
-    ('verschick', ('phase', 'Post', 'Brief senden')),
-    ('brief', ('phase', 'Post', 'Brief senden')),
-    ('gespräch', ('phase', 'Akquise', 'Gespräch')),
-    ('termin', ('phase', 'Akquise', 'Gespräch')),
-    ('nicht erreich', ('phase', 'Akquise', 'Anrufen')),
-    ('anderer zeitpunkt', ('phase', 'Akquise', 'Anrufen')),
-    ('prio', ('phase', 'Akquise', 'Anrufen')),
+    (r'studer', ('phase', 'Extern', 'Studer')),
+    (r'\btim\b', ('phase', 'Extern', 'Tim')),
+    (r'nicht interessiert', ('verloren', 'Nicht interessiert')),
+    (r'kein interesse', ('verloren', 'Nicht interessiert')),
+    (r'lw zone', ('verloren', 'Falsche Zone')),
+    (r'landwirtschaft', ('verloren', 'Falsche Zone')),
+    (r'verkauft', ('verloren', 'Bereits verkauft')),
+    (r'unterlagen', ('phase', 'Akquise', 'Unterlagen')),
+    (r'verschick', ('phase', 'Post', 'Brief senden')),
+    (r'brief', ('phase', 'Post', 'Brief senden')),
+    (r'gespr(ä|ae)ch', ('phase', 'Akquise', 'Gespräch')),
+    (r'termin', ('phase', 'Akquise', 'Gespräch')),
+    (r'nicht erreich', ('phase', 'Akquise', 'Anrufen')),
+    (r'anderer zeitpunkt', ('phase', 'Akquise', 'Anrufen')),
+    (r'prio', ('phase', 'Akquise', 'Anrufen')),
 ]
 
 
@@ -93,7 +106,7 @@ def alle(pfad: str, token: str, **params) -> list:
 def regel_fuer(phase: str) -> tuple | None:
     p = (phase or '').lower()
     for muster, ziel in REGELN:
-        if muster in p:
+        if re.search(muster, p):
             return ziel
     return None
 
@@ -137,7 +150,7 @@ def main() -> None:
     print('## Pipelines und Phasen')
     print()
     anzulegen: list[str] = []
-    for pl, phasen in (('Akquise', AKQUISE), ('Post', POST)):
+    for pl, phasen in (('Akquise', AKQUISE), ('Post', POST), ('Extern', EXTERN)):
         if pl not in name_pipeline:
             anzulegen.append(f'Pipeline "{pl}"')
         for phase, tage in phasen:
@@ -151,7 +164,7 @@ def main() -> None:
     print()
 
     if args.schreiben:
-        for pl, phasen in (('Akquise', AKQUISE), ('Post', POST)):
+        for pl, phasen in (('Akquise', AKQUISE), ('Post', POST), ('Extern', EXTERN)):
             if pl not in name_pipeline:
                 a = sende('/pipelines', token, {'name': pl}, 'POST')
                 if a.get('success'):
@@ -163,13 +176,17 @@ def main() -> None:
             for i, (phase, tage) in enumerate(phasen):
                 if stufe(pl, phase):
                     continue
-                a = sende('/stages', token, {
+                daten = {
                     'name': phase,
                     'pipeline_id': p_obj['id'],
                     'order_nr': i + 1,
-                    'rotten_flag': True,
-                    'rotten_days': tage,
-                }, 'POST')
+                }
+                # Faulzeit null heisst: hier läuft die Zeit bei jemand
+                # anderem, ein rotes Kärtchen wäre nur Lärm.
+                if tage:
+                    daten['rotten_flag'] = True
+                    daten['rotten_days'] = tage
+                a = sende('/stages', token, daten, 'POST')
                 if a.get('success'):
                     stufen.append(a['data'])
 
