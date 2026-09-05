@@ -93,11 +93,46 @@ export function Uebersicht() {
                     {EMPFEHLUNG_LABEL[c.empfehlung]}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium leading-tight">{c.address}</p>
+                    <p className="font-medium leading-tight">
+                      {c.address}
+                      {c.gisUrl && (
+                        <a
+                          href={c.gisUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          title="Parzelle auf der Karte"
+                          className="ml-1.5 inline-flex align-middle text-muted-foreground hover:text-foreground"
+                        >
+                          <MapPin className="h-3.5 w-3.5" />
+                        </a>
+                      )}
+                    </p>
+                    {/* Die Parzellennummer steht zuoberst, weil ohne sie
+                        weder das Grundbuch noch das GIS weiterhilft -- und
+                        ein Anruf ohne diese Nummer führt zu nichts. */}
                     <p className="mt-0.5 text-sm text-muted-foreground">
-                      {c.gemeinde}
+                      <span className="font-medium tabular-nums text-foreground">
+                        {c.parzelle ? `Parzelle ${c.parzelle}` : 'Parzelle unbekannt'}
+                      </span>
+                      {' · '}
+                      {[c.plz, c.gemeinde].filter(Boolean).join(' ')}
                       {c.baujahr ? ` · Baujahr ${c.baujahr}` : ''}
-                      {c.eigentuemer ? ` · ${c.eigentuemer}` : ' · Eigentümer unbekannt'}
+                    </p>
+                    <p className="mt-0.5 text-sm text-muted-foreground">
+                      {c.eigentuemer ?? 'Eigentümer unbekannt'}
+                      {c.telefon ? (
+                        <>
+                          {' · '}
+                          <a
+                            href={`tel:${c.telefon.replace(/\s/g, '')}`}
+                            className="tabular-nums text-primary hover:underline"
+                          >
+                            {c.telefon}
+                          </a>
+                        </>
+                      ) : (
+                        ' · keine Nummer'
+                      )}
                     </p>
                     {c.dafuer.length > 0 && (
                       <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
