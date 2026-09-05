@@ -58,7 +58,7 @@ export function Dashboard() {
               ].map(s => (
                 <div key={s.label} className="text-center bg-card/60 rounded-xl py-3">
                   <p className="text-2xl font-bold">{s.value.toLocaleString('de-CH')}</p>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{s.label}</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider">{s.label}</p>
                 </div>
               ))}
             </div>
@@ -76,15 +76,15 @@ export function Dashboard() {
             <div className="grid grid-cols-3 gap-3">
               <div className="bg-warning/10 rounded-xl p-3 text-center">
                 <p className="text-2xl font-bold text-warning">{followUps?.dueToday ?? 0}</p>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Fällig heute</p>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">Fällig heute</p>
               </div>
               <div className="bg-primary/10 rounded-xl p-3 text-center">
                 <p className="text-2xl font-bold text-primary">{followUps?.dueWeek ?? 0}</p>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Diese Woche</p>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">Diese Woche</p>
               </div>
               <div className="bg-destructive/10 rounded-xl p-3 text-center">
                 <p className="text-2xl font-bold text-destructive">{followUps?.stagnant ?? 0}</p>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Stagniert</p>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">Stagniert</p>
               </div>
             </div>
           </CardContent>
@@ -108,7 +108,7 @@ export function Dashboard() {
             ].map(s => (
               <div key={s.label} className="text-center">
                 <p className={`text-xl font-bold ${s.color}`}>{typeof s.value === 'number' ? s.value.toLocaleString('de-CH') : s.value}</p>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{s.label}</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">{s.label}</p>
               </div>
             ))}
           </div>
@@ -155,7 +155,7 @@ export function Dashboard() {
                     <div className="flex items-center gap-2">
                       <span className="font-bold">{(step.value as number).toLocaleString('de-CH')}</span>
                       {nextStep && (step.value as number) > 0 && (
-                        <Badge variant="outline" className="text-[10px]">
+                        <Badge variant="outline" className="text-xs">
                           → {conversionRate(step.value as number, nextStep.value as number)}%
                         </Badge>
                       )}

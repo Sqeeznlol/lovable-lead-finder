@@ -442,7 +442,7 @@ export function TelefonSuche() {
                 <div>
                   <div className="flex items-center gap-2">
                     <Label className="text-sm font-semibold">Eigentümer 2</Label>
-                    {ownerType2 && <Badge className={`${ownerTypeColor(ownerType2)} text-[10px]`}>{ownerTypeLabel(ownerType2)}</Badge>}
+                    {ownerType2 && <Badge className={`${ownerTypeColor(ownerType2)} text-xs`}>{ownerTypeLabel(ownerType2)}</Badge>}
                   </div>
                   <p className="text-lg font-bold mt-1">{current.owner_name_2}</p>
                   {current.owner_address_2 && <p className="text-sm text-muted-foreground">{current.owner_address_2}</p>}
@@ -488,7 +488,7 @@ export function TelefonSuche() {
               className="min-h-[70px] resize-none text-sm"
             />
             {current.notes && (
-              <p className="text-[11px] text-muted-foreground">Bisherige Notizen werden ergänzt, nicht überschrieben.</p>
+              <p className="text-xs text-muted-foreground">Bisherige Notizen werden ergänzt, nicht überschrieben.</p>
             )}
           </div>
 
@@ -566,7 +566,7 @@ export function TelefonSuche() {
             const t = classifyOwner(p.owner_name || '');
             return (
               <div key={p.id} className="flex items-center gap-3 bg-card rounded-xl px-4 py-2.5 shadow-sm border">
-                <Badge className={`${ownerTypeColor(t)} text-[10px] shrink-0`}>{ownerTypeLabel(t)}</Badge>
+                <Badge className={`${ownerTypeColor(t)} text-xs shrink-0`}>{ownerTypeLabel(t)}</Badge>
                 <span className="truncate flex-1 text-sm font-medium">{p.owner_name}</span>
                 <span className="text-xs text-muted-foreground truncate">{p.address}</span>
               </div>

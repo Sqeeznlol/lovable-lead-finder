@@ -43,7 +43,7 @@ export function VorauswahlStatsBar({ stats, filteredCount, showFiltered }: Vorau
               <p className={`text-xl font-bold tabular-nums ${s.colorClass}`}>
                 {value.toLocaleString('de-CH')}
               </p>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">{s.label}</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">{s.label}</p>
             </div>
           );
         })}
@@ -54,7 +54,7 @@ export function VorauswahlStatsBar({ stats, filteredCount, showFiltered }: Vorau
           <p className="text-xl font-bold tabular-nums text-primary">
             {(stats?.weekProcessed ?? 0).toLocaleString('de-CH')}
           </p>
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">7 Tage</p>
+          <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">7 Tage</p>
         </div>
         <div className="bg-card rounded-xl border px-3 py-2.5 text-center hover:shadow-md transition-shadow">
           <div className="flex items-center justify-center gap-1 mb-0.5">
@@ -63,7 +63,7 @@ export function VorauswahlStatsBar({ stats, filteredCount, showFiltered }: Vorau
           <p className="text-xl font-bold tabular-nums text-emerald-500">
             {stats?.conversionRate ?? 0}%
           </p>
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Conv.-Rate</p>
+          <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Conv.-Rate</p>
         </div>
         <div className="bg-card rounded-xl border px-3 py-2.5 text-center hover:shadow-md transition-shadow">
           <div className="flex items-center justify-center gap-1 mb-0.5">
@@ -72,7 +72,7 @@ export function VorauswahlStatsBar({ stats, filteredCount, showFiltered }: Vorau
           <p className="text-xl font-bold tabular-nums text-primary">
             {(stats?.pipedriveExported ?? 0).toLocaleString('de-CH')}
           </p>
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Pipedrive</p>
+          <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Pipedrive</p>
         </div>
         <div className="bg-card rounded-xl border px-3 py-2.5 text-center hover:shadow-md transition-shadow">
           <div className="flex items-center justify-center gap-1 mb-0.5">
@@ -81,13 +81,13 @@ export function VorauswahlStatsBar({ stats, filteredCount, showFiltered }: Vorau
           <p className="text-xl font-bold tabular-nums text-primary">
             {stats?.progressPercent ?? 0}%
           </p>
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Fortschritt</p>
+          <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Fortschritt</p>
         </div>
       </div>
       <div className="flex items-center gap-3">
         <Progress value={stats?.progressPercent ?? 0} className="h-2 flex-1" />
         {showFiltered && filteredCount !== undefined && (
-          <Badge variant="outline" className="text-[10px] whitespace-nowrap">
+          <Badge variant="outline" className="text-xs whitespace-nowrap">
             {filteredCount.toLocaleString('de-CH')} gefiltert
           </Badge>
         )}

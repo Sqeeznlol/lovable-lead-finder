@@ -295,11 +295,11 @@ export function Vorauswahl() {
             </SelectContent>
           </Select>
           <div className="flex items-center gap-1">
-            <Label className="text-[10px] text-muted-foreground">Bj.bis</Label>
+            <Label className="text-xs text-muted-foreground">Bj.bis</Label>
             <Input type="number" value={effectiveBaujahrBis} onChange={e => setBaujahrBis(e.target.value)} className="w-20 h-8 text-xs" placeholder={isPrioList ? 'offen' : undefined} />
           </div>
           <div className="flex items-center gap-1">
-            <Label className="text-[10px] text-muted-foreground">MaxWhg</Label>
+            <Label className="text-xs text-muted-foreground">MaxWhg</Label>
             <Input type="number" value={maxWhg} onChange={e => setMaxWhg(e.target.value)} placeholder="∞" className="w-16 h-8 text-xs" />
           </div>
           <Button variant="ghost" size="sm" onClick={() => setShowFilters(!showFilters)} className="gap-1 h-8 text-xs">
@@ -319,23 +319,23 @@ export function Vorauswahl() {
       {showFilters && (
         <div className="bg-card rounded-lg border p-3 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
           <div className="space-y-0.5">
-            <Label className="text-[10px] text-muted-foreground">Bj. von</Label>
+            <Label className="text-xs text-muted-foreground">Bj. von</Label>
             <Input type="number" value={baujahrVon} onChange={e => setBaujahrVon(e.target.value)} placeholder="1900" className="h-8 text-xs" />
           </div>
           <div className="space-y-0.5">
-            <Label className="text-[10px] text-muted-foreground">Min Whg.</Label>
+            <Label className="text-xs text-muted-foreground">Min Whg.</Label>
             <Input type="number" value={minWhg} onChange={e => setMinWhg(e.target.value)} placeholder="0" className="h-8 text-xs" />
           </div>
           <div className="space-y-0.5">
-            <Label className="text-[10px] text-muted-foreground">Gemeinde</Label>
+            <Label className="text-xs text-muted-foreground">Gemeinde</Label>
             <Input value={gemeindeFilter} onChange={e => setGemeindeFilter(e.target.value)} placeholder="Suchen..." className="h-8 text-xs" />
           </div>
           <div className="space-y-0.5">
-            <Label className="text-[10px] text-muted-foreground">Bezirk</Label>
+            <Label className="text-xs text-muted-foreground">Bezirk</Label>
             <Input value={bezirkFilter} onChange={e => setBezirkFilter(e.target.value)} placeholder="Suchen..." className="h-8 text-xs" />
           </div>
           <div className="space-y-0.5">
-            <Label className="text-[10px] text-muted-foreground">Kategorie</Label>
+            <Label className="text-xs text-muted-foreground">Kategorie</Label>
             <Select value={kategorieFilter} onValueChange={setKategorieFilter}>
               <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Alle" /></SelectTrigger>
               <SelectContent>
@@ -399,10 +399,10 @@ export function Vorauswahl() {
                       <TableCell>
                         <div>
                           <p className="font-medium text-sm truncate max-w-[200px]">{p.address}</p>
-                          <p className="text-[10px] text-muted-foreground">{p.plz_ort || p.gemeinde || ''}</p>
+                          <p className="text-xs text-muted-foreground">{p.plz_ort || p.gemeinde || ''}</p>
                         </div>
                       </TableCell>
-                      <TableCell><Badge variant="outline" className="text-[10px]">{p.zone}</Badge></TableCell>
+                      <TableCell><Badge variant="outline" className="text-xs">{p.zone}</Badge></TableCell>
                       <TableCell className="text-xs">{p.baujahr || '–'}</TableCell>
                       <TableCell className="text-xs">{p.wohnungen ? Number(p.wohnungen) : '–'}</TableCell>
                       <TableCell className="text-xs">{p.gebaeudeflaeche ? `${Math.round(Number(p.gebaeudeflaeche))}m²` : '–'}</TableCell>
@@ -470,19 +470,19 @@ export function Vorauswahl() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 mb-2 flex-wrap">
                           {current.zone && <Badge className="bg-primary/10 text-primary border-primary/20 text-xs">{current.zone}</Badge>}
-                          {current.gebaeudeart && <Badge variant="outline" className="text-[10px]">{current.gebaeudeart}</Badge>}
-                          {current.kategorie && <Badge variant="outline" className="text-[10px]">{current.kategorie}</Badge>}
-                          {current.wohnungen && <Badge variant="outline" className="text-[10px]">{current.wohnungen} Whg.</Badge>}
-                          {current.parzelle && <Badge variant="outline" className="text-[10px] font-mono">Parz. {current.parzelle}</Badge>}
-                          {current.bfs_nr && <Badge variant="outline" className="text-[10px] font-mono">BFS {current.bfs_nr}</Badge>}
-                          {current.egrid && <Badge variant="outline" className="text-[10px] font-mono">{current.egrid}</Badge>}
+                          {current.gebaeudeart && <Badge variant="outline" className="text-xs">{current.gebaeudeart}</Badge>}
+                          {current.kategorie && <Badge variant="outline" className="text-xs">{current.kategorie}</Badge>}
+                          {current.wohnungen && <Badge variant="outline" className="text-xs">{current.wohnungen} Whg.</Badge>}
+                          {current.parzelle && <Badge variant="outline" className="text-xs font-mono">Parz. {current.parzelle}</Badge>}
+                          {current.bfs_nr && <Badge variant="outline" className="text-xs font-mono">BFS {current.bfs_nr}</Badge>}
+                          {current.egrid && <Badge variant="outline" className="text-xs font-mono">{current.egrid}</Badge>}
                         </div>
                         <h2 className="text-xl sm:text-2xl font-bold tracking-tight leading-tight">{current.address}</h2>
                         <p className="text-muted-foreground text-sm mt-0.5">{current.plz_ort || current.gemeinde || ''}</p>
                       </div>
                       <div className={`flex-shrink-0 w-14 h-14 rounded-2xl border-2 flex flex-col items-center justify-center ${scoreBg(score)}`}>
                         <span className={`text-xl font-black ${scoreColor(score)}`}>{score}</span>
-                        <span className="text-[8px] text-muted-foreground font-medium">SCORE</span>
+                        <span className="text-xs text-muted-foreground font-medium">SCORE</span>
                       </div>
                     </div>
 
@@ -491,7 +491,7 @@ export function Vorauswahl() {
                         <div className="flex items-center gap-2 bg-background/60 rounded-lg px-3 py-1.5">
                           <Home className="h-3.5 w-3.5 text-primary flex-shrink-0" />
                           <div>
-                            <p className="text-[9px] text-muted-foreground">HNF</p>
+                            <p className="text-xs text-muted-foreground">HNF</p>
                             <p className="font-semibold text-sm">{Math.round(Number(current.gebaeudeflaeche))} m²</p>
                           </div>
                         </div>
@@ -500,7 +500,7 @@ export function Vorauswahl() {
                         <div className="flex items-center gap-2 bg-background/60 rounded-lg px-3 py-1.5">
                           <Ruler className="h-3.5 w-3.5 text-primary flex-shrink-0" />
                           <div>
-                            <p className="text-[9px] text-muted-foreground">Grundstück</p>
+                            <p className="text-xs text-muted-foreground">Grundstück</p>
                             <p className="font-semibold text-sm">{Math.round(Number(current.area))} m²</p>
                           </div>
                         </div>
@@ -509,7 +509,7 @@ export function Vorauswahl() {
                         <div className="flex items-center gap-2 bg-background/60 rounded-lg px-3 py-1.5">
                           <Calendar className="h-3.5 w-3.5 text-primary flex-shrink-0" />
                           <div>
-                            <p className="text-[9px] text-muted-foreground">Baujahr</p>
+                            <p className="text-xs text-muted-foreground">Baujahr</p>
                             <p className="font-semibold text-sm">{current.baujahr}</p>
                           </div>
                         </div>
@@ -518,7 +518,7 @@ export function Vorauswahl() {
                         <div className="flex items-center gap-2 bg-background/60 rounded-lg px-3 py-1.5">
                           <Layers className="h-3.5 w-3.5 text-primary flex-shrink-0" />
                           <div>
-                            <p className="text-[9px] text-muted-foreground">Geschosse</p>
+                            <p className="text-xs text-muted-foreground">Geschosse</p>
                             <p className="font-semibold text-sm">{Number(current.geschosse)}</p>
                           </div>
                         </div>
@@ -605,7 +605,7 @@ export function Vorauswahl() {
                       )}
                     </div>
                     {(current.parzelle || current.bfs_nr || current.egrid) && (
-                      <p className="text-[10px] text-muted-foreground mt-1.5">{current.parzelle ? `Parzelle: ${current.parzelle}` : ''}{current.bfs_nr ? ` • BFS: ${current.bfs_nr}` : ''}{current.egrid ? ` • EGRID: ${current.egrid}` : ''}</p>
+                      <p className="text-xs text-muted-foreground mt-1.5">{current.parzelle ? `Parzelle: ${current.parzelle}` : ''}{current.bfs_nr ? ` • BFS: ${current.bfs_nr}` : ''}{current.egrid ? ` • EGRID: ${current.egrid}` : ''}</p>
                     )}
                   </div>
 
@@ -632,7 +632,7 @@ export function Vorauswahl() {
                         </a>
                       </div>
                     )}
-                    <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
                       <Keyboard className="h-3 w-3" />
                       <span><kbd className="bg-muted px-1 rounded font-mono">Enter/J</kbd> Interessant</span>
                       <span><kbd className="bg-muted px-1 rounded font-mono">N</kbd> Nein</span>
@@ -655,7 +655,7 @@ export function Vorauswahl() {
                           <span className={scoreColor(s)}>{s}</span>
                         </div>
                         <span className="truncate flex-1 text-sm font-medium">{p.address}</span>
-                        {p.zone && <Badge variant="outline" className="text-[10px]">{p.zone}</Badge>}
+                        {p.zone && <Badge variant="outline" className="text-xs">{p.zone}</Badge>}
                         {p.gebaeudeflaeche && <span className="text-xs text-muted-foreground">{Math.round(Number(p.gebaeudeflaeche))}m²</span>}
                       </div>
                     );

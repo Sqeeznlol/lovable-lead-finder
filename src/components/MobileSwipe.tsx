@@ -157,7 +157,7 @@ export function MobileSwipe() {
           Bauraum
         </h1>
         <div className="flex items-center gap-3">
-          <div className="flex gap-2 text-[10px] text-muted-foreground">
+          <div className="flex gap-2 text-xs text-muted-foreground">
             <span>✅{sessionStats.interessant}</span>
             <span>❌{sessionStats.nein}</span>
           </div>
@@ -179,7 +179,7 @@ export function MobileSwipe() {
           ].map(s => (
             <div key={s.label}>
               <p className="text-xs font-bold tabular-nums">{typeof s.value === 'number' ? s.value.toLocaleString('de-CH') : s.value}</p>
-              <p className="text-[8px] text-muted-foreground uppercase">{s.label}</p>
+              <p className="text-xs text-muted-foreground uppercase">{s.label}</p>
             </div>
           ))}
         </div>
@@ -201,9 +201,9 @@ export function MobileSwipe() {
           {/* Top bar */}
           <div className="flex items-center justify-between px-3 py-1.5 bg-muted/30 border-b">
             <div className="flex items-center gap-1.5">
-              <Badge variant="outline" className="text-[9px] h-5">#{currentIndex + 1}/{items.length}</Badge>
-              {current.zone && <Badge className="bg-primary/10 text-primary border-primary/20 text-[9px] h-5">{current.zone}</Badge>}
-              {current.kategorie && <Badge variant="outline" className="text-[9px] h-5">{current.kategorie}</Badge>}
+              <Badge variant="outline" className="text-xs h-5">#{currentIndex + 1}/{items.length}</Badge>
+              {current.zone && <Badge className="bg-primary/10 text-primary border-primary/20 text-xs h-5">{current.zone}</Badge>}
+              {current.kategorie && <Badge variant="outline" className="text-xs h-5">{current.kategorie}</Badge>}
             </div>
             <div className={`w-10 h-10 rounded-xl border-2 flex flex-col items-center justify-center ${scoreBg(score)}`}>
               <span className={`text-sm font-black ${scoreColor(score)}`}>{score}</span>
@@ -222,7 +222,7 @@ export function MobileSwipe() {
               <div className="flex items-center gap-1.5 bg-muted/40 rounded-lg px-2 py-1">
                 <MapPin className="h-3 w-3 text-primary flex-shrink-0" />
                 <div>
-                  <p className="text-[8px] text-muted-foreground">Whg.</p>
+                  <p className="text-xs text-muted-foreground">Whg.</p>
                   <p className="font-bold text-xs">{Number(current.wohnungen)}</p>
                 </div>
               </div>
@@ -231,7 +231,7 @@ export function MobileSwipe() {
               <div className="flex items-center gap-1.5 bg-muted/40 rounded-lg px-2 py-1">
                 <Calendar className="h-3 w-3 text-primary flex-shrink-0" />
                 <div>
-                  <p className="text-[8px] text-muted-foreground">Bj.</p>
+                  <p className="text-xs text-muted-foreground">Bj.</p>
                   <p className="font-bold text-xs">{current.baujahr}</p>
                 </div>
               </div>
@@ -240,7 +240,7 @@ export function MobileSwipe() {
               <div className="flex items-center gap-1.5 bg-muted/40 rounded-lg px-2 py-1">
                 <Home className="h-3 w-3 text-primary flex-shrink-0" />
                 <div>
-                  <p className="text-[8px] text-muted-foreground">HNF</p>
+                  <p className="text-xs text-muted-foreground">HNF</p>
                   <p className="font-bold text-xs">{Math.round(Number(current.gebaeudeflaeche))}m²</p>
                 </div>
               </div>
@@ -249,7 +249,7 @@ export function MobileSwipe() {
               <div className="flex items-center gap-1.5 bg-muted/40 rounded-lg px-2 py-1">
                 <Ruler className="h-3 w-3 text-primary flex-shrink-0" />
                 <div>
-                  <p className="text-[8px] text-muted-foreground">GS</p>
+                  <p className="text-xs text-muted-foreground">GS</p>
                   <p className="font-bold text-xs">{Math.round(Number(current.area))}m²</p>
                 </div>
               </div>
@@ -258,7 +258,7 @@ export function MobileSwipe() {
               <div className="flex items-center gap-1.5 bg-muted/40 rounded-lg px-2 py-1">
                 <Layers className="h-3 w-3 text-primary flex-shrink-0" />
                 <div>
-                  <p className="text-[8px] text-muted-foreground">Gesch.</p>
+                  <p className="text-xs text-muted-foreground">Gesch.</p>
                   <p className="font-bold text-xs">{Number(current.geschosse)}</p>
                 </div>
               </div>
@@ -268,7 +268,7 @@ export function MobileSwipe() {
           {/* Owner hint */}
           {current.owner_name && (
             <div className="px-3 pb-2">
-              <p className="text-[10px] text-muted-foreground">Eigentümer: <span className="text-foreground font-medium">{current.owner_name}</span></p>
+              <p className="text-xs text-muted-foreground">Eigentümer: <span className="text-foreground font-medium">{current.owner_name}</span></p>
             </div>
           )}
         </div>
@@ -304,7 +304,7 @@ export function MobileSwipe() {
             <ThumbsUp className="h-5 w-5" /> Ja
           </Button>
         </div>
-        <p className="text-center text-[9px] text-muted-foreground">
+        <p className="text-center text-xs text-muted-foreground">
           ← Swipe links = Nein · ⏳ Später · Swipe rechts = Ja →
         </p>
       </div>

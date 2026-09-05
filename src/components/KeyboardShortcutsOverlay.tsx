@@ -48,7 +48,7 @@ export function KeyboardShortcutsOverlay() {
               </div>
             ))}
           </div>
-          <p className="text-[11px] text-muted-foreground">Drücke <kbd className="font-mono">?</kbd> jederzeit, um diese Übersicht zu öffnen.</p>
+          <p className="text-xs text-muted-foreground">Drücke <kbd className="font-mono">?</kbd> jederzeit, um diese Übersicht zu öffnen.</p>
         </CardContent>
       </Card>
     </div>

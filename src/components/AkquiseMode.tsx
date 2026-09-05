@@ -515,7 +515,7 @@ export function AkquiseMode() {
               </div>
               <div className={`flex-shrink-0 w-20 h-20 rounded-2xl border-2 flex flex-col items-center justify-center ${scoreBg(score)}`}>
                 <span className={`text-2xl font-black ${scoreColor(score)}`}>{score}</span>
-                <span className="text-[10px] text-muted-foreground font-medium">SCORE</span>
+                <span className="text-xs text-muted-foreground font-medium">SCORE</span>
               </div>
             </div>
 
@@ -718,7 +718,7 @@ export function AkquiseMode() {
                                 type="button"
                                 size="sm"
                                 variant="ghost"
-                                className="ml-auto h-6 px-2 text-[10px] gap-1"
+                                className="ml-auto h-6 px-2 text-xs gap-1"
                                 onClick={(e) => {
                                   e.preventDefault();
                                   navigator.clipboard.writeText(opt.number);
@@ -750,7 +750,7 @@ export function AkquiseMode() {
                     )}
 
                     {!extensionAvailable && (
-                      <p className="text-[11px] text-muted-foreground">
+                      <p className="text-xs text-muted-foreground">
                         Chrome Extension benötigt. Herunterladen → entpacken → <code className="bg-muted px-1 rounded">chrome://extensions</code> → Developer Mode → Load Unpacked
                       </p>
                     )}
@@ -817,7 +817,7 @@ export function AkquiseMode() {
                           {owner.raw.trim() && (
                             <>
                               {isNonPerson && (
-                                <Badge className={`${ownerTypeColor(ownerType)} text-[10px]`}>{ownerTypeLabel(ownerType)}</Badge>
+                                <Badge className={`${ownerTypeColor(ownerType)} text-xs`}>{ownerTypeLabel(ownerType)}</Badge>
                               )}
                               <Button size="sm" variant="outline" className="h-7 text-xs gap-1"
                                 onClick={() => window.open(telSearchUrlParsed(owner.parsed, ownerOrt), '_blank')}>
@@ -986,7 +986,7 @@ export function AkquiseMode() {
                     </Tooltip>
                   </TooltipProvider>
                 </div>
-                <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
+                <div className="flex items-center gap-4 text-xs text-muted-foreground">
                   <Keyboard className="h-3 w-3" />
                   <span><kbd className="bg-muted px-1 rounded font-mono">Ctrl+Enter</kbd> Speichern</span>
                   <span><kbd className="bg-muted px-1 rounded font-mono">Ctrl+→</kbd> Skip</span>

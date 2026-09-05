@@ -21,7 +21,7 @@ export function CantonTabs() {
               !c.active && 'text-muted-foreground/50 cursor-not-allowed'
             )}
           >
-            <span className="font-mono text-[11px] opacity-70">{c.id}</span>
+            <span className="font-mono text-xs opacity-70">{c.id}</span>
             <span className="hidden sm:inline">{c.name}</span>
             {!c.active && <Lock className="h-3 w-3" />}
           </button>

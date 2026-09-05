@@ -29,7 +29,7 @@ export function GemeindeSidebar({ selected, onSelect }: Props) {
           <Building2 className="h-4 w-4 text-muted-foreground" />
           <h3 className="font-semibold text-sm">Gemeinden</h3>
           {data && (
-            <span className="text-[10px] text-muted-foreground ml-auto">
+            <span className="text-xs text-muted-foreground ml-auto">
               {data.gemeinden.length}
             </span>
           )}
@@ -60,7 +60,7 @@ export function GemeindeSidebar({ selected, onSelect }: Props) {
             </div>
             {data && (
               <div className={cn(
-                'text-[10px] mt-0.5 flex gap-2',
+                'text-xs mt-0.5 flex gap-2',
                 selected === null ? 'opacity-80' : 'text-muted-foreground',
               )}>
                 <span>{data.all.offen.toLocaleString('de-CH')} offen</span>
@@ -110,7 +110,7 @@ export function GemeindeSidebar({ selected, onSelect }: Props) {
                   <span className="text-xs opacity-80 shrink-0">{g.total.toLocaleString('de-CH')}</span>
                 </div>
                 <div className={cn(
-                  'text-[10px] mt-0.5 flex gap-2',
+                  'text-xs mt-0.5 flex gap-2',
                   isActive ? 'opacity-80' : 'text-muted-foreground',
                 )}>
                   <span>{g.offen.toLocaleString('de-CH')} offen</span>
