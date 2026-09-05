@@ -80,7 +80,12 @@ function applyFilters<T>(
   // Ausgeschlossene stehen standardmässig nicht in der Arbeitsliste: sie
   // lassen sich weder kaufen noch zu Wohnraum entwickeln.
   if (f.ausgeschlossen === 'nur') q = q.eq('ausgeschlossen', true);
-  else if (f.ausgeschlossen !== 'alle') q = q.eq('ausgeschlossen', false);
+  else if (f.ausgeschlossen !== 'alle') {
+    q = q.eq('ausgeschlossen', false);
+    // Von Hand archivierte Objekte sind erledigt -- sie stehen nur noch
+    // in der Ansicht, die ausdrücklich alles zeigt.
+    q = q.neq('preselection_status', 'Ausschliessen');
+  }
   if (f.tier) q = q.eq('score_tier', f.tier);
   if (f.hnfDeltaMin != null) q = q.gte('hnf_delta', f.hnfDeltaMin);
   if (f.reserveMin != null) q = q.gte('reserve_gf', f.reserveMin);
