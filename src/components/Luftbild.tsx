@@ -51,7 +51,7 @@ export function Luftbild({ address, plzOrt, className }: Props) {
     return (
       <div className={`grid min-h-[180px] place-items-center gap-1 rounded-2xl bg-muted/40 text-center ${className || ''}`}>
         <ImageOff className="h-5 w-5 text-muted-foreground" />
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           {state === 'fehler' ? 'Luftbild nicht erreichbar' : 'Adresse nicht gefunden'}
         </p>
       </div>
@@ -71,7 +71,7 @@ export function Luftbild({ address, plzOrt, className }: Props) {
         href={swisstopoMapUrl(coords.lat, coords.lon)}
         target="_blank"
         rel="noopener noreferrer"
-        className="absolute bottom-2 right-2 flex items-center gap-1 rounded-full bg-background/85 px-2.5 py-1 text-[10px] font-medium backdrop-blur transition-opacity"
+        className="absolute bottom-2 right-2 flex items-center gap-1 rounded-full bg-background/85 px-2.5 py-1 text-xs font-medium backdrop-blur transition-opacity"
       >
         swisstopo <ExternalLink className="h-3 w-3" />
       </a>

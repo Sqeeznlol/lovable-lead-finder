@@ -7,6 +7,8 @@ import { useMasterProperties, useGemeindeStats, type MasterFilters } from '@/hoo
 import { MasterFiltersBar } from './MasterFilters';
 import { GemeindeSidebar } from './GemeindeSidebar';
 import { PropertyDetailDialog } from './PropertyDetailDialog';
+import { beurteile, EMPFEHLUNG_LABEL, type Empfehlung } from '@/lib/akquise';
+import { LAGE_LABEL } from '@/lib/gemeinden-zh';
 
 const m2 = (v: number | null | undefined) =>
   v == null ? '—' : `${Math.round(Number(v)).toLocaleString('de-CH')} m²`;
@@ -26,11 +28,16 @@ const vorwahlKurz = (v: string | null | undefined) => {
   }
 };
 
-const tierStil = (t: string | null | undefined) =>
-  t === 'A' ? 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30'
-  : t === 'B' ? 'bg-primary/15 text-primary border-primary/30'
-  : t === 'C' ? 'bg-amber-500/15 text-amber-600 border-amber-500/30'
-  : 'bg-muted text-muted-foreground border-border';
+/**
+ * Die Empfehlung ist die eine Angabe, nach der die Liste gelesen wird:
+ * grün heisst anrufen, grau heisst Finger weg.
+ */
+const empfehlungStil: Record<Empfehlung, string> = {
+  anrufen:       'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30',
+  pruefen:       'bg-primary/12 text-primary border-primary/25',
+  zurueckstellen:'bg-amber-500/12 text-amber-700 dark:text-amber-400 border-amber-500/25',
+  nein:          'bg-muted text-muted-foreground border-border',
+};
 
 const SORTIERUNG: { wert: MasterFilters['sortBy']; label: string }[] = [
   { wert: 'hnf_delta', label: 'HNF-Zuwachs' },
@@ -144,7 +151,7 @@ export function MasterList() {
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-10 bg-muted text-xs uppercase text-muted-foreground">
                   <tr>
-                    <th className="text-center p-3 font-medium">Tier</th>
+                    <th className="whitespace-nowrap p-3 text-left font-medium">Empfehlung</th>
                     <th className="text-left p-3 font-medium">Adresse</th>
                     <th className="text-left p-3 font-medium">Gemeinde</th>
                     <th className="whitespace-nowrap p-3 text-right font-medium">HNF&nbsp;+</th>
@@ -166,12 +173,17 @@ export function MasterList() {
                       Keine Datensätze gefunden.
                     </td></tr>
                   )}
-                  {data?.rows.map(p => (
-                    <tr key={p.id} className="border-t hover:bg-muted/30 cursor-pointer"
+                  {data?.rows.map(p => {
+                    const urteil = beurteile(p);
+                    return (
+                    <tr key={p.id} className="cursor-pointer border-t transition-colors hover:bg-muted/40"
                         onClick={() => setSelectedId(p.id)}>
-                      <td className="p-3 text-center">
-                        <span className={`inline-flex h-7 w-7 items-center justify-center rounded-lg border text-xs font-bold ${tierStil(p.score_tier)}`}>
-                          {p.score_tier || '–'}
+                      <td className="p-3">
+                        <span
+                          className={`inline-flex items-center whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${empfehlungStil[urteil.empfehlung]}`}
+                          title={[...urteil.dafuer, ...urteil.dagegen.map(d => '– ' + d)].join('\n')}
+                        >
+                          {EMPFEHLUNG_LABEL[urteil.empfehlung]}
                         </span>
                       </td>
                       <td className="min-w-[200px] p-3">
@@ -184,13 +196,17 @@ export function MasterList() {
                       </td>
                       <td className="whitespace-nowrap p-3 text-muted-foreground">{p.gemeinde || '—'}</td>
                       <td className="whitespace-nowrap p-3 text-right font-medium tabular-nums text-primary">{m2(p.hnf_delta)}</td>
-                      <td className="whitespace-nowrap p-3 text-right tabular-nums">{mio(p.marge_chf)}</td>
+                      <td className="whitespace-nowrap p-3 text-right tabular-nums" title={`Erlös in ${p.gemeinde || 'dieser Gemeinde'}: ${urteil.erloesProM2.toLocaleString('de-CH')} CHF/m² · ${LAGE_LABEL[urteil.lage]}`}>
+                        {urteil.margeLagegerecht != null
+                          ? (urteil.margeLagegerecht / 1e6).toFixed(1)
+                          : mio(p.marge_chf)}
+                      </td>
                       <td className="whitespace-nowrap p-3 text-right tabular-nums text-muted-foreground">{m2(p.bebaubar_m2 ?? p.area)}</td>
                       <td className="whitespace-nowrap p-3 text-right tabular-nums">{p.baujahr || '—'}</td>
                       <td className="p-3">
                         <Badge
                           variant="outline"
-                          className="whitespace-nowrap text-[10px]"
+                          className="whitespace-nowrap text-xs"
                           title={p.preselection_status || 'Nicht geprüft'}
                         >
                           {vorwahlKurz(p.preselection_status)}
@@ -206,7 +222,8 @@ export function MasterList() {
                         )}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

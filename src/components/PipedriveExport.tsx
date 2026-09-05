@@ -363,9 +363,9 @@ export function PipedriveExport() {
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-xs font-semibold text-muted-foreground uppercase">Spalten wählen</p>
                       <div className="flex gap-1">
-                        <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2"
+                        <Button size="sm" variant="ghost" className="h-6 text-xs px-2"
                           onClick={() => setSelectedColumns(new Set(EXPORT_COLUMNS.map(c => c.key)))}>Alle</Button>
-                        <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2"
+                        <Button size="sm" variant="ghost" className="h-6 text-xs px-2"
                           onClick={() => setSelectedColumns(new Set(DEFAULT_COLUMNS))}>Standard</Button>
                       </div>
                     </div>

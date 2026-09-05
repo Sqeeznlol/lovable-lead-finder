@@ -173,13 +173,40 @@ input, textarea, select {
   body {
     @apply bg-background text-foreground antialiased;
     font-family: 'DM Sans', sans-serif;
+    /* ss01/cv11: geschlossenes a und gerades l -- ruhiger im Fliesstext.
+       Basis auf 15.5px: 14px war auf grossen Bildschirmen zu klein für
+       Listen, die man den ganzen Tag liest. */
     font-feature-settings: 'ss01', 'cv11';
+    font-size: 15.5px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Zahlen in Tabellen müssen untereinander stehen, sonst springt die
+     Spalte und Beträge lassen sich nicht vergleichen. */
+  table, .tabular, [class*="tabular-nums"] {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum', 'ss01';
+  }
+
+  th {
+    letter-spacing: 0.06em;
+    font-weight: 500;
   }
 
   h1, h2, h3, .font-serif {
     font-family: 'Newsreader', serif;
-    letter-spacing: -0.015em;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
   }
+
+  /* Überschriften bekommen mehr Gewicht gegenüber dem Fliesstext, damit
+     die Hierarchie auch beim Überfliegen trägt. */
+  h1 { @apply text-3xl; }
+  h2 { @apply text-2xl; }
+  h3 { @apply text-lg; }
 
   code, .font-mono {
     font-family: 'DM Sans', monospace;

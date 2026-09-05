@@ -522,14 +522,14 @@ function StatusBadge({ status }: { status: QueuedFile['status'] }) {
     error: { label: 'Fehler', cls: 'bg-destructive/10 text-destructive' },
   };
   const c = map[status];
-  return <span className={`text-[10px] uppercase px-2 py-0.5 rounded-full ${c.cls}`}>{c.label}</span>;
+  return <span className={`text-xs uppercase px-2 py-0.5 rounded-full ${c.cls}`}>{c.label}</span>;
 }
 
 function SummaryStat({ label, value, color }: { label: string; value: number; color?: string }) {
   return (
     <div>
       <p className={`text-2xl font-bold ${color || 'text-foreground'}`}>{value.toLocaleString('de-CH')}</p>
-      <p className="text-[10px] text-muted-foreground uppercase tracking-wider mt-1">{label}</p>
+      <p className="text-xs text-muted-foreground uppercase tracking-wider mt-1">{label}</p>
     </div>
   );
 }

@@ -169,7 +169,7 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
                   );
                 })()}
                 {!extensionAvailable && (
-                  <p className="text-[11px] text-muted-foreground">Chrome-Extension empfohlen für Auto-Speicherung.</p>
+                  <p className="text-xs text-muted-foreground">Chrome-Extension empfohlen für Auto-Speicherung.</p>
                 )}
               </div>
 
@@ -244,7 +244,7 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
 function Stat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="rounded-lg border p-2.5">
-      <p className="text-[10px] uppercase text-muted-foreground tracking-wider">{label}</p>
+      <p className="text-xs uppercase text-muted-foreground tracking-wider">{label}</p>
       <p className="font-medium mt-0.5">{value}</p>
     </div>
   );

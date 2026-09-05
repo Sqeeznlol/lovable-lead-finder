@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { Building2, LayoutDashboard, Upload, Phone, Menu, X, Zap, Search, FileSpreadsheet, Eye, Shield, Share, Plus, Database } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+const Uebersicht = lazy(() => import('@/components/Uebersicht').then(m => ({ default: m.Uebersicht })));
 const Dashboard = lazy(() => import('@/components/Dashboard').then(m => ({ default: m.Dashboard })));
 const PropertyList = lazy(() => import('@/components/PropertyList').then(m => ({ default: m.PropertyList })));
 const CsvImport = lazy(() => import('@/components/CsvImport').then(m => ({ default: m.CsvImport })));
@@ -21,13 +22,14 @@ import { useCanton } from '@/hooks/use-canton';
 import { usePlatform } from '@/hooks/use-platform';
 import { useMidnightReset } from '@/hooks/use-phones';
 
-type Tab = 'dashboard' | 'master' | 'vorauswahl' | 'akquise' | 'telsuche' | 'properties' | 'import' | 'masterimport' | 'phones' | 'export' | 'admin';
+type Tab = 'uebersicht' | 'dashboard' | 'master' | 'vorauswahl' | 'akquise' | 'telsuche' | 'properties' | 'import' | 'masterimport' | 'phones' | 'export' | 'admin';
 
 // Master-Import ist bewusst nicht in der Navigation: die Daten stehen, und
 // ein Import gehört zu den Dingen, die man selten und bewusst macht. Der
 // Reiter lässt sich über den Admin-Bereich öffnen.
 const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'uebersicht', label: 'Übersicht', icon: LayoutDashboard },
+  { id: 'dashboard', label: 'Kennzahlen', icon: LayoutDashboard },
   { id: 'master', label: 'Master-Liste', icon: Database },
   { id: 'vorauswahl', label: 'Vorauswahl', icon: Eye },
   { id: 'akquise', label: 'Akquise-Modus', icon: Zap },
@@ -40,10 +42,10 @@ const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: st
 ];
 
 // Primary tabs visible in the iPhone bottom bar
-const mobileBottomTabs: Tab[] = ['dashboard', 'vorauswahl', 'akquise', 'telsuche', 'properties'];
+const mobileBottomTabs: Tab[] = ['uebersicht', 'master', 'vorauswahl', 'akquise', 'telsuche'];
 
 export default function Index() {
-  const [active, setActive] = useState<Tab>('dashboard');
+  const [active, setActive] = useState<Tab>('uebersicht');
   const [mobileOpen, setMobileOpen] = useState(false);
   const { current, cantons } = useCanton();
   const cantonName = cantons.find(c => c.id === current)?.name ?? '';
@@ -74,7 +76,7 @@ export default function Index() {
             </div>
             <div>
               <h1 className="font-serif text-2xl tracking-tight text-foreground leading-none">Bauraum</h1>
-              <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mt-1.5">Immobilien · Schweiz</p>
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground mt-1.5">Immobilien · Schweiz</p>
             </div>
           </div>
           <div className="mt-5">
@@ -98,7 +100,7 @@ export default function Index() {
           ))}
         </nav>
         <div className="p-5 border-t border-foreground/5 flex items-center justify-between">
-          <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Theme</span>
+          <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Theme</span>
           <ThemeToggle compact />
         </div>
       </aside>
@@ -141,6 +143,7 @@ export default function Index() {
               <Skeleton className="h-64 w-full" />
             </div>
           }>
+            {active === 'uebersicht' && <Uebersicht />}
             {active === 'dashboard' && <Dashboard />}
             {active === 'master' && <MasterList />}
             {active === 'masterimport' && <MasterImport />}
@@ -195,7 +198,7 @@ export default function Index() {
                   }`}>
                     <t.icon className="h-[18px] w-[18px]" />
                   </span>
-                  <span className="text-[10px] font-medium leading-tight">{t.label.split('-')[0].split(' ')[0]}</span>
+                  <span className="text-xs font-medium leading-tight">{t.label.split('-')[0].split(' ')[0]}</span>
                 </button>
               );
             })}

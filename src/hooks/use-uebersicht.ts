@@ -1,0 +1,162 @@
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { beurteile, type Empfehlung } from '@/lib/akquise';
+import { calculatePotential } from '@/lib/potential';
+import { gemeindeprofil, LAGE_LABEL, type Lagestufe } from '@/lib/gemeinden-zh';
+
+/** Felder, die für die Beurteilung gebraucht werden. */
+const FELDER =
+  'id, address, gemeinde, zone, ausnuetzung, area, gebaeudeflaeche, geschosse, ' +
+  'vollgeschosse, baujahr, renovationsjahr, denkmalschutz, isos, wohnungen, ' +
+  'owner_name, eigentuemer_name, gebaeude_anzahl, hnf_delta, marge_chf, ' +
+  'score_tier, potenzial_score, preselection_status, ausgeschlossen';
+
+export interface Chance {
+  id: string;
+  address: string;
+  gemeinde: string | null;
+  empfehlung: Empfehlung;
+  punkte: number;
+  hnfDelta: number | null;
+  marge: number | null;
+  lage: Lagestufe;
+  baujahr: number | null;
+  eigentuemer: string | null;
+  dafuer: string[];
+}
+
+export interface GemeindeChance {
+  gemeinde: string;
+  anrufen: number;
+  /** Anrufen und Prüfen zusammen -- so viele Objekte tragen zur Summe bei. */
+  chancen: number;
+  margeSumme: number;
+  lage: string;
+}
+
+export interface Uebersicht {
+  total: number;
+  bewertet: number;
+  nachEmpfehlung: Record<Empfehlung, number>;
+  margeSumme: number;
+  topChancen: Chance[];
+  topGemeinden: GemeindeChance[];
+  ohneEigentuemer: number;
+}
+
+/**
+ * Wertet die Objekte für die Übersicht aus.
+ *
+ * Die Beurteilung liegt im Frontend, weil sie Erfahrungswerte einbezieht,
+ * die sich häufiger ändern als das Datenbankschema -- Preisniveau je
+ * Gemeinde, Verkaufsbereitschaft je Eigentümertyp. Deshalb wird hier
+ * gelesen und gerechnet statt in der Datenbank abgefragt.
+ *
+ * Geladen wird nur, was nicht ausgeschlossen ist und wo überhaupt ein
+ * Potenzial errechnet wurde; alles andere trägt zur Frage "wen rufe ich an"
+ * nichts bei und würde die Abfrage unnötig gross machen.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const potenzialVon = (p: any) => calculatePotential(p).hnfDelta;
+
+export function useUebersicht() {
+  return useQuery({
+    queryKey: ['uebersicht'],
+    staleTime: 60 * 1000,
+    queryFn: async (): Promise<Uebersicht> => {
+      const { count: total } = await supabase
+        .from('properties')
+        .select('id', { count: 'exact', head: true });
+
+      const chancen: Chance[] = [];
+      const nachEmpfehlung: Record<Empfehlung, number> = {
+        anrufen: 0, pruefen: 0, zurueckstellen: 0, nein: 0,
+      };
+      const proGemeinde = new Map<string, { anrufen: number; chancen: number; marge: number }>();
+      let margeSumme = 0;
+      let bewertet = 0;
+      let ohneEigentuemer = 0;
+
+      // In Seiten lesen: die Beurteilung braucht die Rohdaten, und bei
+      // Hunderttausenden Zeilen wäre eine einzelne Abfrage weder schnell
+      // noch verlässlich.
+      const SEITE = 1000;
+      for (let von = 0; von < 40000; von += SEITE) {
+        const { data, error } = await supabase
+          .from('properties')
+          .select(FELDER)
+          .eq('ausgeschlossen', false)
+          .not('hnf_delta', 'is', null)
+          .order('hnf_delta', { ascending: false, nullsFirst: false })
+          .range(von, von + SEITE - 1);
+
+        if (error || !data?.length) break;
+
+        for (const roh of data) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const p = roh as any;
+          const u = beurteile(p);
+          // HNF und Marge müssen aus derselben Rechnung stammen. Der Wert in
+          // der Datenbank kann älter sein als die aktuelle Formel; dann
+          // stünden hier zwei Zahlen nebeneinander, die nicht zusammenpassen.
+          const gerechnet = potenzialVon(p);
+          bewertet++;
+          nachEmpfehlung[u.empfehlung]++;
+          if (!p.owner_name && !p.eigentuemer_name) ohneEigentuemer++;
+
+          if (u.empfehlung === 'anrufen' || u.empfehlung === 'pruefen') {
+            const marge = u.margeLagegerecht ?? 0;
+            margeSumme += Math.max(marge, 0);
+
+            if (p.gemeinde) {
+              const g = proGemeinde.get(p.gemeinde) ?? { anrufen: 0, chancen: 0, marge: 0 };
+              g.chancen++;
+              if (u.empfehlung === 'anrufen') g.anrufen++;
+              g.marge += Math.max(marge, 0);
+              proGemeinde.set(p.gemeinde, g);
+            }
+
+            chancen.push({
+              id: p.id,
+              address: p.address,
+              gemeinde: p.gemeinde,
+              empfehlung: u.empfehlung,
+              punkte: u.punkte,
+              hnfDelta: gerechnet,
+              marge: u.margeLagegerecht,
+              lage: u.lage,
+              baujahr: p.baujahr,
+              eigentuemer: p.owner_name ?? p.eigentuemer_name ?? null,
+              dafuer: u.dafuer,
+            });
+          }
+        }
+
+        if (data.length < SEITE) break;
+      }
+
+      chancen.sort((a, b) => b.punkte - a.punkte || (b.marge ?? 0) - (a.marge ?? 0));
+
+      const topGemeinden: GemeindeChance[] = [...proGemeinde.entries()]
+        .map(([gemeinde, g]) => ({
+          gemeinde,
+          anrufen: g.anrufen,
+          chancen: g.chancen,
+          margeSumme: g.marge,
+          lage: LAGE_LABEL[gemeindeprofil(gemeinde).stufe],
+        }))
+        .sort((a, b) => b.margeSumme - a.margeSumme)
+        .slice(0, 8);
+
+      return {
+        total: total ?? 0,
+        bewertet,
+        nachEmpfehlung,
+        margeSumme,
+        topChancen: chancen.slice(0, 15),
+        topGemeinden,
+        ohneEigentuemer,
+      };
+    },
+  });
+}

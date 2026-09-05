@@ -39,7 +39,7 @@ export function ListSelector() {
             <span className="text-xs font-medium truncate">{label}</span>
           </div>
           {selectedList && isPrio(selectedList) && (
-            <Badge className="text-[10px] px-1.5 py-0 shrink-0 bg-amber-500/20 text-amber-700 border-amber-300">
+            <Badge className="text-xs px-1.5 py-0 shrink-0 bg-amber-500/20 text-amber-700 border-amber-300">
               PRIO
             </Badge>
           )}
@@ -67,7 +67,7 @@ export function ListSelector() {
             <div className="flex items-center justify-between w-full">
               <span className="font-medium text-sm">Alle Listen</span>
               {countData && (
-                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                <Badge variant="secondary" className="text-xs px-1.5 py-0">
                   {countData.total}
                 </Badge>
               )}
@@ -78,7 +78,7 @@ export function ListSelector() {
             <>
               <DropdownMenuSeparator />
               <div className="px-2 py-1">
-                <span className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider">Prio-Listen</span>
+                <span className="text-xs font-semibold text-amber-600 uppercase tracking-wider">Prio-Listen</span>
               </div>
               {prioLists.map(list => (
                 <DropdownMenuItem
@@ -91,7 +91,7 @@ export function ListSelector() {
                       <Star className="h-3 w-3 text-amber-500 fill-amber-500 shrink-0" />
                       <span className="text-sm truncate">{list.name}</span>
                     </div>
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0 ml-2 bg-amber-500/10 text-amber-700 border-amber-200">
+                    <Badge variant="outline" className="text-xs px-1.5 py-0 shrink-0 ml-2 bg-amber-500/10 text-amber-700 border-amber-200">
                       {countData?.counts[list.id] || list.property_count}
                     </Badge>
                   </div>
@@ -104,7 +104,7 @@ export function ListSelector() {
             <>
               <DropdownMenuSeparator />
               <div className="px-2 py-1">
-                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Listen</span>
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Listen</span>
               </div>
               {otherLists.map(list => (
                 <DropdownMenuItem
@@ -114,7 +114,7 @@ export function ListSelector() {
                 >
                   <div className="flex items-center justify-between w-full">
                     <span className="text-sm truncate">{list.name}</span>
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0 ml-2">
+                    <Badge variant="outline" className="text-xs px-1.5 py-0 shrink-0 ml-2">
                       {countData?.counts[list.id] || list.property_count}
                     </Badge>
                   </div>
@@ -129,7 +129,7 @@ export function ListSelector() {
               <DropdownMenuItem disabled className="opacity-50">
                 <div className="flex items-center justify-between w-full">
                   <span className="text-xs">Ohne Liste</span>
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                  <Badge variant="outline" className="text-xs px-1.5 py-0">
                     {countData.noList}
                   </Badge>
                 </div>
