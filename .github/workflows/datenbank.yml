@@ -249,8 +249,18 @@ jobs:
                 echo "| $1 | HTTP $code, $groesse Bytes |" >> "$GITHUB_STEP_SUMMARY"
               }
 
-              probe "geodienste.ch Übersicht Nutzungsplanung" \
-                "https://geodienste.ch/services/av?REQUEST=GetCapabilities&SERVICE=WFS"
+              # Die eigentliche Frage: lässt sich der Datensatz auch
+              # abrufen, oder ist er nur im Katalog aufgeführt? Geprüft
+              # werden die Wege, über die geodienste.ch seine Dienste
+              # bereitstellt.
+              probe "AV — WFS Fähigkeiten" \
+                "https://geodienste.ch/db/av_0/deu?SERVICE=WFS&REQUEST=GetCapabilities"
+              probe "AV — Liegenschaften TG (2 Objekte)" \
+                "https://geodienste.ch/db/av_0/deu?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAMES=liegenschaft&COUNT=2&SRSNAME=EPSG:2056"
+              probe "Nutzungsplanung — WFS Fähigkeiten" \
+                "https://geodienste.ch/db/nutzungsplanung/deu?SERVICE=WFS&REQUEST=GetCapabilities"
+              probe "Nutzungsplanung — WMS Fähigkeiten" \
+                "https://geodienste.ch/db/nutzungsplanung/deu?SERVICE=WMS&REQUEST=GetCapabilities"
               probe "geodienste.ch Verfügbarkeit" \
                 "https://geodienste.ch/info/services.json"
               probe "TG WFS GetCapabilities" \
