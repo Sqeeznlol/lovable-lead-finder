@@ -215,33 +215,11 @@ jobs:
 
           echo
           echo "### Zonennamen holen"
-          curl -sSL -o /tmp/ili2gpkg.zip \
-            "https://downloads.interlis.ch/ili2gpkg/ili2gpkg-5.1.1.zip"
-          unzip -o -q /tmp/ili2gpkg.zip -d /tmp/ili2gpkg
-          jar=$(find /tmp/ili2gpkg -name 'ili2gpkg*.jar' | head -1)
-          modelldir="/tmp;http://models.interlis.ch/;https://models.geo.admin.ch/"
-
-          rm -f /tmp/zonentyp.gpkg
-          java -jar "$jar" --dbfile /tmp/zonentyp.gpkg \
-            --modeldir "$modelldir" --defaultSrsCode 2056 \
-            --models Nutzungsplanung_V1_2 --createBasketCol --schemaimport \
-            > /tmp/zschema.log 2>&1 || tail -5 /tmp/zschema.log
-          java -jar "$jar" --dbfile /tmp/zonentyp.gpkg \
-            --modeldir "$modelldir" --defaultSrsCode 2056 \
-            --createBasketCol --disableValidation --skipReferenceErrors \
-            --import "$xtf" > /tmp/zimport.log 2>&1 || tail -5 /tmp/zimport.log
-
-          if ogrinfo -so /tmp/zonentyp.gpkg typ_grundnutzung > /dev/null 2>&1; then
-            echo "Spalten:"
-            ogrinfo -so /tmp/zonentyp.gpkg typ_grundnutzung 2>/dev/null \
-              | sed -n '/^Feature Count/p;/^[a-z_0-9]*:/p'
-            echo "Proben:"
-            ogr2ogr -f CSV /vsistdout/ /tmp/zonentyp.gpkg typ_grundnutzung \
-              -limit 5 -lco GEOMETRY=NO 2>/dev/null || true
-          else
-            echo "Typentabelle weiterhin nicht lesbar -- es bleibt beim Schlüssel."
-            rm -f /tmp/zonentyp.gpkg
-          fi
+          # Nicht mit einem Werkzeug: GDAL verwirft die Spalten der
+          # Typentabelle, ili2gpkg bricht am Katalog des Bundes ab. Eine
+          # XTF-Datei ist XML -- die Tabelle wird direkt gelesen.
+          python3 tools/zonentypen.py "$xtf" /tmp/zonentypen.csv
+          head -4 /tmp/zonentypen.csv
 
       - name: Ergebnis bereitstellen
         if: ${{ inputs.schritt == 'zonen' || inputs.schritt == 'alles' }}
@@ -310,11 +288,9 @@ jobs:
 
           ogr2ogr -f GPKG /tmp/arbeit.gpkg -append -nln zonen \
             /tmp/zonen.gpkg zonen
-          if [ -f /tmp/zonentyp.gpkg ]; then
+          if [ -s /tmp/zonentypen.csv ]; then
             ogr2ogr -f GPKG /tmp/arbeit.gpkg -append -nln zonentyp \
-              /tmp/zonentyp.gpkg -dialect sqlite \
-              -sql "SELECT T_Id AS typ_id, bezeichnung, abkuerzung
-                    FROM typ_grundnutzung"
+              /tmp/zonentypen.csv
           fi
 
           # Ohne räumlichen Index vergleicht die Datenbank jede der
