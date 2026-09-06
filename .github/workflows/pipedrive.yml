@@ -44,6 +44,8 @@ on:
           - eigentuemer-schreiben  # dasselbe, aber tatsächlich schreiben
           - doppel       # Doppelte Organisationen finden (Probelauf)
           - doppel-schreiben   # dasselbe, aber tatsächlich zusammenführen
+          - uebernehmen  # EGRID, Parzelle, Kanton vom Kontakt an den Deal
+          - uebernehmen-schreiben  # dasselbe, aber tatsächlich schreiben
       grenze:
         description: 'Höchstzahl Objekte -- bei "deal" die Deal-Nummer'
         required: false
@@ -110,6 +112,13 @@ jobs:
               ;;
             umziehen-schreiben)
               python3 tools/pipedrive-umziehen.py --schreiben \
+                | tee -a "$GITHUB_STEP_SUMMARY"
+              ;;
+            uebernehmen|uebernehmen-schreiben)
+              zusatz=""
+              [ "${{ inputs.aufgabe }}" = "uebernehmen-schreiben" ] \
+                && zusatz="--schreiben"
+              python3 tools/pipedrive-uebernehmen.py $zusatz \
                 | tee -a "$GITHUB_STEP_SUMMARY"
               ;;
             doppel|doppel-schreiben)
