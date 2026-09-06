@@ -494,9 +494,21 @@ jobs:
           # INTERLIS 1 schreibt das Koordinatensystem nicht in die Datei;
           # ohne Angabe bricht das Werkzeug ab. 2056 ist LV95, das
           # Schweizer Bezugssystem seit 2016.
+          # In einem Zug schlug der Import fehl, weil eine Tabelle noch
+          # nicht bestand. Erst das Gerüst anlegen, dann füllen -- der
+          # vom Werkzeug vorgesehene Weg.
+          modelldir="/tmp/av;http://models.interlis.ch/;https://models.geo.admin.ch/"
           java -jar "$jar" --dbfile /tmp/probe.gpkg \
-            --modeldir "/tmp/av;http://models.interlis.ch/;https://models.geo.admin.ch/" \
-            --defaultSrsCode 2056 \
+            --modeldir "$modelldir" --defaultSrsCode 2056 \
+            --models DM01AVCH24LV95D \
+            --schemaimport > /tmp/schema.log 2>&1 || true
+          grep -iE 'error|failed' /tmp/schema.log | head -10 \
+            || echo "(Gerüst ohne Fehler)"
+          tail -2 /tmp/schema.log
+
+          echo
+          java -jar "$jar" --dbfile /tmp/probe.gpkg \
+            --modeldir "$modelldir" --defaultSrsCode 2056 \
             --disableValidation \
             --import "$erste" > /tmp/ili2gpkg.log 2>&1 || true
 
