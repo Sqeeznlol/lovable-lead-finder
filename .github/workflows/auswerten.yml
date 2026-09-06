@@ -22,6 +22,12 @@ on:
         options:
           - oeffentlich  # Schulen, Kirchen, öffentliche Bauten finden
           - arten        # Welche Gebäudearten und Kategorien vorkommen
+          - objekt       # Ein einzelnes Objekt anhand seiner EGRID
+          - projektiert  # Wie viele Bauten noch gar nicht stehen
+      egrid:
+        description: 'Nur für "objekt": die EGRID, z.B. CH707709971116'
+        required: false
+        default: ''
 
 jobs:
   auswerten:
@@ -48,7 +54,43 @@ jobs:
             echo "" >> "$GITHUB_STEP_SUMMARY"
           }
 
-          if [ "${{ inputs.frage }}" = "arten" ]; then
+          if [ "${{ inputs.frage }}" = "objekt" ]; then
+            # Nur EGRID-Form zugelassen -- damit steht fest, dass hier
+            # keine fremde Abfrage in die Datenbank gelangt.
+            kennung=$(printf '%s' "${{ inputs.egrid }}" \
+                      | tr -cd 'A-Za-z0-9')
+            case "$kennung" in
+              CH*) ;;
+              *) echo "Keine gültige EGRID."; exit 1 ;;
+            esac
+            frage "Objekt $kennung" "
+              select address, gemeinde, plz, parzelle, egrid,
+                     area, bebaubar_m2, gebaeudeflaeche, baujahr,
+                     geschosse, vollgeschosse, wohnungen,
+                     coalesce(geb_status,'(leer)')  as gebaeudestatus,
+                     coalesce(gebaeudeart,'(leer)') as gebaeudeart,
+                     coalesce(kategorie,'(leer)')   as kategorie,
+                     zone, round(marge_chf/1e6,1) as marge_mio,
+                     ausgeschlossen, ausschluss_grund
+              from properties where egrid = '$kennung';"
+
+          elif [ "${{ inputs.frage }}" = "projektiert" ]; then
+            # Das Gebäuderegister führt den Status: projektiert,
+            # bewilligt, im Bau, bestehend. Ein Haus, das noch nicht
+            # steht, ist kein Anruf wert -- dort wird gerade gebaut.
+            frage "Gebäudestatus im Bestand" "
+              select coalesce(geb_status,'(leer)') as status, count(*),
+                     count(*) filter (where marge_chf > 1000000) as in_der_liste
+              from properties where ausgeschlossen = false
+              group by 1 order by 2 desc limit 20;"
+            frage "Neubauten der letzten Jahre" "
+              select baujahr, count(*),
+                     count(*) filter (where marge_chf > 1000000) as in_der_liste
+              from properties
+              where ausgeschlossen = false and baujahr >= 2020
+              group by 1 order by 1 desc;"
+
+          elif [ "${{ inputs.frage }}" = "arten" ]; then
             frage "Gebäudearten" "
               select coalesce(gebaeudeart,'(leer)') as art, count(*)
               from properties where ausgeschlossen = false
