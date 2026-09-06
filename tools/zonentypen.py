@@ -76,8 +76,19 @@ def main() -> None:
     if datei is not sys.stdout:
         datei.close()
     print(f'{anzahl} Zonentypen', file=sys.stderr)
+
     if anzahl == 0:
-        sys.exit(1)
+        # Auf einen Namen zu raten hat schon genug Läufe gekostet. Wenn
+        # nichts gefunden wird, sagt die Datei selbst, was in ihr steht.
+        print('Keine gefunden. Elemente in der Datei:', file=sys.stderr)
+        gezaehlt: dict[str, int] = {}
+        for _, element in ET.iterparse(sys.argv[1], events=('end',)):
+            name = ohne_namensraum(element.tag)
+            gezaehlt[name] = gezaehlt.get(name, 0) + 1
+            element.clear()
+        haeufig = sorted(gezaehlt.items(), key=lambda x: -x[1])[:25]
+        for name, wieviele in haeufig:
+            print(f'  {wieviele:>8}  {name}', file=sys.stderr)
 
 
 if __name__ == '__main__':
