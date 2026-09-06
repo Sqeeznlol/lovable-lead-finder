@@ -192,11 +192,11 @@ jobs:
           rm -f /tmp/zonen.gpkg
           java -jar "$jar" --dbfile /tmp/zonen.gpkg \
             --modeldir "$modelldir" --defaultSrsCode 2056 \
-            --models Nutzungsplanung_V1_2 --schemaimport \
+            --models Nutzungsplanung_V1_2 --createBasketCol --schemaimport \
             > /tmp/zschema.log 2>&1 || { tail -20 /tmp/zschema.log; exit 1; }
           java -jar "$jar" --dbfile /tmp/zonen.gpkg \
             --modeldir "$modelldir" --defaultSrsCode 2056 \
-            --disableValidation --import "$xtf" \
+            --disableValidation --createBasketCol --import "$xtf" \
             > /tmp/zimport.log 2>&1 || true
           grep -iE 'error|failed' /tmp/zimport.log | head -10 \
             || echo "(Einlesen ohne Fehler)"
