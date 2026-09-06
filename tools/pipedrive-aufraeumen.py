@@ -201,10 +201,21 @@ def main() -> None:
         # Der Link ist falsch, sobald etwas anderes als Zahlen und ein
         # Komma hinter "locations=" steht.
         alt = str(d.get(k_oereb) or '') if k_oereb else ''
-        if alt and not re.search(r'locations=\d+(%2C|,)[A-Za-z0-9]+&', alt):
-            richtig = oereb((o.get('bfs_nr') or '').strip(),
-                            (o.get('parzelle') or '').strip()
-                            or str(d.get(k_parz) or '').strip())
+        if k_oereb and not re.search(
+                r'locations=\d+(%2C|,)[A-Za-z0-9]+', alt or ''):
+            # Erst nachsehen, ob die Datenbank den Link schon hat:
+            # housing_stat_url traegt bei den Zuercher Objekten den
+            # fertigen Katasterlink mit der richtigen Gemeindenummer.
+            # Selbst bauen geht nur, wo bfs_nr gefuellt ist -- und
+            # genau dort fehlt sie oft.
+            fertig = (o.get('housing_stat_url') or '').strip()
+            if fertig.startswith('https://maps.zh.ch/') \
+                    and re.search(r'locations=\d+,[A-Za-z0-9]+', fertig):
+                richtig = fertig
+            else:
+                richtig = oereb((o.get('bfs_nr') or '').strip(),
+                                (o.get('parzelle') or '').strip()
+                                or str(d.get(k_parz) or '').strip())
             if richtig and richtig != alt:
                 neu[k_oereb] = richtig
                 links += 1
