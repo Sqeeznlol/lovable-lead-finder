@@ -28,6 +28,11 @@ on:
         options:
           - zeigen      # Nur auflisten, was offen ist
           - einspielen  # Offene Migrationen anwenden
+          - grundlage   # Alte Migrationen als angewendet eintragen
+      bis:
+        description: 'Nur für "grundlage": Dateien bis zu diesem Namen'
+        required: false
+        default: ''
 
 jobs:
   migrieren:
@@ -71,6 +76,23 @@ jobs:
 
             if [ "$schon" = "1" ]; then
               echo "| $name | bereits eingespielt |" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            # Die Buchführung ist neu, die Datenbank nicht: die älteren
+            # Migrationen wurden früher von Hand im SQL-Editor
+            # eingespielt und stehen trotzdem als offen da. Sie erneut
+            # auszuführen wäre unnötig und im schlechten Fall schädlich.
+            # "grundlage" trägt sie deshalb nur ein, ohne sie laufen zu
+            # lassen -- bis zu der Datei, die als Grenze genannt wird.
+            if [ "${{ inputs.schritt }}" = "grundlage" ]; then
+              if [ -n "${{ inputs.bis }}" ] \
+                 && [ "$name" \< "${{ inputs.bis }}" -o "$name" = "${{ inputs.bis }}" ]; then
+                psql "$DB" -q -c "insert into public.schema_migrationen (datei) values ('$name') on conflict do nothing;"
+                echo "| $name | als angewendet eingetragen |" >> "$GITHUB_STEP_SUMMARY"
+              else
+                echo "| $name | offen |" >> "$GITHUB_STEP_SUMMARY"
+              fi
               continue
             fi
 
