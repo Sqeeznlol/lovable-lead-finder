@@ -150,33 +150,35 @@ jobs:
           # einmal als Datenbank, einmal mit dem öffentlichen
           # Schlüssel, den der Browser benutzt.
           if [ "${{ inputs.frage }}" = "kantone" ]; then
-            frage "Bestand je Kanton" "
-              select coalesce(kanton, '(leer)') as kanton,
-                     count(*) as objekte,
-                     count(*) filter (where not ausgeschlossen) as sichtbar,
-                     count(address) filter (where address not like 'Parzelle %')
-                       as mit_adresse
-              from properties group by 1 order by 2 desc;"
-
+            # Zuerst der Test, auf den es ankommt: sieht der Browser die
+            # Zeilen? Die Zaehlung darunter ist teuer und darf ihn nicht
+            # verdraengen, wenn sie in die Zeitgrenze laeuft.
             set -a
             . <(grep -E '^VITE_SUPABASE_(URL|PUBLISHABLE_KEY)=' .env \
                 | sed 's/VITE_SUPABASE_URL=/U=/; s/VITE_SUPABASE_PUBLISHABLE_KEY=/K=/' \
                 | tr -d '"')
             set +a
             {
-              echo "### Was der Browser sieht"
+              echo "### Was der Browser mit dem oeffentlichen Schluessel sieht"
               echo '```'
               for kt in ZH TG; do
-                antwort=$(curl -sS -o /tmp/antwort.json -w '%{http_code}' \
+                code=$(curl -sS -o /tmp/antwort.json -w '%{http_code}' \
                   "$U/rest/v1/properties?kanton=eq.$kt&select=egrid,address,gemeinde,zone&limit=2" \
                   -H "apikey: $K" -H "Authorization: Bearer $K" \
                   -H "Prefer: count=exact" -D /tmp/kopf.txt || echo "000")
-                bereich=$(grep -i '^content-range' /tmp/kopf.txt | tr -d '\r')
-                echo "$kt: HTTP $antwort  $bereich"
+                bereich=$(grep -i '^content-range' /tmp/kopf.txt | tr -d '\r' || true)
+                echo "$kt: HTTP $code  $bereich"
                 head -c 300 /tmp/antwort.json; echo
               done
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
+
+            # Eine schlichte Zaehlung; die Filter davor liefen in die
+            # Zeitgrenze und rissen den ganzen Lauf mit.
+            frage "Bestand je Kanton" "
+              set local statement_timeout = '10min';
+              select coalesce(kanton, '(leer)') as kanton, count(*) as objekte
+              from properties group by 1 order by 2 desc;"
           fi
 
           cat "$GITHUB_STEP_SUMMARY"
