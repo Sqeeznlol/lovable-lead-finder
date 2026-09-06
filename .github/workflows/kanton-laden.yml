@@ -170,7 +170,8 @@ jobs:
             | head -80
 
       - name: Zonen umwandeln
-        if: ${{ inputs.schritt == 'zonen' || inputs.schritt == 'alles' }}
+        if: ${{ inputs.schritt == 'zonen' || inputs.schritt == 'alles'
+                || inputs.schritt == 'verschneiden' }}
         run: |
           set -euo pipefail
           xtf=$(find /tmp/npl -name '*.xtf' | head -1)
@@ -194,6 +195,24 @@ jobs:
           ogr2ogr -f GPKG /tmp/zonen.gpkg \
             "$xtf,/tmp/Nutzungsplanung_V1_2.ili" \
             -nln zonen "$ebene"
+
+          # In der Zonenfläche steht nur ein Schlüssel wie
+          # "x4401_221_gngde", nicht "W2". Die Bezeichnung und die
+          # Hauptnutzung stehen in einer eigenen Tabelle des Modells --
+          # ohne sie ist das Ergebnis für einen Anruf unbrauchbar.
+          typebene=$(ogrinfo -so "$xtf,/tmp/Nutzungsplanung_V1_2.ili" 2>/dev/null \
+            | grep -o '[A-Za-z_0-9.]*Typ_Grundnutzung' | head -1)
+          echo "Typenebene: ${typebene:-nicht gefunden}"
+          if [ -n "$typebene" ]; then
+            ogr2ogr -f GPKG /tmp/zonen.gpkg -append \
+              "$xtf,/tmp/Nutzungsplanung_V1_2.ili" \
+              -nln zonentyp "$typebene"
+            echo "Spalten der Typenebene:"
+            ogrinfo -so /tmp/zonen.gpkg zonentyp 2>/dev/null \
+              | sed -n '/^Feature Count/p;/^[A-Za-z_0-9]*: /p'
+            ogr2ogr -f CSV /vsistdout/ /tmp/zonen.gpkg zonentyp \
+              -limit 3 -lco GEOMETRY=NO 2>/dev/null || true
+          fi
 
           ls -lh /tmp/zonen.gpkg
           # Ohne Zeilen ist die Umwandlung gescheitert, gleich was der
@@ -273,6 +292,8 @@ jobs:
 
           ogr2ogr -f GPKG /tmp/arbeit.gpkg -append -nln zonen \
             /tmp/zonen.gpkg zonen
+          ogr2ogr -f GPKG /tmp/arbeit.gpkg -append -nln zonentyp \
+            /tmp/zonen.gpkg zonentyp
 
           # Ohne räumlichen Index vergleicht die Datenbank jede der
           # 140'000 Parzellen mit jeder der 57'000 Zonen -- acht
@@ -283,7 +304,7 @@ jobs:
           # Übriggebliebenen werden genau gerechnet.
           echo "### In eine SpatiaLite-Datenbank umziehen"
           rm -f /tmp/arbeit.sqlite
-          for e in parzellen zonen; do
+          for e in parzellen zonen zonentyp; do
             ogr2ogr -f SQLite /tmp/arbeit.sqlite -append \
               -dsco SPATIALITE=YES -lco SPATIAL_INDEX=YES \
               -nln "$e" /tmp/arbeit.gpkg "$e"
