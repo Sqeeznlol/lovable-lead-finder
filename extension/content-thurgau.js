@@ -23,8 +23,18 @@
   const log = m => console.log('[Akquise TG]', m);
   const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-  /** Der Kasten mit dem Auszug, sobald er da ist. */
-  const auszug = () => document.querySelector('.gb-auszug');
+  /**
+   * Ist der Auszug da?
+   *
+   * Erkannt am sichtbaren Text, nicht an einem Klassennamen: die
+   * Klassen stammten aus einer rekonstruierten Struktur und stimmten
+   * nicht. Die Überschriften stehen dagegen fest.
+   */
+  function auszugText() {
+    const t = document.body.innerText || '';
+    return /Grundbuch-Auszug|Eigent(ü|ue)merinformationen/i.test(t) ? t : '';
+  }
+  const auszug = () => (auszugText() ? document.body : null);
 
   /**
    * Die Eigentümer aus dem Auszug.
@@ -34,31 +44,34 @@
    * unter der Überschrift "Eigentümerinformationen" auch.
    */
   function eigentuemer() {
-    const kasten = auszug();
-    if (!kasten) return [];
-    let absaetze = [...kasten.querySelectorAll('.eigentum p')];
-    if (absaetze.length === 0) {
-      absaetze = [...kasten.querySelectorAll('p')].filter(
-        p => /\d{4}\s+\S/.test(p.innerText || ''));
-    }
-    return absaetze.map(p => {
-      const roh = (p.innerText || '').replace(/\s+/g, ' ').trim();
-      const teile = roh.split(',').map(t => t.trim()).filter(Boolean);
-      // Der Anteil ("1/1") gehoert nicht in den Namen, mit dem
-      // telefoniert wird.
-      const name = (teile[0] || '').replace(/\s+\d+\/\d+\s*$/, '').trim();
-      const plzOrt = teile.find(t => /^\d{4}\s+\S/.test(t)) || '';
-      const strasse = teile.slice(1).find(
-        t => /\d/.test(t) && !/^\d{4}\s/.test(t) && !/^\d+\/\d+$/.test(t)) || '';
-      const m = plzOrt.match(/^(\d{4})\s+(.+)$/);
-      return {
-        name,
-        address: strasse,
-        plz: m ? m[1] : '',
-        ort: m ? m[2] : '',
-        ownershipType: teile.find(t => /^\d+\/\d+$/.test(t)) || '',
-      };
-    }).filter(o => o.name);
+    const ganz = auszugText();
+    if (!ganz) return [];
+    const anfang = ganz.search(/Eigent(ü|ue)merinformationen/i);
+    if (anfang < 0) return [];
+    const rest = ganz.slice(anfang).replace(/^[^\n]*\n/, '');
+    const ende = rest.search(/Zus(ä|ae)tzliche Informationen|Disclaimer|Bodenbedeckung/i);
+    const block = ende > 0 ? rest.slice(0, ende) : rest.slice(0, 1500);
+
+    return block.split('\n')
+      .map(z => z.replace(/\s+/g, ' ').trim())
+      .filter(z => /\d{4}\s+\S/.test(z))
+      .map(z => {
+        const teile = z.split(',').map(t => t.trim()).filter(Boolean);
+        const name = (teile[0] || '').replace(/\s+\d+\/\d+\s*$/, '').trim();
+        const plzOrt = teile.find(t => /^\d{4}\s+\S/.test(t)) || '';
+        const strasse = teile.slice(1).find(
+          t => /\d/.test(t) && !/^\d{4}\s/.test(t) && !/^\d+\/\d+$/.test(t)
+            && !/\bUID\b|CHE[-\s]?\d/i.test(t)) || '';
+        const m = plzOrt.match(/^(\d{4})\s+(.+)$/);
+        return {
+          name,
+          address: strasse,
+          plz: m ? m[1] : '',
+          ort: m ? m[2] : '',
+          ownershipType: teile.find(t => /^\d+\/\d+$/.test(t)) || '',
+        };
+      })
+      .filter(o => o.name);
   }
 
   /**
@@ -69,9 +82,7 @@
    * nicht prüft, speichert den Eigentümer des Nachbarn.
    */
   function egridImAuszug() {
-    const kasten = auszug();
-    const text = kasten ? (kasten.innerText || '') : '';
-    const m = text.match(/\bCH\d{12}\b/);
+    const m = auszugText().match(/\bCH\d{12}\b/);
     return m ? m[0] : '';
   }
 
@@ -209,7 +220,7 @@
       return;   // der Balken bleibt -- ein Klick übernimmt von Hand
     }
 
-    const text = auszug().innerText || '';
+    const text = auszugText();
     chrome.runtime.sendMessage({
       type: 'OWNER_DATA',
       owners,

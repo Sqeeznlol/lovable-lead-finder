@@ -42,15 +42,37 @@
   /**
    * Der Textblock mit der Auskunft.
    *
-   * Zuerst, was von Hand markiert wurde -- das ist die verlässlichste
-   * Angabe, die es gibt. Sonst der kleinste Kasten der Seite, in dem
-   * das Wort "Eigentümer" vorkommt: der grosse enthält die halbe
-   * Seite, der kleinste die Auskunft.
+   * Gesucht wird im sichtbaren Text, nicht in Klassennamen. Der
+   * Versuch mit ".gb-auszug" und ".eigentum" ist gescheitert: diese
+   * Namen stammten aus einer *rekonstruierten* HTML-Struktur, weil das
+   * rohe HTML nicht auslesbar war. Eine Rekonstruktion ist eine
+   * Vermutung, und die hat wieder nichts erkannt.
+   *
+   * Die Überschriften dagegen stehen fest und sind auf dem Schirm zu
+   * lesen:
+   *
+   *     Eigentümerinformationen
+   *     Simon Gränicher,  Widacherring 10, 6102 Malters, 1/1
+   *     Zusätzliche Informationen
+   *
+   * Genommen wird, was zwischen der ersten Überschrift und der
+   * nächsten steht.
    */
   function auskunftstext() {
     const auswahl = String(window.getSelection() || '').trim();
     if (auswahl.length > 20) return auswahl;
 
+    const ganz = document.body.innerText || '';
+    const anfang = ganz.search(/Eigent(ü|ue)mer(informationen|innen und Eigent)/i);
+    if (anfang >= 0) {
+      const rest = ganz.slice(anfang).replace(/^[^\n]*\n/, '');
+      const ende = rest.search(
+        /Zus(ä|ae)tzliche Informationen|Disclaimer|Bodenbedeckung|Grundbuch:/i);
+      const block = ende > 0 ? rest.slice(0, ende) : rest.slice(0, 1500);
+      if (block.trim()) return block.trim();
+    }
+
+    // Notnagel: der kleinste Kasten, in dem das Wort vorkommt.
     let kleinster = null;
     for (const el of document.querySelectorAll('div, section, table, article, dl')) {
       const t = el.innerText || '';
@@ -107,9 +129,10 @@
       // EGRID und Parzellennummer stehen im Auszug selbst. Sie gehen
       // mit, damit die Anwendung das Objekt findet -- auch wenn niemand
       // vorher auf "Abfragen" geklickt hat.
-      const egrid = (roh.match(/\bCH\d{12}\b/) || [])[0] || null;
-      const parzelle = (roh.match(/Liegenschaft\s+Nr\.\s*(\S+)/i) || [])[1]
-        || (roh.match(/Grundst(?:ü|ue)ck\D{0,12}(\d+)/i) || [])[1] || null;
+      const ganz = document.body.innerText || '';
+      const egrid = (roh.match(/\bCH\d{12}\b/) || [])[0]
+        || (ganz.match(/\bCH\d{12}\b/) || [])[0] || null;
+      const parzelle = (ganz.match(/Liegenschaft\s+Nr\.\s*(\S+)/i) || [])[1] || null;
       chrome.runtime.sendMessage({ type: 'OWNER_DATA', owners, roh, egrid, parzelle });
       text.textContent = `${owners.length} Eigentümer übernommen`
         + (egrid ? ` · ${egrid}` : '')

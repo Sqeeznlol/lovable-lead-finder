@@ -71,6 +71,25 @@ Dieser Auszug kann nicht als gültiger Grundbuchauszug verwendet werden.`;
     expect(o.map(x => x.name)).toEqual(['Rudolf Gubler']);
   });
 
+  it('liest den Auszug, wie er auf dem Schirm steht', () => {
+    // Wortlaut aus ThurGIS, Liegenschaft 669 Diessenhofen. Die
+    // Flächenangabe darunter trägt "8253 Diessenhofen" und sähe sonst
+    // wie ein zweiter Eigentümer aus.
+    const text = `Grundbuch-Auszug
+Eigentümerinformationen
+Simon Gränicher,  Widacherring 10, 6102 Malters, 1/1
+Zusätzliche Informationen
+Grundbuch: Nr. 4545 Diessenhofen
+Grundstück: Liegenschaft Nr. 669 ( CH932977092161 )
+Fläche(n): 1'367 m² Garage Assek.Nr. 162.1276, Schlatterstrasse, 8253 Diessenhofen [52 m²]`;
+    const o = leseAuskunft(text);
+    expect(o).toHaveLength(1);
+    expect(o[0].name).toBe('Simon Gränicher');
+    expect(o[0].address).toBe('Widacherring 10');
+    expect(o[0].plz).toBe('6102');
+    expect(o[0].ort).toBe('Malters');
+  });
+
   it('lässt die Handelsregisternummer weg', () => {
     // Parzelle 454: die UID trägt Ziffern und stand als Adresse im
     // Eintrag -- die Rheinstrasse fiel dabei unter den Tisch.
