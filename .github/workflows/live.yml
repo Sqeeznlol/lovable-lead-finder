@@ -1,0 +1,67 @@
+# =====================================================================
+# Was ist wirklich live
+# =====================================================================
+# Der Code kann richtig sein, auf main liegen und trotzdem nicht auf
+# der Seite stehen -- am 6. September lagen fünfzehn Änderungen auf
+# main, von denen eine einzige ausgeliefert wurde. Wer das wissen will,
+# muss die Seite selbst fragen, nicht das Repository.
+#
+# Dieser Ablauf lädt die Startseite, holt daraus das JavaScript und
+# sucht darin nach Spuren der letzten Änderungen. Er verändert nichts.
+name: Was ist live
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Einmal am Morgen, damit ein stehengebliebener Ausrollstand
+    # auffällt, bevor jemand danach telefoniert.
+    - cron: '0 5 * * 1-5'
+
+jobs:
+  pruefen:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Seite abrufen und Spuren suchen
+        run: |
+          set -uo pipefail
+          adresse=https://www.wohntraums.life
+
+          echo "### Startseite" >> "$GITHUB_STEP_SUMMARY"
+          code=$(curl -sS -o /tmp/seite.html -w '%{http_code}' "$adresse" || echo 000)
+          echo "HTTP $code" >> "$GITHUB_STEP_SUMMARY"
+          [ "$code" = "200" ] || { cat "$GITHUB_STEP_SUMMARY"; exit 1; }
+
+          # Vite hängt an jeden Namen einen Fingerabdruck. Ändert sich
+          # der Name, wurde neu gebaut; bleibt er, ist es derselbe Stand.
+          js=$(grep -oE '/assets/index-[A-Za-z0-9_-]+\.js' /tmp/seite.html | head -1)
+          echo "Bündel: ${js:-keines gefunden}" >> "$GITHUB_STEP_SUMMARY"
+          [ -n "$js" ] || { cat "$GITHUB_STEP_SUMMARY"; exit 1; }
+          curl -sS -o /tmp/buendel.js "$adresse$js"
+          echo "Grösse: $(wc -c < /tmp/buendel.js) Bytes" >> "$GITHUB_STEP_SUMMARY"
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Spuren im ausgelieferten Stand" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Was | erwartet | gefunden |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|---|" >> "$GITHUB_STEP_SUMMARY"
+
+          fehlt=0
+          suche() {   # Name, Muster, soll (ja/nein)
+            if grep -q -- "$2" /tmp/buendel.js; then da=ja; else da=nein; fi
+            if [ "$da" = "$3" ]; then zeichen="ok"; else zeichen="**fehlt**"; fehlt=1; fi
+            echo "| $1 | $3 | $da $zeichen |" >> "$GITHUB_STEP_SUMMARY"
+          }
+
+          suche "Thurgauer Kataster (map.geo.tg.ch)" "map.geo.tg.ch" ja
+          suche "Thurgau in der Kantonsauswahl"      "Thurgau"       ja
+          suche "Ablage in Fassung v2"              "bauraum.v2."   ja
+          suche "Listenauswahl 'Alle Listen'"        "Alle Listen"   nein
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$fehlt" = "0" ]; then
+            echo "**Der ausgelieferte Stand ist aktuell.**" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "**Der ausgelieferte Stand hinkt hinterher.** Vercel hat den" \
+                 "letzten Push auf main nicht gebaut." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          cat "$GITHUB_STEP_SUMMARY"
+          exit $fehlt
