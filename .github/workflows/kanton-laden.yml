@@ -574,12 +574,22 @@ jobs:
           # liegt, die dabei ist.
           find /tmp/npl -type f -printf '%p  %s Bytes\n' | sort
           echo
-          echo "### Leser über alle XTF-Dateien"
-          for f in $(find /tmp/npl -name '*.xtf' | sort); do
+          # Auch die XML-Dateien: in der Lieferung liegt
+          # "Nutzungsplanung_Catalogue_CH_V1_2_20210901.xml", und genau
+          # das ist der Katalog, auf den die Typen verweisen. Bisher
+          # wurden nur XTF-Dateien gelesen -- er blieb ungeöffnet.
+          echo "### Leser über alle XTF- und XML-Dateien"
+          for f in $(find /tmp/npl \( -name '*.xtf' -o -name '*.xml' \) \
+                     | sort); do
             echo "-- $f"
-            python3 tools/zonentypen.py "$f" /tmp/zonentypen.csv 2>&1 \
-              | head -8 || true
+            # Nicht kappen: beim letzten Lauf schnitt "head -8" die
+            # Liste der Elemente ab, bevor die gesuchte Zeile kam.
+            python3 tools/zonentypen.py "$f" "/tmp/typen_$(basename "$f").csv" \
+              2>&1 | head -70 || true
           done
+          # Die grösste nicht leere Ausgabe gewinnt.
+          erg=$(ls -S /tmp/typen_*.csv 2>/dev/null | head -1 || true)
+          [ -n "$erg" ] && cp "$erg" /tmp/zonentypen.csv || true
           echo
           echo "### Ergebnis"
           head -10 /tmp/zonentypen.csv

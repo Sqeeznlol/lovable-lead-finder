@@ -86,7 +86,7 @@ def main() -> None:
             name = ohne_namensraum(element.tag)
             gezaehlt[name] = gezaehlt.get(name, 0) + 1
             element.clear()
-        haeufig = sorted(gezaehlt.items(), key=lambda x: -x[1])[:25]
+        haeufig = sorted(gezaehlt.items(), key=lambda x: -x[1])[:60]
         for name, wieviele in haeufig:
             print(f'  {wieviele:>8}  {name}', file=sys.stderr)
 
