@@ -17,6 +17,7 @@ import { parseOwnerString, parseMultipleOwners, parsePortalOwnerText, isGroupHea
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
 import { getMyPhone } from '@/hooks/use-eigentuemer-lookup';
+import { portalUrl } from '@/lib/portal';
 
 interface OwnerEntry {
   raw: string;
@@ -615,12 +616,13 @@ export function AkquiseMode() {
                   const startWith = (phoneNumber: string) => {
                     if (!current?.egrid) return;
                     setAutoStatus('Starte...');
-                    const portalUrl = `https://portal.objektwesen.zh.ch/aks/detail?egrid=${encodeURIComponent(current.egrid)}&bfsNr=${encodeURIComponent(current.bfs_nr || '')}`;
+                    const adresse = portalUrl(current.kanton, current.egrid, current.bfs_nr);
                     if (extensionAvailable) {
                       window.dispatchEvent(new CustomEvent('akquise-start-lookup', {
                         detail: {
                           egrid: current.egrid,
                           bfsNr: current.bfs_nr || '',
+                          kanton: current.kanton || 'ZH',
                           parzelle: current.parzelle || '',
                           phoneNumber,
                           propertyId: current.id,
@@ -634,7 +636,7 @@ export function AkquiseMode() {
                     } else {
                       // Fallback: open portal manually + copy phone to clipboard
                       try { navigator.clipboard.writeText(phoneNumber); } catch { /* noop */ }
-                      const win = window.open(portalUrl, '_blank', 'noopener,noreferrer');
+                      const win = window.open(adresse, '_blank', 'noopener,noreferrer');
                       if (!win) {
                         toast({ title: 'Popup blockiert', description: 'Bitte Popups für diese Seite erlauben.', variant: 'destructive' });
                         setAutoStatus(null);

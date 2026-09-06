@@ -2,6 +2,7 @@ import { useEffect, useCallback, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
+import { portalUrl } from '@/lib/portal';
 
 const PHONE_LS_KEY = 'sqeeztraum.my_phone';
 
@@ -208,11 +209,11 @@ export function useStartEigentuemerLookup() {
       toast({ title: 'Keine EGRID-Nummer', description: 'Property hat keine EGRID — Portal kann nicht aufgerufen werden.', variant: 'destructive' });
       return false;
     }
-    const portalUrl = `https://portal.objektwesen.zh.ch/aks/detail?egrid=${encodeURIComponent(args.egrid)}&bfsNr=${encodeURIComponent(args.bfsNr || '')}`;
+    const adresse = portalUrl(args.kanton, args.egrid, args.bfsNr);
 
     if (!extensionAvailable) {
       // Fallback: open portal manually
-      window.open(portalUrl, '_blank', 'noopener,noreferrer');
+      window.open(adresse, '_blank', 'noopener,noreferrer');
       toast({
         title: 'Extension nicht installiert',
         description: 'Portal in neuem Tab geöffnet — Daten manuell übernehmen.',
@@ -221,7 +222,7 @@ export function useStartEigentuemerLookup() {
     }
 
     if (!phone) {
-      window.open(portalUrl, '_blank', 'noopener,noreferrer');
+      window.open(adresse, '_blank', 'noopener,noreferrer');
       toast({
         title: 'Telefonnummer fehlt',
         description: 'Hinterlege "Meine Telefonnummer" in Einstellungen für Auto-Fill.',

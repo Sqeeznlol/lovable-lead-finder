@@ -188,6 +188,7 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
                       propertyId: data.id,
                       egrid: data.egrid,
                       bfsNr: data.bfs_nr,
+                      kanton: data.kanton,
                       parzelle: data.parzelle,
                       address: data.address,
                       plzOrt: data.plz_ort || data.gemeinde,
