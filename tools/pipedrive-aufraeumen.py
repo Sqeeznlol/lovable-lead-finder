@@ -68,7 +68,7 @@ def get(pfad: str, token: str, **params) -> dict:
 def sende(pfad: str, token: str, daten: dict, methode: str) -> dict:
     url = f'{PIPEDRIVE}{pfad}?api_token={urllib.parse.quote(token)}'
     anfrage = urllib.request.Request(
-        url, data=json.dumps(daten).encode(),
+        url, data=json.dumps(daten).encode() if daten else None,
         headers={'Content-Type': 'application/json'}, method=methode)
     try:
         with urllib.request.urlopen(anfrage, timeout=60) as r:
@@ -109,6 +109,10 @@ def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument('--objekte', required=True)
     p.add_argument('--schreiben', action='store_true')
+    p.add_argument('--felder-loeschen', action='store_true',
+                   help='Objektinfo, Grundstück, Fläche, Grundbuch '
+                        'endgültig entfernen -- nach Sicherung')
+    p.add_argument('--sicherung', default='/tmp/kontaktfelder.json')
     args = p.parse_args()
 
     token = os.environ.get('PIPEDRIVE_TOKEN', '').strip()
@@ -161,6 +165,42 @@ def main() -> None:
             print(f'- `{f["name"]}` wird `{neu}`')
             if args.schreiben:
                 sende(f'/dealFields/{f["id"]}', token, {'name': neu}, 'PUT')
+        print()
+
+    # ------------------- 2c. Die Herkunftsfelder ganz entfernen
+    #
+    # Die Schalter allein genuegen nicht: der Block "Bitte ausfuellen"
+    # blieb stehen, obwohl weder add_visible_flag noch
+    # details_visible_flag noch mandatory_flag gesetzt sind. Ein Feld,
+    # das es nicht mehr gibt, kann nichts mehr einfordern.
+    #
+    # Vorher wird gesichert, was drinsteht: bei den Thurgauer Kontakten
+    # sind das die Grundbuchtexte, aus denen Titel, Parzelle und EGRID
+    # stammen. Die Sicherung ist eine Datei, die der Lauf als Artefakt
+    # ablegt -- ohne sie wird nichts geloescht.
+    if args.felder_loeschen:
+        zu_weg = [f for f in personfelder if f.get('name') in HERKUNFT]
+        gesichert = []
+        for person in alle('/persons', token):
+            eintrag = {'id': person.get('id'), 'name': person.get('name')}
+            for f in zu_weg:
+                wert = person.get(f['key'])
+                if wert not in (None, '', [], {}):
+                    eintrag[f['name']] = wert
+            if len(eintrag) > 2:
+                gesichert.append(eintrag)
+
+        with open(args.sicherung, 'w', encoding='utf-8') as datei:
+            json.dump(gesichert, datei, ensure_ascii=False, indent=1)
+        print(f'## {len(gesichert)} Kontakte gesichert nach {args.sicherung}')
+        print()
+
+        for f in zu_weg:
+            print(f'- `{f["name"]}` wird entfernt')
+            if args.schreiben:
+                a = sende(f'/personFields/{f["id"]}', token, {}, 'DELETE')
+                if not a.get('success'):
+                    print(f'  fehlgeschlagen ({a.get("code")})')
         print()
 
     # ------------------------------------------------ 3. EGID anlegen
