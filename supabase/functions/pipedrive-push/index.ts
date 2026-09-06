@@ -435,19 +435,35 @@ Deno.serve(async (req) => {
             ? [`Parz. ${parzelle}`, ortsteil].filter(Boolean).join(', ')
             : hinten || prop.address;
 
-        // 1. Duplicate check via org
-        const existingOrgId = await findExistingOrg(PIPEDRIVE_API_TOKEN, prop.address);
-        if (existingOrgId) {
-          results.push({ propertyId: prop.id, orgId: existingOrgId, skipped: true });
-          exportedAddresses.add(prop.address);
-          continue;
+        // 1. Gibt es den Deal schon?
+        //
+        // Geprüft wurde bisher, ob eine Organisation mit dieser Adresse
+        // existiert -- und wenn ja, brach der Lauf ab. Das war falsch:
+        // eine Organisation entsteht bei jedem Export, ein Deal nicht.
+        // Wer heute den Eigentümer abfragte, bekam deshalb keinen Deal,
+        // weil die Adresse vor einem Jahr schon einmal exportiert
+        // worden war. Geprüft wird jetzt über die EGRID -- sie benennt
+        // das Grundstück, nicht die Schreibweise seiner Adresse.
+        if (prop.egrid) {
+          const vorhanden = await pipedriveGet('/deals/search', PIPEDRIVE_API_TOKEN, {
+            term: prop.egrid, exact_match: 'true',
+          });
+          const treffer = (vorhanden?.data?.items || []).length > 0;
+          if (treffer) {
+            results.push({ propertyId: prop.id, skipped: true });
+            exportedAddresses.add(prop.address);
+            continue;
+          }
         }
 
-        // 2. Create Organization
-        const orgRes = await pipedrivePost('/organizations', PIPEDRIVE_API_TOKEN, {
-          name: `Liegenschaft: ${prop.address}`,
-          address: prop.address + (prop.plz_ort ? ', ' + prop.plz_ort : ''),
-        });
+        // 2. Die Organisation wiederverwenden, wenn es sie schon gibt.
+        const existingOrgId = await findExistingOrg(PIPEDRIVE_API_TOKEN, prop.address);
+        const orgRes = existingOrgId
+          ? { data: { id: existingOrgId } }
+          : await pipedrivePost('/organizations', PIPEDRIVE_API_TOKEN, {
+              name: `Liegenschaft: ${prop.address}`,
+              address: prop.address + (prop.plz_ort ? ', ' + prop.plz_ort : ''),
+            });
         const orgId = orgRes?.data?.id;
 
         // Extract structured owners from owners_json
