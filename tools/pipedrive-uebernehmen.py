@@ -34,6 +34,23 @@ EGRID = re.compile(r'\bCH\d{12}\b')
 #
 # Gesucht ist die 2028. Zürcher Nummern tragen manchmal ein Kürzel
 # davor ("SE2423"), deshalb die Buchstaben.
+# "Fläche(n): 5'492 m²" -- die Fläche des Grundstücks. Was danach in
+# eckigen Klammern folgt, sind die einzelnen Gebäude:
+#
+#   Oekonomiegebäude [227 m²] Wohnhaus [300 m²] Garage [45 m²]
+#
+# Beides wird gebraucht: die Parzelle sagt, wie viel Land da ist, die
+# Summe der Gebäude, wie wenig davon genutzt wird. Elf Prozent Belegung
+# auf 5'492 m² ist der Fall, auf den sich ein Anruf lohnt.
+GRUNDSTUECK = re.compile(r'Fl(?:ä|ae)che\(n\)\s*:\s*([\d\'’\s.]+)\s*m²')
+GEBAEUDE = re.compile(r'\[\s*([\d\'’\s.]+)\s*m²\s*\]')
+
+
+def zahl(text: str) -> int | None:
+    ziffern = re.sub(r"[^\d]", '', text or '')
+    return int(ziffern) if ziffern else None
+
+
 NUMMER = re.compile(
     r'(?:Liegenschaft|Grundst(?:ü|ue)ck|Parzelle)?\s*(?:Nr\.?)?\s*'
     r'\b([A-Z]{0,3}\d{1,6}[a-z]?)\b')
@@ -123,9 +140,10 @@ def main() -> None:
           for f in (get('/personFields', token).get('data') or [])}
 
     quelle = {
-        'EGRID':    (pf.get('Objektinfo'),  df.get('EGRID')),
-        'Parzelle': (pf.get('Grundstück'),  df.get('Parzelle')),
-        'Kanton':   (pf.get('Grundbuch'),   df.get('Kanton')),
+        'EGRID':         (pf.get('Objektinfo'), df.get('EGRID')),
+        'Parzelle':      (pf.get('Grundstück'), df.get('Parzelle')),
+        'Kanton':        (pf.get('Grundbuch'),  df.get('Kanton')),
+        'Grundstück m²': (pf.get('Fläche'),     df.get('Grundstück m²')),
     }
     fehlend = [n for n, (a, b) in quelle.items() if not a or not b]
     if fehlend:
@@ -159,6 +177,9 @@ def main() -> None:
                 wert = treffer.group(0) if treffer else ''
             elif name == 'Kanton':
                 wert = kanton_von(wert)
+            elif name == 'Grundstück m²':
+                treffer = GRUNDSTUECK.search(wert)
+                wert = str(zahl(treffer.group(1))) if treffer else ''
             elif name == 'Parzelle':
                 # Nicht die ganze Zeile übernehmen: gesucht ist die
                 # Nummer, nicht ihr Beiwerk.
