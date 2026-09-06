@@ -25,6 +25,7 @@ on:
           - objekt       # Ein einzelnes Objekt anhand seiner EGRID
           - projektiert  # Wie viele Bauten noch gar nicht stehen
           - kantone      # Was die Webseite je Kanton zu sehen bekommt
+          - potenzial    # Wo ueberall ein Potenzial gerechnet wurde
       egrid:
         description: 'Nur für "objekt": die EGRID, z.B. CH707709971116'
         required: false
@@ -179,6 +180,31 @@ jobs:
               set local statement_timeout = '10min';
               select coalesce(kanton, '(leer)') as kanton, count(*) as objekte
               from properties group by 1 order by 2 desc;"
+          fi
+
+          if [ "${{ inputs.frage }}" = "potenzial" ]; then
+            # Fuer Thurgau sollte hier nichts stehen: die Ausnuetzung
+            # der Thurgauer Zonen ist nicht hinterlegt. Steht doch
+            # etwas da, hat die Zuercher Rechnung auf Thurgauer
+            # Zonennamen angeschlagen -- und liefert Zahlen, auf die
+            # sich niemand verlassen darf.
+            frage "Gerechnetes Potenzial je Kanton" "
+              set local statement_timeout = '10min';
+              select kanton,
+                     count(*)                        as objekte,
+                     count(hnf_delta)                as mit_hnf,
+                     count(*) filter (where hnf_delta > 0) as hnf_groesser_null,
+                     count(ausnuetzung)              as mit_ausnuetzung,
+                     round(max(marge_chf)/1e6, 1)    as groesste_marge_mio
+              from properties group by 1 order by 1;"
+            frage "Thurgauer Objekte mit gerechnetem Potenzial" "
+              set local statement_timeout = '10min';
+              select address, gemeinde, zone, geschosse, ausnuetzung,
+                     round(hnf_delta) as hnf_delta,
+                     round(marge_chf/1e6, 1) as marge_mio
+              from properties
+              where kanton = 'TG' and hnf_delta > 0
+              order by marge_chf desc nulls last limit 10;"
           fi
 
           cat "$GITHUB_STEP_SUMMARY"
