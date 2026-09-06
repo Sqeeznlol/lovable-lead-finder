@@ -117,7 +117,7 @@ def deal_felder(p: dict, schluessel: dict[str, str]) -> dict:
         'Gemeinde': p.get('gemeinde'),
         'Zone': p.get('zone'),
         'Grundstück m²': p.get('bebaubar_m2') or p.get('area'),
-        'HNF m²': round(p['hnf_delta']) if p.get('hnf_delta') else None,
+        'Mehr Wohnfläche m²': round(p['hnf_delta']) if p.get('hnf_delta') else None,
         'Baujahr': p.get('baujahr'),
         'ÖREB Kataster': p.get('housing_stat_url'),
     }
@@ -221,7 +221,7 @@ def main() -> None:
 
     schluessel = feld_schluessel(token) if token else {}
     fehlend = [n for n in ('Parzelle', 'EGRID', 'Gemeinde', 'Zone',
-                           'Grundstück m²', 'HNF m²', 'Baujahr')
+                           'Grundstück m²', 'Mehr Wohnfläche m²', 'Baujahr')
                if n not in schluessel]
     if fehlend:
         print(f'> Diese Felder fehlen in Pipedrive: {", ".join(fehlend)}')

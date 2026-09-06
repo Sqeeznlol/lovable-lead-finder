@@ -37,7 +37,7 @@ ZUORDNUNG = {
     'Kanton': 'kanton',
     'Zone': 'zone',
     'Grundstück m²': 'bebaubar_m2',
-    'HNF m²': 'hnf_delta',
+    'Mehr Wohnfläche m²': 'hnf_delta',
     'Baujahr': 'baujahr',
     'Geschosse': 'geschosse',
     'ÖREB Kataster': 'housing_stat_url',
@@ -274,7 +274,7 @@ def main() -> None:
             wert = treffer.get(spalte)
             if wert in (None, ''):
                 continue
-            if name in ('HNF m²', 'Grundstück m²'):
+            if name in ('Mehr Wohnfläche m²', 'Grundstück m²'):
                 wert = round(float(wert))
             patch[k] = wert
 

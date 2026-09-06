@@ -36,7 +36,7 @@ ZUORDNUNG = {
     'zone':        'Zone',
     'geschosse':   'Geschosse',
     'baujahr':     'Baujahr',
-    'hnf_delta':   'HNF m²',
+    'hnf_delta':   'Mehr Wohnfläche m²',
     'bebaubar_m2': 'Grundstück m²',
 }
 

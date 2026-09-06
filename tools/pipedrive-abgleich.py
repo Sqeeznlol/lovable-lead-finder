@@ -58,7 +58,7 @@ PARZELLE = re.compile(
 FELDTYPEN = {
     'Parzelle': 'varchar', 'EGRID': 'varchar', 'Gemeinde': 'varchar',
     'Kanton': 'varchar', 'Zone': 'varchar', 'Geschosse': 'double',
-    'Baujahr': 'double', 'HNF m²': 'double', 'Grundstück m²': 'double',
+    'Baujahr': 'double', 'Mehr Wohnfläche m²': 'double', 'Grundstück m²': 'double',
     'ÖREB Kataster': 'varchar',
 }
 
@@ -71,7 +71,7 @@ ZUORDNUNG = {
     'zone':        'Zone',
     'geschosse':   'Geschosse',
     'baujahr':     'Baujahr',
-    'hnf_delta':   'HNF m²',
+    'hnf_delta':   'Mehr Wohnfläche m²',
     'bebaubar_m2': 'Grundstück m²',
 }
 
