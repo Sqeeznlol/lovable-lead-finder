@@ -20,6 +20,7 @@ import { scoreColor, scoreBg } from '@/lib/deal-score';
 import { useListFilter, useLists } from '@/hooks/use-lists';
 import { ListSelector } from '@/components/ListSelector';
 import { GemeindeSidebar } from '@/components/GemeindeSidebar';
+import { useCanton } from '@/hooks/use-canton';
 import { getOerebParzelleUrl } from '@/lib/oereb';
 import { PotenzialPanel } from '@/components/PotenzialPanel';
 import { Luftbild } from '@/components/Luftbild';
@@ -66,7 +67,8 @@ export function Vorauswahl() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const { data: zones } = useZones();
   const { data: gemeinden } = useGemeinden();
-  const { data: queue, refetch } = useUnqueriedProperties(200, selectedListId, isPrioList, selectedGemeinde);
+  const { current: kanton } = useCanton();
+  const { data: queue, refetch } = useUnqueriedProperties(200, selectedListId, isPrioList, selectedGemeinde, kanton);
   const { data: stats, refetch: refetchStats } = useVorauswahlStats();
   const updateProp = useUpdateProperty();
   const { toast } = useToast();
@@ -259,7 +261,7 @@ export function Vorauswahl() {
   return (
     <div className="max-w-[1600px] mx-auto grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-4">
       {/* Gemeinde sidebar */}
-      <GemeindeSidebar selected={selectedGemeinde} onSelect={setSelectedGemeinde} />
+      <GemeindeSidebar selected={selectedGemeinde} onSelect={setSelectedGemeinde} kanton={kanton} />
 
       <div className="space-y-4 min-w-0">
       {/* Stats KPI bar */}

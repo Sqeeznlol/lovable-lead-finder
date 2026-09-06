@@ -9,10 +9,12 @@ import { cn } from '@/lib/utils';
 interface Props {
   selected: string | null;
   onSelect: (gemeinde: string | null) => void;
+  /** Ohne ihn stünden Andelfingen und Amriswil untereinander. */
+  kanton?: string | null;
 }
 
-export function GemeindeSidebar({ selected, onSelect }: Props) {
-  const { data, isLoading, error } = useGemeindeStats();
+export function GemeindeSidebar({ selected, onSelect, kanton }: Props) {
+  const { data, isLoading, error } = useGemeindeStats(kanton);
   const [search, setSearch] = useState('');
 
   const filtered = useMemo(() => {

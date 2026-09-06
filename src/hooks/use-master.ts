@@ -154,13 +154,17 @@ export interface GemeindeStat {
  * Live-Zähler pro Gemeinde. Liest die nötigen Felder in Batches und gruppiert
  * client-seitig — performant genug für ZH (~50-200 Gemeinden, einige hunderttausend Zeilen).
  */
-export function useGemeindeStats() {
+export function useGemeindeStats(kanton?: string | null) {
   return useQuery({
-    queryKey: ['master', 'gemeinde-stats'],
+    // Der Kanton gehört in den Schlüssel, sonst zeigt der
+    // Zwischenspeicher nach dem Umschalten die Gemeinden des vorigen.
+    queryKey: ['master', 'gemeinde-stats', kanton ?? 'alle'],
     queryFn: async () => {
       // Server-seitige Aggregation via RPC — sehr schnell, auch bei 200k+ Zeilen.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase as any).rpc('gemeinde_stats');
+      const { data, error } = await (supabase as any).rpc('gemeinde_stats', {
+        p_kanton: kanton || null,
+      });
       if (error) throw error;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const rows = (data || []) as any[];

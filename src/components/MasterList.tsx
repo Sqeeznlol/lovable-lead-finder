@@ -85,6 +85,7 @@ export function MasterList() {
         <GemeindeSidebar
           selected={filters.gemeinde ?? null}
           onSelect={(g) => setFilters(f => ({ ...f, gemeinde: g, page: 0 }))}
+          kanton={current}
         />
       )}
 

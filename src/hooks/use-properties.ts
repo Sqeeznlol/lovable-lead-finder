@@ -176,9 +176,9 @@ export function useZones() {
   });
 }
 
-export function useUnqueriedProperties(limit: number, listId?: string | null, isPrioList?: boolean, gemeinde?: string | null) {
+export function useUnqueriedProperties(limit: number, listId?: string | null, isPrioList?: boolean, gemeinde?: string | null, kanton?: string | null) {
   return useQuery({
-    queryKey: ['properties', 'unqueried', limit, listId, isPrioList, gemeinde],
+    queryKey: ['properties', 'unqueried', limit, listId, isPrioList, gemeinde, kanton],
     queryFn: async () => {
       let query = supabase
         .from('properties')
@@ -194,6 +194,9 @@ export function useUnqueriedProperties(limit: number, listId?: string | null, is
       }
       if (listId) query = query.eq('list_id', listId);
       if (gemeinde) query = query.eq('gemeinde', gemeinde);
+      // Ohne den Kanton mischt die Prüfliste Zürich und Thurgau --
+      // oben umschalten hätte dann keine Wirkung.
+      if (kanton) query = query.eq('kanton', kanton);
       const { data, error } = await query;
       if (error) throw error;
       return data as Property[];
