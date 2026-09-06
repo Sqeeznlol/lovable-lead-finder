@@ -100,9 +100,12 @@ export function useUebersicht() {
     initialData: () => lesen<Uebersicht>('uebersicht'),
     initialDataUpdatedAt: () => lesen<number>('uebersicht.zeit'),
     queryFn: async (): Promise<Uebersicht> => {
+      // Auch hier genügt die Schätzung: die Zahl steht als Fussnote
+      // ("259'000 Objekte im Bestand") und muss nicht auf die Zeile
+      // genau stimmen, aber sofort dastehen.
       const { count: total } = await supabase
         .from('properties')
-        .select('id', { count: 'exact', head: true });
+        .select('id', { count: 'estimated', head: true });
 
       const chancen: Chance[] = [];
       const nachEmpfehlung: Record<Empfehlung, number> = {
