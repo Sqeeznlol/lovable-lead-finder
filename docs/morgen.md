@@ -51,10 +51,9 @@ Solange sie fehlen, wirken die Zonenausschlüsse nur in der Übersicht
 (die im Browser rechnet), nicht in der Masterliste (die die Spalte
 `ausgeschlossen` aus der Datenbank liest).
 
-## Thurgau -- etwa zur Hälfte fertig
+## Thurgau -- Schritte eins bis drei sind fertig
 
-Erledigt: Die Quelle ist gefunden und frei abrufbar. geodienste.ch legt
-je Kanton eine Datei bereit; das Kantonskürzel steckt im Pfad, für Zug
+Die Quelle ist frei abrufbar; das Kantonskürzel steckt im Pfad, für Zug
 oder Aargau gilt dieselbe Adresse.
 
     https://geodienste.ch/downloads/interlis/npl_nutzungsplanung/TG/
@@ -62,31 +61,51 @@ oder Aargau gilt dieselbe Adresse.
     https://geodienste.ch/downloads/interlis/av/TG/
       av_TG_lv95.zip                           159.5 MB
 
-Beide antworten ohne Anmeldung. GDAL liest die Nutzungsplanung sauber:
-56'810 Zonenflächen, Ausdehnung über den ganzen Kanton, dazu 134
-Zonentypen mit Code und Bezeichnung.
+In der Nacht auf den 6. September durchgelaufen:
 
-Ehrlicher Stand am Abend des 5. September: Der Schritt "zonen" lief
-durch, hat aber nichts erzeugt -- die Ausgabedatei war zwei Kilobyte
-gross, also leer. Der Ebenenname im Aufruf traf nichts, und ein
-angehängtes "|| true" verschluckte den Fehler. Beides ist behoben: der
-Name wird jetzt aus dem Dienst geholt, und der Ablauf bricht ab, wenn
-weniger als tausend Zonenflächen herauskommen.
+    56'810   Zonenflächen
+    140'275  Grundstücke
+    137'233  Parzellenflächen mit Umriss
+    193'642  Ergebniszeilen: je Parzelle und Zone die Fläche
+             und der Anteil in Prozent
 
-Damit steht Thurgau bei Schritt eins von fünf, nicht bei zweieinhalb.
+Eine Zeile sieht so aus:
+
+    CH842026777174, Parzelle 776, TG4401, 171'348 m² gesamt,
+    davon 2'144 m² (1 %) in der einen und 4'266 m² (2 %) in
+    der nächsten Zone
+
+Genau darauf kommt es an: eine Parzelle kann zur Hälfte Wohnzone und zur
+Hälfte Wald sein, bebauen lässt sich nur der Zonenanteil. In Zürich war
+das anfangs übersehen worden, mit dem Ergebnis von Margen in
+Milliardenhöhe.
+
+Zwei Dinge waren dabei zu lösen und sind es wert, notiert zu werden:
+
+  * GDAL liest die Amtliche Vermessung nur halb -- die Spalten heissen
+    Field01 bis Field09 und die Grundstücksgrenzen bleiben lose Linien.
+    Ohne Flächen ist jede Rechnung wertlos. Die Umwandlung läuft deshalb
+    über ili2gpkg aus der amtlichen INTERLIS-Werkzeugkette. Das gilt für
+    jeden weiteren Kanton.
+  * Ohne räumlichen Index vergleicht die Datenbank jede der 140'000
+    Parzellen mit jeder der 57'000 Zonen. Ein Lauf lief eine halbe
+    Stunde ohne eine einzige Zeile. Mit Index dauert es zwei Minuten.
 
 Offen:
 
-1. Zonen umwandeln -- Aufruf korrigiert, Lauf noch ausstehend
-2. Parzellen aus der Amtlichen Vermessung laden und umwandeln
-3. Parzellen mit Zonen verschneiden -- je Parzelle Zone und
-   Flächenanteil, so wie es die Zürcher Liste im Klammerzusatz führt
-4. Adressen und Gebäudedaten dazunehmen
-5. In die Datenbank schreiben, `kanton = TG`
+1. Zonenname. In der Zonenfläche steht nur ein Schlüssel wie
+   "x4401_221_gngde", nicht "W2". Die Bezeichnung steht in einer
+   Typentabelle, die sich mit keinem der beiden Werkzeuge herauslösen
+   liess: GDAL faltet sie in die Zonenfläche und verwirft ihre Spalten,
+   ili2gpkg bricht ab, weil die Typen auf einen Katalog des Bundes in
+   einer eigenen Datei verweisen. Ohne den Namen lässt sich nicht
+   rechnen, wie hoch gebaut werden darf -- das ist die nächste Aufgabe.
+2. Adressen und Gebäudedaten (Baujahr, Geschosse, Wohnungen) fehlen.
+3. In die Datenbank schreiben, `kanton = TG`.
 
-Schritt 3 ist der aufwendige. Die Rechnung hängt daran: eine Parzelle
-kann zur Hälfte Wohnzone und zur Hälfte Wald sein, bebauen lässt sich
-nur der Zonenanteil.
+Die Zwischenstände liegen als Artefakte am Lauf "Kanton laden"; die
+Umwandlung der Vermessung dauert eine halbe Stunde und muss dank
+"schritt: verschneiden" nicht wiederholt werden.
 
 ## Pipedrive
 
