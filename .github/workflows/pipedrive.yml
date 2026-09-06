@@ -40,6 +40,8 @@ on:
           - deal         # Einen einzelnen Deal ansehen (Nummer in 'grenze')
           - titel        # Titel aus der Datenbank bilden (Probelauf)
           - titel-schreiben    # dasselbe, aber tatsächlich schreiben
+          - eigentuemer  # Miteigentümer in eigene Kontakte trennen
+          - eigentuemer-schreiben  # dasselbe, aber tatsächlich schreiben
       grenze:
         description: 'Höchstzahl Objekte -- bei "deal" die Deal-Nummer'
         required: false
@@ -106,6 +108,13 @@ jobs:
               ;;
             umziehen-schreiben)
               python3 tools/pipedrive-umziehen.py --schreiben \
+                | tee -a "$GITHUB_STEP_SUMMARY"
+              ;;
+            eigentuemer|eigentuemer-schreiben)
+              zusatz=""
+              [ "${{ inputs.aufgabe }}" = "eigentuemer-schreiben" ] \
+                && zusatz="--schreiben"
+              python3 tools/pipedrive-eigentuemer.py $zusatz \
                 | tee -a "$GITHUB_STEP_SUMMARY"
               ;;
             titel|titel-schreiben)
