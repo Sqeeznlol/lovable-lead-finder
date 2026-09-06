@@ -126,7 +126,7 @@ jobs:
               from public.properties p
               join eindeutig e on e.egrid = p.egrid
               where p.kanton = 'TG'
-              group by 1 order by 2 desc;"
+              group by 1 order by 2 desc limit 60;"
 
           elif [ "${{ inputs.frage }}" = "arten" ]; then
             frage "Gebäudearten" "
