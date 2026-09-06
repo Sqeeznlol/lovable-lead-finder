@@ -155,12 +155,19 @@ def main() -> None:
                         if f.get('name') == 'Grundstück'), None)
 
     zu_aendern: list[tuple[dict, str]] = []
-    ohne_objekt = 0
+    ohne_egrid: list[str] = []
+    fremd: list[str] = []
     for d in deals:
         kennung = egrid_von(d, schluessel, personen)
         objekt = dict(objekte.get(kennung) or {})
         if not objekt:
-            ohne_objekt += 1
+            # Zwei ganz verschiedene Gründe, die man auseinanderhalten
+            # muss: entweder trägt der Deal gar keine EGRID -- dann ist
+            # die Verbindung zum Objekt nie hergestellt worden --, oder
+            # er trägt eine, die in der Datenbank fehlt. Letzteres heisst
+            # meist: ein anderer Kanton, den wir noch nicht haben.
+            (fremd if kennung else ohne_egrid).append(
+                f'{d.get("id")} {kennung or d.get("title")}')
             continue
         # Was die Datenbank nicht führt, steht vielleicht am Kontakt.
         if not objekt.get('parzelle'):
@@ -177,10 +184,22 @@ def main() -> None:
     if len(zu_aendern) > 20:
         print(f'- … und {len(zu_aendern) - 20} weitere')
     print()
-    if ohne_objekt:
-        print(f'> {ohne_objekt} Deals lassen sich keinem Objekt in der')
-        print('> Datenbank zuordnen. Sie behalten ihren Titel -- ein')
-        print('> falscher Titel wäre schlimmer als ein unschöner.')
+    if ohne_egrid:
+        print(f'## {len(ohne_egrid)} Deals ohne EGRID')
+        print()
+        print('Bei ihnen wurde die Verbindung zum Objekt nie hergestellt.')
+        print()
+        for z in ohne_egrid[:10]:
+            print(f'- `{z}`')
+        print()
+    if fremd:
+        print(f'## {len(fremd)} Deals mit unbekannter EGRID')
+        print()
+        print('Die EGRID steht am Deal, das Objekt fehlt in der Datenbank --')
+        print('meist ein Kanton, den wir noch nicht geladen haben.')
+        print()
+        for z in fremd[:10]:
+            print(f'- `{z}`')
         print()
 
     if not args.schreiben:
