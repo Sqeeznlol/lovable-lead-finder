@@ -424,3 +424,53 @@ describe('Bahnareal', () => {
     expect(p.keineWohnnutzung).toBe(false);
   });
 });
+
+describe('Thurgauer Zonen: was nicht bebaubar ist', () => {
+  // Wortlaut aus dem Bestand (Auswertung "zonen-tg", 106'068 Parzellen
+  // mit genau einer Zone).
+  const raus = [
+    'Lw Landwirtschaftszone',
+    'Lw Landwirtschaftzone',
+    'L Landwirtschaftszone',
+    'LwbN Landwirtschaftszone für besondere Nutzungen',
+    'Ls Landschaftsschutzzone',
+    'W Wald',
+    'Wa Wald',
+    'Fo Wald',
+    'Fo Forstzone Fo',
+    'SaB Strasse ausserhalb Bauzone',
+    'SnB Strassenflächen ausserhalb von Bauzonen',
+    'StNB Strasse Nichtbaugebiet',
+    'SiB Strasse innerhalb Bauzone',
+    'StrA Verkehrsfläche ausserhalb Baugebiet',
+    'SB Strassen und Wege innerhalb von Bauzonen',
+    'VB Verkehrsfläche in Bauzone',
+    'NzZaB Nicht zugewiesene Zone ausserhalb der Bauzonen',
+    'Dep A Deponiezone Typ A',
+    'Ab Abbauzonen Ab',
+    'AG Arbeitszone Gewerbe',
+    'AI Arbeitszone Industrie',
+    'G* Gewerbezone mit max. Gebäudehöhe = 10 m',
+  ];
+  it.each(raus)('nimmt "%s" aus der Liste', z => {
+    expect(istAusgeschlossen({ zone: z })).toBe(true);
+  });
+
+  // Die Gegenprobe ist die wichtigere: eine Wohn- und Arbeitszone
+  // enthält das Wort "Arbeitszone" und fiel bisher mit heraus, obwohl
+  // dort gerade Wohnraum entstehen darf.
+  const bleibt = [
+    'WA2 Wohn- und Arbeitszone 2',
+    'WA3 Wohn- und Arbeitszone WA3',
+    'WA 3 Wohn- und Arbeitszone dreigeschossiger Erscheinung',
+    'W2a Wohnzone 2a',
+    'D Dorfzone',
+    'DK Dorfkernzone',
+    'Z Zentrumszone',
+    'A Altstadtzone',
+    'W80 Wohnzone 80',
+  ];
+  it.each(bleibt)('lässt "%s" in der Liste', z => {
+    expect(istAusgeschlossen({ zone: z })).toBe(false);
+  });
+});

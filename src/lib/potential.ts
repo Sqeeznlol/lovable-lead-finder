@@ -80,11 +80,18 @@ export interface ParsedZone {
   unbrauchbar: boolean;
 }
 
+// Seit dem Thurgau stehen hier auch die Strassen- und
+// Verkehrsflächen: der Kanton führt sie als eigene Zonen ("SaB Strasse
+// ausserhalb Bauzone", "SnB Strassenflächen ausserhalb von Bauzonen",
+// "StrA Verkehrsfläche ausserhalb Baugebiet"), und sie standen als
+// kaufbare Objekte in der Liste. Dasselbe gilt für die
+// Landschaftsschutz- und Forstzonen.
+//
 // "Wald" bewusst nur als eigenständiges Wort: es gibt die Gemeinde Wald (ZH)
 // und Flurnamen wie "Waldegg", die keine Waldzone sind. Beim Bahnareal
 // dasselbe -- eine Bahnhofstrasse liegt meist in der Kernzone und ist sehr
 // wohl kaufbar, das Areal der Bahn selbst nicht.
-const NICHT_BAUZONE = /landwirtschaftszone|\bwald\b|waldzone|freihaltezone|erholungszone|gew(ä|ae)sser|reservezone|verkehrszone|\bbahnareal\b|\bbahngebiet\b|\bbahnzone\b|\bgleisareal\b|eisenbahn/i;
+const NICHT_BAUZONE = /landwirtschaft|landschaftsschutz|\bwald\b|waldzone|forstzone|freihaltezone|erholungszone|gew(ä|ae)sser|reservezone|verkehrszone|verkehrsfl(ä|ae)che|\bstrasse\b|strassen|nationalstrass|nichtbaugebiet|nichtbauzone|nicht zugewiesene zone|ausserhalb (von )?(der )?(bauzone|bauzonen|baugebiet)|deponie|abbauzone|\bbahnareal\b|\bbahngebiet\b|\bbahnzone\b|\bgleisareal\b|\bbahnfl(ä|ae)che|eisenbahn/i;
 
 /**
  * Zonen, in denen kein Wohnraum entstehen kann.
@@ -94,7 +101,7 @@ const NICHT_BAUZONE = /landwirtschaftszone|\bwald\b|waldzone|freihaltezone|erhol
  * keine Wohnnutzung zulässt, geht das nicht -- die Objekte gehören deshalb
  * gar nicht erst in die Arbeitsliste, auch wenn dort baulich Reserve läge.
  */
-const KEINE_WOHNNUTZUNG = /gewerbezone|industriezone|arbeitszone|(zone f(ü|ue)r )?(ö|oe)ffentliche(n)? (bauten|zwecke)|(ö|oe)ffentliche bauten/i;
+const KEINE_WOHNNUTZUNG = /gewerbezone|gewerbe|industrie|arbeitszone|(zone f(ü|ue)r )?(ö|oe)ffentliche(n)? (bauten|zwecke)|(ö|oe)ffentliche bauten/i;
 
 /**
  * Zonen-Kürzel, wie sie einzelne Gemeinden führen -- Winterthur schreibt
@@ -174,7 +181,12 @@ export function parseZone(raw?: string | null): ParsedZone {
   }
 
   if (NICHT_BAUZONE.test(text)) return { ...leer, zonenflaeche, anteilProzent, keineBauzone: true };
-  if (KEINE_WOHNNUTZUNG.test(text)) return { ...leer, zonenflaeche, anteilProzent, keineWohnnutzung: true };
+  // "Wohn- und Arbeitszone" enthält "Arbeitszone" -- und war damit bisher
+  // ausgeschlossen, obwohl dort gerade Wohnraum entstehen darf. Steht
+  // "Wohn" im Namen, schlägt das die Gewerberegel.
+  if (KEINE_WOHNNUTZUNG.test(text) && !/wohn/i.test(text)) {
+    return { ...leer, zonenflaeche, anteilProzent, keineWohnnutzung: true };
+  }
 
   // Bereits normierte Kurzform ("W3", "W4G")
   const kurzMatch = text.toUpperCase().replace(/\s+/g, '').match(/^([WKZ]{1,2}G?\d?G?)$/);
