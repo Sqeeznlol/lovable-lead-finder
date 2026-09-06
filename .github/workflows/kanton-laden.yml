@@ -176,54 +176,46 @@ jobs:
           set -euo pipefail
           xtf=$(find /tmp/npl -name '*.xtf' | head -1)
 
-          # Der Ebenenname trägt den vollen Pfad im Modell. Ein blosses
-          # "Grundnutzung_Zonenflaeche" trifft nichts -- der erste Versuch
-          # lieferte deshalb eine leere Datei von zwei Kilobyte, und das
-          # angehängte "|| true" verschluckte den Fehler. Der Name wird
-          # jetzt aus dem Dienst selbst geholt.
-          ebene=$(ogrinfo -so "$xtf,/tmp/Nutzungsplanung_V1_2.ili" 2>/dev/null \
-            | grep -o '[A-Za-z_0-9.]*Grundnutzung_Zonenflaeche' | head -1)
-          echo "Ebene: ${ebene:-nicht gefunden}"
-          if [ -z "$ebene" ]; then
-            echo "Die Ebene mit den Zonen liess sich nicht finden." >&2
-            exit 1
-          fi
+          # Auch hier das amtliche Werkzeug statt GDAL. GDAL faltet die
+          # Typentabelle in die Zonenfläche hinein und verwirft dabei
+          # genau die Spalten, um die es geht ("Failed to add new
+          # definition to existing layers ... Abkuerzung, Bemerkungen").
+          # Übrig bliebe ein Schlüssel wie "x4401_221_gngde" -- für ein
+          # Telefonat wertlos, denn niemand ruft wegen "x4401_221" an,
+          # sondern wegen einer W2 mit ungenutzten Geschossen.
+          curl -sSL -o /tmp/ili2gpkg.zip \
+            "https://downloads.interlis.ch/ili2gpkg/ili2gpkg-5.1.1.zip"
+          unzip -o -q /tmp/ili2gpkg.zip -d /tmp/ili2gpkg
+          jar=$(find /tmp/ili2gpkg -name 'ili2gpkg*.jar' | head -1)
 
-          # Nur die Grundnutzung: das sind die Zonen, in denen gebaut wird.
-          # Überlagernde Festlegungen (Lärm, Gefahren) sind eine eigene
-          # Frage und kämen später dazu.
-          ogr2ogr -f GPKG /tmp/zonen.gpkg \
-            "$xtf,/tmp/Nutzungsplanung_V1_2.ili" \
-            -nln zonen "$ebene"
-
-          # In der Zonenfläche steht nur ein Schlüssel wie
-          # "x4401_221_gngde", nicht "W2". Die Bezeichnung und die
-          # Hauptnutzung stehen in einer eigenen Tabelle des Modells --
-          # ohne sie ist das Ergebnis für einen Anruf unbrauchbar.
-          # Die Typentabelle liegt im selben Themenbereich wie die
-          # Zonenflächen -- ihr Name ergibt sich daraus, statt ihn zu
-          # suchen. Die Suche danach hat zweimal den ganzen Schritt
-          # abgebrochen, weil ein erfolgloses grep unter "set -e" zählt.
-          typebene="${ebene%Grundnutzung_Zonenflaeche}Typ_Grundnutzung"
-          echo "Typenebene: $typebene"
-          rm -f /tmp/zonentyp.gpkg
-          ogr2ogr -f GPKG /tmp/zonentyp.gpkg \
-            "$xtf,/tmp/Nutzungsplanung_V1_2.ili" \
-            -nln zonentyp "$typebene" || true
-          if [ -f /tmp/zonentyp.gpkg ]; then
-            echo "Spalten der Typenebene:"
-            ogrinfo -so /tmp/zonentyp.gpkg zonentyp 2>/dev/null \
-              | sed -n '/^Feature Count/p;/^[A-Za-z_0-9]*: /p'
-            ogr2ogr -f CSV /vsistdout/ /tmp/zonentyp.gpkg zonentyp \
-              -limit 3 -lco GEOMETRY=NO 2>/dev/null || true
-          else
-            echo "Typentabelle nicht gefunden -- es bleibt beim Schlüssel."
-          fi
+          modelldir="/tmp;http://models.interlis.ch/;https://models.geo.admin.ch/"
+          rm -f /tmp/zonen.gpkg
+          java -jar "$jar" --dbfile /tmp/zonen.gpkg \
+            --modeldir "$modelldir" --defaultSrsCode 2056 \
+            --models Nutzungsplanung_V1_2 --schemaimport \
+            > /tmp/zschema.log 2>&1 || { tail -20 /tmp/zschema.log; exit 1; }
+          java -jar "$jar" --dbfile /tmp/zonen.gpkg \
+            --modeldir "$modelldir" --defaultSrsCode 2056 \
+            --disableValidation --import "$xtf" \
+            > /tmp/zimport.log 2>&1 || true
+          grep -iE 'error|failed' /tmp/zimport.log | head -10 \
+            || echo "(Einlesen ohne Fehler)"
 
           ls -lh /tmp/zonen.gpkg
-          # Ohne Zeilen ist die Umwandlung gescheitert, gleich was der
-          # Rückgabewert sagt.
-          n=$(ogrinfo -so -al /tmp/zonen.gpkg 2>/dev/null \
+          echo "### Ebenen"
+          ogrinfo -so -al /tmp/zonen.gpkg 2>/dev/null \
+            | grep -E 'Layer name|Feature Count' | paste - - \
+            | grep -iE 'zonenflaeche|typ_grundnutzung' || true
+
+          for e in grundnutzung_zonenflaeche typ_grundnutzung; do
+            echo "--- Spalten von $e"
+            ogrinfo -so /tmp/zonen.gpkg "$e" 2>&1 \
+              | sed -n '/^[a-z_0-9]*:/p' || true
+            ogr2ogr -f CSV /vsistdout/ /tmp/zonen.gpkg "$e" \
+              -limit 3 -lco GEOMETRY=NO 2>/dev/null || true
+          done
+
+          n=$(ogrinfo -so /tmp/zonen.gpkg grundnutzung_zonenflaeche 2>/dev/null \
             | grep -oP 'Feature Count: \K[0-9]+' | head -1)
           echo "Zonenflächen: ${n:-0}"
           if [ "${n:-0}" -lt 1000 ]; then
@@ -297,9 +289,12 @@ jobs:
               JOIN grundstueck g ON g.T_Id = l.liegenschaft_von"
 
           ogr2ogr -f GPKG /tmp/arbeit.gpkg -append -nln zonen \
-            /tmp/zonen.gpkg zonen
-          [ -f /tmp/zonentyp.gpkg ] && ogr2ogr -f GPKG /tmp/arbeit.gpkg \
-            -append -nln zonentyp /tmp/zonentyp.gpkg zonentyp
+            /tmp/zonen.gpkg grundnutzung_zonenflaeche
+          ogr2ogr -f GPKG /tmp/arbeit.gpkg -append -nln zonentyp \
+            /tmp/zonen.gpkg -dialect sqlite \
+            -sql "SELECT T_Id AS typ_id, bezeichnung, abkuerzung,
+                         hauptnutzung_ch
+                  FROM typ_grundnutzung"
 
           # Ohne räumlichen Index vergleicht die Datenbank jede der
           # 140'000 Parzellen mit jeder der 57'000 Zonen -- acht
@@ -323,8 +318,9 @@ jobs:
           if ogrinfo -so /tmp/arbeit.gpkg zonentyp > /dev/null 2>&1; then
             ogr2ogr -f SQLite /tmp/arbeit.sqlite -append \
               -dsco SPATIALITE=YES -nln zonentyp /tmp/arbeit.gpkg zonentyp
-            namen_wahl="t.Bezeichnung AS zone_name, t.Abkuerzung AS zone_kurz,"
-            namen_join="LEFT JOIN zonentyp t ON t.TID = z.typ"
+            namen_wahl="t.bezeichnung AS zone_name, t.abkuerzung AS zone_kurz,
+                        t.hauptnutzung_ch AS hauptnutzung,"
+            namen_join="LEFT JOIN zonentyp t ON t.typ_id = z.typ"
           fi
           echo "Zonennamen: ${namen_wahl:-keine}"
 
