@@ -254,18 +254,25 @@ jobs:
           ls -lh /tmp/zonen.gpkg /tmp/parzellen.gpkg
 
           # Beide Quellen in eine Datei, damit sich darin rechnen lässt.
-          # Die Vermessungsdatei bleibt, wie sie ist -- ihre Schlüssel
-          # (T_Id) gehen beim Kopieren sonst verloren. Dazu kommen die
-          # Zonen und eine begradigte Fassung der Parzellenumrisse: die
-          # amtlichen Grenzen enthalten Kreisbögen, mit denen SpatiaLite
-          # nicht rechnen kann.
+          # Grundstück und Fläche gehören zusammen -- die Nummer und die
+          # EGRID stehen am Grundstück, der Umriss an der Fläche. Beides
+          # wird gleich hier verbunden, solange der Schlüssel T_Id noch
+          # eine gewöhnliche Spalte ist; beim Kopieren gilt er als interne
+          # Satznummer und ginge verloren.
+          #
+          # Die amtlichen Grenzen enthalten Kreisbögen, mit denen
+          # SpatiaLite nicht rechnen kann; GDAL begradigt sie dabei.
           cp /tmp/parzellen.gpkg /tmp/arbeit.gpkg
+          ogr2ogr -f GPKG /tmp/arbeit.gpkg -append -nln parzellen \
+            -nlt CONVERT_TO_LINEAR /tmp/arbeit.gpkg \
+            -dialect sqlite -sql "
+              SELECT g.egris_egrid, g.nummer, g.nbident, g.art,
+                     l.flaechenmass, l.geometrie
+              FROM liegenschaft l
+              JOIN grundstueck g ON g.T_Id = l.liegenschaft_von"
+
           ogr2ogr -f GPKG /tmp/arbeit.gpkg -append -nln zonen \
             /tmp/zonen.gpkg zonen
-          ogr2ogr -f GPKG /tmp/arbeit.gpkg -append -nln flaechen \
-            -nlt CONVERT_TO_LINEAR /tmp/arbeit.gpkg \
-            -sql "SELECT liegenschaft_von, flaechenmass, geometrie
-                  FROM liegenschaft"
 
           # Ohne räumlichen Index vergleicht die Datenbank jede der
           # 140'000 Parzellen mit jeder der 57'000 Zonen -- acht
@@ -276,28 +283,19 @@ jobs:
           # Übriggebliebenen werden genau gerechnet.
           echo "### In eine SpatiaLite-Datenbank umziehen"
           rm -f /tmp/arbeit.sqlite
-          for e in flaechen zonen; do
+          for e in parzellen zonen; do
             ogr2ogr -f SQLite /tmp/arbeit.sqlite -append \
               -dsco SPATIALITE=YES -lco SPATIAL_INDEX=YES \
               -nln "$e" /tmp/arbeit.gpkg "$e"
           done
-          # Der Schlüssel T_Id gilt als interne Satznummer und ginge beim
-          # Kopieren verloren -- ohne ihn lässt sich die Fläche nicht dem
-          # Grundstück zuordnen. Deshalb ausdrücklich als Spalte mitnehmen.
-          ogr2ogr -f SQLite /tmp/arbeit.sqlite -append \
-            -dsco SPATIALITE=YES -nln grundstueck /tmp/arbeit.gpkg \
-            -dialect sqlite -sql "SELECT T_Id AS gs_id, egris_egrid,
-                                         nummer, nbident, art
-                                  FROM grundstueck"
-          ogrinfo -so -al /tmp/arbeit.sqlite 2>/dev/null \
-            | grep -E 'Layer name|Feature Count' | paste - -
-          # Ohne die Grundstücke fehlen EGRID und Parzellennummer -- dann
-          # ist das Ergebnis wertlos.
-          ogrinfo -so /tmp/arbeit.sqlite grundstueck > /dev/null 2>&1 \
-            || { echo "Ebene grundstueck fehlt."; exit 1; }
 
-          # Wie die Geometriespalte heisst, sagt die Datei selbst; darauf
-          # zu raten hat diesen Ablauf schon mehrfach einen Lauf gekostet.
+          echo "### Was in der Arbeitsdatenbank steht"
+          for e in parzellen zonen; do
+            echo "-- $e"
+            ogrinfo -so /tmp/arbeit.sqlite "$e" 2>/dev/null \
+              | sed -n '/^Feature Count/p;/^[A-Za-z_0-9]*: /p'
+          done
+
           # SpatiaLite führt selbst Buch darüber, wie die Geometriespalte
           # jeder Tabelle heisst. Diese Tabelle zu fragen ist verlässlich;
           # aus der Textausgabe von ogrinfo zu lesen war es nicht.
@@ -307,9 +305,9 @@ jobs:
                WHERE f_table_name = '$1'" 2>/dev/null \
               | sed -n 's/.*= //p' | head -1
           }
-          gsp=$(spalte flaechen)
+          gsp=$(spalte parzellen)
           gsz=$(spalte zonen)
-          echo "Geometrie: flaechen.${gsp:?} zonen.${gsz:?}"
+          echo "Geometrie: parzellen.${gsp:?} zonen.${gsz:?}"
 
           echo
           echo "### Verschneiden"
@@ -320,21 +318,20 @@ jobs:
                 g.nummer                               AS parzelle,
                 g.nbident                              AS vermessungskreis,
                 g.art                                  AS art,
-                l.flaechenmass                         AS flaeche_m2,
+                g.flaechenmass                         AS flaeche_m2,
                 z.Typ                                  AS zone_typ,
-                ROUND(ST_Area(ST_Intersection(l.$gsp, z.$gsz)))
+                ROUND(ST_Area(ST_Intersection(g.$gsp, z.$gsz)))
                                                        AS zone_m2,
-                ROUND(100.0 * ST_Area(ST_Intersection(l.$gsp, z.$gsz))
-                      / NULLIF(l.flaechenmass, 0))     AS anteil_prozent
-              FROM flaechen l
-              JOIN grundstueck g ON g.gs_id = l.liegenschaft_von
+                ROUND(100.0 * ST_Area(ST_Intersection(g.$gsp, z.$gsz))
+                      / NULLIF(g.flaechenmass, 0))     AS anteil_prozent
+              FROM parzellen g
               JOIN zonen z
               WHERE z.ROWID IN (
                       SELECT ROWID FROM SpatialIndex
                       WHERE f_table_name = 'zonen'
-                        AND search_frame = l.$gsp)
-                AND ST_Intersects(l.$gsp, z.$gsz)
-                AND ST_Area(ST_Intersection(l.$gsp, z.$gsz)) > 5
+                        AND search_frame = g.$gsp)
+                AND ST_Intersects(g.$gsp, z.$gsz)
+                AND ST_Area(ST_Intersection(g.$gsp, z.$gsz)) > 5
             " || { echo "Verschneiden fehlgeschlagen"; exit 1; }
 
           zeilen=$(( $(wc -l < /tmp/verschnitten.csv) - 1 ))
