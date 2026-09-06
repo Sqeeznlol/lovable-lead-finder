@@ -92,47 +92,9 @@ export function Uebersicht() {
       {/* Die knappste Ressource im Ablauf: fünf Grundbuchabfragen am Tag. */}
       <Eigentuemersuche objekte={data.nachschlagen} />
 
-      {/* Eigentümer bekannt, Nummer nicht: der Zwischenstand, an dem
-          die Kette hängen bleibt. Er gehört sichtbar gemacht, sonst
-          liegt er zwischen den Objekten und fällt niemandem auf. */}
-      {(() => {
-        const offen = data.topChancen.filter(
-          (c: Chance) => c.eigentuemer && !c.telefon);
-        if (offen.length === 0) return null;
-        return (
-          <Card>
-            <CardContent className="p-0">
-              <div className="flex items-center gap-2 border-b p-5">
-                <UserSearch className="h-4 w-4 text-muted-foreground" />
-                <h2 className="font-serif">Eigentümer bekannt, Nummer fehlt</h2>
-                <span className="ml-auto text-xs text-muted-foreground">
-                  {offen.length}
-                </span>
-              </div>
-              <ul className="divide-y">
-                {offen.map((c: Chance) => (
-                  <li key={c.id} className="flex items-baseline justify-between gap-3 p-4">
-                    <span className="min-w-0">
-                      <span className="block truncate font-medium">{c.address}</span>
-                      <span className="block truncate text-sm text-muted-foreground">
-                        {c.eigentuemer}
-                      </span>
-                    </span>
-                    <a
-                      href={`https://tel.search.ch/?was=${encodeURIComponent(c.eigentuemer || '')}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="shrink-0 text-sm underline underline-offset-4"
-                    >
-                      Nummer suchen
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        );
-      })()}
+      {/* Was einen Eigentümer hat, steht nicht mehr hier, sondern im
+          Akquise-Modus: dort wird die Nummer gesucht. Die Übersicht
+          zeigt nur, was noch abzufragen ist. */}
 
       <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
         {/* Konkrete Adressen */}

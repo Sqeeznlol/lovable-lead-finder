@@ -172,6 +172,14 @@ export function useUebersicht(kanton?: string) {
           if (p.preselection_status === ARCHIV_STATUS) continue;
           if (verkauftNie(p.owner_name ?? p.eigentuemer_name)) continue;
 
+          // Steht ein Eigentümer da -- Name, Firma, irgendein Text --,
+          // ist die Arbeit hier getan. Die Übersicht zeigt, was noch
+          // abzufragen ist; alles Weitere gehört in den Akquise-Modus,
+          // wo die Nummer gesucht wird.
+          const hatEigentuemer = String(
+            p.owner_name ?? p.eigentuemer_name ?? '').trim().length > 0;
+          if (hatEigentuemer) continue;
+
           const u = beurteile(p);
           // HNF und Marge müssen aus derselben Rechnung stammen. Der Wert in
           // der Datenbank kann älter sein als die aktuelle Formel; dann
