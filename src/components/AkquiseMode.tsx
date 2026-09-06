@@ -325,8 +325,11 @@ export function AkquiseMode() {
         owners_json: ownersJson as any,
       });
 
-      // Bei Auto-Telefon-Treffer direkt zu Pipedrive pushen
-      if (hasAnyPhone && (autoPhone1 || autoPhone2)) {
+      // Sobald eine Nummer dasteht, geht es nach Pipedrive -- gleich,
+      // ob die Suche sie gefunden oder jemand sie eingetippt hat. Die
+      // Einschraenkung auf gefundene Nummern liess die von Hand
+      // eingetragenen liegen, und niemand sah es.
+      if (hasAnyPhone) {
         try {
           setAutoStatus('📤 Push zu Pipedrive...');
           const batch = [{

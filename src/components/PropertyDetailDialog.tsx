@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Objektansicht } from '@/components/Objektansicht';
 import { protokolliere } from '@/lib/protokoll';
 import { AuskunftEinfuegen } from '@/components/AuskunftEinfuegen';
+import { weiterverarbeiten } from '@/hooks/use-eigentuemer-lookup';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ExternalLink, MapPin, Phone, User, Save, Loader2, Bot, RefreshCw, Archive, ClipboardPaste } from 'lucide-react';
@@ -115,8 +116,20 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
       return;
     }
     toast({ title: '✓ Gespeichert' });
+
+    // Steht jetzt beides da -- Eigentümer und Nummer -- und war das
+    // Objekt noch nicht draussen, dann ist der nächste Schritt
+    // eindeutig: Deal in Akquise, Phase "Neu". Darauf muss niemand
+    // noch einmal klicken.
+    const vollstaendig = String(data.owner_name ?? '').trim()
+      && String(data.owner_phone ?? '').trim();
+    if (vollstaendig && !data.is_queried) {
+      await weiterverarbeiten(data.id, toast);
+    }
+
     qc.invalidateQueries({ queryKey: ['master'] });
     qc.invalidateQueries({ queryKey: ['properties'] });
+    qc.invalidateQueries({ queryKey: ['uebersicht'] });
     onClose();
   };
 
