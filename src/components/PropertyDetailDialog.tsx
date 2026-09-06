@@ -8,9 +8,10 @@ import { grundbuchUrl, verkauftNie, ARCHIV_STATUS } from '@/lib/grundbuch';
 import { Label } from '@/components/ui/label';
 import { Objektansicht } from '@/components/Objektansicht';
 import { protokolliere } from '@/lib/protokoll';
+import { AuskunftEinfuegen } from '@/components/AuskunftEinfuegen';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ExternalLink, MapPin, Phone, User, Save, Loader2, Bot, RefreshCw, Archive } from 'lucide-react';
+import { ExternalLink, MapPin, Phone, User, Save, Loader2, Bot, RefreshCw, Archive, ClipboardPaste } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
@@ -39,6 +40,7 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
   const [data, setData] = useState<Property | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [einfuegen, setEinfuegen] = useState(false);
   const { toast } = useToast();
   const qc = useQueryClient();
   const startLookup = useStartEigentuemerLookup();
@@ -256,6 +258,14 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
                       ? (<><RefreshCw className="h-3 w-3" /> Erneut abrufen</>)
                       : (<><Bot className="h-3 w-3" /> Eigentümer abrufen</>)}
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1 text-xs"
+                    onClick={() => setEinfuegen(true)}
+                  >
+                    <ClipboardPaste className="h-3 w-3" /> Auskunft einfügen
+                  </Button>
                 </div>
                 {(() => {
                   const d = data as Property & { eigentuemer_name?: string | null; eigentuemer_adresse?: string | null; eigentuemer_plz_ort?: string | null };
@@ -354,6 +364,11 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
             </div>
           </>
         )}
+        <AuskunftEinfuegen
+          propertyId={einfuegen ? (data?.id ?? null) : null}
+          adresse={data?.address}
+          onClose={() => setEinfuegen(false)}
+        />
       </DialogContent>
     </Dialog>
   );

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ExternalLink, UserSearch, Check, Archive, X } from 'lucide-react';
+import { ExternalLink, UserSearch, Check, Archive, X, ClipboardPaste } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,7 @@ import { gemeindeBfsNr } from '@/lib/swisstopo';
 import { grundbuchUrl, verkauftNie, ARCHIV_STATUS } from '@/lib/grundbuch';
 import { useStartEigentuemerLookup, useExtensionAvailable } from '@/hooks/use-eigentuemer-lookup';
 import { protokolliere } from '@/lib/protokoll';
+import { AuskunftEinfuegen } from '@/components/AuskunftEinfuegen';
 import type { Chance } from '@/hooks/use-uebersicht';
 
 /** Wie viele Auskünfte das Portal pro Tag freigibt. */
@@ -51,6 +52,7 @@ export function Eigentuemersuche({ objekte }: { objekte: Chance[] }) {
   const [verbraucht, setVerbraucht] = useState(gezaehlt);
   const [entwurf, setEntwurf] = useState<Record<string, string>>({});
   const [speichert, setSpeichert] = useState<string | null>(null);
+  const [einfuegen, setEinfuegen] = useState<Chance | null>(null);
   // In den importierten Daten fehlt die Gemeindenummer durchgehend, ohne sie
   // lässt sich das Grundstück im Portal nicht adressieren. Sie wird deshalb
   // einmal je Gemeinde nachgeschlagen, nicht einmal je Objekt.
@@ -230,6 +232,16 @@ export function Eigentuemersuche({ objekte }: { objekte: Chance[] }) {
                     </span>
                   )}
 
+                  {/* Solange die Extension nicht steht: Block aus dem
+                      Portal kopieren, hier einfügen, fertig. */}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setEinfuegen(c)}
+                  >
+                    <ClipboardPaste className="mr-1 h-3.5 w-3.5" /> Auskunft einfügen
+                  </Button>
+
                   <Input
                     value={entwurf[c.id] ?? ''}
                     onChange={e => setEntwurf(v => ({ ...v, [c.id]: e.target.value }))}
@@ -262,6 +274,12 @@ export function Eigentuemersuche({ objekte }: { objekte: Chance[] }) {
           })}
         </ul>
       </CardContent>
+
+      <AuskunftEinfuegen
+        propertyId={einfuegen?.id ?? null}
+        adresse={einfuegen?.address}
+        onClose={() => setEinfuegen(null)}
+      />
     </Card>
   );
 }

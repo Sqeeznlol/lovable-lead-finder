@@ -52,7 +52,7 @@ interface StartArgs {
  * Schlägt ein Schritt fehl, bleibt das Objekt in der Liste. Ein halb
  * abgelegtes Objekt wäre schlimmer als eines, das noch dasteht.
  */
-async function weiterverarbeiten(
+export async function weiterverarbeiten(
   propertyId: string,
   toast: ReturnType<typeof useToast>['toast'],
 ): Promise<void> {
