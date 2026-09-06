@@ -525,6 +525,13 @@ jobs:
             | grep -E 'Layer name|Feature Count|Geometry:' | paste - - - \
             | grep -i 'liegenschaft\|grundstueck' || true
 
-          echo
-          echo "### Spalten der Grundstücke"
-          ogrinfo -so /tmp/probe.gpkg liegenschaften_grundstueck 2>&1 | head -25
+          # Das Werkzeug benennt die Ebenen nach dem Modell, klein
+          # geschrieben und ohne Themenpräfix: grundstueck, liegenschaft.
+          for e in grundstueck liegenschaft; do
+            echo
+            echo "### Spalten von $e"
+            ogrinfo -so /tmp/probe.gpkg "$e" 2>&1 | sed -n '/^[a-z_]*:/p'
+            echo "--- Probe"
+            ogr2ogr -f CSV /vsistdout/ /tmp/probe.gpkg "$e" \
+              -limit 3 -lco GEOMETRY=NO 2>/dev/null || true
+          done
