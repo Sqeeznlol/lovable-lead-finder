@@ -11,7 +11,15 @@
  * wurde. Innerhalb einer Sitzung ist der Nutzen gross, darüber hinaus
  * wäre er es nicht wert.
  */
-const VORSATZ = 'bauraum.v1.';
+/**
+ * Die Zahl im Namen ist die Fassung der abgelegten Form. Sie steigt,
+ * sobald sich ändert, was in einer Zeile steht -- sonst liest die neue
+ * Anwendung dreissig Minuten lang alte Zeilen weiter, denen ein Feld
+ * fehlt. Genau das ist passiert, als der Kanton dazukam: der
+ * Katasterlink zeigte weiter auf Zürich, weil in der abgelegten Zeile
+ * kein Kanton stand.
+ */
+const VORSATZ = 'bauraum.v2.';
 
 /** Wie lange ein abgelegtes Ergebnis noch gilt. */
 const HALTBAR = 30 * 60 * 1000;
