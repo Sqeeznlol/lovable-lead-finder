@@ -124,26 +124,40 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
         ) : (
           <>
             <DialogHeader>
-              <DialogTitle>{data.address}</DialogTitle>
-              <DialogDescription>
-                {data.gemeinde} {data.plz && `· ${data.plz}`} {data.egrid && `· EGRID ${data.egrid}`}
-              </DialogDescription>
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <DialogTitle>{data.address}</DialogTitle>
+                  <DialogDescription>
+                    {data.gemeinde} {data.plz && `· ${data.plz}`} {data.egrid && `· EGRID ${data.egrid}`}
+                  </DialogDescription>
+                </div>
+                {/* Oben, nicht unten: es ist die häufigste Entscheidung.
+                    Die meisten Objekte sind nichts, und wer das nach
+                    drei Sekunden sieht, soll nicht erst scrollen. */}
+                {data.preselection_status === ARCHIV_STATUS ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="shrink-0"
+                    onClick={() => update({ preselection_status: 'Nicht geprüft' })}
+                  >
+                    Aus dem Archiv holen
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0"
+                    onClick={archivieren}
+                    disabled={saving}
+                  >
+                    <Archive className="mr-1 h-4 w-4" /> Nicht interessant
+                  </Button>
+                )}
+              </div>
             </DialogHeader>
 
             <div className="space-y-4">
-              {/* Ein Bild von oben beantwortet in zwei Sekunden, was
-                  keine Zahl beantwortet: steht da noch Platz, hängt das
-                  Grundstück am Hang, ist der Nachbar schon gebaut. */}
-              <Objektansicht
-                address={data.address}
-                plzOrt={data.plz_ort || [data.plz, data.gemeinde].filter(Boolean).join(' ')}
-                parzelle={data.parzelle}
-                bfsNr={data.bfs_nr}
-                gemeinde={data.gemeinde}
-                kanton={data.kanton}
-                className="h-56"
-              />
-
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                 <Stat label="Fläche" value={data.area ? `${data.area.toLocaleString('de-CH')} m²` : '—'} />
                 <Stat label="Gebäude" value={data.gebaeudeflaeche ? `${data.gebaeudeflaeche.toLocaleString('de-CH')} m²` : '—'} />
@@ -154,6 +168,21 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
                 <Stat label="Zone" value={data.zone || '—'} />
                 <Stat label="Kategorie" value={data.kategorie || '—'} />
               </div>
+
+              {/* Zuerst die Zahlen, dann das Bild -- und das über die
+                  ganze Breite: ein Luftbild in Briefmarkengrösse
+                  beantwortet keine Frage. Es zeigt in zwei Sekunden,
+                  was keine Zahl zeigt: steht da noch Platz, hängt das
+                  Grundstück am Hang, hat der Nachbar schon gebaut. */}
+              <Objektansicht
+                address={data.address}
+                plzOrt={data.plz_ort || [data.plz, data.gemeinde].filter(Boolean).join(' ')}
+                parzelle={data.parzelle}
+                bfsNr={data.bfs_nr}
+                gemeinde={data.gemeinde}
+                kanton={data.kanton}
+                className="h-72 w-full"
+              />
 
               <div className="flex flex-wrap gap-2">
                 {/* Der gespeicherte Link fehlt bei den meisten Objekten;
@@ -315,18 +344,6 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
             )}
 
             <div className="flex justify-end gap-2">
-              {data.preselection_status === ARCHIV_STATUS ? (
-                <Button variant="ghost" onClick={() => update({ preselection_status: 'Nicht geprüft' })}>
-                  Aus dem Archiv holen
-                </Button>
-              ) : (
-                /* Blass am Rand wurde er nie geklickt -- und es ist der
-                   Knopf, der am häufigsten gebraucht wird: die meisten
-                   Objekte sind nichts. */
-                <Button variant="outline" onClick={archivieren} disabled={saving}>
-                  <Archive className="mr-1 h-4 w-4" /> Nicht interessant
-                </Button>
-              )}
               <Button variant="ghost" onClick={onClose}>Abbrechen</Button>
               <Button onClick={save} disabled={saving}>
                 {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
