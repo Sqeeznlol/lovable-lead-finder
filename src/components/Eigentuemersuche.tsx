@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { gemeindeBfsNr } from '@/lib/swisstopo';
 import { grundbuchUrl, verkauftNie, ARCHIV_STATUS } from '@/lib/grundbuch';
 import { useStartEigentuemerLookup, useExtensionAvailable } from '@/hooks/use-eigentuemer-lookup';
+import { protokolliere } from '@/lib/protokoll';
 import type { Chance } from '@/hooks/use-uebersicht';
 
 /** Wie viele Auskünfte das Portal pro Tag freigibt. */
@@ -143,6 +144,7 @@ export function Eigentuemersuche({ objekte }: { objekte: Chance[] }) {
       toast({ title: 'Fehler', description: error.message, variant: 'destructive' });
       return;
     }
+    void protokolliere('archiviert', c.address, c.kanton);
     toast({ title: '✓ Verworfen', description: c.address });
     qc.invalidateQueries({ queryKey: ['uebersicht'] });
     qc.invalidateQueries({ queryKey: ['master'] });

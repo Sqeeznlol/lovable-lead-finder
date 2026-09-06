@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { portalUrl } from '@/lib/portal';
+import { protokolliere } from '@/lib/protokoll';
 
 const PHONE_LS_KEY = 'sqeeztraum.my_phone';
 
@@ -113,6 +114,7 @@ async function weiterverarbeiten(
     })
     .eq('id', propertyId);
 
+  void protokolliere('deal', `${p.address} — ${telefon ? 'Akquise' : 'Search'}`, p.kanton);
   toast({
     title: telefon ? '📞 Deal in Akquise angelegt' : '🔍 Deal in Search angelegt',
     description: telefon
@@ -186,6 +188,7 @@ export function useEigentuemerLookupListener() {
         return;
       }
 
+      void protokolliere('eigentuemer', first.name || null);
       toast({ title: `✅ Eigentümer gespeichert: ${first.name || 'unbekannt'}` });
       qc.invalidateQueries({ queryKey: ['properties'] });
       qc.invalidateQueries({ queryKey: ['master'] });
@@ -244,6 +247,7 @@ export function useStartEigentuemerLookup() {
         plzOrt: args.plzOrt || '',
       },
     }));
+    void protokolliere('abfrage', args.address || args.egrid, args.kanton);
     toast({ title: '🤖 Portal wird geöffnet…', description: 'SMS-Code im Portal-Tab eingeben — Daten werden automatisch gespeichert.' });
     return true;
   }, [extensionAvailable, toast]);

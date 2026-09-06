@@ -18,6 +18,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { CantonTabs } from '@/components/CantonTabs';
 import { KeyboardShortcutsOverlay } from '@/components/KeyboardShortcutsOverlay';
 import { AdminSchloss } from '@/components/AdminSchloss';
+import { Protokoll } from '@/components/Protokoll';
 import { useCanton } from '@/hooks/use-canton';
 import { usePlatform } from '@/hooks/use-platform';
 import { useMidnightReset } from '@/hooks/use-phones';
@@ -165,6 +166,7 @@ export default function Index() {
               <AdminSchloss>
               <div className="space-y-6">
                 <AdminSettings />
+                <Protokoll />
                 <div className="rounded-2xl border border-dashed p-5">
                   <p className="text-sm font-medium">Stillgelegte Bereiche</p>
                   <p className="mt-1 text-sm text-muted-foreground">

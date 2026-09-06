@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, createContext, useContext } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { protokolliere } from '@/lib/protokoll';
 import type { User, Session } from '@supabase/supabase-js';
 
 export type AppRole = 'admin' | 'office' | 'mobile_swipe';
@@ -61,6 +62,10 @@ function useAuthInternal(): AuthContextType {
     // Set up listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
+        // Nur die Anmeldung selbst festhalten -- dieser Haken feuert
+        // auch beim Auffrischen des Zugangs, und dann stuende in der
+        // Liste jede Stunde eine neue "Anmeldung".
+        if (_event === 'SIGNED_IN') void protokolliere('anmeldung');
         if (session?.user) {
           // Use setTimeout to avoid Supabase deadlock
           setTimeout(async () => {
@@ -103,6 +108,7 @@ function useAuthInternal(): AuthContextType {
   };
 
   const signOut = async () => {
+    await protokolliere('abmeldung');
     await supabase.auth.signOut();
   };
 

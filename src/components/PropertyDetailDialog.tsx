@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { grundbuchUrl, verkauftNie, ARCHIV_STATUS } from '@/lib/grundbuch';
 import { Label } from '@/components/ui/label';
 import { Objektansicht } from '@/components/Objektansicht';
+import { protokolliere } from '@/lib/protokoll';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ExternalLink, MapPin, Phone, User, Save, Loader2, Bot, RefreshCw, Archive } from 'lucide-react';
@@ -82,6 +83,7 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
       return;
     }
     update({ preselection_status: ARCHIV_STATUS, preselection_note: grund });
+    void protokolliere('archiviert', data?.address ?? null, data?.kanton ?? null);
     toast({ title: '✓ Archiviert', description: grund });
     qc.invalidateQueries({ queryKey: ['master'] });
     qc.invalidateQueries({ queryKey: ['properties'] });
