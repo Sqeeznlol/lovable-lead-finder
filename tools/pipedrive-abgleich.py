@@ -138,7 +138,22 @@ def texte(satz: dict) -> str:
 
 
 def oereb(objekt: dict) -> str:
-    """Der Link, der die Parzelle im Kataster auch wirklich auswählt."""
+    """Der Kataster des richtigen Kantons.
+
+    Zürich waehlt die Parzelle ueber Gemeindenummer und Nummer aus. Der
+    Thurgau kennt diese Adresse nicht -- ein Zuercher Link zeigte dort
+    irgendein fremdes Grundstueck gleicher Nummer, und im Gespraech
+    sieht das glaubwuerdig aus. Deshalb dort ueber den EGRID, so wie
+    man es von Hand macht.
+    """
+    kanton = (objekt.get('kanton') or '').strip().upper()
+    egrid = (objekt.get('egrid') or '').strip()
+    if kanton == 'TG':
+        if not egrid:
+            return ''
+        return ('https://map.geo.tg.ch/apps/mf-geoadmin3/?lang=de&topic=oereb'
+                '&bgLayer=basemap_farbig&zoom=8&swisssearch='
+                + urllib.parse.quote(egrid))
     nr = (objekt.get('parzelle') or '').strip()
     bfs = (objekt.get('bfs_nr') or '').strip()
     if not nr or not bfs:
