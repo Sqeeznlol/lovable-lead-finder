@@ -190,7 +190,11 @@ export function useUnqueriedProperties(limit: number, listId?: string | null, is
         .limit(limit);
       // For PRIO lists, skip status/baujahr filters entirely
       if (!isPrioList) {
-        query = query.eq('geb_status', 'Bestehend');
+        // Zürich schreibt "Bestehend", der Thurgau "Gebäude bestehend".
+        // Der genaue Vergleich liess deshalb jedes Thurgauer Objekt
+        // heraus -- der Akquise-Modus war dort leer, ohne dass es
+        // jemandem gesagt wurde.
+        query = query.ilike('geb_status', '%bestehend%');
       }
       if (listId) query = query.eq('list_id', listId);
       if (gemeinde) query = query.eq('gemeinde', gemeinde);

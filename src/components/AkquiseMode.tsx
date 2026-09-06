@@ -18,6 +18,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { supabase } from '@/integrations/supabase/client';
 import { getMyPhone } from '@/hooks/use-eigentuemer-lookup';
 import { portalUrl } from '@/lib/portal';
+import { gehoertInDenAkquiseModus, nurNummerFehlt } from '@/lib/akquise-liste';
 
 interface OwnerEntry {
   raw: string;
@@ -115,10 +116,17 @@ export function AkquiseMode() {
   // Sort queue by deal score, apply zone filter
   const baujahrMax = baujahrBis ? parseInt(baujahrBis, 10) : null;
   const items = (queue || [])
+    // Die Regel steht in src/lib/akquise-liste.ts und ist geprüft.
+    .filter(gehoertInDenAkquiseModus)
     .filter(p => zoneFilter === 'Alle' || p.zone === zoneFilter)
     .filter(p => !baujahrMax || !p.baujahr || p.baujahr <= baujahrMax)
     .map(p => ({ ...p, _score: calculateDealScore(p) }))
-    .sort((a, b) => b._score - a._score);
+    // Vorn steht, wo nur noch die Nummer fehlt: dort ist der nächste
+    // Schritt klein und klar.
+    .sort((a, b) => {
+      const offen = (x: typeof a) => (nurNummerFehlt(x) ? 1 : 0);
+      return offen(b) - offen(a) || b._score - a._score;
+    });
 
   const current = items[currentIndex];
   const score = current?._score ?? 0;
