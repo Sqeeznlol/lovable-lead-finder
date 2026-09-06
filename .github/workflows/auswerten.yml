@@ -1,0 +1,99 @@
+# =====================================================================
+# Auswerten
+# =====================================================================
+# Feste Abfragen auf den Bestand, um Fragen zu beantworten, die sich
+# nicht schätzen lassen: Wie viele Objekte tragen keine Wohnung? Welche
+# Gebäudearten kommen vor? Wie viele hätte eine neue Regel getroffen?
+#
+# Bewusst ohne freie Eingabe: was hier läuft, steht im Repository und
+# ist nachlesbar. Gelesen wird nur.
+# =====================================================================
+
+name: Auswerten
+
+on:
+  workflow_dispatch:
+    inputs:
+      frage:
+        description: 'Was ausgewertet werden soll'
+        required: true
+        default: 'oeffentlich'
+        type: choice
+        options:
+          - oeffentlich  # Schulen, Kirchen, öffentliche Bauten finden
+          - arten        # Welche Gebäudearten und Kategorien vorkommen
+
+jobs:
+  auswerten:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Werkzeuge
+        run: sudo apt-get install -y -qq postgresql-client
+
+      - name: Abfrage
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
+
+          frage() {
+            echo "### $1" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            psql "$DB" -v ON_ERROR_STOP=1 -X -q -c "$2" \
+              >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+          }
+
+          if [ "${{ inputs.frage }}" = "arten" ]; then
+            frage "Gebäudearten" "
+              select coalesce(gebaeudeart,'(leer)') as art, count(*)
+              from properties where ausgeschlossen = false
+              group by 1 order by 2 desc limit 40;"
+            frage "Kategorien" "
+              select coalesce(kategorie,'(leer)') as kategorie, count(*)
+              from properties where ausgeschlossen = false
+              group by 1 order by 2 desc limit 40;"
+            frage "Zonen der grössten Parzellen" "
+              select coalesce(zone,'(leer)') as zone, count(*),
+                     round(avg(area)) as flaeche_schnitt
+              from properties
+              where ausgeschlossen = false and area > 5000
+              group by 1 order by 2 desc limit 25;"
+          else
+            # Ein Haus ohne eine einzige Wohnung ist kein Wohnhaus.
+            # Zusammen mit einer grossen Parzelle ist das das Muster von
+            # Schule, Spital, Kirche, Verwaltung -- Eigentümer, die nicht
+            # verkaufen.
+            frage "Objekte ohne jede Wohnung" "
+              select
+                count(*) filter (where coalesce(wohnungen,0) = 0) as ohne_wohnung,
+                count(*) filter (where coalesce(wohnungen,0) = 0
+                                   and area > 3000)               as ohne_wohnung_gross,
+                count(*)                                          as alle
+              from properties where ausgeschlossen = false;"
+            frage "Davon in der Anrufliste (Marge über 1 Mio)" "
+              select
+                count(*) filter (where coalesce(wohnungen,0) = 0) as ohne_wohnung,
+                count(*)                                          as alle
+              from properties
+              where ausgeschlossen = false and marge_chf > 1000000;"
+            frage "Eigentümer, die nie verkaufen" "
+              select count(*) as oeffentliche_hand
+              from properties
+              where ausgeschlossen = false
+                and coalesce(owner_name, eigentuemer_name) ~*
+                    '(stadt|gemeinde|kanton|bund|eidgenoss|kirch|schul|spital|universit|zweckverband|sbb|post|swisscom)';"
+            frage "Die zwanzig grössten ohne Wohnung" "
+              select address, gemeinde, area, wohnungen, baujahr,
+                     left(coalesce(zone,''), 30) as zone,
+                     round(marge_chf/1e6, 1) as marge_mio
+              from properties
+              where ausgeschlossen = false and coalesce(wohnungen,0) = 0
+              order by marge_chf desc nulls last limit 20;"
+          fi
+
+          cat "$GITHUB_STEP_SUMMARY"
