@@ -8,6 +8,7 @@ import {
   swisstopoMapUrl,
   oerebUrl,
   oerebParzelleUrl,
+  katasterUrl,
   streetViewLinkUrl,
   streetViewEmbedUrl,
   gemeindeBfsNr,
@@ -31,6 +32,8 @@ interface Props {
   bfsNr?: string | number | null;
   /** Gemeindename -- daraus wird die Nummer geholt, wenn sie fehlt. */
   gemeinde?: string | null;
+  /** Kanton -- jeder führt seinen eigenen ÖREB-Kataster. */
+  kanton?: string | null;
   className?: string;
 }
 
@@ -47,7 +50,7 @@ interface Props {
  * kostet nichts, ohne Schlüssel bleibt aber nur der Link -- deshalb steht
  * dort eine Schaltfläche, solange VITE_GOOGLE_MAPS_KEY fehlt.
  */
-export function Objektansicht({ address, plzOrt, parzelle, bfsNr, gemeinde, className }: Props) {
+export function Objektansicht({ address, plzOrt, parzelle, bfsNr, gemeinde, kanton, className }: Props) {
   const [coords, setCoords] = useState<GeoCoords | null>(null);
   const [stand, setStand] = useState<'laden' | 'ok' | 'leer' | 'fehler'>('laden');
   const [modus, setModus] = useState<Modus>('luft');
@@ -113,17 +116,20 @@ export function Objektansicht({ address, plzOrt, parzelle, bfsNr, gemeinde, clas
   const { lat, lon } = coords;
   const bfs = bfsNr != null && String(bfsNr).trim() !== '' ? bfsNr : bfsGeholt;
   const parzellenLink = oerebParzelleUrl(parzelle, bfs);
+  const kataster = katasterUrl(kanton, lat, lon, parzelle, bfs);
+  const eigenerKanton = String(kanton ?? '').trim().toUpperCase() === 'TG';
   const einbettung = modus === 'strasse' ? streetViewEmbedUrl(lat, lon) : null;
 
   const weiterLink =
     modus === 'zone'
-      ? (parzellenLink ?? oerebUrl(lat, lon))
+      ? kataster
     : modus === 'strasse' ? streetViewLinkUrl(lat, lon)
     : swisstopoMapUrl(lat, lon);
 
   const weiterLabel =
     modus === 'zone'
-      ? (parzellenLink ? 'Parzelle im Kataster' : 'ÖREB-Kataster')
+      ? (eigenerKanton ? 'Kataster Thurgau'
+         : parzellenLink ? 'Parzelle im Kataster' : 'ÖREB-Kataster')
     : modus === 'strasse' ? 'Street View'
     : 'swisstopo';
 
