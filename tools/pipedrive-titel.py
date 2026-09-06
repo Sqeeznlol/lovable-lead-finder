@@ -95,6 +95,29 @@ def titel(objekt: dict) -> str:
     return hinten
 
 
+def aus_organisation(deal: dict) -> dict:
+    """Die Liegenschaft aus dem Namen der Organisation lesen.
+
+    Der Export nannte sie "Liegenschaft: Zeughausstrasse 74 [CH...]".
+    Das ist die Adresse des Grundstücks -- anders als der alte
+    Deal-Titel, in dem oft der Wohnsitz des Eigentümers steht.
+    """
+    org = deal.get('org_id')
+    name = org.get('name') if isinstance(org, dict) else ''
+    name = re.sub(r'^\s*Liegenschaft:\s*', '', name or '')
+    name = re.sub(r'\s*\[[^\]]*\]\s*$', '', name).strip()
+    if not name:
+        return {}
+
+    teile = [t.strip() for t in re.split(r'[,·]', name) if t.strip()]
+    if not teile:
+        return {}
+    ort = next((t for t in teile[1:] if re.search(r'\b\d{4}\b', t)), '')
+    if not ort and len(teile) > 1:
+        ort = teile[-1]
+    return {'address': teile[0], 'gemeinde': ort, 'plz': ''}
+
+
 def person_von(deal: dict, personen: dict) -> dict:
     person = deal.get('person_id')
     kennung = person.get('value') if isinstance(person, dict) else person
@@ -166,6 +189,11 @@ def main() -> None:
     for d in deals:
         kennung = egrid_von(d, schluessel, personen)
         objekt = dict(objekte.get(kennung) or {})
+        if not objekt:
+            # Zweite Quelle: die Organisation trägt die Adresse der
+            # Liegenschaft. Damit bekommen auch die Deals einen Titel,
+            # deren Kanton noch nicht in der Datenbank steht.
+            objekt = aus_organisation(d)
         if not objekt:
             # Zwei ganz verschiedene Gründe, die man auseinanderhalten
             # muss: entweder trägt der Deal gar keine EGRID -- dann ist
