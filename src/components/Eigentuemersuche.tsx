@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { gemeindeBfsNr } from '@/lib/swisstopo';
 import { grundbuchUrl, verkauftNie, ARCHIV_STATUS } from '@/lib/grundbuch';
+import { useStartEigentuemerLookup, useExtensionAvailable } from '@/hooks/use-eigentuemer-lookup';
 import type { Chance } from '@/hooks/use-uebersicht';
 
 /** Wie viele Auskünfte das Portal pro Tag freigibt. */
@@ -55,6 +56,8 @@ export function Eigentuemersuche({ objekte }: { objekte: Chance[] }) {
   const [bfsNachGemeinde, setBfsNachGemeinde] = useState<Record<string, string>>({});
   const { toast } = useToast();
   const qc = useQueryClient();
+  const starten = useStartEigentuemerLookup();
+  const mitExtension = useExtensionAvailable();
 
   const gemeinden = [...new Set(objekte.map(o => o.gemeinde).filter(Boolean) as string[])];
   const fehlend = gemeinden.filter(g => !(g in bfsNachGemeinde)).join('|');
@@ -187,7 +190,28 @@ export function Eigentuemersuche({ objekte }: { objekte: Chance[] }) {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  {link ? (
+                  {/* Mit Extension läuft die ganze Kette: Portal, Nummer,
+                      Deal, aus der Liste. Ohne sie bleibt der blosse Link
+                      -- dann wird der Name von Hand eingetragen. */}
+                  {mitExtension ? (
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        const los = starten({
+                          propertyId: c.id,
+                          egrid: c.egrid,
+                          bfsNr: bfs,
+                          kanton: c.kanton,
+                          parzelle: c.parzelle,
+                          address: c.address,
+                          plzOrt: [c.plz, c.gemeinde].filter(Boolean).join(' '),
+                        });
+                        if (los) { zaehlen(); setVerbraucht(gezaehlt()); }
+                      }}
+                    >
+                      <UserSearch className="mr-1 h-3.5 w-3.5" /> Abfragen
+                    </Button>
+                  ) : link ? (
                     <a
                       href={link}
                       target="_blank"
