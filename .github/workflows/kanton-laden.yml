@@ -64,75 +64,69 @@ jobs:
           sudo apt-get install -y -qq gdal-bin python3-gdal unzip \
             libsqlite3-mod-spatialite
 
-      - name: Amtliche Vermessung ansehen
+      - name: Amtliche Vermessung umwandeln
         if: ${{ inputs.schritt == 'parzellen' || inputs.schritt == 'alles' }}
         env:
           KANTON: ${{ inputs.kanton }}
         run: |
           set -euo pipefail
+
+          # Warum nicht GDAL: es liest die Datei zwar, kennt aber die
+          # Attributnamen nicht (Field01..Field09) und lässt die Grenzen
+          # als lose Linien liegen -- ohne Flächen ist die Rechnung
+          # wertlos. ili2gpkg aus der amtlichen INTERLIS-Werkzeugkette
+          # benennt die Spalten nach dem Modell und setzt die Grenzen zu
+          # Flächen zusammen.
+          curl -sSL -o /tmp/ili2gpkg.zip \
+            "https://downloads.interlis.ch/ili2gpkg/ili2gpkg-5.1.1.zip"
+          unzip -o -q /tmp/ili2gpkg.zip -d /tmp/ili2gpkg
+          jar=$(find /tmp/ili2gpkg -name 'ili2gpkg*.jar' | head -1)
+
           # 159 MB für Thurgau; das Herunterladen dauert.
           basis=https://geodienste.ch/downloads/interlis
           curl -sSL -o /tmp/av.zip "$basis/av/$KANTON/av_${KANTON}_lv95.zip"
           ls -lh /tmp/av.zip
           mkdir -p /tmp/av && unzip -o -q /tmp/av.zip -d /tmp/av
+          echo "Gemeindedateien: $(find /tmp/av -name '*.itf' | wc -l)"
 
-          echo "### Was in der Datei steckt"
-          find /tmp/av -type f -printf '%f  %s Bytes\n' | sort | head -30
-          echo
-          echo "Dateien insgesamt: $(find /tmp/av -type f | wc -l)"
-          echo
-
-          # Eine Datei je Gemeinde, Format ITF, Modell DM01AVCH24LV95D --
-          # das ist die amtliche Vermessung nach INTERLIS 1.
-          erste=$(find /tmp/av -name '*.itf' | head -1)
-          echo "Erste Datenfile: $erste"
-          echo
-
-          # Das Modell liegt manchmal der Lieferung bei; sonst im offenen
-          # Verzeichnis des Bundes.
-          modell=$(find /tmp/av -name '*.ili' | head -1)
-          if [ -z "$modell" ]; then
-            modell=/tmp/DM01AVCH24LV95D.ili
-            curl -sSL -o "$modell" \
-              "https://models.geo.admin.ch/V_D/DM01AVCH24LV95D.ili" \
-              || curl -sSL -o "$modell" \
-                 "https://models.geo.admin.ch/DM01AVCH24LV95D.ili"
-          fi
-          echo "Modell: $modell ($(wc -c < "$modell") Bytes)"
-          echo
-
-          echo "### Ebenen zu den Grundstücken"
-          # Nur die, um die es geht -- die Liste ist sonst hundert Zeilen
-          # lang und die Grundstücke stehen ganz unten.
-          ogrinfo -so -al "$erste,$modell" 2>&1 \
-            | grep -E 'Layer name|Feature Count' | paste - - \
-            | grep -i 'liegenschaft\|grundstueck' || true
-          echo
-
-          echo "### Alle Gemeinden umwandeln"
-          # Eine Datei je Gemeinde, rund achtzig Stück. Sie werden
-          # nacheinander an dieselbe Ausgabe angehängt.
+          modelldir="/tmp/av;http://models.interlis.ch/;https://models.geo.admin.ch/"
           rm -f /tmp/parzellen.gpkg
-          n=0
+
+          # Erst das Gerüst -- in einem Zug mit dem Einlesen scheitert es
+          # an einer noch fehlenden Tabelle.  LV95 (2056) muss angegeben
+          # werden, weil INTERLIS 1 das Bezugssystem nicht mitschreibt.
+          java -jar "$jar" --dbfile /tmp/parzellen.gpkg \
+            --modeldir "$modelldir" --defaultSrsCode 2056 \
+            --models DM01AVCH24LV95D --schemaimport > /tmp/schema.log 2>&1 \
+            || { tail -20 /tmp/schema.log; exit 1; }
+
+          n=0; fehler=0
           for f in /tmp/av/*.itf; do
             n=$((n + 1))
-            # -append ab der zweiten Datei; die erste legt die Ausgabe an.
-            zusatz=""
-            [ "$n" -gt 1 ] && zusatz="-append"
-            ogr2ogr -f GPKG /tmp/parzellen.gpkg $zusatz \
-              "$f,$modell" -nln parzellen -skipfailures \
-              Liegenschaften__Grundstueck 2>/dev/null || true
-            ogr2ogr -f GPKG /tmp/parzellen.gpkg -append \
-              "$f,$modell" -nln flaechen -skipfailures \
-              Liegenschaften__Liegenschaft 2>/dev/null || true
+            java -jar "$jar" --dbfile /tmp/parzellen.gpkg \
+              --modeldir "$modelldir" --defaultSrsCode 2056 \
+              --disableValidation --import "$f" > /tmp/import.log 2>&1 \
+              || { fehler=$((fehler + 1)); echo "  fehlgeschlagen: $(basename "$f")"
+                   grep -iE 'error' /tmp/import.log | head -3 || true; }
             [ $((n % 20)) -eq 0 ] && echo "  $n Gemeinden ..."
           done
-          echo "$n Gemeinden verarbeitet."
-          echo
+          echo "$n Gemeinden verarbeitet, $fehler fehlgeschlagen."
 
-          ls -lh /tmp/parzellen.gpkg || { echo "Keine Ausgabe."; exit 1; }
-          ogrinfo -so -al /tmp/parzellen.gpkg 2>&1 \
-            | grep -E 'Layer name|Feature Count|^[A-Za-z_]+: ' | head -30
+          ls -lh /tmp/parzellen.gpkg
+          echo "### Ebenen"
+          ogrinfo -so -al /tmp/parzellen.gpkg 2>/dev/null \
+            | grep -E 'Layer name|Feature Count|Geometry Column' | paste - - - \
+            | grep -iE 'grundstueck|liegenschaft' || true
+
+          # Ohne Parzellen ist alles Weitere sinnlos -- lieber hier
+          # abbrechen als später mit halben Daten weiterrechnen.
+          anzahl=$(ogrinfo -so /tmp/parzellen.gpkg grundstueck 2>/dev/null \
+                   | grep -oP 'Feature Count: \K[0-9]+' | head -1)
+          echo "Grundstücke: ${anzahl:-0}"
+          if [ "${anzahl:-0}" -lt 50000 ]; then
+            echo "Zu wenige Grundstücke -- erwartet werden über 100'000." >&2
+            exit 1
+          fi
 
       - name: Nutzungsplanung holen
         if: ${{ inputs.schritt != 'parzellen' }}
@@ -262,89 +256,48 @@ jobs:
           # Beide Quellen in eine Datei, damit sich darin rechnen lässt.
           cp /tmp/parzellen.gpkg /tmp/arbeit.gpkg
           ogr2ogr -f GPKG /tmp/arbeit.gpkg -append -nln zonen /tmp/zonen.gpkg zonen
-
           echo "### Ebenen in der Arbeitsdatei"
-          ogrinfo -so -al /tmp/arbeit.gpkg 2>&1 \
-            | grep -E 'Layer name|Feature Count' | paste - -
+          ogrinfo -so -al /tmp/arbeit.gpkg 2>/dev/null \
+            | grep -E 'Layer name|Feature Count' | paste - - \
+            | grep -iE 'grundstueck|liegenschaft|zonen' || true
 
-          # Die Feldnamen stehen nicht im Modell-Handbuch, sondern in den
-          # Daten. Sie hier auszugeben kostet nichts und erspart einen
-          # zweiten halbstündigen Lauf, falls die Abfrage danebengreift.
-          echo
-          echo "### Felder"
-          for e in parzellen flaechen zonen; do
-            echo "-- $e"
-            ogrinfo -so /tmp/arbeit.gpkg "$e" 2>&1 \
-              | sed -n '/^[A-Za-z_0-9]*: /p' | head -40
-          done
-
-          # Die ITF-Ebenen kommen ohne Attributnamen an (Field01, Field02
-          # ...). Welches Feld welches ist, steht nur in den Werten --
-          # eine EGRID sieht man ihr an, eine Parzellennummer auch.
-          #
-          # Aus den Proben des letzten Laufs ist bekannt:
-          #   parzellen  Field03 = Vermessungskreis (TG4401)
-          #              Field04 = Parzellennummer
-          #              Field05 = EGRID
-          #   flaechen   Field06 = amtliches Flächenmass in m²
-          # Offen ist, über welches Feld die beiden zusammenhängen und
-          # welche Ebene die Umrisse trägt. Beides steht unten.
-          echo
-          echo "### Geometrie"
-          for e in parzellen flaechen zonen; do
-            echo -n "$e: "
-            ogrinfo -so /tmp/arbeit.gpkg "$e" 2>/dev/null \
-              | grep -m1 'Geometry:' || echo "?"
-          done
-
-          echo
-          echo "### Proben"
-          for e in parzellen flaechen; do
-            echo "-- $e"
-            ogr2ogr -f CSV /vsistdout/ /tmp/arbeit.gpkg "$e" \
-              -limit 5 -lco GEOMETRY=NO 2>/dev/null || true
-          done
-
-          echo
-          echo "### Wie hängen die Ebenen zusammen"
-          # Wenn die Umrisse in "flaechen" liegen und Field02 auf die
-          # Parzelle zeigt, muss die Fläche der Geometrie zum amtlichen
-          # Flächenmass in Field06 passen. Das ist die Probe aufs Exempel.
-          ogr2ogr -f CSV /vsistdout/ /tmp/arbeit.gpkg -dialect sqlite -sql "
-            SELECT Field02, Field06 AS amtlich,
-                   ROUND(ST_Area(geom)) AS gerechnet,
-                   GeometryType(geom) AS art
-            FROM flaechen LIMIT 5" 2>&1 | head -10 || true
-
-          echo
-          echo "### Zählungen"
-          ogr2ogr -f CSV /vsistdout/ /tmp/arbeit.gpkg -dialect sqlite -sql "
-            SELECT
-              (SELECT COUNT(DISTINCT Field05) FROM parzellen) AS egrids,
-              (SELECT COUNT(DISTINCT Field02) FROM flaechen)  AS f02,
-              (SELECT COUNT(*) FROM parzellen p
-                 JOIN flaechen f ON f.Field02 = p.Field01)    AS treffer_01,
-              (SELECT COUNT(*) FROM parzellen p
-                 JOIN flaechen f ON f.Field02 = p.Field04)    AS treffer_04
-            " 2>&1 | head -5 || true
+          # Die Spaltennamen stammen aus dem amtlichen Modell:
+          #   grundstueck   nbident, nummer, egris_egrid, art,
+          #                 gesamteflaechenmass
+          #   liegenschaft  flaechenmass, liegenschaft_von -> grundstueck
+          # Wie die Geometriespalte heisst, sagt die Datei selbst; darauf
+          # zu raten hat diesen Ablauf schon zweimal Stunden gekostet.
+          gsp=$(ogrinfo -so -al /tmp/arbeit.gpkg liegenschaft 2>/dev/null \
+                | sed -n 's/^Geometry Column = //p' | head -1)
+          gsz=$(ogrinfo -so -al /tmp/arbeit.gpkg zonen 2>/dev/null \
+                | sed -n 's/^Geometry Column = //p' | head -1)
+          gsp=${gsp:-geometrie}; gsz=${gsz:-geom}
+          echo "Geometrie: liegenschaft.$gsp, zonen.$gsz"
 
           echo
           echo "### Verschneiden"
+          # Kreisbögen kann SpatiaLite nicht rechnen -- die amtlichen
+          # Grenzen enthalten welche. CastToXY/ST_CurveToLine macht
+          # daraus Linienzüge.
           ogr2ogr -f CSV /tmp/verschnitten.csv /tmp/arbeit.gpkg \
             -dialect sqlite -sql "
               SELECT
-                p.EGRIS_EGRID          AS egrid,
-                p.Nummer               AS parzelle,
-                p.GrundstueckArt       AS art,
-                ROUND(ST_Area(f.geom))                    AS flaeche_m2,
+                g.egris_egrid                             AS egrid,
+                g.nummer                                  AS parzelle,
+                g.nbident                                 AS vermessungskreis,
+                g.art                                     AS art,
+                l.flaechenmass                            AS flaeche_m2,
                 z.Typ                                     AS zone_typ,
-                ROUND(ST_Area(ST_Intersection(f.geom, z.geom)))       AS zone_m2,
-                ROUND(100.0 * ST_Area(ST_Intersection(f.geom, z.geom))
-                      / NULLIF(ST_Area(f.geom), 0))       AS anteil_prozent
-              FROM flaechen f
-              JOIN parzellen p ON p.Grundstueck = f.Grundstueck
-              JOIN zonen z ON ST_Intersects(f.geom, z.geom)
-              WHERE ST_Area(ST_Intersection(f.geom, z.geom)) > 5
+                ROUND(ST_Area(ST_Intersection(
+                  ST_CurveToLine(l.$gsp), z.$gsz)))       AS zone_m2,
+                ROUND(100.0 * ST_Area(ST_Intersection(
+                        ST_CurveToLine(l.$gsp), z.$gsz))
+                      / NULLIF(l.flaechenmass, 0))        AS anteil_prozent
+              FROM liegenschaft l
+              JOIN grundstueck g ON g.T_Id = l.liegenschaft_von
+              JOIN zonen z ON ST_Intersects(ST_CurveToLine(l.$gsp), z.$gsz)
+              WHERE ST_Area(ST_Intersection(
+                      ST_CurveToLine(l.$gsp), z.$gsz)) > 5
             " || { echo "Verschneiden fehlgeschlagen"; exit 1; }
 
           zeilen=$(( $(wc -l < /tmp/verschnitten.csv) - 1 ))
