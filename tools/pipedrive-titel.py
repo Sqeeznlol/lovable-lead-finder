@@ -118,6 +118,34 @@ def aus_organisation(deal: dict) -> dict:
     return {'address': teile[0], 'gemeinde': ort, 'plz': ''}
 
 
+# Im Feld "Fläche" steht die Grundbuchauskunft im Volltext:
+#
+#   1, Fläche(n): 5'492 m² Oekonomiegebäude Assek.Nr. 700.1005 [227 m²]
+#   Wohnhaus und Oekonomiegebäude Assek.Nr. 700.1049, Sangenstrasse 27,
+#   8570 Weinfelden [300 m²] Garage Assek.Nr. 700.1051 [45 m²]
+#
+# Darin steckt die Adresse der Liegenschaft -- nicht zu verwechseln mit
+# dem Wohnsitz des Eigentümers, der im Adressfeld steht. Bei diesem
+# Beispiel wohnt Frau Burkhart an der Zweigstrasse 14, das Grundstück
+# liegt an der Sangenstrasse 27.
+OBJEKTADRESSE = re.compile(
+    r'([A-ZÄÖÜ][A-Za-zÄÖÜäöüéèàç.\-\' ]{2,40}\s+\d+[a-z]?)\s*,\s*'
+    r'(\d{4})\s+([A-ZÄÖÜ][A-Za-zÄÖÜäöüéèàç.\- ]{1,30}?)\s*\[')
+
+
+def aus_flaeche(p_daten: dict) -> dict:
+    """Die Adresse der Liegenschaft aus dem Fläche-Text holen."""
+    for wert in p_daten.values():
+        if not isinstance(wert, str) or 'Assek' not in wert:
+            continue
+        treffer = OBJEKTADRESSE.search(wert)
+        if treffer:
+            return {'address': treffer.group(1).strip(),
+                    'plz': treffer.group(2),
+                    'gemeinde': treffer.group(3).strip()}
+    return {}
+
+
 def person_von(deal: dict, personen: dict) -> dict:
     person = deal.get('person_id')
     kennung = person.get('value') if isinstance(person, dict) else person
@@ -194,6 +222,9 @@ def main() -> None:
             # Liegenschaft. Damit bekommen auch die Deals einen Titel,
             # deren Kanton noch nicht in der Datenbank steht.
             objekt = aus_organisation(d)
+        if not objekt:
+            # Dritte Quelle: die Grundbuchauskunft im Feld "Fläche".
+            objekt = aus_flaeche(person_von(d, personen))
         if not objekt:
             # Zwei ganz verschiedene Gründe, die man auseinanderhalten
             # muss: entweder trägt der Deal gar keine EGRID -- dann ist
