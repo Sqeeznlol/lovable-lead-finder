@@ -26,8 +26,18 @@ const ARTEN = [
 /** Was zwischen Name und Adresse steht und keines von beidem ist. */
 const FUELLER = [
   'schweiz', 'mit sitz in', 'aktiengesellschaft', 'gesellschaft mit',
-  'genossenschaft', 'in liquidation',
+  'genossenschaft', 'in liquidation', 'kommanditgesellschaft',
+  'einfache gesellschaft', 'stiftung', 'verein',
 ];
+
+/**
+ * Die Handelsregisternummer einer Firma.
+ *
+ * "UID CHE-216.013.073" trägt Ziffern und stand deshalb als Adresse im
+ * Eintrag -- die richtige Strasse zwei Felder weiter fiel unter den
+ * Tisch. Am Telefon nützt eine UID nichts.
+ */
+const UID = /\b(UID\b|CHE[-\s]?\d)/i;
 
 /** Überschriften und Feldnamen -- keine Eigentümer. */
 const KEINE_ZEILE =
@@ -45,6 +55,7 @@ export function zerlegeZeile(roh: string): Eigentuemer {
     const klein = t.toLowerCase();
     if (ARTEN.some(a => klein.includes(a))) { ownershipType = t; continue; }
     if (FUELLER.some(f => klein.startsWith(f) || klein === f)) continue;
+    if (UID.test(t)) continue;
     if (/^\d{4}\s+\S/.test(t)) { plzOrt = t; continue; }
     if (/\d/.test(t) && !address) { address = t; continue; }
   }

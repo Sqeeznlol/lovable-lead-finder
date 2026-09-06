@@ -70,4 +70,18 @@ Dieser Auszug kann nicht als gültiger Grundbuchauszug verwendet werden.`;
     const o = leseAuskunft(text);
     expect(o.map(x => x.name)).toEqual(['Rudolf Gubler']);
   });
+
+  it('lässt die Handelsregisternummer weg', () => {
+    // Parzelle 454: die UID trägt Ziffern und stand als Adresse im
+    // Eintrag -- die Rheinstrasse fiel dabei unter den Tisch.
+    const o = leseAuskunft(
+      'Heinz Ulmer Immobilien AG,  Aktiengesellschaft, mit Sitz in '
+      + 'Schaffhausen SH, UID CHE-216.013.073, Rheinstrasse 40, '
+      + '8200 Schaffhausen, 1/1');
+    expect(o).toHaveLength(1);
+    expect(o[0].name).toBe('Heinz Ulmer Immobilien AG');
+    expect(o[0].address).toBe('Rheinstrasse 40');
+    expect(o[0].plz).toBe('8200');
+    expect(o[0].ort).toBe('Schaffhausen');
+  });
 });
