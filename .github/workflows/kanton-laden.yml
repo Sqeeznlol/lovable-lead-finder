@@ -27,6 +27,10 @@ on:
         description: 'Kantonskürzel, z.B. TG'
         required: true
         default: 'TG'
+      quelllauf:
+        description: 'Nur für "verschneiden": Nummer des Laufs mit den fertigen Dateien'
+        required: false
+        default: ''
       schritt:
         description: 'Was ausgeführt werden soll'
         required: true
@@ -37,6 +41,7 @@ on:
           - zonen        # Zonen umwandeln und als Datei bereitstellen
           - parzellen    # Amtliche Vermessung ansehen und umwandeln
           - alles        # Zonen und Parzellen laden, verschneiden, ausgeben
+          - verschneiden # Fertige Dateien aus einem früheren Lauf verschneiden
 
 jobs:
   laden:
@@ -205,7 +210,7 @@ jobs:
           fi
 
       - name: Ergebnis bereitstellen
-        if: ${{ inputs.schritt == 'zonen' }}
+        if: ${{ inputs.schritt == 'zonen' || inputs.schritt == 'alles' }}
         uses: actions/upload-artifact@v4
         with:
           name: zonen-${{ inputs.kanton }}
@@ -213,15 +218,29 @@ jobs:
           if-no-files-found: warn
 
       - name: Parzellen bereitstellen
-        if: ${{ inputs.schritt == 'parzellen' }}
+        if: ${{ inputs.schritt == 'parzellen' || inputs.schritt == 'alles' }}
         uses: actions/upload-artifact@v4
         with:
           name: parzellen-${{ inputs.kanton }}
           path: /tmp/parzellen.gpkg
           if-no-files-found: warn
 
+      # Die Umwandlung dauert eine halbe Stunde und ändert sich nicht.
+      # Für das Verschneiden allein lohnt es nicht, sie zu wiederholen --
+      # die Dateien liegen als Artefakt des letzten Laufs bereit.
+      - name: Dateien aus früherem Lauf holen
+        if: ${{ inputs.schritt == 'verschneiden' }}
+        uses: actions/download-artifact@v4
+        with:
+          pattern: '*-${{ inputs.kanton }}'
+          merge-multiple: true
+          path: /tmp
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.quelllauf }}
+          repository: ${{ github.repository }}
+
       - name: Verschneiden
-        if: ${{ inputs.schritt == 'alles' }}
+        if: ${{ inputs.schritt == 'alles' || inputs.schritt == 'verschneiden' }}
         run: |
           set -euo pipefail
 
@@ -256,6 +275,17 @@ jobs:
               | sed -n '/^[A-Za-z_0-9]*: /p' | head -40
           done
 
+          # Die ITF-Ebenen kommen ohne Attributnamen an (Field01, Field02
+          # ...). Welches Feld welches ist, steht nur in den Werten --
+          # eine EGRID sieht man ihr an, eine Parzellennummer auch.
+          echo
+          echo "### Proben"
+          for e in parzellen flaechen; do
+            echo "-- $e"
+            ogr2ogr -f CSV /vsistdout/ /tmp/arbeit.gpkg "$e" \
+              -limit 3 -lco GEOMETRY=NO 2>/dev/null || true
+          done
+
           echo
           echo "### Verschneiden"
           ogr2ogr -f CSV /tmp/verschnitten.csv /tmp/arbeit.gpkg \
@@ -285,7 +315,7 @@ jobs:
           head -5 /tmp/verschnitten.csv
 
       - name: Verschnitt bereitstellen
-        if: ${{ inputs.schritt == 'alles' }}
+        if: ${{ inputs.schritt == 'alles' || inputs.schritt == 'verschneiden' }}
         uses: actions/upload-artifact@v4
         with:
           name: verschnitten-${{ inputs.kanton }}
