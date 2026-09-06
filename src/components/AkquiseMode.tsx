@@ -198,7 +198,7 @@ export function AkquiseMode() {
       }
       if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
         e.preventDefault();
-        if (portalUrl) { window.open(portalUrl, '_blank'); setGisOpened(true); }
+        if (gisLink) { window.open(gisLink, '_blank'); setGisOpened(true); }
         return;
       }
       if ((e.ctrlKey || e.metaKey) && e.key === 'h') {
@@ -211,8 +211,16 @@ export function AkquiseMode() {
     return () => window.removeEventListener('keydown', handler);
   });
 
-  // GIS URL - must go through maps.zh.ch (direct portal access is blocked)
-  const portalUrl = current?.egrid
+  // Der Kartendienst des Kantons. Hiess bis eben "portalUrl" und
+  // verdeckte damit die Funktion gleichen Namens -- und zeigte im
+  // Thurgau eine Zuercher Parzelle.
+  const gisLink = String(current?.kanton ?? '').trim().toUpperCase() === 'TG'
+    ? (current?.egrid
+        ? 'https://map.geo.tg.ch/apps/mf-geoadmin3/?lang=de&topic=oereb'
+          + '&bgLayer=basemap_farbig&zoom=8&swisssearch='
+          + encodeURIComponent(current.egrid)
+        : null)
+    : current?.egrid
     ? `https://maps.zh.ch/?locate=parz&locations=${current.egrid}&topic=DLGOWfarbigZH&scale=500`
     : current?.parzelle && current?.bfs_nr
       ? `https://maps.zh.ch/?locate=parz&locations=${current.bfs_nr},${current.parzelle}&topic=DLGOWfarbigZH&scale=500`
@@ -772,9 +780,9 @@ export function AkquiseMode() {
                 <div className="flex gap-3">
                   <Button
                     onClick={() => {
-                      if (portalUrl) { window.open(portalUrl, '_blank'); setGisOpened(true); }
+                      if (gisLink) { window.open(gisLink, '_blank'); setGisOpened(true); }
                     }}
-                    disabled={!portalUrl || remaining <= 0}
+                    disabled={!gisLink || remaining <= 0}
                     className="flex-1 h-12 text-base gap-2"
                   >
                     <MapPin className="h-5 w-5" />

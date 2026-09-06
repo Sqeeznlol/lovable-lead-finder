@@ -126,8 +126,16 @@ export function useUebersicht(kanton?: string) {
       // In Seiten lesen: die Beurteilung braucht die Rohdaten, und bei
       // Hunderttausenden Zeilen wäre eine einzelne Abfrage weder schnell
       // noch verlässlich.
+      //
+      // Gelesen wurde bisher eine Seite nach der anderen: vierzig Male
+      // hin und zurück, jedes Mal warten. Das dauerte lange genug, dass
+      // jemand die Seite für kaputt hielt. Die Seiten hängen aber nicht
+      // voneinander ab -- also gehen sie zu acht gleichzeitig los.
       const SEITE = 1000;
-      for (let von = 0; von < 40000; von += SEITE) {
+      const SEITEN = 40;
+      const GLEICHZEITIG = 8;
+
+      const seite = async (von: number) => {
         let abfrage = supabase
           .from('properties')
           .select(FELDER)
@@ -137,8 +145,24 @@ export function useUebersicht(kanton?: string) {
           .not('hnf_delta', 'is', null)
           .order('hnf_delta', { ascending: false, nullsFirst: false })
           .range(von, von + SEITE - 1);
+        if (error) return null;
+        return data ?? [];
+      };
 
-        if (error || !data?.length) break;
+      let fertig = false;
+      for (let block = 0; block < SEITEN && !fertig; block += GLEICHZEITIG) {
+        const offsets = Array.from(
+          { length: Math.min(GLEICHZEITIG, SEITEN - block) },
+          (_, i) => (block + i) * SEITE,
+        );
+        const stapel = await Promise.all(offsets.map(seite));
+
+        for (const data of stapel) {
+          // Eine kurze oder leere Seite heisst: hier hört der Bestand
+          // auf. Die restlichen Seiten des Blocks sind dann leer, und
+          // weitere Blöcke braucht es nicht.
+          if (!data || data.length < SEITE) fertig = true;
+          if (!data?.length) continue;
 
         for (const roh of data) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -199,8 +223,7 @@ export function useUebersicht(kanton?: string) {
             });
           }
         }
-
-        if (data.length < SEITE) break;
+        }
       }
 
       chancen.sort((a, b) => b.punkte - a.punkte || (b.marge ?? 0) - (a.marge ?? 0));
