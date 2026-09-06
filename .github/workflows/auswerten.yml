@@ -26,6 +26,7 @@ on:
           - projektiert  # Wie viele Bauten noch gar nicht stehen
           - kantone      # Was die Webseite je Kanton zu sehen bekommt
           - potenzial    # Wo ueberall ein Potenzial gerechnet wurde
+          - zonen-tg     # Zonen im Thurgau, nur eindeutig zugeordnete Parzellen
       egrid:
         description: 'Nur für "objekt": die EGRID, z.B. CH707709971116'
         required: false
@@ -96,6 +97,33 @@ jobs:
               from properties
               where ausgeschlossen = false and baujahr >= 2020
               group by 1 order by 1 desc;"
+
+          elif [ "${{ inputs.frage }}" = "zonen-tg" ]; then
+            # Eine Parzelle kann zur Hälfte Wohnzone und zur Hälfte Wald
+            # sein. Solche Fälle sagen über die Zone nichts Klares aus,
+            # also zählen hier nur Parzellen mit genau einer Zone.
+            frage "Wie eindeutig die Zuordnung ist" "
+              with je as (
+                select egrid, count(*) as zonen from public.verschnitt_tg
+                group by 1
+              )
+              select
+                count(*) filter (where zonen = 1) as eine_zone,
+                count(*) filter (where zonen > 1) as mehrere_zonen,
+                count(*)                          as parzellen
+              from je;"
+            frage "Zonen im Thurgau (nur Parzellen mit genau einer Zone)" "
+              with eindeutig as (
+                select egrid from public.verschnitt_tg
+                group by egrid having count(*) = 1
+              )
+              select coalesce(nullif(v.zone_name,''), v.zone_typ, '(ohne Namen)')
+                       as zone,
+                     count(*)                     as parzellen,
+                     round(avg(v.flaeche_m2))     as flaeche_schnitt_m2
+              from public.verschnitt_tg v
+              join eindeutig e on e.egrid = v.egrid
+              group by 1 order by 2 desc;"
 
           elif [ "${{ inputs.frage }}" = "arten" ]; then
             frage "Gebäudearten" "
