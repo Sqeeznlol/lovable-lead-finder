@@ -278,13 +278,52 @@ jobs:
           # Die ITF-Ebenen kommen ohne Attributnamen an (Field01, Field02
           # ...). Welches Feld welches ist, steht nur in den Werten --
           # eine EGRID sieht man ihr an, eine Parzellennummer auch.
+          #
+          # Aus den Proben des letzten Laufs ist bekannt:
+          #   parzellen  Field03 = Vermessungskreis (TG4401)
+          #              Field04 = Parzellennummer
+          #              Field05 = EGRID
+          #   flaechen   Field06 = amtliches Flächenmass in m²
+          # Offen ist, über welches Feld die beiden zusammenhängen und
+          # welche Ebene die Umrisse trägt. Beides steht unten.
+          echo
+          echo "### Geometrie"
+          for e in parzellen flaechen zonen; do
+            echo -n "$e: "
+            ogrinfo -so /tmp/arbeit.gpkg "$e" 2>/dev/null \
+              | grep -m1 'Geometry:' || echo "?"
+          done
+
           echo
           echo "### Proben"
           for e in parzellen flaechen; do
             echo "-- $e"
             ogr2ogr -f CSV /vsistdout/ /tmp/arbeit.gpkg "$e" \
-              -limit 3 -lco GEOMETRY=NO 2>/dev/null || true
+              -limit 5 -lco GEOMETRY=NO 2>/dev/null || true
           done
+
+          echo
+          echo "### Wie hängen die Ebenen zusammen"
+          # Wenn die Umrisse in "flaechen" liegen und Field02 auf die
+          # Parzelle zeigt, muss die Fläche der Geometrie zum amtlichen
+          # Flächenmass in Field06 passen. Das ist die Probe aufs Exempel.
+          ogr2ogr -f CSV /vsistdout/ /tmp/arbeit.gpkg -dialect sqlite -sql "
+            SELECT Field02, Field06 AS amtlich,
+                   ROUND(ST_Area(geom)) AS gerechnet,
+                   GeometryType(geom) AS art
+            FROM flaechen LIMIT 5" 2>&1 | head -10 || true
+
+          echo
+          echo "### Zählungen"
+          ogr2ogr -f CSV /vsistdout/ /tmp/arbeit.gpkg -dialect sqlite -sql "
+            SELECT
+              (SELECT COUNT(DISTINCT Field05) FROM parzellen) AS egrids,
+              (SELECT COUNT(DISTINCT Field02) FROM flaechen)  AS f02,
+              (SELECT COUNT(*) FROM parzellen p
+                 JOIN flaechen f ON f.Field02 = p.Field01)    AS treffer_01,
+              (SELECT COUNT(*) FROM parzellen p
+                 JOIN flaechen f ON f.Field02 = p.Field04)    AS treffer_04
+            " 2>&1 | head -5 || true
 
           echo
           echo "### Verschneiden"
