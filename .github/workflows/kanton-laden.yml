@@ -284,6 +284,14 @@ jobs:
           ogrinfo -so -al /tmp/arbeit.sqlite 2>/dev/null \
             | grep -E 'Layer name|Feature Count' | paste - -
 
+          # Wie die Geometriespalte heisst, sagt die Datei selbst; darauf
+          # zu raten hat diesen Ablauf schon mehrfach einen Lauf gekostet.
+          gsp=$(ogrinfo -so -al /tmp/arbeit.sqlite flaechen 2>/dev/null \
+                | sed -n 's/^Geometry Column = //p' | head -1)
+          gsz=$(ogrinfo -so -al /tmp/arbeit.sqlite zonen 2>/dev/null \
+                | sed -n 's/^Geometry Column = //p' | head -1)
+          echo "Geometrie: flaechen.${gsp:?} zonen.${gsz:?}"
+
           echo
           echo "### Verschneiden"
           ogr2ogr -f CSV /tmp/verschnitten.csv /tmp/arbeit.sqlite \
@@ -295,9 +303,9 @@ jobs:
                 g.art                                  AS art,
                 l.flaechenmass                         AS flaeche_m2,
                 z.Typ                                  AS zone_typ,
-                ROUND(ST_Area(ST_Intersection(l.GEOMETRY, z.GEOMETRY)))
+                ROUND(ST_Area(ST_Intersection(l.$gsp, z.$gsz)))
                                                        AS zone_m2,
-                ROUND(100.0 * ST_Area(ST_Intersection(l.GEOMETRY, z.GEOMETRY))
+                ROUND(100.0 * ST_Area(ST_Intersection(l.$gsp, z.$gsz))
                       / NULLIF(l.flaechenmass, 0))     AS anteil_prozent
               FROM flaechen l
               JOIN grundstueck g ON g.T_Id = l.liegenschaft_von
@@ -305,9 +313,9 @@ jobs:
               WHERE z.ROWID IN (
                       SELECT ROWID FROM SpatialIndex
                       WHERE f_table_name = 'zonen'
-                        AND search_frame = l.GEOMETRY)
-                AND ST_Intersects(l.GEOMETRY, z.GEOMETRY)
-                AND ST_Area(ST_Intersection(l.GEOMETRY, z.GEOMETRY)) > 5
+                        AND search_frame = l.$gsp)
+                AND ST_Intersects(l.$gsp, z.$gsz)
+                AND ST_Area(ST_Intersection(l.$gsp, z.$gsz)) > 5
             " || { echo "Verschneiden fehlgeschlagen"; exit 1; }
 
           zeilen=$(( $(wc -l < /tmp/verschnitten.csv) - 1 ))
