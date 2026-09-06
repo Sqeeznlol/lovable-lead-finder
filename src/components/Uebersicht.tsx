@@ -3,6 +3,7 @@ import { Objektansicht } from '@/components/Objektansicht';
 import { Eigentuemersuche } from '@/components/Eigentuemersuche';
 import { Card, CardContent } from '@/components/ui/card';
 import { useCanton } from '@/hooks/use-canton';
+import { Parzellensuche } from '@/components/Parzellensuche';
 import { useUebersicht, type Chance } from '@/hooks/use-uebersicht';
 import { EMPFEHLUNG_LABEL, type Empfehlung } from '@/lib/akquise';
 import { zoneKurzform } from '@/lib/potential';
@@ -48,6 +49,9 @@ export function Uebersicht() {
 
   return (
     <div className="space-y-8">
+      {/* Ganz oben: am Telefon wird eine Nummer genannt, und dann muss
+          das Grundstück da sein -- nicht erst nach drei Filtern. */}
+      <Parzellensuche kanton={current} />
       <div>
         <h1 className="font-serif tracking-tight">Übersicht</h1>
         <p className="mt-1 text-muted-foreground">
