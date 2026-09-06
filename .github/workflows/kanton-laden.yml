@@ -45,6 +45,7 @@ on:
           - modell       # Warum das Vermessungsmodell nicht greift
           - formate      # Welche Dateiformate geodienste anbietet
           - ili2gpkg     # Umwandlung mit dem amtlichen INTERLIS-Werkzeug
+          - zonentypen   # Nur die Zonennamen aus der Datei lesen
 
 jobs:
   laden:
@@ -557,3 +558,25 @@ jobs:
             ogr2ogr -f CSV /vsistdout/ /tmp/probe.gpkg "$e" \
               -limit 3 -lco GEOMETRY=NO 2>/dev/null || true
           done
+
+      # ---------------------------------------------------------------
+      # Nur die Zonennamen
+      # ---------------------------------------------------------------
+      # Im grossen Lauf geht die Meldung des Lesers zwischen tausend
+      # anderen Zeilen unter. Hier steht sie allein.
+      - name: Zonentypen lesen
+        if: ${{ inputs.schritt == 'zonentypen' }}
+        run: |
+          set -euo pipefail
+          xtf=$(find /tmp/npl -name '*.xtf' | head -1)
+          ls -lh "$xtf"
+          echo
+          echo "### Anfang der Datei"
+          head -c 1500 "$xtf"
+          echo
+          echo
+          echo "### Leser"
+          python3 tools/zonentypen.py "$xtf" /tmp/zonentypen.csv || true
+          echo
+          echo "### Ergebnis"
+          head -10 /tmp/zonentypen.csv
