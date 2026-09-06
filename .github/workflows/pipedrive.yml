@@ -52,6 +52,8 @@ on:
           - aus-text-schreiben     # dasselbe, aber tatsächlich schreiben
           - fuellen      # Zone, Geschosse, Gemeinde, ÖREB aus der Datenbank
           - fuellen-schreiben      # dasselbe, aber tatsächlich schreiben
+          - zuordnen     # Deals mit unklarem Titel sammeln (Probelauf)
+          - zuordnen-schreiben     # dasselbe, aber tatsächlich verschieben
       grenze:
         description: 'Höchstzahl Objekte -- bei "deal" die Deal-Nummer'
         required: false
@@ -140,6 +142,13 @@ jobs:
                 && zusatz="--schreiben"
               python3 tools/pipedrive-fuellen.py --objekte /tmp/objekte.csv \
                 $zusatz | tee -a "$GITHUB_STEP_SUMMARY"
+              ;;
+            zuordnen|zuordnen-schreiben)
+              zusatz=""
+              [ "${{ inputs.aufgabe }}" = "zuordnen-schreiben" ] \
+                && zusatz="--schreiben"
+              python3 tools/pipedrive-zuordnen.py $zusatz \
+                | tee -a "$GITHUB_STEP_SUMMARY"
               ;;
             aus-text|aus-text-schreiben)
               zusatz=""
