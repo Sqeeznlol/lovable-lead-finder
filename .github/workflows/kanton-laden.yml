@@ -51,6 +51,8 @@ on:
           - gwr          # Gebäuderegister ansehen: Adressen, Baujahr, Geschosse
           - gwr-probe    # Register laden und zeigen, was sich verbinden liesse
           - gwr-schreiben          # Adressen und Gebäudedaten übernehmen
+          - zonennamen   # Schlüssel durch Zonennamen ersetzen (Probelauf)
+          - zonennamen-schreiben   # dasselbe, aber tatsächlich schreiben
 
 jobs:
   laden:
@@ -920,3 +922,88 @@ jobs:
                    count(geschosse) as mit_geschossen,
                    count(wohnungen) as mit_wohnungen
             from public.properties where kanton = '$KANTON';"
+
+      # =============================================================
+      # Zonennamen nachziehen
+      # =============================================================
+      # In der Zonenfläche steht nur ein Schlüssel wie
+      # "x4401_221_gngde". Die Verschneidung hat ihn so übernommen, und
+      # so steht er heute in der Datenbank -- unbrauchbar für jemanden,
+      # der wissen will, ob dort Wohnen erlaubt ist.
+      #
+      # Neu verschneiden wäre der teure Weg. Der Schlüssel steht ja
+      # schon in der Spalte; es fehlt nur die Übersetzung. Die liest
+      # dieser Schritt aus derselben Datei und schreibt sie an die
+      # Objekte, die den Schlüssel tragen.
+      - name: Zonennamen nachziehen
+        if: ${{ startsWith(inputs.schritt, 'zonennamen') }}
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+          KANTON: ${{ inputs.kanton }}
+        run: |
+          set -euo pipefail
+          [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
+          sudo apt-get install -y -qq postgresql-client
+
+          for f in $(find /tmp/npl \( -name '*.xtf' -o -name '*.xml' \) | sort); do
+            python3 tools/zonentypen.py "$f" "/tmp/typen_$(basename "$f").csv" \
+              2>&1 | head -3 || true
+          done
+          # Die grösste Ausgabe gewinnt: die Zonenflächen-Datei trägt
+          # die 2'202 Typen, der Katalog nur die 34 des Bundes.
+          erg=$(ls -S /tmp/typen_*.csv 2>/dev/null | head -1)
+          [ -n "$erg" ] || { echo "Keine Typen gefunden."; exit 1; }
+          echo "Verwende $erg mit $(( $(wc -l < "$erg") - 1 )) Typen"
+          head -5 "$erg"
+
+          psql "$DB" -v ON_ERROR_STOP=1 -X -q -c "
+            drop table if exists public.zonentypen;
+            create table public.zonentypen (
+              typ_id text, code text, bezeichnung text, abkuerzung text);"
+          psql "$DB" -v ON_ERROR_STOP=1 -X -q \
+            -c "\\copy public.zonentypen from '$erg' with (format csv, header true)"
+          psql "$DB" -v ON_ERROR_STOP=1 -X -q -c "
+            create index on public.zonentypen (typ_id);
+            analyze public.zonentypen;"
+
+          echo "### Wie viele Objekte tragen noch einen Schlüssel"
+          psql "$DB" -X -q -c "
+            set local statement_timeout = '15min';
+            select count(*) as mit_schluessel,
+                   count(t.typ_id) as davon_uebersetzbar
+            from public.properties p
+            left join public.zonentypen t on t.typ_id = p.zone
+            where p.kanton = '$KANTON' and p.zone like 'x%_gngde';"
+
+          echo "### Beispiele"
+          psql "$DB" -X -q -c "
+            select p.zone as schluessel, t.abkuerzung, t.bezeichnung,
+                   count(*)
+            from public.properties p
+            join public.zonentypen t on t.typ_id = p.zone
+            where p.kanton = '$KANTON'
+            group by 1,2,3 order by 4 desc limit 12;"
+
+          if [ "${{ inputs.schritt }}" != "zonennamen-schreiben" ]; then
+            echo ""
+            echo "**Probelauf** -- properties wurde nicht berührt."
+            exit 0
+          fi
+
+          echo "### Schreiben"
+          # Das Kürzel voran, wie es in den Zürcher Zonen steht: beim
+          # Telefonieren nennt man "W2", nicht den ganzen Satz.
+          psql "$DB" -v ON_ERROR_STOP=1 -X -q -c "
+            set local statement_timeout = '30min';
+            update public.properties p
+               set zone = trim(coalesce(nullif(t.abkuerzung,'') || ' ', '')
+                               || coalesce(nullif(t.bezeichnung,''),
+                                           t.abkuerzung))
+            from public.zonentypen t
+            where t.typ_id = p.zone and p.kanton = '$KANTON'
+              and coalesce(nullif(t.bezeichnung,''), t.abkuerzung) is not null;"
+
+          echo "### Die zehn häufigsten Zonen danach"
+          psql "$DB" -X -q -c "
+            select zone, count(*) from public.properties
+            where kanton = '$KANTON' group by 1 order by 2 desc limit 10;"
