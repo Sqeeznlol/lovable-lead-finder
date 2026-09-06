@@ -113,7 +113,15 @@ def einzeln(stueck: str) -> dict | None:
     # Namensfeld wäre schlimmer als ein fehlender Kontakt.
     if not name or WIE_EINE_ADRESSE.match(name) or name[0].isdigit():
         return None
-    return {'name': name, 'adresse': ', '.join(x for x in (strasse, ort) if x)}
+
+    # Eine Adresse ohne Ort ist eine halbe Adresse -- "Schochenhausstrasse"
+    # ohne Postleitzahl hilft weder beim Brief noch beim Nachschlagen.
+    # Dann lieber den Kontakt ohne Adresse: der Name stimmt, und das
+    # Fehlende sieht man.
+    adresse = ', '.join(x for x in (strasse, ort) if x)
+    if not PLZ.search(adresse):
+        adresse = ''
+    return {'name': name, 'adresse': adresse}
 
 
 def aufteilen(text: str) -> list[dict]:
