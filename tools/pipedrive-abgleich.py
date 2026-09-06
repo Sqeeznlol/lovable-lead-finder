@@ -56,6 +56,12 @@ ZUORDNUNG = {
     'bebaubar_m2': 'Grundstück m²',
 }
 
+# Angelegt wird nur, was vollstaendig ist. Ein halber Deal kostet beim
+# Telefonieren mehr Zeit, als er spart: wer anruft, muss nachschlagen,
+# was ohnehin in der Datenbank steht.
+PFLICHT = ('egrid', 'parzelle', 'address', 'plz', 'gemeinde', 'zone',
+           'geschosse', 'bebaubar_m2', 'eigentuemer_name')
+
 ZIEL_PIPELINE = 'Akquise'
 ZIEL_PHASE = 'Neu'
 
@@ -203,6 +209,7 @@ def main() -> None:
 
     fehlend.sort(key=marge, reverse=True)
 
+
     print(f'# Abgleich Zürich — {len(objekte)} Objekte, {len(deals)} Deals')
     print()
     print(f'- {len(beidseitig)} beidseitig bekannt')
@@ -214,17 +221,32 @@ def main() -> None:
     # Ein Deal ohne Eigentümer ist eine leere Karteikarte: man kann ihn
     # weder anrufen noch anschreiben. Wie viele der fehlenden Objekte
     # überhaupt anrufbar sind, entscheidet, was "anlegen" hier heisst.
-    mit_name = [e for e in fehlend if (objekte[e].get('eigentuemer_name') or
-                                       objekte[e].get('owner_name') or '').strip()]
-    mit_nummer = [e for e in mit_name if (objekte[e].get('owner_phone') or '').strip()]
-    print(f'Davon mit Eigentümer: {len(mit_name)}, davon mit Nummer: '
-          f'{len(mit_nummer)}.')
+    kandidaten, luecken = [], {}
+    for e in fehlend:
+        o = objekte[e]
+        if o.get('kanton') != 'ZH':
+            continue
+        if o.get('ausgeschlossen') == 't' or \
+           o.get('preselection_status') == 'Ausschliessen':
+            continue
+        try:
+            if float(o.get('hnf_delta') or 0) <= 0:
+                continue
+        except ValueError:
+            continue
+        fehlt = [f for f in PFLICHT if not (o.get(f) or '').strip()]
+        if fehlt:
+            for f in fehlt:
+                luecken[f] = luecken.get(f, 0) + 1
+            continue
+        kandidaten.append(e)
+
+    print(f'Davon vollständig genug zum Anlegen: {len(kandidaten)}.')
     print()
-    if not mit_name:
-        print('> Kein einziges der fehlenden Objekte kennt seinen')
-        print('> Eigentümer. Deals daraus wären leere Karteikarten --')
-        print('> der nächste Schritt ist die Grundbuchabfrage, nicht')
-        print('> der Export. Angelegt wird deshalb nichts.')
+    if luecken:
+        print('Woran die übrigen ZH-Objekte scheitern:')
+        for f, n in sorted(luecken.items(), key=lambda x: -x[1]):
+            print(f'- {f} fehlt bei {n}')
         print()
 
     schluessel = {f['name']: f['key']
@@ -267,10 +289,10 @@ def main() -> None:
              if (s.get('name') or '').strip() == ZIEL_PHASE),
             eigene[0] if eigene else None)
 
-    anzulegen = mit_name[:args.grenze]
-    print(f'## Neu anlegen — {len(anzulegen)} von {len(mit_name)}')
+    anzulegen = kandidaten[:args.grenze]
+    print(f'## Neu anlegen — {len(anzulegen)} von {len(kandidaten)}')
     print()
-    if len(mit_name) > args.grenze:
+    if len(kandidaten) > args.grenze:
         print(f'> Nach Marge sortiert; der Rest folgt beim nächsten Lauf.')
         print()
 

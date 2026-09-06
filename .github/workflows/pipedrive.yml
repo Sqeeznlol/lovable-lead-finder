@@ -146,9 +146,11 @@ jobs:
                 $zusatz | tee -a "$GITHUB_STEP_SUMMARY"
               ;;
             abgleich|abgleich-schreiben)
-              # Die Auswahl entscheidet der Anruf, nicht die Datenbank:
-              # ausgeschlossene Zonen und Objekte ohne gerechnetes
-              # Potenzial gehoeren in die Recherche, nicht ins Telefon.
+              # Ergaenzt wird gegen alle Objekte, gleich welcher Kanton
+              # und gleich ob gerechnet: was in einem Deal fehlt, soll
+              # aus der Datenbank kommen, sobald es dort steht.
+              # Angelegt wird nur die geprueste ZH-Auswahl -- die Wahl
+              # trifft das Werkzeug, nicht die Abfrage.
               sudo apt-get install -y -qq postgresql-client
               psql "$SUPABASE_DB_URL" -X -q --csv -c "
                 select egrid,
@@ -166,18 +168,15 @@ jobs:
                        coalesce(round(marge_chf)::text,'0')  as marge_chf,
                        coalesce(eigentuemer_name,'')    as eigentuemer_name,
                        coalesce(eigentuemer_adresse,'') as eigentuemer_adresse,
-                       coalesce(owner_phone,'')         as owner_phone
-                from properties
-                where egrid is not null
-                  and kanton = 'ZH'
-                  and not ausgeschlossen
-                  and preselection_status <> 'Ausschliessen'
-                  and coalesce(hnf_delta, 0) > 0" > /tmp/zh.csv
-              wc -l /tmp/zh.csv
+                       coalesce(owner_phone,'')         as owner_phone,
+                       ausgeschlossen,
+                       coalesce(preselection_status,'') as preselection_status
+                from properties where egrid is not null" > /tmp/objekte.csv
+              wc -l /tmp/objekte.csv
               zusatz=""
               [ "${{ inputs.aufgabe }}" = "abgleich-schreiben" ] \
                 && zusatz="--schreiben --rueckschreiben /tmp/rueck.sql"
-              python3 tools/pipedrive-abgleich.py --objekte /tmp/zh.csv \
+              python3 tools/pipedrive-abgleich.py --objekte /tmp/objekte.csv \
                 --grenze "${{ inputs.grenze }}" $zusatz \
                 | tee -a "$GITHUB_STEP_SUMMARY"
               # Die Deal-Nummern zurueck in die Datenbank, damit der
