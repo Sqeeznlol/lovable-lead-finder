@@ -128,7 +128,7 @@ jobs:
             felder-weg|felder-weg-schreiben)
               zusatz=""
               [ "${{ inputs.aufgabe }}" = "felder-weg-schreiben" ] \
-                && zusatz="--schreiben"
+                && zusatz="--schreiben --leeren"
               python3 tools/pipedrive-felder-weg.py $zusatz \
                 | tee -a "$GITHUB_STEP_SUMMARY"
               ;;

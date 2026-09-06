@@ -33,6 +33,18 @@ def get(pfad: str, token: str, **params) -> dict:
         return json.load(r)
 
 
+def sende(pfad: str, token: str, daten: dict, methode: str = 'PUT') -> dict:
+    url = f'{PIPEDRIVE}{pfad}?api_token={urllib.parse.quote(token)}'
+    anfrage = urllib.request.Request(
+        url, data=json.dumps(daten).encode(),
+        headers={'Content-Type': 'application/json'}, method=methode)
+    try:
+        with urllib.request.urlopen(anfrage, timeout=60) as r:
+            return json.load(r)
+    except urllib.error.HTTPError as e:
+        return {'success': False, 'code': e.code}
+
+
 def loeschen(pfad: str, token: str) -> dict:
     url = f'{PIPEDRIVE}{pfad}?api_token={urllib.parse.quote(token)}'
     anfrage = urllib.request.Request(url, method='DELETE')
@@ -62,6 +74,8 @@ def alle(pfad: str, token: str, **params) -> list:
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument('--schreiben', action='store_true')
+    p.add_argument('--leeren', action='store_true',
+                   help='Werte entfernen, bevor das Feld gelöscht wird')
     args = p.parse_args()
 
     token = os.environ.get('PIPEDRIVE_TOKEN', '').strip()
@@ -99,7 +113,23 @@ def main() -> None:
             print(f'- {name}: leer, kann weg')
     print()
 
-    if belegt:
+    if belegt and args.leeren:
+        # Die Namen stehen inzwischen als Kontakte am Deal. Ein Feld,
+        # das denselben Namen noch einmal führt, wirft in einem halben
+        # Jahr die Frage auf, welcher der richtige ist -- doppelte
+        # Wahrheiten altern schlecht.
+        print('## Felder leeren')
+        print()
+        geleert = 0
+        for f in felder:
+            for kennung in belegt.get(f['name'], []):
+                if sende(f'/deals/{kennung}', token,
+                         {f['key']: ''}, 'PUT').get('success'):
+                    geleert += 1
+        print(f'- {geleert} Werte entfernt')
+        print()
+        belegt = {}
+    elif belegt:
         print('> Felder mit Werten bleiben stehen. Erst gehören die')
         print('> Namen gesichert -- danach können sie weg.')
         print()
