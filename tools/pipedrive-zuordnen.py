@@ -123,12 +123,30 @@ def main() -> None:
     name_pipeline = {x['id']: x.get('name') for x in pipelines}
     name_phase = {s['id']: s.get('name') for s in phasen}
 
+    # Wohin ein wieder brauchbarer Deal zurueckgeht: dorthin, wo
+    # angerufen wird. Ein Deal in "Zuordnen" wartet auf niemanden.
+    akquise = next((x for x in pipelines
+                    if (x.get('name') or '').strip().lower() == 'akquise'), None)
+    akquise_phase = None
+    if akquise:
+        eigene = [s for s in phasen if s.get('pipeline_id') == akquise['id']]
+        eigene.sort(key=lambda x: x.get('order_nr') or 0)
+        akquise_phase = next(
+            (x for x in eigene
+             if (x.get('name') or '').strip().lower() == 'neu'),
+            eigene[0] if eigene else None)
+
     deals = alle('/deals', token, status='open')
-    passt, unklar = [], []
+    passt, unklar, zurueck = [], [], []
     for d in deals:
         titel = (d.get('title') or '').strip()
         if ziel and d.get('pipeline_id') == ziel['id']:
-            continue          # liegt schon dort
+            # Liegt in "Zuordnen". Traegt er inzwischen den vereinbarten
+            # Titel, ist der Grund fuers Liegenbleiben weg -- dann
+            # gehoert er zurueck zu den Anrufen.
+            if TITEL.match(titel):
+                zurueck.append(d)
+            continue
         (passt if TITEL.match(titel) else unklar).append(d)
 
     print(f'# Zuordnen — {len(deals)} offene Deals')
@@ -138,6 +156,7 @@ def main() -> None:
         print()
     print(f'- {len(passt)} Titel entsprechen der Form')
     print(f'- {len(unklar)} Titel entsprechen ihr nicht')
+    print(f'- {len(zurueck)} liegen in "{PIPELINE}" und haben jetzt die Form')
     print()
 
     if unklar:
@@ -156,8 +175,23 @@ def main() -> None:
                 verschoben += 1
     print()
 
+    zurueckgeholt = 0
+    if zurueck:
+        print('## Kommen zurueck nach Akquise')
+        print()
+        for d in zurueck:
+            print(f'- {d["id"]} `{(d.get("title") or "")[:60]}`')
+            if args.schreiben and akquise and akquise_phase:
+                a = sende(f'/deals/{d["id"]}', token,
+                          {'pipeline_id': akquise['id'],
+                           'stage_id': akquise_phase['id']}, 'PUT')
+                if a.get('success'):
+                    zurueckgeholt += 1
+        print()
+
     if args.schreiben:
-        print(f'**{verschoben} Deals verschoben.**')
+        print(f'**{verschoben} Deals verschoben, '
+              f'{zurueckgeholt} zurueck nach Akquise.**')
     else:
         print('**Probelauf** — es wurde nichts verändert.')
 
