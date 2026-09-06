@@ -28,6 +28,16 @@ PIPEDRIVE = 'https://api.pipedrive.com/v1'
 
 EGRID = re.compile(r'\bCH\d{12}\b')
 
+# Die Parzellennummer steht selten allein. Im Bestand steht zum Beispiel
+#
+#   Grundstück: Liegenschaft Nr. 2028 ( CH945005774131 )
+#
+# Gesucht ist die 2028. Zürcher Nummern tragen manchmal ein Kürzel
+# davor ("SE2423"), deshalb die Buchstaben.
+NUMMER = re.compile(
+    r'(?:Liegenschaft|Grundst(?:ü|ue)ck|Parzelle)?\s*(?:Nr\.?)?\s*'
+    r'\b([A-Z]{0,3}\d{1,6}[a-z]?)\b')
+
 # Grundbuchamt -> Kantonskürzel. Die Ämter tragen den Kantonsnamen,
 # manche einen Bezirksnamen mit Kantonszusatz.
 KANTONE = {
@@ -75,6 +85,16 @@ def alle(pfad: str, token: str, **params) -> list:
             break
         start = weiter.get('next_start', start + 500)
     return raus
+
+
+def naechste_egrid(p_daten: dict):
+    """Die EGRID irgendwo im Kontakt finden."""
+    for wert in p_daten.values():
+        if isinstance(wert, str):
+            treffer = EGRID.search(wert)
+            if treffer:
+                return treffer
+    return None
 
 
 def kanton_von(grundbuch: str) -> str:
@@ -132,10 +152,19 @@ def main() -> None:
                 continue  # Was dasteht, bleibt.
             wert = str(p_daten.get(vom_kontakt) or '').strip()
             if name == 'EGRID':
-                treffer = EGRID.search(wert)
+                # Die EGRID kann in jedem Feld des Kontakts stecken --
+                # im Bestand steht sie mal unter "Objektinfo", mal
+                # mitten in der Zeile unter "Grundstück".
+                treffer = EGRID.search(wert) or naechste_egrid(p_daten)
                 wert = treffer.group(0) if treffer else ''
             elif name == 'Kanton':
                 wert = kanton_von(wert)
+            elif name == 'Parzelle':
+                # Nicht die ganze Zeile übernehmen: gesucht ist die
+                # Nummer, nicht ihr Beiwerk.
+                ohne_egrid = EGRID.sub('', wert)
+                treffer = NUMMER.search(ohne_egrid)
+                wert = treffer.group(1) if treffer else ''
             if wert:
                 neu[zum_deal] = wert
         if neu:
