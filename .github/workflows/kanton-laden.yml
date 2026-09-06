@@ -497,10 +497,17 @@ jobs:
           java -jar "$jar" --dbfile /tmp/probe.gpkg \
             --modeldir "/tmp/av;http://models.interlis.ch/;https://models.geo.admin.ch/" \
             --defaultSrsCode 2056 \
-            --import "$erste" 2>&1 | tail -25
+            --disableValidation \
+            --import "$erste" > /tmp/ili2gpkg.log 2>&1 || true
+
+          # Die Meldungen zwischen tausend Zeilen "Info: validate ..."
+          # herauszufischen ist der halbe Erfolg.
+          grep -iE 'error|fehler|failed|warning' /tmp/ili2gpkg.log \
+            | head -20 || echo "(keine Fehlermeldungen)"
+          tail -3 /tmp/ili2gpkg.log
 
           echo
-          ls -lh /tmp/probe.gpkg
+          ls -lh /tmp/probe.gpkg || { echo "Keine Ausgabe entstanden."; exit 1; }
           echo "### Ebenen mit Flächen"
           ogrinfo -so -al /tmp/probe.gpkg 2>/dev/null \
             | grep -E 'Layer name|Feature Count|Geometry:' | paste - - - \
