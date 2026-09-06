@@ -276,11 +276,19 @@ jobs:
           # Übriggebliebenen werden genau gerechnet.
           echo "### In eine SpatiaLite-Datenbank umziehen"
           rm -f /tmp/arbeit.sqlite
-          for e in flaechen grundstueck zonen; do
+          for e in flaechen zonen; do
             ogr2ogr -f SQLite /tmp/arbeit.sqlite -append \
               -dsco SPATIALITE=YES -lco SPATIAL_INDEX=YES \
               -nln "$e" /tmp/arbeit.gpkg "$e"
           done
+          # Der Schlüssel T_Id gilt als interne Satznummer und ginge beim
+          # Kopieren verloren -- ohne ihn lässt sich die Fläche nicht dem
+          # Grundstück zuordnen. Deshalb ausdrücklich als Spalte mitnehmen.
+          ogr2ogr -f SQLite /tmp/arbeit.sqlite -append \
+            -dsco SPATIALITE=YES -nln grundstueck /tmp/arbeit.gpkg \
+            -dialect sqlite -sql "SELECT T_Id AS gs_id, egris_egrid,
+                                         nummer, nbident, art
+                                  FROM grundstueck"
           ogrinfo -so -al /tmp/arbeit.sqlite 2>/dev/null \
             | grep -E 'Layer name|Feature Count' | paste - -
           # Ohne die Grundstücke fehlen EGRID und Parzellennummer -- dann
@@ -319,7 +327,7 @@ jobs:
                 ROUND(100.0 * ST_Area(ST_Intersection(l.$gsp, z.$gsz))
                       / NULLIF(l.flaechenmass, 0))     AS anteil_prozent
               FROM flaechen l
-              JOIN grundstueck g ON g.T_Id = l.liegenschaft_von
+              JOIN grundstueck g ON g.gs_id = l.liegenschaft_von
               JOIN zonen z
               WHERE z.ROWID IN (
                       SELECT ROWID FROM SpatialIndex
