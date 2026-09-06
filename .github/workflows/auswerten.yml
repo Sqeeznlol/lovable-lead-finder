@@ -71,7 +71,12 @@ jobs:
                      coalesce(gebaeudeart,'(leer)') as gebaeudeart,
                      coalesce(kategorie,'(leer)')   as kategorie,
                      zone, round(marge_chf/1e6,1) as marge_mio,
-                     ausgeschlossen, ausschluss_grund
+                     ausgeschlossen, ausschluss_grund,
+                     bfs_nr, gwr_egid, hnf_bestand, hnf_delta, hnf_neu,
+                     gf_bestand, gf_zulaessig, ausnuetzung,
+                     vollgeschosse_zulaessig,
+                     coalesce(housing_stat_url,'(leer)') as housing_stat_url,
+                     coalesce(eigentuemer_name,'(leer)') as eigentuemer
               from properties where egrid = '$kennung';"
 
           elif [ "${{ inputs.frage }}" = "projektiert" ]; then
