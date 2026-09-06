@@ -284,7 +284,9 @@
         log('Success page detected!');
         await sleep(1500);
         const owners = extractOwners();
-        chrome.runtime.sendMessage({ type: 'OWNER_DATA', owners });
+        // Der Wortlaut geht mit, damit sich nachprüfen lässt, ob
+        // richtig gelesen wurde.
+        chrome.runtime.sendMessage({ type: 'OWNER_DATA', owners, roh: document.body.innerText || '' });
         return;
       }
     }
@@ -296,6 +298,15 @@
       error: 'Timeout — SMS-Code nicht eingegeben'
     });
   }
+
+  // Der Balken liegt über allem, was hier automatisch läuft: erkennt
+  // der Ausleser nichts -- und er wurde nie an einem echten Fall
+  // geprüft --, übernimmt ein Klick, was auf dem Schirm steht.
+  const balkenAn = () => window.akquiseBalken?.(
+    'Bauraum — läuft automatisch. Erkennt es nichts: Eigentümer '
+    + 'markieren und übernehmen.');
+  if (document.body) balkenAn();
+  else document.addEventListener('DOMContentLoaded', balkenAn);
 
   // Run immediately
   run();
