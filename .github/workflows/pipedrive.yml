@@ -56,6 +56,7 @@ on:
           - zuordnen-schreiben     # dasselbe, aber tatsächlich verschieben
           - abgleich     # ZH-Objekte mit Pipedrive abgleichen (Probelauf)
           - abgleich-schreiben     # dasselbe, aber tatsächlich schreiben
+          - pruefen      # Alle Felder und einen Deal mit Feldnamen zeigen
       grenze:
         description: 'Höchstzahl Objekte -- bei "deal" die Deal-Nummer'
         required: false
@@ -144,6 +145,10 @@ jobs:
                 && zusatz="--schreiben"
               python3 tools/pipedrive-fuellen.py --objekte /tmp/objekte.csv \
                 $zusatz | tee -a "$GITHUB_STEP_SUMMARY"
+              ;;
+            pruefen)
+              python3 tools/pipedrive-pruefen.py "${{ inputs.grenze }}" \
+                | tee -a "$GITHUB_STEP_SUMMARY"
               ;;
             abgleich|abgleich-schreiben)
               # Ergaenzt wird gegen alle Objekte, gleich welcher Kanton
