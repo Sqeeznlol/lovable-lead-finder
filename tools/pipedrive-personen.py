@@ -49,8 +49,10 @@ KEINE_PERSON = re.compile(
     r'Miteigentümer|Gemeinschaft|Korporation|Genossame|Bank|'
     r'Versicherung|SBB|Post|Swisscom)\b', re.IGNORECASE)
 
-# "8004 Zürich", "6340 Baar" -- vier Ziffern, dann der Ort.
-PLZ_ORT = re.compile(r'^\s*(\d{4})\s+(.+?)\s*$')
+# "8004 Zürich", "9063 Stein AR" -- vier Ziffern, dann der Ort. Der Ort
+# endet am Komma, am Zeilenende oder am Trennzeichen zwischen zwei
+# Eigentümern.
+PLZ_IN_TEXT = re.compile(r'\b\d{4}\s+[A-Za-zÄÖÜäöüéèàç][^,\n¬]*')
 
 
 def get(pfad: str, token: str, **params) -> dict:
@@ -89,56 +91,50 @@ def alle(pfad: str, token: str, **params) -> list:
 
 
 def zerlegen(voll: str) -> dict:
-    """Aus dem verrutschten Namen die vier Angaben herausholen.
+    """Aus dem Namensfeld die Adresse herausholen.
 
-    Zurück kommt, was sich sicher sagen lässt -- lieber ein Feld leer
-    lassen als es falsch füllen. Ein Kontakt mit leerer Adresse ist ein
-    Ärgernis, ein Kontakt mit fremder Adresse ein Fehlanruf.
+    Zwei Dinge werden hier bewusst NICHT getan, beide, weil ein
+    Probelauf an den echten Daten gezeigt hat, wohin sie führen:
+
+    Der Name wird nicht in Vor- und Nachname zerlegt. Die Reihenfolge
+    ist im Bestand nicht einheitlich -- neben "Zeberg Sonja" steht
+    "Markus Schiffmann" und "Marlen Graf". Eine Regel, die beides
+    richtig trifft, gibt es nicht, und ein falsch einsortierter Name
+    ist schlimmer als ein unsortierter: man findet die Person nicht
+    mehr wieder.
+
+    Einträge mit mehreren Eigentümern werden übersprungen. Bei
+
+        Ernst Meyer, Espenpark 8, 9220 Bischofszell
+        ¬ Willi Walter Meyer, Weinbergstrasse 3, 8532 Weiningen
+
+    gehören zwei Adressen zu zwei Menschen. Welche die richtige ist,
+    kann hier niemand entscheiden -- und eine fremde Adresse im Feld
+    heisst: Brief an den Falschen.
     """
-    teile = [t.strip() for t in (voll or '').split(',') if t.strip()]
-    if not teile:
+    text = (voll or '').strip()
+    if not text:
         return {}
 
-    ergebnis: dict[str, str] = {}
-    name = teile[0]
+    # Der Anteil am Ende ("1/1", "1/2") gehört nicht zur Adresse.
+    text = re.sub(r',?\s*\d+/\d+\s*$', '', text)
 
-    # Von hinten aufrollen: das letzte Stück mit PLZ ist Ort, was
-    # dazwischen liegt, ist die Strasse.
-    ort = strasse = ''
-    for t in reversed(teile[1:]):
-        if not ort and PLZ_ORT.match(t):
-            ort = t
-        elif ort and not strasse:
-            strasse = t
-    if not ort and len(teile) >= 3:
-        # Kein "8004 Zürich"-Muster: dann ist das letzte Stück der Ort.
-        ort, strasse = teile[-1], teile[-2]
+    stellen = list(PLZ_IN_TEXT.finditer(text))
+    if len(stellen) != 1:
+        # Keine Adresse erkennbar oder mehrere Eigentümer.
+        return {'mehrdeutig': True} if len(stellen) > 1 else {}
 
-    if strasse or ort:
-        ergebnis['adresse'] = ', '.join(x for x in (strasse, ort) if x)
-    if strasse:
-        ergebnis['strasse'] = strasse
-    if ort:
-        ergebnis['ort'] = ort
+    treffer = stellen[0]
+    ort = treffer.group(0).strip()
 
-    # Der Name selbst: "Zeberg Sonja" -> Nachname Zeberg, Vorname Sonja.
-    #
-    # Nur wenn eine Adresse dabeisteht: dann stammt der Eintrag aus dem
-    # Import und die Reihenfolge ist bekannt. Ein blosses "Hans Muster",
-    # das jemand von Hand angelegt hat, wird nicht angerührt -- dort
-    # wäre "Nachname Hans" schlicht falsch.
-    if ergebnis.get('adresse') and not KEINE_PERSON.search(name):
-        woerter = name.split()
-        if woerter and woerter[0].lower() in ('von', 'van', 'de', 'du',
-                                              'della', 'di', 'zu'):
-            # "von Arx Peter" -- das Adelspartikel gehört zum Nachnamen.
-            if len(woerter) == 3:
-                ergebnis['nachname'] = ' '.join(woerter[:2])
-                ergebnis['vorname'] = woerter[2]
-        elif len(woerter) == 2:
-            ergebnis['nachname'], ergebnis['vorname'] = woerter
-    ergebnis['name'] = name
-    return ergebnis
+    # Die Strasse steht unmittelbar vor der Postleitzahl, getrennt durch
+    # ein Komma.
+    davor = text[:treffer.start()].rstrip().rstrip(',')
+    strasse = davor.split(',')[-1].strip()
+    if not strasse:
+        return {}
+
+    return {'adresse': f'{strasse}, {ort}'}
 
 
 def karte(adresse: str) -> str:
@@ -173,17 +169,17 @@ def main() -> None:
     print()
 
     aenderungen: list[tuple[dict, dict]] = []
+    mehrdeutig = 0
     for person in personen:
         voll = (person.get('name') or '').strip()
         teile = zerlegen(voll)
+        if teile.get('mehrdeutig'):
+            mehrdeutig += 1
+            continue
         if not teile:
             continue
 
         neu: dict = {}
-        # Namen nur richten, wenn wirklich etwas verrutscht ist.
-        if teile.get('nachname') and person.get('last_name') != teile['nachname']:
-            neu['last_name'] = teile['nachname']
-            neu['first_name'] = teile['vorname']
         adresse = teile.get('adresse')
         if adresse:
             if k_adresse and not (person.get(k_adresse) or '').strip():
@@ -195,12 +191,15 @@ def main() -> None:
 
     print(f'## {len(aenderungen)} von {len(personen)} Kontakten unvollständig')
     print()
+    if mehrdeutig:
+        print(f'> Bei {mehrdeutig} Kontakten stehen mehrere Eigentümer mit')
+        print('> je eigener Adresse im Feld. Dort wird nichts gesetzt --')
+        print('> welche Adresse gilt, kann nur ein Mensch entscheiden.')
+        print()
     for person, neu in aenderungen[:15]:
         print(f'- `{person.get("name")}`')
         for schl, wert in neu.items():
-            bezeichnung = {'last_name': 'Nachname',
-                           'first_name': 'Vorname',
-                           k_adresse: 'Adresse',
+            bezeichnung = {k_adresse: 'Adresse',
                            k_maps: 'Maps'}.get(schl, schl)
             gekuerzt = wert if len(str(wert)) < 60 else str(wert)[:57] + '…'
             print(f'  - {bezeichnung}: `{gekuerzt}`')
