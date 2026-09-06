@@ -82,6 +82,12 @@ def alle(pfad: str, token: str, **params) -> list:
     return raus
 
 
+# Parz. 2688 · Lettenmattstrasse 12, 8903 Birmensdorf
+VEREINBART = re.compile(
+    r'^Parz\. [A-Za-zÄÖÜ]{0,3}\d+[a-zA-Z]?(?:[./-]\d+)? · '
+    r'\S.*, \d{4} \S.*$')
+
+
 def titel(objekt: dict) -> str:
     """Parzellennummer, Adresse, Postleitzahl mit Ort.
 
@@ -97,6 +103,13 @@ def titel(objekt: dict) -> str:
     ort = ' '.join(x for x in (objekt.get('plz'), objekt.get('gemeinde')) if x)
     nr = (objekt.get('parzelle') or '').strip()
     adresse = (objekt.get('address') or '').strip()
+
+    # Im Thurgau tragen die Parzellen ohne Gebaeude als Adresse den Text
+    # "Parzelle 1374". Als Titel ergaebe das "Parz. 1374 · Parzelle
+    # 1374" -- die Nummer zweimal und der Ort nirgends. Dann lieber die
+    # Gemeinde: die sagt beim Anruf mehr als eine wiederholte Nummer.
+    if re.fullmatch(r'Parzelle\s+\S+', adresse, re.IGNORECASE):
+        adresse = ''
 
     hinten = ', '.join(x for x in (adresse, ort) if x)
     if nr and adresse:
@@ -231,6 +244,7 @@ def main() -> None:
                         if f.get('name') == 'Grundstück'), None)
 
     zu_aendern: list[tuple[dict, str]] = []
+    geprueft: list[str] = []
     ohne_egrid: list[str] = []
     fremd: list[str] = []
     for d in deals:
@@ -257,7 +271,15 @@ def main() -> None:
         if not objekt.get('parzelle'):
             objekt['parzelle'] = parzelle_von(d, personen, grundstueck)
         neu = titel(objekt)
-        if neu and neu != (d.get('title') or '').strip():
+        alt = (d.get('title') or '').strip()
+        # Ein Titel, der schon die vereinbarte Form hat, wurde von Hand
+        # geprueft. Ihn zu ueberschreiben hiesse, eine Hausnummer gegen
+        # eine andere zu tauschen, ohne zu wissen, welche stimmt --
+        # dafuer gibt es die Pipeline "Zuordnen".
+        if VEREINBART.match(alt):
+            geprueft.append(f'{d.get("id")} {alt}')
+            continue
+        if neu and neu != alt:
             zu_aendern.append((d, neu))
 
     print(f'## {len(zu_aendern)} von {len(deals)} Deals bekommen einen neuen Titel')
@@ -268,6 +290,15 @@ def main() -> None:
     if len(zu_aendern) > 20:
         print(f'- … und {len(zu_aendern) - 20} weitere')
     print()
+    if geprueft:
+        print(f'## {len(geprueft)} Titel bleiben, wie sie sind')
+        print()
+        print('Sie haben schon die vereinbarte Form und wurden von Hand')
+        print('geprüft. Was daran nicht stimmt, gehört nach "Zuordnen".')
+        print()
+        for z in geprueft[:5]:
+            print(f'- `{z}`')
+        print()
     if ohne_egrid:
         print(f'## {len(ohne_egrid)} Deals ohne EGRID')
         print()
