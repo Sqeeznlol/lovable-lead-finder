@@ -134,7 +134,14 @@ def zerlegen(voll: str) -> dict:
     if not strasse:
         return {}
 
-    return {'adresse': f'{strasse}, {ort}'}
+    # Der Name ist alles vor der Strasse. Die Reihenfolge von Vor- und
+    # Nachname wird dabei nicht angetastet -- sie ist im Bestand nicht
+    # einheitlich, und ein falsch einsortierter Name ist schlimmer als
+    # ein unsortierter. Entfernt wird nur, was gar nicht in ein
+    # Namensfeld gehört: Strasse, Postleitzahl und Ort.
+    name = davor[:davor.rfind(strasse)].strip().rstrip(',').strip() \
+        if strasse in davor else davor
+    return {'adresse': f'{strasse}, {ort}', 'name': name or None}
 
 
 def karte(adresse: str) -> str:
@@ -180,6 +187,11 @@ def main() -> None:
             continue
 
         neu: dict = {}
+        # Die Adresse gehört aus dem Namensfeld heraus -- dort steht sie
+        # quer über Nach- und Vorname verteilt.
+        name = teile.get('name')
+        if name and name != voll:
+            neu['name'] = name
         adresse = teile.get('adresse')
         if adresse:
             if k_adresse and not (person.get(k_adresse) or '').strip():
@@ -199,7 +211,8 @@ def main() -> None:
     for person, neu in aenderungen[:15]:
         print(f'- `{person.get("name")}`')
         for schl, wert in neu.items():
-            bezeichnung = {k_adresse: 'Adresse',
+            bezeichnung = {'name': 'Name',
+                           k_adresse: 'Adresse',
                            k_maps: 'Maps'}.get(schl, schl)
             gekuerzt = wert if len(str(wert)) < 60 else str(wert)[:57] + '…'
             print(f'  - {bezeichnung}: `{gekuerzt}`')
