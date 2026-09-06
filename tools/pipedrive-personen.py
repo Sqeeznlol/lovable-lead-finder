@@ -116,8 +116,13 @@ def zerlegen(voll: str) -> dict:
     if not text:
         return {}
 
-    # Der Anteil am Ende ("1/1", "1/2") gehört nicht zur Adresse.
+    # Der Anteil am Ende ("1/1", "1/2") gehört nicht zur Adresse, die
+    # Eigentumsform ebensowenig, und dass die Schweiz gemeint ist, weiss
+    # der Anrufende auch so.
     text = re.sub(r',?\s*\d+/\d+\s*$', '', text)
+    text = re.sub(r',?\s*(Allein|Mit|Gesamt)eigentum\s*$', '', text,
+                  flags=re.IGNORECASE)
+    text = re.sub(r',?\s*Schweiz\s*$', '', text, flags=re.IGNORECASE)
 
     stellen = list(PLZ_IN_TEXT.finditer(text))
     if len(stellen) != 1:
@@ -192,9 +197,21 @@ def main() -> None:
         name = teile.get('name')
         if name and name != voll:
             neu['name'] = name
+        # Die Adresse kann auch im Adressfeld selbst stecken -- dort
+        # steht bei vielen Kontakten die ganze Rohzeile der
+        # Grundbuchauskunft: "Leutert-Illi, Marie Elsa,
+        # Sennhüttenstrasse 3, 8912 Obfelden, Schweiz, Alleineigentum".
+        # Ein solches Feld ist zwar gefüllt, aber unbrauchbar.
         adresse = teile.get('adresse')
+        vorhanden = (person.get(k_adresse) or '').strip() if k_adresse else ''
+        if not adresse and vorhanden:
+            adresse = zerlegen(vorhanden).get('adresse')
+
         if adresse:
-            if k_adresse and not (person.get(k_adresse) or '').strip():
+            # Ersetzt wird nur, was erkennbar die Rohzeile ist: eine von
+            # Hand eingetragene Adresse bleibt, wie sie ist.
+            roh = vorhanden and vorhanden.count(',') >= 3
+            if k_adresse and (not vorhanden or roh) and vorhanden != adresse:
                 neu[k_adresse] = adresse
             if k_maps and not (person.get(k_maps) or '').strip():
                 neu[k_maps] = karte(adresse)
