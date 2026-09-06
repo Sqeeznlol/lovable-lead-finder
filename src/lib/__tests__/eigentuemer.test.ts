@@ -45,4 +45,29 @@ Hans Müller, Dorfstrasse 3, 8253 Diessenhofen, Alleineigentum`;
     expect(leseAuskunft('')).toEqual([]);
     expect(leseAuskunft('nur irgendein Satz ohne alles')).toEqual([]);
   });
+
+  it('liest die Thurgauer Auskunft', () => {
+    // Wortlaut aus map.geo.tg.ch, Liegenschaft 447 Diessenhofen.
+    // Zwei Leerzeichen nach dem Namen und der Anteil "1/1" am Schluss.
+    const o = leseAuskunft('Rudolf Gubler,  Grabenstrasse 12, 8253 Diessenhofen, 1/1');
+    expect(o).toHaveLength(1);
+    expect(o[0].name).toBe('Rudolf Gubler');
+    expect(o[0].address).toBe('Grabenstrasse 12');
+    expect(o[0].plz).toBe('8253');
+    expect(o[0].ort).toBe('Diessenhofen');
+  });
+
+  it('übergeht die Zusatzangaben des Thurgauer Auszugs', () => {
+    // Sie tragen Postleitzahlen und sähen sonst wie Eigentümer aus.
+    const text = `Grundbuch-Auszug
+Eigentümerinformationen
+Rudolf Gubler,  Grabenstrasse 12, 8253 Diessenhofen, 1/1
+Zusätzliche Informationen
+Grundbuch: Nr. 4545 Diessenhofen
+Grundstück: Liegenschaft Nr. 447 ( CH627728290920 )
+Fläche(n): 1'567 m² Nebengebäude (nv), Grabenstrasse, 8253 Diessenhofen [11 m²]
+Dieser Auszug kann nicht als gültiger Grundbuchauszug verwendet werden.`;
+    const o = leseAuskunft(text);
+    expect(o.map(x => x.name)).toEqual(['Rudolf Gubler']);
+  });
 });
