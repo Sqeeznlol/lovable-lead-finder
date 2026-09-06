@@ -14,7 +14,6 @@ const TelefonSuche = lazy(() => import('@/components/TelefonSuche').then(m => ({
 const PipedriveExport = lazy(() => import('@/components/PipedriveExport').then(m => ({ default: m.PipedriveExport })));
 const Vorauswahl = lazy(() => import('@/components/Vorauswahl').then(m => ({ default: m.Vorauswahl })));
 const AdminSettings = lazy(() => import('@/components/AdminSettings').then(m => ({ default: m.AdminSettings })));
-import { ListSelector } from '@/components/ListSelector';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CantonTabs } from '@/components/CantonTabs';
 import { KeyboardShortcutsOverlay } from '@/components/KeyboardShortcutsOverlay';
@@ -36,7 +35,6 @@ const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: st
   { id: 'telsuche', label: 'Telefon-Suche', icon: Search },
   { id: 'properties', label: 'Liegenschaften', icon: Building2 },
   { id: 'export', label: 'Pipedrive Export', icon: FileSpreadsheet },
-  { id: 'import', label: 'Listen-Import (alt)', icon: Upload },
   { id: 'phones', label: 'Telefone', icon: Phone },
   { id: 'admin', label: 'Admin', icon: Shield },
 ];
@@ -78,9 +76,6 @@ export default function Index() {
               <h1 className="font-serif text-2xl tracking-tight text-foreground leading-none">Bauraum</h1>
               <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground mt-1.5">Immobilien · Schweiz</p>
             </div>
-          </div>
-          <div className="mt-5">
-            <ListSelector />
           </div>
         </div>
         <nav className="p-4 space-y-1 flex-1 overflow-y-auto">
@@ -125,14 +120,11 @@ export default function Index() {
           </div>
         </header>
 
-        {/* Mobile-only sub-bar with current tab name + ListSelector */}
+        {/* Auf dem Handy nur noch der Name der Ansicht. */}
         <div className="lg:hidden px-4 py-2 flex items-center gap-3 border-b border-foreground/5 bg-background/60 backdrop-blur-xl">
           <span className="text-xs font-medium text-foreground truncate">
             {tabs.find(t => t.id === active)?.label}
           </span>
-          <div className="ml-auto min-w-0 flex-1 max-w-[60%]">
-            <ListSelector />
-          </div>
         </div>
 
         <div className="flex-1 p-4 lg:p-12 max-w-7xl pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-12 animate-fade-in">
