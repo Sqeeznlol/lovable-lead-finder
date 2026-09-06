@@ -254,13 +254,11 @@ jobs:
           ls -lh /tmp/zonen.gpkg /tmp/parzellen.gpkg
 
           # Beide Quellen in eine Datei, damit sich darin rechnen lässt.
-          # Die amtlichen Grenzen enthalten Kreisbögen; SpatiaLite kann
-          # damit nicht rechnen. GDAL begradigt sie beim Kopieren zu
-          # Linienzügen -- der Abweichung von wenigen Zentimetern steht
-          # gegenüber, dass die Rechnung sonst gar nicht läuft.
           # Die Vermessungsdatei bleibt, wie sie ist -- ihre Schlüssel
           # (T_Id) gehen beim Kopieren sonst verloren. Dazu kommen die
-          # Zonen und eine begradigte Fassung der Parzellenumrisse.
+          # Zonen und eine begradigte Fassung der Parzellenumrisse: die
+          # amtlichen Grenzen enthalten Kreisbögen, mit denen SpatiaLite
+          # nicht rechnen kann.
           cp /tmp/parzellen.gpkg /tmp/arbeit.gpkg
           ogr2ogr -f GPKG /tmp/arbeit.gpkg -append -nln zonen \
             /tmp/zonen.gpkg zonen
@@ -268,45 +266,48 @@ jobs:
             -nlt CONVERT_TO_LINEAR /tmp/arbeit.gpkg \
             -sql "SELECT liegenschaft_von, flaechenmass, geometrie
                   FROM liegenschaft"
-          echo "### Ebenen in der Arbeitsdatei"
-          ogrinfo -so -al /tmp/arbeit.gpkg 2>/dev/null \
-            | grep -E 'Layer name|Feature Count' | paste - - \
-            | grep -iE 'grundstueck|liegenschaft|zonen' || true
 
-          # Die Spaltennamen stammen aus dem amtlichen Modell:
-          #   grundstueck   nbident, nummer, egris_egrid, art,
-          #                 gesamteflaechenmass
-          #   liegenschaft  flaechenmass, liegenschaft_von -> grundstueck
-          # Wie die Geometriespalte heisst, sagt die Datei selbst; darauf
-          # zu raten hat diesen Ablauf schon zweimal Stunden gekostet.
-          gsp=$(ogrinfo -so -al /tmp/arbeit.gpkg flaechen 2>/dev/null \
-                | sed -n 's/^Geometry Column = //p' | head -1)
-          gsz=$(ogrinfo -so -al /tmp/arbeit.gpkg zonen 2>/dev/null \
-                | sed -n 's/^Geometry Column = //p' | head -1)
-          gsp=${gsp:-geometrie}; gsz=${gsz:-geom}
-          echo "Geometrie: flaechen.$gsp, zonen.$gsz"
+          # Ohne räumlichen Index vergleicht die Datenbank jede der
+          # 140'000 Parzellen mit jeder der 57'000 Zonen -- acht
+          # Milliarden Vergleiche, die nie fertig werden. Ein erster
+          # Versuch lief eine halbe Stunde ohne eine einzige Zeile.
+          # SpatiaLite bringt dafür die Tabelle "SpatialIndex" mit, die
+          # zuerst grob nach Rechtecken vorsortiert; erst die wenigen
+          # Übriggebliebenen werden genau gerechnet.
+          echo "### In eine SpatiaLite-Datenbank umziehen"
+          rm -f /tmp/arbeit.sqlite
+          for e in flaechen grundstueck zonen; do
+            ogr2ogr -f SQLite /tmp/arbeit.sqlite -append \
+              -dsco SPATIALITE=YES -lco SPATIAL_INDEX=YES \
+              -nln "$e" /tmp/arbeit.gpkg "$e"
+          done
+          ogrinfo -so -al /tmp/arbeit.sqlite 2>/dev/null \
+            | grep -E 'Layer name|Feature Count' | paste - -
 
           echo
           echo "### Verschneiden"
-          ogr2ogr -f CSV /tmp/verschnitten.csv /tmp/arbeit.gpkg \
+          ogr2ogr -f CSV /tmp/verschnitten.csv /tmp/arbeit.sqlite \
             -dialect sqlite -sql "
               SELECT
-                g.egris_egrid                             AS egrid,
-                g.nummer                                  AS parzelle,
-                g.nbident                                 AS vermessungskreis,
-                g.art                                     AS art,
-                l.flaechenmass                            AS flaeche_m2,
-                z.Typ                                     AS zone_typ,
-                ROUND(ST_Area(ST_Intersection(
-                  l.$gsp, z.$gsz)))       AS zone_m2,
-                ROUND(100.0 * ST_Area(ST_Intersection(
-                        l.$gsp, z.$gsz))
-                      / NULLIF(l.flaechenmass, 0))        AS anteil_prozent
+                g.egris_egrid                          AS egrid,
+                g.nummer                               AS parzelle,
+                g.nbident                              AS vermessungskreis,
+                g.art                                  AS art,
+                l.flaechenmass                         AS flaeche_m2,
+                z.Typ                                  AS zone_typ,
+                ROUND(ST_Area(ST_Intersection(l.GEOMETRY, z.GEOMETRY)))
+                                                       AS zone_m2,
+                ROUND(100.0 * ST_Area(ST_Intersection(l.GEOMETRY, z.GEOMETRY))
+                      / NULLIF(l.flaechenmass, 0))     AS anteil_prozent
               FROM flaechen l
               JOIN grundstueck g ON g.T_Id = l.liegenschaft_von
-              JOIN zonen z ON ST_Intersects(l.$gsp, z.$gsz)
-              WHERE ST_Area(ST_Intersection(
-                      l.$gsp, z.$gsz)) > 5
+              JOIN zonen z
+              WHERE z.ROWID IN (
+                      SELECT ROWID FROM SpatialIndex
+                      WHERE f_table_name = 'zonen'
+                        AND search_frame = l.GEOMETRY)
+                AND ST_Intersects(l.GEOMETRY, z.GEOMETRY)
+                AND ST_Area(ST_Intersection(l.GEOMETRY, z.GEOMETRY)) > 5
             " || { echo "Verschneiden fehlgeschlagen"; exit 1; }
 
           zeilen=$(( $(wc -l < /tmp/verschnitten.csv) - 1 ))
