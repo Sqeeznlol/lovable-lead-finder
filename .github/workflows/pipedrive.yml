@@ -54,6 +54,8 @@ on:
           - fuellen-schreiben      # dasselbe, aber tatsächlich schreiben
           - zuordnen     # Deals mit unklarem Titel sammeln (Probelauf)
           - zuordnen-schreiben     # dasselbe, aber tatsächlich verschieben
+          - abgleich     # ZH-Objekte mit Pipedrive abgleichen (Probelauf)
+          - abgleich-schreiben     # dasselbe, aber tatsächlich schreiben
       grenze:
         description: 'Höchstzahl Objekte -- bei "deal" die Deal-Nummer'
         required: false
@@ -142,6 +144,49 @@ jobs:
                 && zusatz="--schreiben"
               python3 tools/pipedrive-fuellen.py --objekte /tmp/objekte.csv \
                 $zusatz | tee -a "$GITHUB_STEP_SUMMARY"
+              ;;
+            abgleich|abgleich-schreiben)
+              # Die Auswahl entscheidet der Anruf, nicht die Datenbank:
+              # ausgeschlossene Zonen und Objekte ohne gerechnetes
+              # Potenzial gehoeren in die Recherche, nicht ins Telefon.
+              sudo apt-get install -y -qq postgresql-client
+              psql "$SUPABASE_DB_URL" -X -q --csv -c "
+                select egrid,
+                       coalesce(parzelle, plot_number, '') as parzelle,
+                       coalesce(address,'')     as address,
+                       coalesce(plz,'')         as plz,
+                       coalesce(gemeinde,'')    as gemeinde,
+                       coalesce(kanton,'')      as kanton,
+                       coalesce(zone,'')        as zone,
+                       coalesce(geschosse::text,'')          as geschosse,
+                       coalesce(baujahr::text,'')            as baujahr,
+                       coalesce(round(hnf_delta)::text,'')   as hnf_delta,
+                       coalesce(round(bebaubar_m2)::text,'') as bebaubar_m2,
+                       coalesce(bfs_nr::text,'')             as bfs_nr,
+                       coalesce(round(marge_chf)::text,'0')  as marge_chf,
+                       coalesce(eigentuemer_name,'')    as eigentuemer_name,
+                       coalesce(eigentuemer_adresse,'') as eigentuemer_adresse,
+                       coalesce(owner_phone,'')         as owner_phone
+                from properties
+                where egrid is not null
+                  and kanton = 'ZH'
+                  and not ausgeschlossen
+                  and preselection_status <> 'Ausschliessen'
+                  and coalesce(hnf_delta, 0) > 0" > /tmp/zh.csv
+              wc -l /tmp/zh.csv
+              zusatz=""
+              [ "${{ inputs.aufgabe }}" = "abgleich-schreiben" ] \
+                && zusatz="--schreiben --rueckschreiben /tmp/rueck.sql"
+              python3 tools/pipedrive-abgleich.py --objekte /tmp/zh.csv \
+                --grenze "${{ inputs.grenze }}" $zusatz \
+                | tee -a "$GITHUB_STEP_SUMMARY"
+              # Die Deal-Nummern zurueck in die Datenbank, damit der
+              # naechste Lauf dieselben Objekte wiederfindet.
+              if [ -s /tmp/rueck.sql ]; then
+                psql "$SUPABASE_DB_URL" -X -q -f /tmp/rueck.sql \
+                  && echo "Deal-Nummern zurueckgeschrieben." \
+                     >> "$GITHUB_STEP_SUMMARY"
+              fi
               ;;
             zuordnen|zuordnen-schreiben)
               zusatz=""
