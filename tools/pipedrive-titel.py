@@ -72,21 +72,27 @@ def alle(pfad: str, token: str, **params) -> list:
 
 
 def titel(objekt: dict) -> str:
-    """Adresse, Postleitzahl mit Ort, Parzellennummer.
+    """Parzellennummer, Adresse, Postleitzahl mit Ort.
 
-    Am Telefon beginnt das Gespräch mit der Adresse; die Postleitzahl
-    macht sie über mehrere Kantone eindeutig; und ohne Parzellennummer
-    lässt sich weder das Grundbuch noch der ÖREB-Kataster aufrufen.
+    Die Parzelle steht vorn, weil sie das Grundstück eindeutig benennt
+    und in Grundbuch wie ÖREB-Kataster der Schlüssel ist. Dann die
+    Adresse -- damit beginnt das Gespräch am Telefon -- und die
+    Postleitzahl, die sie über mehrere Kantone eindeutig macht.
+
+    Kurz gehalten, weil Pipedrive in der Listenansicht rechts
+    abschneidet: "an der" und "in" tragen nichts bei und kosten die
+    Zeichen, an denen dann die Strasse fehlt.
     """
     ort = ' '.join(x for x in (objekt.get('plz'), objekt.get('gemeinde')) if x)
     nr = (objekt.get('parzelle') or '').strip()
     adresse = (objekt.get('address') or '').strip()
-    if not adresse:
-        adresse = f'Parz. {nr}' if nr else ''
-    kopf = ', '.join(x for x in (adresse, ort) if x)
-    if nr and objekt.get('address'):
-        return f'{kopf} · Parz. {nr}'
-    return kopf
+
+    hinten = ', '.join(x for x in (adresse, ort) if x)
+    if nr and adresse:
+        return f'Parz. {nr} · {hinten}'
+    if nr:
+        return ', '.join(x for x in (f'Parz. {nr}', ort) if x)
+    return hinten
 
 
 def person_von(deal: dict, personen: dict) -> dict:
