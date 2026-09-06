@@ -368,23 +368,28 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Der Titel muss beim Anruf tragen: Adresse zuerst -- das ist
-        // der erste Satz am Telefon --, dann Postleitzahl und Ort, weil
-        // es über mehrere Kantone Dorfstrassen zuhauf gibt, und zuletzt
-        // die Parzellennummer, ohne die weder Grundbuch noch ÖREB
-        // aufzurufen sind.
+        // Parzellennummer, Adresse, Postleitzahl mit Ort:
         //
-        // Zone und Fläche standen früher hier. Sie beantworten die Frage
-        // "welches Haus ist das" nicht, und die Fläche ändert sich mit
-        // jeder Neuberechnung.
+        //     Parz. 2688 · Lettenmattstrasse 12, 8903 Birmensdorf
+        //
+        // Die Parzelle steht vorn, weil sie das Grundstück eindeutig
+        // benennt und in Grundbuch wie ÖREB-Kataster der Schlüssel ist.
+        // Dann die Adresse -- damit beginnt das Gespräch am Telefon --
+        // und die Postleitzahl, die sie über mehrere Kantone eindeutig
+        // macht.
+        //
+        // Zone und Gebäudefläche standen früher hier. Sie beantworten
+        // die Frage "welches Grundstück ist das" nicht, und die Fläche
+        // ändert sich mit jeder Neuberechnung.
         const ortsteil = [prop.plz, prop.gemeinde || prop.plz_ort]
           .filter(Boolean).join(' ');
-        const parzelle = prop.parzelle || prop.plot_number || '';
-        const leadTitle = [
-          [prop.address || (parzelle ? `Parz. ${parzelle}` : ''), ortsteil]
-            .filter(Boolean).join(', '),
-          prop.address && parzelle ? `Parz. ${parzelle}` : '',
-        ].filter(Boolean).join(' · ') || prop.address;
+        const parzelle = String(prop.parzelle || prop.plot_number || '').trim();
+        const hinten = [prop.address, ortsteil].filter(Boolean).join(', ');
+        const leadTitle = parzelle && prop.address
+          ? `Parz. ${parzelle} · ${hinten}`
+          : parzelle
+            ? [`Parz. ${parzelle}`, ortsteil].filter(Boolean).join(', ')
+            : hinten || prop.address;
 
         // 1. Duplicate check via org
         const existingOrgId = await findExistingOrg(PIPEDRIVE_API_TOKEN, prop.address);
