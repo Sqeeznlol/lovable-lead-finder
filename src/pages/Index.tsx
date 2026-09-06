@@ -23,24 +23,38 @@ import { useMidnightReset } from '@/hooks/use-phones';
 
 type Tab = 'uebersicht' | 'dashboard' | 'master' | 'vorauswahl' | 'akquise' | 'telsuche' | 'properties' | 'import' | 'masterimport' | 'phones' | 'export' | 'admin';
 
-// Master-Import ist bewusst nicht in der Navigation: die Daten stehen, und
-// ein Import gehört zu den Dingen, die man selten und bewusst macht. Der
-// Reiter lässt sich über den Admin-Bereich öffnen.
+// Zehn Reiter waren neun zu viel. Was der neue Ablauf selbst erledigt,
+// braucht keinen eigenen Ort mehr:
+//
+//   Vorauswahl      -- die Zonenregeln archivieren von selbst, was sich
+//                      nicht bebauen lässt
+//   Telefon-Suche   -- läuft nach jeder Abfrage automatisch
+//   Pipedrive Export-- der Deal entsteht beim Abfragen, nicht in einem
+//                      eigenen Schritt
+//   Liegenschaften  -- zeigt dasselbe wie die Master-Liste, nur älter
+//   Kennzahlen      -- die Zahlen, die zählen, stehen oben in der Übersicht
+//
+// Gelöscht ist nichts: die Reiter lassen sich im Admin-Bereich wieder
+// öffnen, ebenso der Master-Import, den man selten und bewusst macht.
 const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'uebersicht', label: 'Übersicht', icon: LayoutDashboard },
-  { id: 'dashboard', label: 'Kennzahlen', icon: LayoutDashboard },
   { id: 'master', label: 'Master-Liste', icon: Database },
-  { id: 'vorauswahl', label: 'Vorauswahl', icon: Eye },
   { id: 'akquise', label: 'Akquise-Modus', icon: Zap },
-  { id: 'telsuche', label: 'Telefon-Suche', icon: Search },
-  { id: 'properties', label: 'Liegenschaften', icon: Building2 },
-  { id: 'export', label: 'Pipedrive Export', icon: FileSpreadsheet },
   { id: 'phones', label: 'Telefone', icon: Phone },
   { id: 'admin', label: 'Admin', icon: Shield },
 ];
 
+/** Die stillgelegten Reiter -- erreichbar, aber nicht mehr im Weg. */
+const stillgelegt: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { id: 'dashboard', label: 'Kennzahlen', icon: LayoutDashboard },
+  { id: 'vorauswahl', label: 'Vorauswahl', icon: Eye },
+  { id: 'telsuche', label: 'Telefon-Suche', icon: Search },
+  { id: 'properties', label: 'Liegenschaften', icon: Building2 },
+  { id: 'export', label: 'Pipedrive Export', icon: FileSpreadsheet },
+];
+
 // Primary tabs visible in the iPhone bottom bar
-const mobileBottomTabs: Tab[] = ['uebersicht', 'master', 'vorauswahl', 'akquise', 'telsuche'];
+const mobileBottomTabs: Tab[] = ['uebersicht', 'master', 'akquise', 'phones'];
 
 export default function Index() {
   const [active, setActive] = useState<Tab>('uebersicht');
@@ -149,6 +163,27 @@ export default function Index() {
             {active === 'admin' && (
               <div className="space-y-6">
                 <AdminSettings />
+                <div className="rounded-2xl border border-dashed p-5">
+                  <p className="text-sm font-medium">Stillgelegte Bereiche</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Was der Ablauf inzwischen selbst erledigt. Nichts davon
+                    ist gelöscht -- ein Klick öffnet es wieder.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {stillgelegt.map(t => (
+                      <Button
+                        key={t.id}
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => setActive(t.id)}
+                      >
+                        <t.icon className="h-4 w-4" /> {t.label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="rounded-2xl border border-dashed p-5">
                   <p className="text-sm font-medium">Master-Import</p>
                   <p className="mt-1 text-sm text-muted-foreground">

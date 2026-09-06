@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ExternalLink, UserSearch, Check, Archive } from 'lucide-react';
+import { ExternalLink, UserSearch, Check, Archive, X } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -116,6 +116,35 @@ export function Eigentuemersuche({ objekte }: { objekte: Chance[] }) {
     qc.invalidateQueries({ queryKey: ['master'] });
   };
 
+  /**
+   * Was sich beim Ansehen als nichts entpuppt.
+   *
+   * Die Bewertung rechnet mit Zahlen aus dem Gebäuderegister und der
+   * Zonenordnung. Manchmal sieht man auf dem Luftbild in zwei Sekunden,
+   * dass daraus nichts wird -- ein Schopf hinter dem Haus, ein Hang,
+   * eine Baustelle. Dafür ein Klick, kein Formular: der Grund ist
+   * festgehalten, damit später zu sehen ist, wo die Rechnung danebenlag.
+   */
+  const verwerfen = async (c: Chance) => {
+    setSpeichert(c.id);
+    const { error } = await supabase
+      .from('properties')
+      .update({
+        preselection_status: ARCHIV_STATUS,
+        preselection_note: 'Von Hand verworfen — nicht rentabel',
+        preselection_decided_at: new Date().toISOString(),
+      })
+      .eq('id', c.id);
+    setSpeichert(null);
+    if (error) {
+      toast({ title: 'Fehler', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: '✓ Verworfen', description: c.address });
+    qc.invalidateQueries({ queryKey: ['uebersicht'] });
+    qc.invalidateQueries({ queryKey: ['master'] });
+  };
+
   return (
     <Card>
       <CardContent className="p-0">
@@ -190,6 +219,16 @@ export function Eigentuemersuche({ objekte }: { objekte: Chance[] }) {
                     {verkauftNie(entwurf[c.id] || '')
                       ? <><Archive className="mr-1 h-3.5 w-3.5" /> Archivieren</>
                       : <><Check className="mr-1 h-3.5 w-3.5" /> Eintragen</>}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-muted-foreground hover:text-destructive"
+                    onClick={() => verwerfen(c)}
+                    disabled={speichert === c.id}
+                    title="Bringt nichts — aus der Liste nehmen"
+                  >
+                    <X className="mr-1 h-3.5 w-3.5" /> Nicht rentabel
                   </Button>
                 </div>
               </li>
