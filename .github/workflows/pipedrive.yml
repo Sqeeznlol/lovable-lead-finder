@@ -46,6 +46,8 @@ on:
           - doppel-schreiben   # dasselbe, aber tatsächlich zusammenführen
           - uebernehmen  # EGRID, Parzelle, Kanton vom Kontakt an den Deal
           - uebernehmen-schreiben  # dasselbe, aber tatsächlich schreiben
+          - felder-weg   # Eigentümer 1/2 und EGID entfernen (Probelauf)
+          - felder-weg-schreiben   # dasselbe, aber tatsächlich löschen
       grenze:
         description: 'Höchstzahl Objekte -- bei "deal" die Deal-Nummer'
         required: false
@@ -112,6 +114,13 @@ jobs:
               ;;
             umziehen-schreiben)
               python3 tools/pipedrive-umziehen.py --schreiben \
+                | tee -a "$GITHUB_STEP_SUMMARY"
+              ;;
+            felder-weg|felder-weg-schreiben)
+              zusatz=""
+              [ "${{ inputs.aufgabe }}" = "felder-weg-schreiben" ] \
+                && zusatz="--schreiben"
+              python3 tools/pipedrive-felder-weg.py $zusatz \
                 | tee -a "$GITHUB_STEP_SUMMARY"
               ;;
             uebernehmen|uebernehmen-schreiben)
