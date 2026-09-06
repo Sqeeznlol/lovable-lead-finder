@@ -45,9 +45,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'OWNER_DATA') {
     chrome.storage.local.get('currentJob', (result) => {
       const job = result.currentJob;
-      if (!job) return;
 
-      // Send data to all app tabs (match both lovable.app and lovableproject.com)
+      // Bisher hoerte es hier auf, wenn kein Auftrag lief: wer die
+      // Karte selbst geoeffnet hatte, klickte auf "Uebernehmen", und
+      // nichts geschah. Der Auszug nennt die EGRID aber selbst -- damit
+      // findet die Anwendung das Objekt auch ohne Auftrag.
+      const kennung = job?.propertyId || null;
+      const egrid = msg.egrid || job?.egrid || null;
+
       chrome.tabs.query({}, (tabs) => {
         for (const tab of tabs) {
           if (tab.url && (
@@ -58,21 +63,24 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           )) {
             chrome.tabs.sendMessage(tab.id, {
               type: 'OWNER_RESULT',
-              propertyId: job.propertyId,
+              propertyId: kennung,
+              egrid,
+              parzelle: msg.parzelle || null,
               owners: msg.owners,
+              roh: msg.roh || null,
               error: msg.error || null
             }).catch(() => {});
           }
         }
       });
 
-      // Close the portal tab
-      if (sender.tab?.id) {
+      // Den Portal-Tab nur schliessen, wenn er fuer einen Auftrag
+      // geoeffnet wurde. Wer selbst dort hingegangen ist, will
+      // weiterarbeiten.
+      if (job && sender.tab?.id) {
         chrome.tabs.remove(sender.tab.id).catch(() => {});
+        chrome.storage.local.remove('currentJob');
       }
-
-      // Clear job
-      chrome.storage.local.remove('currentJob');
     });
   }
 

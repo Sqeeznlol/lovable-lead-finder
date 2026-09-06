@@ -30,7 +30,10 @@
       window.dispatchEvent(new CustomEvent('akquise-owner-data', {
         detail: {
           propertyId: msg.propertyId,
+          egrid: msg.egrid || null,
+          parzelle: msg.parzelle || null,
           owners: msg.owners,
+          roh: msg.roh || null,
           error: msg.error || null
         }
       }));

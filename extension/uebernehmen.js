@@ -104,10 +104,16 @@
         text.style.color = '#ffb4b4';
         return;
       }
-      // Der Wortlaut geht mit: an ihm lässt sich später prüfen, ob
-      // richtig gelesen wurde, ohne dass jemand nachklicken muss.
-      chrome.runtime.sendMessage({ type: 'OWNER_DATA', owners, roh });
-      text.textContent = `${owners.length} Eigentümer übernommen — zurück zur Liste.`;
+      // EGRID und Parzellennummer stehen im Auszug selbst. Sie gehen
+      // mit, damit die Anwendung das Objekt findet -- auch wenn niemand
+      // vorher auf "Abfragen" geklickt hat.
+      const egrid = (roh.match(/\bCH\d{12}\b/) || [])[0] || null;
+      const parzelle = (roh.match(/Liegenschaft\s+Nr\.\s*(\S+)/i) || [])[1]
+        || (roh.match(/Grundst(?:ü|ue)ck\D{0,12}(\d+)/i) || [])[1] || null;
+      chrome.runtime.sendMessage({ type: 'OWNER_DATA', owners, roh, egrid, parzelle });
+      text.textContent = `${owners.length} Eigentümer übernommen`
+        + (egrid ? ` · ${egrid}` : '')
+        + ' — wird auf wohntraums.life eingetragen.';
       text.style.color = '#b7f7c0';
     });
 

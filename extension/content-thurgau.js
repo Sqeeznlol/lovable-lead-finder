@@ -209,10 +209,15 @@
       return;   // der Balken bleibt -- ein Klick übernimmt von Hand
     }
 
+    const text = auszug().innerText || '';
     chrome.runtime.sendMessage({
       type: 'OWNER_DATA',
       owners,
-      roh: (auszug().innerText || ''),
+      roh: text,
+      // Der Auszug nennt beides selbst -- damit findet die Anwendung
+      // das Objekt, ohne dass jemand es ihr sagen muss.
+      egrid: gefunden || auftrag.egrid || null,
+      parzelle: (text.match(/Liegenschaft\s+Nr\.\s*(\S+)/i) || [])[1] || null,
     });
     log(owners);
   }

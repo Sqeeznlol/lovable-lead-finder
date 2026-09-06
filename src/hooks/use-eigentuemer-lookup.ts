@@ -134,11 +134,35 @@ export function useEigentuemerLookupListener() {
   useEffect(() => {
     const handler = async (e: Event) => {
       const detail = (e as CustomEvent).detail || {};
-      const { propertyId, owners, error } = detail as {
+      const { owners, error, egrid } = detail as {
         propertyId?: string;
+        egrid?: string | null;
         owners?: Array<{ name?: string; address?: string; plz?: string; ort?: string }>;
         error?: string | null;
       };
+
+      // Wer die Karte selbst geöffnet hat, hat nie auf "Abfragen"
+      // geklickt -- dann gibt es keine Kennung. Der Auszug nennt die
+      // EGRID aber selbst, und die ist schweizweit eindeutig: damit
+      // findet sich das Objekt auch so.
+      let propertyId = detail.propertyId as string | undefined;
+      if (!propertyId && egrid) {
+        const { data: gefunden } = await supabase
+          .from('properties')
+          .select('id')
+          .eq('egrid', egrid)
+          .maybeSingle();
+        propertyId = gefunden?.id;
+        if (!propertyId) {
+          toast({
+            title: 'Objekt nicht gefunden',
+            description: `Zu ${egrid} steht nichts im Bestand — der Auszug `
+              + 'gehört zu einem Grundstück, das wir nicht führen.',
+            variant: 'destructive',
+          });
+          return;
+        }
+      }
       if (!propertyId) return;
 
       if (error || !owners || owners.length === 0) {
