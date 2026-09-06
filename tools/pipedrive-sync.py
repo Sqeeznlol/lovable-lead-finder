@@ -131,8 +131,23 @@ def deal_felder(p: dict, schluessel: dict[str, str]) -> dict:
 
 # ------------------------------------------------------------ Übertragung
 def titel(p: dict) -> str:
-    ort = ' '.join(x for x in (p.get('plz'), p.get('gemeinde')) if x)
-    return f"{p.get('address') or 'Ohne Adresse'} · {ort}".strip(' ·')
+    """Wie ein Deal heisst: Adresse, Ort, Parzelle.
+
+    Am Telefon beginnt das Gespräch mit der Adresse; die Postleitzahl
+    macht sie über mehrere Kantone eindeutig; und ohne Parzellennummer
+    lässt sich weder das Grundbuch noch der ÖREB-Kataster aufrufen.
+
+    Nicht im Titel: der Eigentümername (er steht im Kontakt, und ein
+    Eigentümer kann mehrere Parzellen haben) und die Marge (sie ändert
+    sich mit jeder Neuberechnung).
+    """
+    ort = ' '.join(str(x) for x in (p.get('plz'), p.get('gemeinde')) if x)
+    nr = p.get('parzelle') or p.get('plot_number')
+    adresse = p.get('address') or (f'Parz. {nr}' if nr else 'Ohne Adresse')
+    kopf = ', '.join(x for x in (adresse, ort) if x)
+    if nr and p.get('address'):
+        return f'{kopf} · Parz. {nr}'
+    return kopf
 
 
 def uebertragen(p: dict, token: str, schluessel: dict[str, str],
