@@ -43,6 +43,25 @@ PIPEDRIVE = 'https://api.pipedrive.com/v1'
 
 EGRID = re.compile(r'\bCH\d{12}\b')
 
+# "Parz. 2688 · Lettenmattstrasse 12, 8903 Birmensdorf" -- Nummer und
+# Postleitzahl. Die Parzellennummer allein genuegt nicht: sie ist nur
+# innerhalb einer Gemeinde eindeutig, schweizweit gibt es Tausende
+# Parzellen 12. Erst mit der Postleitzahl wird daraus ein Schluessel.
+# Gebildet wird der Schluessel nur aus einem Titel in der vereinbarten
+# Form. Sonst greift er auch bei "Parz. 1, Grundstueck: Liegenschaft
+# Nr. 1344" -- und liest die Grundstuecksnummer als Postleitzahl.
+PARZELLE = re.compile(
+    r'^Parz\. ([A-Za-zÄÖÜ]{0,3}\d+[a-zA-Z]?(?:[./-]\d+)?) · '
+    r'\S.*, (\d{4}) \S')
+
+# Welchen Typ ein Feld braucht, wenn es in Pipedrive noch fehlt.
+FELDTYPEN = {
+    'Parzelle': 'varchar', 'EGRID': 'varchar', 'Gemeinde': 'varchar',
+    'Kanton': 'varchar', 'Zone': 'varchar', 'Geschosse': 'double',
+    'Baujahr': 'double', 'HNF m²': 'double', 'Grundstück m²': 'double',
+    'ÖREB Kataster': 'varchar',
+}
+
 # Spalte in der Datenbank -> Feldname in Pipedrive
 ZUORDNUNG = {
     'parzelle':    'Parzelle',
@@ -99,6 +118,12 @@ def alle(pfad: str, token: str, **params) -> list:
             break
         start = weiter.get('next_start', start + 500)
     return raus
+
+
+def parzellenschluessel(text: str) -> str | None:
+    """Parzellennummer und Postleitzahl als ein Schlüssel."""
+    t = PARZELLE.match((text or '').strip())
+    return f'{t.group(1).upper()}@{t.group(2)}' if t else None
 
 
 def texte(satz: dict) -> str:
@@ -188,8 +213,19 @@ def main() -> None:
 
     # Welche EGRID gehört zu welchem Deal? Sie steht mal im eigenen
     # Feld, mal nur im Fliesstext eines Kontakts.
+    # Die Objekte auch über Parzelle und Postleitzahl auffindbar machen:
+    # der Eigentümername steht nur in Pipedrive, die EGRID nur bei
+    # einem Teil der Deals -- Parzelle und Ort stehen dafür im Titel.
+    ueber_parzelle: dict[str, str] = {}
+    for e, o in objekte.items():
+        nr = (o.get('parzelle') or '').strip().upper()
+        plz = (o.get('plz') or '').strip()
+        if nr and plz:
+            ueber_parzelle.setdefault(f'{nr}@{plz}', e)
+
     zu_deal: dict[str, dict] = {}
     ohne = []
+    ueber_nr = 0
     for d in deals:
         text = texte(d)
         for quelle, kasten in ((d.get('person_id'), personen),
@@ -200,6 +236,12 @@ def main() -> None:
         treffer = EGRID.search(text)
         if treffer:
             zu_deal.setdefault(treffer.group(0), d)
+            continue
+        schluessel = parzellenschluessel(d.get('title') or '')
+        e = ueber_parzelle.get(schluessel or '')
+        if e:
+            zu_deal.setdefault(e, d)
+            ueber_nr += 1
         else:
             ohne.append(d)
 
@@ -221,7 +263,8 @@ def main() -> None:
     print(f'- {len(beidseitig)} beidseitig bekannt')
     print(f'- {len(fehlend)} Objekte ohne Deal')
     print(f'- {len(verwaist)} Deals mit EGRID, die die Datenbank nicht kennt')
-    print(f'- {len(ohne)} Deals ganz ohne EGRID -- unberührt')
+    print(f'- davon {ueber_nr} über Parzelle und Postleitzahl gefunden')
+    print(f'- {len(ohne)} Deals ohne Zuordnung -- unberührt')
     print()
 
     # Ein Deal ohne Eigentümer ist eine leere Karteikarte: man kann ihn
@@ -258,6 +301,26 @@ def main() -> None:
     schluessel = {f['name']: f['key']
                   for f in (get('/dealFields', token).get('data') or [])
                   if f.get('name')}
+
+    # Ein Feld, das es nicht gibt, kann nichts aufnehmen. Fehlt eines,
+    # wird es angelegt statt uebersprungen -- sonst faellt die Angabe
+    # stillschweigend unter den Tisch.
+    fehlende_felder = [n for n in FELDTYPEN if n not in schluessel]
+    if fehlende_felder:
+        print(f'## Fehlende Felder: {", ".join(fehlende_felder)}')
+        print()
+        for name in fehlende_felder:
+            if not args.schreiben:
+                continue
+            a = sende('/dealFields', token,
+                      {'name': name, 'field_type': FELDTYPEN[name]}, 'POST')
+            neu = (a.get('data') or {}).get('key')
+            if neu:
+                schluessel[name] = neu
+                print(f'- `{name}` angelegt')
+            else:
+                print(f'- `{name}` liess sich nicht anlegen ({a.get("code")})')
+        print()
 
     # ---------------------------------------------------- ergänzen
     ergaenzt = 0
