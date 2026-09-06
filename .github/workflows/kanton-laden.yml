@@ -43,6 +43,7 @@ on:
           - alles        # Zonen und Parzellen laden, verschneiden, ausgeben
           - verschneiden # Fertige Dateien aus einem früheren Lauf verschneiden
           - modell       # Warum das Vermessungsmodell nicht greift
+          - formate      # Welche Dateiformate geodienste anbietet
 
 jobs:
   laden:
@@ -414,3 +415,40 @@ jobs:
               echo
             done
           done
+
+      # ---------------------------------------------------------------
+      # Gibt es die Vermessung auch fertig?
+      # ---------------------------------------------------------------
+      # INTERLIS 1 bringt die Attributnamen nur mit passendem Modell,
+      # und beide amtlichen Modelle greifen hier nicht: die Felder
+      # heissen Field01..Field09, die Umrisse liegen als lose Linien in
+      # einer eigenen Ebene. Das liesse sich mit genug Aufwand von Hand
+      # zusammensetzen -- aber nur, wenn es keinen fertigen Weg gibt.
+      #
+      # geodienste.ch liefert manche Themen zusätzlich als GeoPackage
+      # oder Shapefile. Dort sind Namen und Flächen bereits gebildet.
+      # Dieser Schritt sieht nach, was es gibt, statt es zu vermuten.
+      - name: Formate prüfen
+        if: ${{ inputs.schritt == 'formate' }}
+        env:
+          KANTON: ${{ inputs.kanton }}
+        run: |
+          set -uo pipefail
+          basis=https://geodienste.ch/downloads
+          for ordner in gpkg shp shape dxf interlis; do
+            for datei in \
+              "av/$KANTON/av_${KANTON}_lv95.zip" \
+              "av/$KANTON/av_${KANTON}_lv95.gpkg" \
+              "av/av_${KANTON}_lv95.zip"; do
+              url="$basis/$ordner/$datei"
+              code=$(curl -sS -o /dev/null -w '%{http_code} %{size_download}' \
+                     -r 0-0 "$url" 2>/dev/null || echo "---")
+              echo "$code  $url"
+            done
+          done
+
+          echo
+          echo "### Was der Dienst selbst über die Formate sagt"
+          curl -sS "https://geodienste.ch/services/av" \
+            -H 'Accept: application/json' 2>/dev/null | head -c 2000
+          echo
