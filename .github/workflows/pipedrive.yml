@@ -35,6 +35,8 @@ on:
           - ordnen-schreiben  # Titel setzen, Adressfeld entfernen
           - umziehen     # Neue Pipelines und Zuordnung zeigen
           - umziehen-schreiben  # Pipelines anlegen und Deals einordnen
+          - kontakte     # Namen, Adresse und Kartenlink prüfen (Probelauf)
+          - kontakte-schreiben  # dasselbe, aber tatsächlich schreiben
       grenze:
         description: 'Höchstzahl Objekte beim Abgleich'
         required: false
@@ -100,6 +102,14 @@ jobs:
               ;;
             umziehen-schreiben)
               python3 tools/pipedrive-umziehen.py --schreiben \
+                | tee -a "$GITHUB_STEP_SUMMARY"
+              ;;
+            kontakte)
+              python3 tools/pipedrive-personen.py \
+                | tee -a "$GITHUB_STEP_SUMMARY"
+              ;;
+            kontakte-schreiben)
+              python3 tools/pipedrive-personen.py --schreiben \
                 | tee -a "$GITHUB_STEP_SUMMARY"
               ;;
             ordnen)
