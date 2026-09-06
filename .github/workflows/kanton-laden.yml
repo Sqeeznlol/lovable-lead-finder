@@ -203,14 +203,18 @@ jobs:
           typebene=$(ogrinfo -so "$xtf,/tmp/Nutzungsplanung_V1_2.ili" 2>/dev/null \
             | grep -o '[A-Za-z_0-9.]*Typ_Grundnutzung' | head -1)
           echo "Typenebene: ${typebene:-nicht gefunden}"
+          # In eine eigene Datei: an die Zonendatei angehängt versucht
+          # GDAL, die Spalten der bestehenden Ebene zu erweitern, und
+          # verwirft sie dann.
           if [ -n "$typebene" ]; then
-            ogr2ogr -f GPKG /tmp/zonen.gpkg -append \
+            rm -f /tmp/zonentyp.gpkg
+            ogr2ogr -f GPKG /tmp/zonentyp.gpkg \
               "$xtf,/tmp/Nutzungsplanung_V1_2.ili" \
               -nln zonentyp "$typebene"
             echo "Spalten der Typenebene:"
-            ogrinfo -so /tmp/zonen.gpkg zonentyp 2>/dev/null \
+            ogrinfo -so /tmp/zonentyp.gpkg zonentyp 2>/dev/null \
               | sed -n '/^Feature Count/p;/^[A-Za-z_0-9]*: /p'
-            ogr2ogr -f CSV /vsistdout/ /tmp/zonen.gpkg zonentyp \
+            ogr2ogr -f CSV /vsistdout/ /tmp/zonentyp.gpkg zonentyp \
               -limit 3 -lco GEOMETRY=NO 2>/dev/null || true
           fi
 
@@ -293,7 +297,7 @@ jobs:
           ogr2ogr -f GPKG /tmp/arbeit.gpkg -append -nln zonen \
             /tmp/zonen.gpkg zonen
           ogr2ogr -f GPKG /tmp/arbeit.gpkg -append -nln zonentyp \
-            /tmp/zonen.gpkg zonentyp
+            /tmp/zonentyp.gpkg zonentyp
 
           # Ohne räumlichen Index vergleicht die Datenbank jede der
           # 140'000 Parzellen mit jeder der 57'000 Zonen -- acht
