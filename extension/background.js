@@ -9,6 +9,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       currentJob: {
         egrid: msg.egrid,
         bfsNr: msg.bfsNr,
+        kanton: msg.kanton || 'ZH',
         phoneNumber: phoneNumber,
         propertyId: msg.propertyId,
         appOrigin: msg.appOrigin,
@@ -16,8 +17,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
     });
 
-    // Go DIRECTLY to the portal
-    const portalUrl = `https://portal.objektwesen.zh.ch/aks/detail?egrid=${encodeURIComponent(msg.egrid)}&bfsNr=${encodeURIComponent(msg.bfsNr || '')}`;
+    // Jeder Kanton fuehrt sein eigenes Portal. Zuerich hat eine
+    // eigene Auskunft, der Thurgau haengt sie an den Kartendienst:
+    // Parzelle suchen, SMS-Code, dann oeffnet sich das Fenster mit den
+    // Eigentuemern. Der Ablauf drumherum ist derselbe.
+    const kanton = String(msg.kanton || 'ZH').trim().toUpperCase();
+    const portalUrl = kanton === 'TG'
+      ? 'https://map.geo.tg.ch/apps/mf-geoadmin3/?lang=de&topic=grundbuchvermessung'
+        + '&bgLayer=basemap_farbig&zoom=8&layers=grundbuch,av_komplett'
+        + `&swisssearch=${encodeURIComponent(msg.egrid || '')}`
+      : `https://portal.objektwesen.zh.ch/aks/detail?egrid=${encodeURIComponent(msg.egrid)}&bfsNr=${encodeURIComponent(msg.bfsNr || '')}`;
     chrome.tabs.create({ url: portalUrl });
     sendResponse({ ok: true });
     return true;
@@ -42,6 +51,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       chrome.tabs.query({}, (tabs) => {
         for (const tab of tabs) {
           if (tab.url && (
+            tab.url.includes('wohntraums.life') ||
             tab.url.includes('lovable.app') ||
             tab.url.includes('lovableproject.com') ||
             tab.url.includes('localhost')

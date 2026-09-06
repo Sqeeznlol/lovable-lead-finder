@@ -1,11 +1,17 @@
 {
   "manifest_version": 3,
   "name": "Akquise GIS Automation",
-  "version": "1.3.0",
-  "description": "Automatisiert die Eigentumsauskunft über das kantonale Portal",
-  "permissions": ["activeTab", "storage", "tabs", "scripting"],
+  "version": "1.4.0",
+  "description": "Automatisiert die Eigentumsauskunft über die kantonalen Portale (ZH, TG)",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "tabs",
+    "scripting"
+  ],
   "host_permissions": [
-    "https://portal.objektwesen.zh.ch/*"
+    "https://portal.objektwesen.zh.ch/*",
+    "https://map.geo.tg.ch/*"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -16,18 +22,45 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://portal.objektwesen.zh.ch/*"],
-      "js": ["content-portal.js"],
+      "matches": [
+        "https://portal.objektwesen.zh.ch/*"
+      ],
+      "js": [
+        "content-portal.js"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://*.lovable.app/*", "https://*.lovableproject.com/*", "http://localhost:*/*"],
-      "js": ["content-app.js"],
+      "matches": [
+        "https://map.geo.tg.ch/*"
+      ],
+      "js": [
+        "content-thurgau.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://wohntraums.life/*",
+        "https://www.wohntraums.life/*",
+        "https://*.lovable.app/*",
+        "https://*.lovableproject.com/*",
+        "http://localhost:*/*"
+      ],
+      "js": [
+        "content-app.js"
+      ],
       "run_at": "document_idle"
     }
   ],
   "externally_connectable": {
-    "matches": ["https://*.lovable.app/*", "https://*.lovableproject.com/*", "http://localhost:*/*"]
+    "matches": [
+      "https://wohntraums.life/*",
+      "https://www.wohntraums.life/*",
+      "https://*.lovable.app/*",
+      "https://*.lovableproject.com/*",
+      "http://localhost:*/*"
+    ]
   },
   "icons": {
     "48": "icon.png",

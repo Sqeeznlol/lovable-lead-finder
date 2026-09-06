@@ -15,6 +15,7 @@
       egrid: detail.egrid,
       bfsNr: detail.bfsNr,
       parzelle: detail.parzelle,
+      kanton: detail.kanton,
       phoneNumber: detail.phoneNumber,
       propertyId: detail.propertyId,
       appOrigin: detail.appOrigin,
