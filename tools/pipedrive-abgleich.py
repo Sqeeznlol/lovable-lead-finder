@@ -150,6 +150,12 @@ def felder(p: dict, schluessel: dict, vorhanden: dict | None = None) -> dict:
             continue
         if vorhanden is not None and str(vorhanden.get(k) or '').strip():
             continue
+        # Eine Null ist keine Angabe. "HNF m² 0" liest sich am Telefon
+        # wie "kein Potenzial", gemeint ist aber "noch nicht gerechnet"
+        # -- das Feld bleibt lieber leer, bis eine Zahl dasteht.
+        if wert in ('0', '0.0') and spalte in ('hnf_delta', 'bebaubar_m2',
+                                               'geschosse', 'baujahr'):
+            continue
         raus[k] = wert
     k = schluessel.get('ÖREB Kataster')
     link = oereb(p)
