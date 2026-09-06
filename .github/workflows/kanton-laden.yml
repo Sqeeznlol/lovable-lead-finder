@@ -46,6 +46,8 @@ on:
           - formate      # Welche Dateiformate geodienste anbietet
           - ili2gpkg     # Umwandlung mit dem amtlichen INTERLIS-Werkzeug
           - zonentypen   # Nur die Zonennamen aus der Datei lesen
+          - einspielen   # Verschnitt in die Datenbank (Probelauf)
+          - einspielen-schreiben   # dasselbe, aber tatsächlich schreiben
 
 jobs:
   laden:
@@ -593,3 +595,127 @@ jobs:
           echo
           echo "### Ergebnis"
           head -10 /tmp/zonentypen.csv
+
+      # =============================================================
+      # In die Datenbank
+      # =============================================================
+      # Bis hierher liegt das Ergebnis als Datei am Lauf. Nützlich wird
+      # es erst in der Datenbank hinter wohntraums.life -- dort suchen
+      # die Masterliste und der Pipedrive-Abgleich.
+      #
+      # Je Parzelle gibt es mehrere Zeilen, eine je Zone. Übernommen
+      # wird die grösste: sie bestimmt, was auf dem Grundstück gebaut
+      # werden darf. Die übrigen Anteile stehen im Text daneben, damit
+      # niemand später rätselt, warum die Fläche nicht aufgeht.
+      #
+      # Adressen liefert die Vermessung nicht mit. "address" ist aber
+      # ein Pflichtfeld, deshalb steht dort vorerst die Parzelle --
+      # ehrlicher als eine erfundene Strasse, und beim Nachliefern der
+      # Gebäudedaten leicht zu erkennen.
+      - name: Verschnitt holen
+        if: ${{ startsWith(inputs.schritt, 'einspielen') }}
+        uses: actions/download-artifact@v4
+        with:
+          pattern: 'verschnitten-${{ inputs.kanton }}'
+          merge-multiple: true
+          path: /tmp
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.quelllauf }}
+          repository: ${{ github.repository }}
+
+      - name: Einspielen
+        if: ${{ startsWith(inputs.schritt, 'einspielen') }}
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+          KANTON: ${{ inputs.kanton }}
+        run: |
+          set -euo pipefail
+          [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
+          sudo apt-get install -y -qq postgresql-client
+
+          ls -lh /tmp/verschnitten.csv
+          echo "Zeilen: $(( $(wc -l < /tmp/verschnitten.csv) - 1 ))"
+          head -3 /tmp/verschnitten.csv
+
+          # Erst in eine eigene Tabelle laden. Was dort steht, lässt
+          # sich zählen und ansehen, bevor es die 259'000 bestehenden
+          # Zeilen berührt.
+          psql "$DB" -v ON_ERROR_STOP=1 -X -q -c "
+            drop table if exists public.verschnitt_tg;
+            create table public.verschnitt_tg (
+              egrid text, parzelle text, vermessungskreis text, art text,
+              flaeche_m2 numeric, zone_typ text,
+              zone_name text, zone_kurz text,
+              zone_m2 numeric, anteil_prozent numeric);"
+
+          # Die Kopfzeile entscheidet, welche Spalten es gibt: ohne
+          # Zonennamen fehlen zwei davon.
+          kopf=$(head -1 /tmp/verschnitten.csv)
+          echo "Spalten: $kopf"
+          psql "$DB" -v ON_ERROR_STOP=1 -X -q \
+            -c "\\copy public.verschnitt_tg ($kopf) from '/tmp/verschnitten.csv' with (format csv, header true)"
+
+          echo "### Was geladen wurde"
+          psql "$DB" -X -q -c "
+            select count(*) as zeilen,
+                   count(distinct egrid) as parzellen,
+                   count(*) filter (where zone_name is not null) as mit_zonenname
+            from public.verschnitt_tg;"
+
+          echo "### Die zehn häufigsten Zonen"
+          psql "$DB" -X -q -c "
+            select coalesce(zone_name, zone_typ) as zone, count(*)
+            from public.verschnitt_tg group by 1 order by 2 desc limit 10;"
+
+          if [ "${{ inputs.schritt }}" != "einspielen-schreiben" ]; then
+            echo "### Was geschrieben würde"
+            psql "$DB" -X -q -c "
+              with haupt as (
+                select distinct on (egrid) *
+                from public.verschnitt_tg
+                where egrid is not null and egrid <> ''
+                order by egrid, zone_m2 desc nulls last)
+              select count(*) as neue_objekte,
+                     count(*) filter (
+                       where egrid in (select egrid from public.properties
+                                       where egrid is not null))
+                       as davon_schon_vorhanden
+              from haupt;"
+            echo ""
+            echo "**Probelauf** -- die Tabelle properties wurde nicht berührt."
+            exit 0
+          fi
+
+          echo "### Schreiben"
+          psql "$DB" -v ON_ERROR_STOP=1 -X -q -c "
+            with haupt as (
+              select distinct on (egrid) *
+              from public.verschnitt_tg
+              where egrid is not null and egrid <> ''
+              order by egrid, zone_m2 desc nulls last)
+            insert into public.properties
+              (address, egrid, plot_number, parzelle, bfs_nr, kanton,
+               area, zone, notes)
+            select
+              'Parzelle ' || coalesce(h.parzelle, '?'),
+              h.egrid, h.parzelle, h.parzelle,
+              nullif(regexp_replace(coalesce(h.vermessungskreis,''),
+                                    '\\D', '', 'g'), ''),
+              '$KANTON',
+              h.flaeche_m2,
+              coalesce(nullif(h.zone_name, ''), h.zone_typ),
+              'Zonenanteil ' || coalesce(h.zone_m2::text,'?') || ' m2 ('
+                || coalesce(h.anteil_prozent::text,'?') || '%)'
+            from haupt h
+            on conflict (egrid) where egrid is not null do update set
+              parzelle    = coalesce(public.properties.parzelle, excluded.parzelle),
+              plot_number = coalesce(public.properties.plot_number, excluded.plot_number),
+              bfs_nr      = coalesce(public.properties.bfs_nr, excluded.bfs_nr),
+              kanton      = coalesce(public.properties.kanton, excluded.kanton),
+              area        = coalesce(public.properties.area, excluded.area),
+              zone        = coalesce(public.properties.zone, excluded.zone);"
+
+          echo "### Ergebnis"
+          psql "$DB" -X -q -c "
+            select kanton, count(*) from public.properties
+            group by 1 order by 2 desc;"
