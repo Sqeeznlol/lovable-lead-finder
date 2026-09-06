@@ -208,6 +208,38 @@ export function useUnqueriedProperties(limit: number, listId?: string | null, is
   });
 }
 
+/**
+ * Die Objekte, bei denen nur noch die Nummer fehlt.
+ *
+ * Sie müssen eigens geholt werden. Die Warteschlange des Akquise-Modus
+ * nimmt die zweihundert grössten Gebäude und filtert erst danach --
+ * ein Objekt, dessen Eigentümer gestern eingetragen wurde, steht in
+ * dieser Rangfolge irgendwo bei fünftausend und kam nie mit. Es war
+ * also nicht "nicht im Modus", es war nie geladen.
+ *
+ * Hier zählt nicht die Grösse, sondern der Zustand: Eigentümer
+ * bekannt, Nummer offen. Das sind wenige, und sie gehören nach vorn.
+ */
+export function useOffeneNummern(limit = 200) {
+  return useQuery({
+    queryKey: ['properties', 'offene-nummern', limit],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('properties')
+        .select('*')
+        .eq('is_queried', false)
+        .not('owner_name', 'is', null)
+        .neq('owner_name', '')
+        .is('owner_phone', null)
+        .order('marge_chf', { ascending: false, nullsFirst: false })
+        .limit(limit);
+      if (error) throw error;
+      return data as Property[];
+    },
+    staleTime: 15 * 1000,
+  });
+}
+
 export function usePreselectedProperties(limit: number, listId?: string | null) {
   return useQuery({
     queryKey: ['properties', 'preselected', limit, listId],

@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { usePreselectedProperties, useUpdateProperty, useZones } from '@/hooks/use-properties';
+import { useOffeneNummern, usePreselectedProperties, useUpdateProperty, useZones } from '@/hooks/use-properties';
 import { useListFilter, useLists } from '@/hooks/use-lists';
 import { ListSelector } from '@/components/ListSelector';
 import { usePhoneNumbers, useIncrementPhoneQuery } from '@/hooks/use-phones';
@@ -44,6 +44,12 @@ export function AkquiseMode() {
   const { data: lists } = useLists();
 
   const { data: queue, refetch } = usePreselectedProperties(100, selectedListId);
+  // Die Warteschlange holt nur, was den Status "Vorausgewählt" trägt.
+  // Ein Objekt mit eingetragenem Eigentümer heisst aber "Eigentümer
+  // ermittelt" -- es konnte hier nie erscheinen, gleich wie gefiltert
+  // wurde. Genau diese gehören aber hierher: hier wird die Nummer
+  // gesucht.
+  const { data: offeneNummern } = useOffeneNummern(200);
   const updateProp = useUpdateProperty();
   const incrementPhone = useIncrementPhoneQuery();
   const { toast } = useToast();
@@ -115,11 +121,19 @@ export function AkquiseMode() {
 
   // Sort queue by deal score, apply zone filter
   const baujahrMax = baujahrBis ? parseInt(baujahrBis, 10) : null;
-  const items = (queue || [])
+  const zusammen = [
+    ...(offeneNummern || []),
+    ...(queue || []).filter(
+      p => !(offeneNummern || []).some(o => o.id === p.id)),
+  ];
+  const items = zusammen
     // Die Regel steht in src/lib/akquise-liste.ts und ist geprüft.
     .filter(gehoertInDenAkquiseModus)
-    .filter(p => zoneFilter === 'Alle' || p.zone === zoneFilter)
-    .filter(p => !baujahrMax || !p.baujahr || p.baujahr <= baujahrMax)
+    // Zone und Baujahr sind Vorauswahl-Filter. Auf ein Objekt, dessen
+    // Eigentümer schon dasteht, gehören sie nicht angewendet: die
+    // Entscheidung ist dort längst gefallen, es fehlt nur die Nummer.
+    .filter(p => nurNummerFehlt(p) || zoneFilter === 'Alle' || p.zone === zoneFilter)
+    .filter(p => nurNummerFehlt(p) || !baujahrMax || !p.baujahr || p.baujahr <= baujahrMax)
     .map(p => ({ ...p, _score: calculateDealScore(p) }))
     // Vorn steht, wo nur noch die Nummer fehlt: dort ist der nächste
     // Schritt klein und klar.
