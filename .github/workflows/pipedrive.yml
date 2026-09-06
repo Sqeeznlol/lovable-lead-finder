@@ -48,6 +48,8 @@ on:
           - uebernehmen-schreiben  # dasselbe, aber tatsächlich schreiben
           - felder-weg   # Eigentümer 1/2 und EGID entfernen (Probelauf)
           - felder-weg-schreiben   # dasselbe, aber tatsächlich löschen
+          - aus-text     # Namen aus Textfeldern zu Kontakten machen
+          - aus-text-schreiben     # dasselbe, aber tatsächlich schreiben
       grenze:
         description: 'Höchstzahl Objekte -- bei "deal" die Deal-Nummer'
         required: false
@@ -114,6 +116,13 @@ jobs:
               ;;
             umziehen-schreiben)
               python3 tools/pipedrive-umziehen.py --schreiben \
+                | tee -a "$GITHUB_STEP_SUMMARY"
+              ;;
+            aus-text|aus-text-schreiben)
+              zusatz=""
+              [ "${{ inputs.aufgabe }}" = "aus-text-schreiben" ] \
+                && zusatz="--schreiben"
+              python3 tools/pipedrive-kontakte-aus-text.py $zusatz \
                 | tee -a "$GITHUB_STEP_SUMMARY"
               ;;
             felder-weg|felder-weg-schreiben)
