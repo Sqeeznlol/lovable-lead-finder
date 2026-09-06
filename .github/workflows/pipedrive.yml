@@ -33,6 +33,7 @@ on:
           - nachfuellen-schreiben  # dasselbe, aber tatsächlich schreiben
           - ordnen       # Titel und Adressfeld prüfen (Probelauf)
           - ordnen-schreiben  # Titel setzen, Adressfeld entfernen
+          - automationen # Nachsehen, was die Schnittstelle bei Regeln hergibt
           - pipelines    # Pipeline "Search" anlegen und Kennungen zeigen
           - pipelines-schreiben  # dasselbe, aber tatsaechlich anlegen
           - umziehen     # Neue Pipelines und Zuordnung zeigen
@@ -121,6 +122,10 @@ jobs:
               ;;
             nachfuellen-schreiben)
               python3 tools/pipedrive-nachfuellen.py --schreiben \
+                | tee -a "$GITHUB_STEP_SUMMARY"
+              ;;
+            automationen)
+              python3 tools/pipedrive-automationen.py \
                 | tee -a "$GITHUB_STEP_SUMMARY"
               ;;
             pipelines)
