@@ -38,6 +38,8 @@ on:
           - kontakte     # Namen, Adresse und Kartenlink prüfen (Probelauf)
           - kontakte-schreiben  # dasselbe, aber tatsächlich schreiben
           - deal         # Einen einzelnen Deal ansehen (Nummer in 'grenze')
+          - titel        # Titel aus der Datenbank bilden (Probelauf)
+          - titel-schreiben    # dasselbe, aber tatsächlich schreiben
       grenze:
         description: 'Höchstzahl Objekte -- bei "deal" die Deal-Nummer'
         required: false
@@ -56,6 +58,7 @@ jobs:
           C: ${{ secrets.PIPEDRIVE_TOKEN }}
           D: ${{ secrets.PIPEDRIVETOKEN }}
           E: ${{ secrets.PIPEDRIVE }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           set -euo pipefail
           # Die erste nicht leere Schreibweise gewinnt.
@@ -104,6 +107,24 @@ jobs:
             umziehen-schreiben)
               python3 tools/pipedrive-umziehen.py --schreiben \
                 | tee -a "$GITHUB_STEP_SUMMARY"
+              ;;
+            titel|titel-schreiben)
+              # Der Titel muss aus der Datenbank kommen, nicht aus dem
+              # alten Titel: dort steht oft die Wohnadresse des
+              # Eigentümers statt der Liegenschaft.
+              sudo apt-get install -y -qq postgresql-client
+              psql "$SUPABASE_DB_URL" -X -q --csv -c "
+                select egrid,
+                       coalesce(address,'')  as address,
+                       coalesce(plz,'')      as plz,
+                       coalesce(gemeinde,'') as gemeinde,
+                       coalesce(parzelle, plot_number, '') as parzelle
+                from properties where egrid is not null" > /tmp/objekte.csv
+              wc -l /tmp/objekte.csv
+              zusatz=""
+              [ "${{ inputs.aufgabe }}" = "titel-schreiben" ] && zusatz="--schreiben"
+              python3 tools/pipedrive-titel.py --objekte /tmp/objekte.csv \
+                $zusatz | tee -a "$GITHUB_STEP_SUMMARY"
               ;;
             deal)
               python3 tools/pipedrive-deal.py "${{ inputs.grenze }}" \
