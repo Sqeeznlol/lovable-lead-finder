@@ -258,3 +258,37 @@ niemand mehr von Hand nachklicken muss.
 
 Für Zug, Aargau und Luzern gilt dasselbe, sobald sie dazukommen: erst
 das Portal des Kantons suchen, dann den Link bauen.
+
+## Wie gepusht und ausgeliefert wird
+
+Am 6. September lagen fünfzehn Änderungen auf `main` und eine einzige
+davon stand auf der Seite. Auffallen konnte das nur, weil jemand
+zufällig klickte. Der Ablauf ist deshalb umgestellt:
+
+  1. **Gearbeitet wird auf `main`**, in einem Commit je Sache. Ein
+     Branch lohnt sich nur, wenn jemand mitlesen soll; jeder zusätzliche
+     Push kostet bei Vercel ein Kontingent, und davon gibt es hundert
+     am Tag.
+
+  2. **Jeder Bau schreibt seinen Commit in das Bündel** (`__FASSUNG__`
+     in `vite.config.ts`, sichtbar als `window.bauraumFassung`). Damit
+     ist von aussen ablesbar, welcher Stand läuft -- der Name des
+     Bündels taugt dafür nicht, er hängt auch an den
+     Umgebungsvariablen.
+
+  3. **Der Ablauf "Was ist live" läuft bei jedem Push auf `main`** und
+     wartet bis zu zehn Minuten darauf, dass genau dieser Commit auf
+     der Seite auftaucht. Tut er es nicht, ist der Lauf rot und sagt,
+     welcher Stand stattdessen ausgeliefert ist. Niemand muss mehr von
+     Hand nachsehen, und niemand telefoniert mehr mit einer Seite, die
+     eine Woche alt ist.
+
+  4. **Der Ablauf "Ausliefern" baut selbst und liefert ab**, sobald im
+     Repository `VERCEL_TOKEN`, `VERCEL_ORG_ID` und `VERCEL_PROJECT_ID`
+     hinterlegt sind. Fehlen sie, sagt er das und hört auf. Solange
+     bleibt die Git-Anbindung von Vercel der einzige Weg -- und die
+     hat schon einmal einen halben Tag lang nichts gebaut.
+
+Bleibt sie wieder stehen, hilft in Vercel *Promote to Production* auf
+einem fertigen Preview: das bringt einen bereits gebauten Stand live,
+ohne neu zu bauen, und kostet deshalb kein Kontingent.

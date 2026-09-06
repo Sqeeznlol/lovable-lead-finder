@@ -6,62 +6,86 @@
 # main, von denen eine einzige ausgeliefert wurde. Wer das wissen will,
 # muss die Seite selbst fragen, nicht das Repository.
 #
-# Dieser Ablauf lädt die Startseite, holt daraus das JavaScript und
-# sucht darin nach Spuren der letzten Änderungen. Er verändert nichts.
+# Gefragt wird nach dem Commit: seit derselben Änderung schreibt der
+# Bau seinen Commit ins Bündel (window.bauraumFassung). Damit braucht
+# dieser Ablauf keine Liste von Merkmalen mehr, die veraltet, sobald
+# jemand eine Zeile ändert -- er sucht schlicht den Stand, der oben auf
+# main liegt. Er verändert nichts.
 name: Was ist live
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
   schedule:
     # Einmal am Morgen, damit ein stehengebliebener Ausrollstand
     # auffällt, bevor jemand danach telefoniert.
     - cron: '0 5 * * 1-5'
 
+# Bei drei Pushes kurz nacheinander interessiert nur der letzte.
+concurrency:
+  group: live
+  cancel-in-progress: true
+
 jobs:
   pruefen:
     runs-on: ubuntu-latest
     steps:
-      - name: Seite abrufen und Spuren suchen
+      - name: Auf die Seite warten und den Stand ablesen
+        env:
+          # Bei einem Push der eben gepushte Stand, sonst der Kopf von main.
+          GESUCHT: ${{ github.sha }}
+          # Nach einem Push braucht Vercel ein paar Minuten; bei einem
+          # Lauf von Hand oder am Morgen soll niemand darauf warten.
+          VERSUCHE: ${{ github.event_name == 'push' && 20 || 1 }}
         run: |
           set -uo pipefail
           adresse=https://www.wohntraums.life
+          kurz=${GESUCHT:0:8}
 
-          echo "### Startseite" >> "$GITHUB_STEP_SUMMARY"
-          code=$(curl -sS -o /tmp/seite.html -w '%{http_code}' "$adresse" || echo 000)
-          echo "HTTP $code" >> "$GITHUB_STEP_SUMMARY"
-          [ "$code" = "200" ] || { cat "$GITHUB_STEP_SUMMARY"; exit 1; }
-
-          # Vite hängt an jeden Namen einen Fingerabdruck. Ändert sich
-          # der Name, wurde neu gebaut; bleibt er, ist es derselbe Stand.
-          js=$(grep -oE '/assets/index-[A-Za-z0-9_-]+\.js' /tmp/seite.html | head -1)
-          echo "Bündel: ${js:-keines gefunden}" >> "$GITHUB_STEP_SUMMARY"
-          [ -n "$js" ] || { cat "$GITHUB_STEP_SUMMARY"; exit 1; }
-          curl -sS -o /tmp/buendel.js "$adresse$js"
-          echo "Grösse: $(wc -c < /tmp/buendel.js) Bytes" >> "$GITHUB_STEP_SUMMARY"
-
+          echo "### Gesucht" >> "$GITHUB_STEP_SUMMARY"
+          echo "Stand \`$kurz\` auf main." >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "### Spuren im ausgelieferten Stand" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Was | erwartet | gefunden |" >> "$GITHUB_STEP_SUMMARY"
-          echo "|---|---|---|" >> "$GITHUB_STEP_SUMMARY"
 
-          fehlt=0
-          suche() {   # Name, Muster, soll (ja/nein)
-            if grep -q -- "$2" /tmp/buendel.js; then da=ja; else da=nein; fi
-            if [ "$da" = "$3" ]; then zeichen="ok"; else zeichen="**fehlt**"; fehlt=1; fi
-            echo "| $1 | $3 | $da $zeichen |" >> "$GITHUB_STEP_SUMMARY"
+          nachsehen() {
+            curl -sS -o /tmp/seite.html "$adresse" || return 1
+            js=$(grep -oE '/assets/index-[A-Za-z0-9_-]+\.js' /tmp/seite.html | head -1)
+            [ -n "$js" ] || return 1
+            curl -sS -o /tmp/buendel.js "$adresse$js" || return 1
+            # Der Verkleinerer benennt die Zuweisung um -- aus
+            # "window.bauraumFassung" wird "bP". Der Commit selbst
+            # bleibt aber woertlich stehen, und danach wird gesucht.
+            if grep -q -- "$GESUCHT" /tmp/buendel.js; then
+              gefunden=$GESUCHT
+            else
+              gefunden=$(grep -oE '="[0-9a-f]{40}"' /tmp/buendel.js \
+                         | head -1 | grep -oE '[0-9a-f]{40}')
+            fi
           }
 
-          suche "Thurgauer Kataster (map.geo.tg.ch)" "map.geo.tg.ch" ja
-          suche "Thurgau in der Kantonsauswahl"      "Thurgau"       ja
-          suche "Ablage in Fassung v2"              "bauraum.v2."   ja
-          suche "Listenauswahl 'Alle Listen'"        "Alle Listen"   nein
+          n=0
+          while :; do
+            n=$((n + 1))
+            nachsehen
+            if [ "${gefunden:-}" = "$GESUCHT" ]; then
+              echo "### Live" >> "$GITHUB_STEP_SUMMARY"
+              echo "Bündel \`$js\` trägt \`$kurz\` -- der Stand ist draussen." \
+                >> "$GITHUB_STEP_SUMMARY"
+              cat "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            [ "$n" -lt "$VERSUCHE" ] || break
+            sleep 30
+          done
 
+          echo "### Nicht live" >> "$GITHUB_STEP_SUMMARY"
+          echo "Ausgeliefert ist \`${gefunden:-unbekannt}\`, erwartet \`$kurz\`." \
+            >> "$GITHUB_STEP_SUMMARY"
+          echo "Bündel: \`${js:-keines gefunden}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          if [ "$fehlt" = "0" ]; then
-            echo "**Der ausgelieferte Stand ist aktuell.**" >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "**Der ausgelieferte Stand hinkt hinterher.** Vercel hat den" \
-                 "letzten Push auf main nicht gebaut." >> "$GITHUB_STEP_SUMMARY"
-          fi
+          echo "Vercel hat diesen Push nicht gebaut. Steht in Vercel ein" \
+               "fertiger Preview, bringt ihn *Promote to Production* ohne" \
+               "neuen Bau live; sind die drei Geheimnisse gesetzt, macht" \
+               "es der Ablauf **Ausliefern** von selbst." >> "$GITHUB_STEP_SUMMARY"
           cat "$GITHUB_STEP_SUMMARY"
-          exit $fehlt
+          exit 1
