@@ -51,8 +51,11 @@ def zahl(text: str) -> int | None:
     return int(ziffern) if ziffern else None
 
 
+# Das Wort davor muss stehen. Ohne diese Bedingung griff die Regel auf
+# die führende "1," in "1, Grundstück: Liegenschaft Nr. 1344" und
+# schrieb eine 1 ins Parzellenfeld.
 NUMMER = re.compile(
-    r'(?:Liegenschaft|Grundst(?:ü|ue)ck|Parzelle)?\s*(?:Nr\.?)?\s*'
+    r'(?:Liegenschaft|Grundst(?:ü|ue)ck|Parzelle)\s*(?:Nr\.?)?\s*'
     r'\b([A-Z]{0,3}\d{1,6}[a-z]?)\b')
 
 # Grundbuchamt -> Kantonskürzel. Die Ämter tragen den Kantonsnamen,
@@ -166,10 +169,16 @@ def main() -> None:
         for name, (vom_kontakt, zum_deal) in quelle.items():
             if not vom_kontakt or not zum_deal:
                 continue
-            if str(d.get(zum_deal) or '').strip():
-                continue  # Was dasteht, bleibt.
+            steht_da = str(d.get(zum_deal) or '').strip()
+            # Was dasteht, bleibt -- ausser es ist die "1", die ein
+            # früherer Lauf dieses Werkzeugs falsch eingetragen hat.
+            if steht_da and not (name == 'Parzelle' and steht_da == '1'):
+                continue
             wert = str(p_daten.get(vom_kontakt) or '').strip()
-            if name == 'EGRID':
+            if name == 'Parzelle' and re.fullmatch(
+                    r'[A-Z]{0,3}\d{1,6}[a-z]?', wert):
+                pass  # Steht dort nur die Nummer, ist sie es schon.
+            elif name == 'EGRID':
                 # Die EGRID kann in jedem Feld des Kontakts stecken --
                 # im Bestand steht sie mal unter "Objektinfo", mal
                 # mitten in der Zeile unter "Grundstück".
