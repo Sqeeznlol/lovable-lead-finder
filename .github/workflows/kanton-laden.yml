@@ -42,6 +42,7 @@ on:
           - parzellen    # Amtliche Vermessung ansehen und umwandeln
           - alles        # Zonen und Parzellen laden, verschneiden, ausgeben
           - verschneiden # Fertige Dateien aus einem früheren Lauf verschneiden
+          - modell       # Warum das Vermessungsmodell nicht greift
 
 jobs:
   laden:
@@ -360,3 +361,49 @@ jobs:
           name: verschnitten-${{ inputs.kanton }}
           path: /tmp/verschnitten.csv
           if-no-files-found: warn
+
+      # ---------------------------------------------------------------
+      # Warum das Modell nicht greift
+      # ---------------------------------------------------------------
+      # Die Parzellen kommen als Field01..Field09 an und die Umrisse
+      # fehlen ganz. Beides hat dieselbe Ursache: GDAL wendet das
+      # INTERLIS-Modell nicht an. Ohne Modell kennt es weder die
+      # Attributnamen noch weiss es, dass die Linien in der Ebene
+      # "_Geometrie" zu Flächen der Ebene "Liegenschaft" gehören.
+      #
+      # Die Meldung dazu stand die ganze Zeit auf der Fehlerausgabe --
+      # die ich beim Umwandeln nach /dev/null geschickt hatte. Hier
+      # bleibt sie sichtbar.
+      - name: Modell prüfen
+        if: ${{ inputs.schritt == 'modell' }}
+        env:
+          KANTON: ${{ inputs.kanton }}
+        run: |
+          set -euo pipefail
+          basis=https://geodienste.ch/downloads/interlis
+          curl -sSL -o /tmp/av.zip "$basis/av/$KANTON/av_${KANTON}_lv95.zip"
+          mkdir -p /tmp/av && unzip -o -q /tmp/av.zip -d /tmp/av
+
+          # Die kleinste Gemeinde reicht für den Versuch.
+          erste=$(find /tmp/av -name '*.itf' -printf '%s %p\n' \
+                  | sort -n | head -1 | cut -d' ' -f2)
+          echo "Probe: $erste"
+          mitgeliefert=$(find /tmp/av -name '*.ili' | head -1)
+          echo "Mitgeliefertes Modell: $mitgeliefert"
+          echo
+
+          curl -sSL -o /tmp/vom-bund.ili \
+            "https://models.geo.admin.ch/V_D/DM01AVCH24LV95D.ili" || true
+          echo "Vom Bund: $(wc -c < /tmp/vom-bund.ili 2>/dev/null || echo 0) Bytes"
+          echo
+
+          for m in "$mitgeliefert" /tmp/vom-bund.ili; do
+            [ -s "$m" ] || continue
+            echo "=============== $m"
+            # Ohne 2>/dev/null -- genau darum geht es.
+            ogrinfo -so "$erste,$m" Liegenschaften__Grundstueck 2>&1 | head -25
+            echo
+            echo "--- Liegenschaft"
+            ogrinfo -so "$erste,$m" Liegenschaften__Liegenschaft 2>&1 | head -25
+            echo
+          done
