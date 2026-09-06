@@ -211,6 +211,22 @@ def main() -> None:
     print(f'- {len(ohne)} Deals ganz ohne EGRID -- unberührt')
     print()
 
+    # Ein Deal ohne Eigentümer ist eine leere Karteikarte: man kann ihn
+    # weder anrufen noch anschreiben. Wie viele der fehlenden Objekte
+    # überhaupt anrufbar sind, entscheidet, was "anlegen" hier heisst.
+    mit_name = [e for e in fehlend if (objekte[e].get('eigentuemer_name') or
+                                       objekte[e].get('owner_name') or '').strip()]
+    mit_nummer = [e for e in mit_name if (objekte[e].get('owner_phone') or '').strip()]
+    print(f'Davon mit Eigentümer: {len(mit_name)}, davon mit Nummer: '
+          f'{len(mit_nummer)}.')
+    print()
+    if not mit_name:
+        print('> Kein einziges der fehlenden Objekte kennt seinen')
+        print('> Eigentümer. Deals daraus wären leere Karteikarten --')
+        print('> der nächste Schritt ist die Grundbuchabfrage, nicht')
+        print('> der Export. Angelegt wird deshalb nichts.')
+        print()
+
     schluessel = {f['name']: f['key']
                   for f in (get('/dealFields', token).get('data') or [])
                   if f.get('name')}
@@ -251,10 +267,10 @@ def main() -> None:
              if (s.get('name') or '').strip() == ZIEL_PHASE),
             eigene[0] if eigene else None)
 
-    anzulegen = fehlend[:args.grenze]
-    print(f'## Neu anlegen — {len(anzulegen)} von {len(fehlend)}')
+    anzulegen = mit_name[:args.grenze]
+    print(f'## Neu anlegen — {len(anzulegen)} von {len(mit_name)}')
     print()
-    if len(fehlend) > args.grenze:
+    if len(mit_name) > args.grenze:
         print(f'> Nach Marge sortiert; der Rest folgt beim nächsten Lauf.')
         print()
 
