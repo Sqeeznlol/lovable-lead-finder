@@ -9,9 +9,10 @@
       Grundstück ist die EGRID der Schlüssel; die EGID beantwortet
       keine Frage, die sich am Telefon stellt.
 
-Gelöscht wird nur, was leer ist. Steht irgendwo ein Wert, bricht der
-Lauf ab und nennt ihn: ein gelöschtes Feld ist nicht wiederherstellbar,
-und was jemand von Hand eingetragen hat, wiegt schwerer als Ordnung.
+Gelöscht wird nur, was leer ist. Wo ein Wert steht, bleibt das Feld --
+und der Lauf sagt, bei welchen Deals. Ein gelöschtes Feld lässt sich
+nicht wiederherstellen, und was jemand von Hand eingetragen hat, wiegt
+schwerer als Ordnung.
 """
 import argparse
 import json
@@ -99,15 +100,22 @@ def main() -> None:
     print()
 
     if belegt:
-        print('**Abgebrochen** — es steht etwas drin. Ein gelöschtes Feld')
-        print('lässt sich nicht wiederherstellen.')
+        print('> Felder mit Werten bleiben stehen. Erst gehören die')
+        print('> Namen gesichert -- danach können sie weg.')
+        print()
+
+    leer = [f for f in felder if f['name'] not in belegt]
+    if not leer:
+        print('Nichts zu löschen.')
         return
 
     if not args.schreiben:
+        print(f'Zu löschen: {", ".join(f["name"] for f in leer)}')
+        print()
         print('**Probelauf** — es wurde nichts verändert.')
         return
 
-    for f in felder:
+    for f in leer:
         a = loeschen(f'/dealFields/{f["id"]}', token)
         stand = 'entfernt' if a.get('success') else f'fehlgeschlagen ({a.get("code")})'
         print(f'- {f["name"]}: {stand}')
