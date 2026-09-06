@@ -79,7 +79,15 @@ jobs:
                      gf_bestand, gf_zulaessig, ausnuetzung,
                      vollgeschosse_zulaessig,
                      coalesce(housing_stat_url,'(leer)') as housing_stat_url,
-                     coalesce(eigentuemer_name,'(leer)') as eigentuemer
+                     -- Zwei Felder tragen den Eigentuemer: das eine
+                     -- kommt aus der Abfrage, das andere aus der
+                     -- Handeingabe. Wer nur eines liest, sieht "leer",
+                     -- wo etwas steht.
+                     coalesce(eigentuemer_name,'(leer)') as aus_abfrage,
+                     coalesce(owner_name,'(leer)')       as eingetragen,
+                     coalesce(owner_phone,'(leer)')      as telefon,
+                     is_queried, status,
+                     coalesce(pipedrive_deal_id,'(leer)') as deal
               from properties where egrid = '$kennung';"
 
           elif [ "${{ inputs.frage }}" = "projektiert" ]; then
