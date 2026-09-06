@@ -33,16 +33,27 @@ def typen(pfad: str):
     der falschen Sprache ist immer noch besser als ein Schlüssel.
     """
     for _, element in ET.iterparse(pfad, events=('end',)):
-        # Die Elemente tragen den vollen Modellpfad im Namen:
-        # "Nutzungsplanung_V1_2.Geobasisdaten.Typ_Grundnutzung".
-        if not ohne_namensraum(element.tag).endswith('Typ_Grundnutzung'):
+        # Die Elemente tragen den vollen Modellpfad im Namen. Gesucht
+        # wurde lange "Typ_Grundnutzung" -- den gibt es nicht. In der
+        # Thurgauer Lieferung heissen sie
+        # "Nutzungsplanung_V1_2.Geobasisdaten.Typ" (2'202 Stueck, je
+        # Gemeinde) und ".Typ_Kt" (134, kantonsweit). Die Endung allein
+        # genuegt nicht als Pruefung: "Typ" steht auch als blosses
+        # Verweisfeld in jeder Zonenflaeche.
+        name = ohne_namensraum(element.tag)
+        if not (name.startswith('Nutzungsplanung')
+                and (name.endswith('.Typ') or name.endswith('.Typ_Kt')
+                     or name.endswith('Typ_Grundnutzung'))):
             continue
 
         kennung = (element.get('TID') or element.get('BID') or '').strip()
         werte: dict[str, str] = {}
         for kind in element:
-            name = ohne_namensraum(kind.tag)
-            if not (name.endswith('Bezeichnung') or name.endswith('Abkuerzung')):
+            feld = ohne_namensraum(kind.tag)
+            # "Code" ist der Schlüssel, den die Zonenfläche nennt --
+            # ohne ihn nützt die schönste Bezeichnung nichts.
+            if not (feld.endswith('Bezeichnung') or feld.endswith('Abkuerzung')
+                    or feld == 'Code'):
                 continue
             # Mehrsprachig: unter der Bezeichnung hängt eine Liste je
             # Sprache, dazwischen viel Leerraum. Gesucht ist der erste
@@ -50,11 +61,17 @@ def typen(pfad: str):
             zeilen = [z.strip() for z in kind.itertext() if z.strip()]
             if not zeilen:
                 continue
-            kurz = 'Abkuerzung' if name.endswith('Abkuerzung') else 'Bezeichnung'
+            if feld == 'Code':
+                kurz = 'Code'
+            elif feld.endswith('Abkuerzung'):
+                kurz = 'Abkuerzung'
+            else:
+                kurz = 'Bezeichnung'
             # "de" ist die Sprachangabe, nicht der Name.
             werte[kurz] = next((z for z in zeilen if len(z) > 2), zeilen[0])
         if kennung:
-            yield kennung, werte.get('Bezeichnung', ''), werte.get('Abkuerzung', '')
+            yield (kennung, werte.get('Code', ''),
+                   werte.get('Bezeichnung', ''), werte.get('Abkuerzung', ''))
         element.clear()
 
 
@@ -67,7 +84,7 @@ def main() -> None:
     datei = open(ziel, 'w', newline='', encoding='utf-8') \
         if ziel != '-' else sys.stdout
     schreiber = csv.writer(datei)
-    schreiber.writerow(['typ_id', 'bezeichnung', 'abkuerzung'])
+    schreiber.writerow(['typ_id', 'code', 'bezeichnung', 'abkuerzung'])
 
     anzahl = 0
     for zeile in typen(sys.argv[1]):
