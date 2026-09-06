@@ -56,6 +56,19 @@ def main() -> None:
     personfelder = zeige_felder('/personFields', token, 'Personen-Felder')
     zeige_felder('/organizationFields', token, 'Organisations-Felder')
 
+    # Die eigenen Kontaktfelder vollstaendig, nicht nur die Flags, die
+    # ich fuer wichtig hielt: der Block "Bitte ausfuellen" haengt an
+    # einem Schalter, und welcher es ist, steht hier.
+    print('## Eigene Kontaktfelder -- vollständig')
+    print()
+    for f in personfelder:
+        if f.get('edit_flag'):
+            print(f'- `{f.get("name")}`')
+            print(f'  ```')
+            print(f'  {json.dumps(f, ensure_ascii=False, sort_keys=True)}')
+            print(f'  ```')
+    print()
+
     if not nummer:
         return
 
