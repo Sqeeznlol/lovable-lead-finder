@@ -17,6 +17,7 @@ const AdminSettings = lazy(() => import('@/components/AdminSettings').then(m => 
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CantonTabs } from '@/components/CantonTabs';
 import { KeyboardShortcutsOverlay } from '@/components/KeyboardShortcutsOverlay';
+import { AdminSchloss } from '@/components/AdminSchloss';
 import { useCanton } from '@/hooks/use-canton';
 import { usePlatform } from '@/hooks/use-platform';
 import { useMidnightReset } from '@/hooks/use-phones';
@@ -161,6 +162,7 @@ export default function Index() {
             {active === 'import' && <CsvImport />}
             {active === 'phones' && <PhoneManager />}
             {active === 'admin' && (
+              <AdminSchloss>
               <div className="space-y-6">
                 <AdminSettings />
                 <div className="rounded-2xl border border-dashed p-5">
@@ -199,6 +201,7 @@ export default function Index() {
                   </Button>
                 </div>
               </div>
+              </AdminSchloss>
             )}
           </Suspense>
         </div>
