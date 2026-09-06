@@ -254,8 +254,20 @@ jobs:
           ls -lh /tmp/zonen.gpkg /tmp/parzellen.gpkg
 
           # Beide Quellen in eine Datei, damit sich darin rechnen lässt.
+          # Die amtlichen Grenzen enthalten Kreisbögen; SpatiaLite kann
+          # damit nicht rechnen. GDAL begradigt sie beim Kopieren zu
+          # Linienzügen -- der Abweichung von wenigen Zentimetern steht
+          # gegenüber, dass die Rechnung sonst gar nicht läuft.
+          # Die Vermessungsdatei bleibt, wie sie ist -- ihre Schlüssel
+          # (T_Id) gehen beim Kopieren sonst verloren. Dazu kommen die
+          # Zonen und eine begradigte Fassung der Parzellenumrisse.
           cp /tmp/parzellen.gpkg /tmp/arbeit.gpkg
-          ogr2ogr -f GPKG /tmp/arbeit.gpkg -append -nln zonen /tmp/zonen.gpkg zonen
+          ogr2ogr -f GPKG /tmp/arbeit.gpkg -append -nln zonen \
+            /tmp/zonen.gpkg zonen
+          ogr2ogr -f GPKG /tmp/arbeit.gpkg -append -nln flaechen \
+            -nlt CONVERT_TO_LINEAR /tmp/arbeit.gpkg \
+            -sql "SELECT liegenschaft_von, flaechenmass, geometrie
+                  FROM liegenschaft"
           echo "### Ebenen in der Arbeitsdatei"
           ogrinfo -so -al /tmp/arbeit.gpkg 2>/dev/null \
             | grep -E 'Layer name|Feature Count' | paste - - \
@@ -267,18 +279,15 @@ jobs:
           #   liegenschaft  flaechenmass, liegenschaft_von -> grundstueck
           # Wie die Geometriespalte heisst, sagt die Datei selbst; darauf
           # zu raten hat diesen Ablauf schon zweimal Stunden gekostet.
-          gsp=$(ogrinfo -so -al /tmp/arbeit.gpkg liegenschaft 2>/dev/null \
+          gsp=$(ogrinfo -so -al /tmp/arbeit.gpkg flaechen 2>/dev/null \
                 | sed -n 's/^Geometry Column = //p' | head -1)
           gsz=$(ogrinfo -so -al /tmp/arbeit.gpkg zonen 2>/dev/null \
                 | sed -n 's/^Geometry Column = //p' | head -1)
           gsp=${gsp:-geometrie}; gsz=${gsz:-geom}
-          echo "Geometrie: liegenschaft.$gsp, zonen.$gsz"
+          echo "Geometrie: flaechen.$gsp, zonen.$gsz"
 
           echo
           echo "### Verschneiden"
-          # Kreisbögen kann SpatiaLite nicht rechnen -- die amtlichen
-          # Grenzen enthalten welche. CastToXY/ST_CurveToLine macht
-          # daraus Linienzüge.
           ogr2ogr -f CSV /tmp/verschnitten.csv /tmp/arbeit.gpkg \
             -dialect sqlite -sql "
               SELECT
@@ -289,15 +298,15 @@ jobs:
                 l.flaechenmass                            AS flaeche_m2,
                 z.Typ                                     AS zone_typ,
                 ROUND(ST_Area(ST_Intersection(
-                  ST_CurveToLine(l.$gsp), z.$gsz)))       AS zone_m2,
+                  l.$gsp, z.$gsz)))       AS zone_m2,
                 ROUND(100.0 * ST_Area(ST_Intersection(
-                        ST_CurveToLine(l.$gsp), z.$gsz))
+                        l.$gsp, z.$gsz))
                       / NULLIF(l.flaechenmass, 0))        AS anteil_prozent
-              FROM liegenschaft l
+              FROM flaechen l
               JOIN grundstueck g ON g.T_Id = l.liegenschaft_von
-              JOIN zonen z ON ST_Intersects(ST_CurveToLine(l.$gsp), z.$gsz)
+              JOIN zonen z ON ST_Intersects(l.$gsp, z.$gsz)
               WHERE ST_Area(ST_Intersection(
-                      ST_CurveToLine(l.$gsp), z.$gsz)) > 5
+                      l.$gsp, z.$gsz)) > 5
             " || { echo "Verschneiden fehlgeschlagen"; exit 1; }
 
           zeilen=$(( $(wc -l < /tmp/verschnitten.csv) - 1 ))
