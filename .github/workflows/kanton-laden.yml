@@ -218,7 +218,9 @@ jobs:
           # Nicht mit einem Werkzeug: GDAL verwirft die Spalten der
           # Typentabelle, ili2gpkg bricht am Katalog des Bundes ab. Eine
           # XTF-Datei ist XML -- die Tabelle wird direkt gelesen.
-          python3 tools/zonentypen.py "$xtf" /tmp/zonentypen.csv
+          # Ohne Namen ist die Liste schlechter, aber nicht wertlos --
+          # der Lauf darf daran nicht scheitern.
+          python3 tools/zonentypen.py "$xtf" /tmp/zonentypen.csv || true
           head -4 /tmp/zonentypen.csv
 
       - name: Ergebnis bereitstellen
