@@ -50,6 +50,8 @@ on:
           - felder-weg-schreiben   # dasselbe, aber tatsächlich löschen
           - aus-text     # Namen aus Textfeldern zu Kontakten machen
           - aus-text-schreiben     # dasselbe, aber tatsächlich schreiben
+          - fuellen      # Zone, Geschosse, Gemeinde, ÖREB aus der Datenbank
+          - fuellen-schreiben      # dasselbe, aber tatsächlich schreiben
       grenze:
         description: 'Höchstzahl Objekte -- bei "deal" die Deal-Nummer'
         required: false
@@ -117,6 +119,27 @@ jobs:
             umziehen-schreiben)
               python3 tools/pipedrive-umziehen.py --schreiben \
                 | tee -a "$GITHUB_STEP_SUMMARY"
+              ;;
+            fuellen|fuellen-schreiben)
+              sudo apt-get install -y -qq postgresql-client
+              psql "$SUPABASE_DB_URL" -X -q --csv -c "
+                select egrid,
+                       coalesce(gemeinde,'')    as gemeinde,
+                       coalesce(kanton,'')      as kanton,
+                       coalesce(zone,'')        as zone,
+                       coalesce(geschosse::text,'')   as geschosse,
+                       coalesce(baujahr::text,'')     as baujahr,
+                       coalesce(round(hnf_delta)::text,'')   as hnf_delta,
+                       coalesce(round(bebaubar_m2)::text,'') as bebaubar_m2,
+                       coalesce(parzelle, plot_number, '')   as parzelle,
+                       coalesce(bfs_nr::text,'') as bfs_nr
+                from properties where egrid is not null" > /tmp/objekte.csv
+              wc -l /tmp/objekte.csv
+              zusatz=""
+              [ "${{ inputs.aufgabe }}" = "fuellen-schreiben" ] \
+                && zusatz="--schreiben"
+              python3 tools/pipedrive-fuellen.py --objekte /tmp/objekte.csv \
+                $zusatz | tee -a "$GITHUB_STEP_SUMMARY"
               ;;
             aus-text|aus-text-schreiben)
               zusatz=""
