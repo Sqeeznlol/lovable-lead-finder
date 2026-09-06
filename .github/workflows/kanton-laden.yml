@@ -44,6 +44,7 @@ on:
           - verschneiden # Fertige Dateien aus einem früheren Lauf verschneiden
           - modell       # Warum das Vermessungsmodell nicht greift
           - formate      # Welche Dateiformate geodienste anbietet
+          - ili2gpkg     # Umwandlung mit dem amtlichen INTERLIS-Werkzeug
 
 jobs:
   laden:
@@ -452,3 +453,55 @@ jobs:
           curl -sS "https://geodienste.ch/services/av" \
             -H 'Accept: application/json' 2>/dev/null | head -c 2000
           echo
+
+      # ---------------------------------------------------------------
+      # Der amtliche Weg
+      # ---------------------------------------------------------------
+      # geodienste liefert die Vermessung ausschliesslich als INTERLIS 1
+      # (alle anderen Formate: 404). GDAL kommt damit nur halb zurecht --
+      # es kennt die Attributnamen nicht und bildet aus den Grenzlinien
+      # keine Flächen.
+      #
+      # Für genau diese Aufgabe gibt es ili2gpkg aus der offiziellen
+      # INTERLIS-Werkzeugkette: es liest das Modell, benennt die Spalten
+      # wie im Modell und setzt die Grenzlinien zu Flächen zusammen.
+      # Erst damit ergibt "Fläche der Parzelle" überhaupt einen Wert.
+      - name: Mit ili2gpkg umwandeln
+        if: ${{ inputs.schritt == 'ili2gpkg' }}
+        env:
+          KANTON: ${{ inputs.kanton }}
+        run: |
+          set -euo pipefail
+          java -version 2>&1 | head -2
+
+          curl -sSL -o /tmp/ili2gpkg.zip \
+            "https://downloads.interlis.ch/ili2gpkg/ili2gpkg-5.1.1.zip"
+          ls -lh /tmp/ili2gpkg.zip
+          unzip -o -q /tmp/ili2gpkg.zip -d /tmp/ili2gpkg
+          jar=$(find /tmp/ili2gpkg -name 'ili2gpkg*.jar' | head -1)
+          echo "Werkzeug: $jar"
+
+          basis=https://geodienste.ch/downloads/interlis
+          curl -sSL -o /tmp/av.zip "$basis/av/$KANTON/av_${KANTON}_lv95.zip"
+          mkdir -p /tmp/av && unzip -o -q /tmp/av.zip -d /tmp/av
+
+          # Erst an der kleinsten Gemeinde -- wenn das trägt, folgt der Rest.
+          erste=$(find /tmp/av -name '*.itf' -printf '%s %p\n' \
+                  | sort -n | head -1 | cut -d' ' -f2)
+          echo "Probe: $erste"
+
+          rm -f /tmp/probe.gpkg
+          java -jar "$jar" --dbfile /tmp/probe.gpkg \
+            --modeldir "/tmp/av;http://models.interlis.ch/;https://models.geo.admin.ch/" \
+            --import "$erste" 2>&1 | tail -25
+
+          echo
+          ls -lh /tmp/probe.gpkg
+          echo "### Ebenen mit Flächen"
+          ogrinfo -so -al /tmp/probe.gpkg 2>/dev/null \
+            | grep -E 'Layer name|Feature Count|Geometry:' | paste - - - \
+            | grep -i 'liegenschaft\|grundstueck' || true
+
+          echo
+          echo "### Spalten der Grundstücke"
+          ogrinfo -so /tmp/probe.gpkg liegenschaften_grundstueck 2>&1 | head -25
