@@ -89,10 +89,30 @@ export async function weiterverarbeiten(
     }
   }
 
-  // 2. Deal anlegen.
+  // 2. Ohne Nummer kein Deal.
+  //
+  // Vorher ging das Objekt auch ohne Nummer nach Pipedrive, in die
+  // Pipeline "Search". Das ist jetzt anders: gepusht wird erst, wenn
+  // die Nummer hier steht. Ein Deal, den niemand anrufen kann, ist
+  // eine Zeile in einer Liste, die ohnehin zu lang ist.
+  //
+  // Das Objekt bleibt so lange stehen, wo es ist -- sichtbar, mit dem
+  // Eigentümer, aber ohne Nummer.
+  if (!telefon) {
+    await supabase.from('properties')
+      .update({ status: 'Telefonnummer gesucht' })
+      .eq('id', propertyId);
+    toast({
+      title: 'Keine Nummer gefunden',
+      description: `${p.owner_name} — das Objekt bleibt in der Liste, `
+        + 'bis eine Nummer da ist.',
+    });
+    return;
+  }
+
   const { data: push, error: pushErr } = await supabase.functions.invoke(
     'pipedrive-push',
-    { body: { properties: [{ ...p, owner_phone: telefon || null }] } },
+    { body: { properties: [{ ...p, owner_phone: telefon }] } },
   );
   if (pushErr || !(push?.summary?.created > 0)) {
     toast({
@@ -114,12 +134,10 @@ export async function weiterverarbeiten(
     })
     .eq('id', propertyId);
 
-  void protokolliere('deal', `${p.address} — ${telefon ? 'Akquise' : 'Search'}`, p.kanton);
+  void protokolliere('deal', `${p.address} — Akquise`, p.kanton);
   toast({
-    title: telefon ? '📞 Deal in Akquise angelegt' : '🔍 Deal in Search angelegt',
-    description: telefon
-      ? `${p.owner_name} · ${telefon}`
-      : `${p.owner_name} — keine Nummer gefunden, Eigentümer stehen in der Notiz`,
+    title: '📞 Deal in Akquise angelegt',
+    description: `${p.owner_name} · ${telefon}`,
   });
 }
 
