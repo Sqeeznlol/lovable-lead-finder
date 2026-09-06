@@ -4,6 +4,7 @@ import { beurteile, type Empfehlung } from '@/lib/akquise';
 import { calculatePotential } from '@/lib/potential';
 import { gemeindeprofil, LAGE_LABEL, type Lagestufe } from '@/lib/gemeinden-zh';
 import { verkauftNie, ARCHIV_STATUS } from '@/lib/grundbuch';
+import { lesen, schreiben } from '@/lib/zwischenspeicher';
 
 /** Felder, die für die Beurteilung gebraucht werden. */
 const FELDER =
@@ -90,7 +91,14 @@ const potenzialVon = (p: any) => calculatePotential(p);
 export function useUebersicht() {
   return useQuery({
     queryKey: ['uebersicht'],
-    staleTime: 60 * 1000,
+    // Eine halbe Stunde: der Bestand ändert sich nicht im Minutentakt,
+    // und jeder Aufruf kostete bisher vierzig Abfragen samt Neurechnung.
+    staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
+    // Beim Öffnen steht sofort das Ergebnis der letzten Rechnung da.
+    // Neu gerechnet wird im Hintergrund, ohne dass die Seite leer wird.
+    initialData: () => lesen<Uebersicht>('uebersicht'),
+    initialDataUpdatedAt: () => lesen<number>('uebersicht.zeit'),
     queryFn: async (): Promise<Uebersicht> => {
       const { count: total } = await supabase
         .from('properties')
@@ -195,7 +203,7 @@ export function useUebersicht() {
         .sort((a, b) => b.margeSumme - a.margeSumme)
         .slice(0, 8);
 
-      return {
+      const ergebnis: Uebersicht = {
         total: total ?? 0,
         bewertet,
         nachEmpfehlung,
@@ -205,6 +213,11 @@ export function useUebersicht() {
         topGemeinden,
         ohneEigentuemer,
       };
+      // Nur das Ergebnis wird abgelegt, nicht die vierzigtausend Zeilen,
+      // aus denen es entstand.
+      schreiben('uebersicht', ergebnis);
+      schreiben('uebersicht.zeit', Date.now());
+      return ergebnis;
     },
   });
 }
