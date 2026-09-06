@@ -38,6 +38,21 @@ ANTEIL = re.compile(
 # das Land und der Bruchteil.
 VORSPANN = re.compile(r'^\s*((Schweiz|Suisse|Svizzera)\b|\d+/\d+)[\s,]*', re.I)
 
+# Erbengemeinschaften führen die Mitglieder als Aufzählung:
+#
+#   Schmid-Colemberg Luzi Erben, Gemeinschaft, Bahnhofstrasse 25, ...
+#   bestehend aus:
+#   -   Luzi Schmid, Rebenstrasse 69, 9320 Arbon
+#   -   Beatrice Huber-Schmid, Dorf 10, 8561 Ottoberg
+#
+# Wer hier stumpf an der Postleitzahl schneidet, macht aus "Dorf 10"
+# einen Namen. Die Aufzählung wird deshalb zuerst zerlegt.
+AUFZAEHLUNG = re.compile(r'\bbestehend\s+aus\s*:?', re.I)
+PUNKT = re.compile(r'\s+-\s+')
+
+# Eine Strasse ist kein Name: "Dorf 10", "Bahnhofstrasse 25a".
+WIE_EINE_ADRESSE = re.compile(r'^[^,\d]{2,}\s+\d+[a-z]?$', re.I)
+
 
 def get(pfad: str, token: str, **params) -> dict:
     params['api_token'] = token
@@ -74,6 +89,33 @@ def alle(pfad: str, token: str, **params) -> list:
     return raus
 
 
+def einzeln(stueck: str) -> dict | None:
+    """Aus "Bolli, Jürg, Emmerstrasse 21, 8192 Glattfelden" Name und
+    Adresse holen -- oder nichts, wenn das Ergebnis nicht taugt.
+    """
+    stueck = ANTEIL.sub('', (stueck or '')).strip(' ,-')
+    teile = [t.strip() for t in stueck.split(',') if t.strip()]
+    if len(teile) < 2:
+        return None
+
+    ort = teile[-1]
+    strasse = teile[-2] if len(teile) >= 3 else ''
+    name = ', '.join(teile[:-2]) if len(teile) >= 3 else teile[0]
+
+    # "Schweiz  Bolli, Susanne" -> "Bolli, Susanne"
+    while True:
+        gekuerzt = VORSPANN.sub('', name).strip()
+        if gekuerzt == name:
+            break
+        name = gekuerzt
+
+    # Lieber keinen Eintrag als einen falschen: eine Strasse im
+    # Namensfeld wäre schlimmer als ein fehlender Kontakt.
+    if not name or WIE_EINE_ADRESSE.match(name) or name[0].isdigit():
+        return None
+    return {'name': name, 'adresse': ', '.join(x for x in (strasse, ort) if x)}
+
+
 def aufteilen(text: str) -> list[dict]:
     """Aus einer Grundbuchzeile die einzelnen Eigentümer holen.
 
@@ -85,6 +127,16 @@ def aufteilen(text: str) -> list[dict]:
     roh = (text or '').replace('\n', ' ').strip()
     if not roh:
         return []
+
+    # Erbengemeinschaft: die Gemeinschaft selbst bleibt der
+    # Hauptkontakt, die Mitglieder kommen als eigene Einträge dazu.
+    if AUFZAEHLUNG.search(roh):
+        kopf, _, rest = AUFZAEHLUNG.split(roh, 1)[0], '', ''
+        kopf = AUFZAEHLUNG.split(roh, 1)[0]
+        rest = AUFZAEHLUNG.split(roh, 1)[1]
+        eintraege = [einzeln(kopf)] + [einzeln(t) for t in PUNKT.split(rest)]
+        gefiltert = [e for e in eintraege if e]
+        return gefiltert if len(gefiltert) >= 2 else []
 
     stellen = list(PLZ.finditer(roh))
     if len(stellen) < 2:
@@ -98,27 +150,9 @@ def aufteilen(text: str) -> list[dict]:
         stueck = roh[anfang:(ende if ende != -1 else len(roh))].strip(' ,')
         anfang = (ende + 1) if ende != -1 else len(roh)
 
-        stueck = ANTEIL.sub('', stueck).strip(' ,')
-        teile = [t.strip() for t in stueck.split(',') if t.strip()]
-        if len(teile) < 2:
-            continue
-        # "Bolli, Jürg, Emmerstrasse 21, 8192 Glattfelden"
-        #  ^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-        ort = teile[-1]
-        strasse = teile[-2] if len(teile) >= 3 else ''
-        name = ', '.join(teile[:-2]) if len(teile) >= 3 else teile[0]
-        # "Schweiz  Bolli, Susanne" -> "Bolli, Susanne"
-        while True:
-            gekuerzt = VORSPANN.sub('', name).strip()
-            if gekuerzt == name:
-                break
-            name = gekuerzt
-        if not name:
-            continue
-        eigentuemer.append({
-            'name': name,
-            'adresse': ', '.join(x for x in (strasse, ort) if x),
-        })
+        eintrag = einzeln(stueck)
+        if eintrag:
+            eigentuemer.append(eintrag)
     return eigentuemer if len(eigentuemer) >= 2 else []
 
 
