@@ -33,6 +33,8 @@ on:
           - nachfuellen-schreiben  # dasselbe, aber tatsächlich schreiben
           - ordnen       # Titel und Adressfeld prüfen (Probelauf)
           - ordnen-schreiben  # Titel setzen, Adressfeld entfernen
+          - pipelines    # Pipeline "Search" anlegen und Kennungen zeigen
+          - pipelines-schreiben  # dasselbe, aber tatsaechlich anlegen
           - umziehen     # Neue Pipelines und Zuordnung zeigen
           - umziehen-schreiben  # Pipelines anlegen und Deals einordnen
           - kontakte     # Namen, Adresse und Kartenlink prüfen (Probelauf)
@@ -119,6 +121,13 @@ jobs:
               ;;
             nachfuellen-schreiben)
               python3 tools/pipedrive-nachfuellen.py --schreiben \
+                | tee -a "$GITHUB_STEP_SUMMARY"
+              ;;
+            pipelines)
+              python3 tools/pipedrive-pipelines.py | tee -a "$GITHUB_STEP_SUMMARY"
+              ;;
+            pipelines-schreiben)
+              python3 tools/pipedrive-pipelines.py --schreiben \
                 | tee -a "$GITHUB_STEP_SUMMARY"
               ;;
             umziehen)
