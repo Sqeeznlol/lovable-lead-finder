@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { grundbuchUrl, verkauftNie, ARCHIV_STATUS } from '@/lib/grundbuch';
 import { Label } from '@/components/ui/label';
+import { Objektansicht } from '@/components/Objektansicht';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ExternalLink, MapPin, Phone, User, Save, Loader2, Bot, RefreshCw } from 'lucide-react';
+import { ExternalLink, MapPin, Phone, User, Save, Loader2, Bot, RefreshCw, Archive } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
@@ -130,6 +131,19 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
             </DialogHeader>
 
             <div className="space-y-4">
+              {/* Ein Bild von oben beantwortet in zwei Sekunden, was
+                  keine Zahl beantwortet: steht da noch Platz, hängt das
+                  Grundstück am Hang, ist der Nachbar schon gebaut. */}
+              <Objektansicht
+                address={data.address}
+                plzOrt={data.plz_ort || [data.plz, data.gemeinde].filter(Boolean).join(' ')}
+                parzelle={data.parzelle}
+                bfsNr={data.bfs_nr}
+                gemeinde={data.gemeinde}
+                kanton={data.kanton}
+                className="h-56"
+              />
+
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                 <Stat label="Fläche" value={data.area ? `${data.area.toLocaleString('de-CH')} m²` : '—'} />
                 <Stat label="Gebäude" value={data.gebaeudeflaeche ? `${data.gebaeudeflaeche.toLocaleString('de-CH')} m²` : '—'} />
@@ -142,11 +156,24 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                {data.google_maps_url && (
-                  <a href={data.google_maps_url} target="_blank" rel="noreferrer">
-                    <Button size="sm" variant="outline"><MapPin className="h-3.5 w-3.5 mr-1" /> Maps</Button>
-                  </a>
-                )}
+                {/* Der gespeicherte Link fehlt bei den meisten Objekten;
+                    aus Adresse und Ort lässt er sich immer bilden. */}
+                <a
+                  href={data.google_maps_url || `https://www.google.com/maps/search/?api=1&query=${
+                    encodeURIComponent([data.address, data.plz_ort || [data.plz, data.gemeinde].filter(Boolean).join(' ')].filter(Boolean).join(', '))}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <Button size="sm" variant="outline"><MapPin className="h-3.5 w-3.5 mr-1" /> Maps</Button>
+                </a>
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${
+                    encodeURIComponent([data.address, data.plz_ort || [data.plz, data.gemeinde].filter(Boolean).join(' ')].filter(Boolean).join(', '))}&basemap=satellite`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <Button size="sm" variant="outline"><MapPin className="h-3.5 w-3.5 mr-1" /> Satellit</Button>
+                </a>
                 {data.gis_url && (
                   <a href={data.gis_url} target="_blank" rel="noreferrer">
                     <Button size="sm" variant="outline"><ExternalLink className="h-3.5 w-3.5 mr-1" /> GIS</Button>
@@ -293,8 +320,11 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
                   Aus dem Archiv holen
                 </Button>
               ) : (
-                <Button variant="ghost" onClick={archivieren} disabled={saving}>
-                  Archivieren
+                /* Blass am Rand wurde er nie geklickt -- und es ist der
+                   Knopf, der am häufigsten gebraucht wird: die meisten
+                   Objekte sind nichts. */
+                <Button variant="outline" onClick={archivieren} disabled={saving}>
+                  <Archive className="mr-1 h-4 w-4" /> Nicht interessant
                 </Button>
               )}
               <Button variant="ghost" onClick={onClose}>Abbrechen</Button>

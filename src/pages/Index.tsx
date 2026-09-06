@@ -39,7 +39,7 @@ type Tab = 'uebersicht' | 'dashboard' | 'master' | 'vorauswahl' | 'akquise' | 't
 // öffnen, ebenso der Master-Import, den man selten und bewusst macht.
 const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'uebersicht', label: 'Übersicht', icon: LayoutDashboard },
-  { id: 'master', label: 'Master-Liste', icon: Database },
+  { id: 'master', label: 'Abfrage', icon: Database },
   { id: 'akquise', label: 'Akquise-Modus', icon: Zap },
   { id: 'phones', label: 'Telefone', icon: Phone },
   { id: 'admin', label: 'Admin', icon: Shield },

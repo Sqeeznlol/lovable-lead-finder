@@ -92,7 +92,7 @@ export function MasterList() {
       <div className="space-y-4 min-w-0">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">Master-Liste {titleSuffix}</h2>
+            <h2 className="text-2xl font-bold tracking-tight">Abfrage {titleSuffix}</h2>
             <p className="text-sm text-muted-foreground">
               {isLoading
                 ? 'Lade…'
