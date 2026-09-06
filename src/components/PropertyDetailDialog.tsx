@@ -157,12 +157,12 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
                     <Button size="sm" variant="outline"><ExternalLink className="h-3.5 w-3.5 mr-1" /> Kataster</Button>
                   </a>
                 )}
-                {grundbuchUrl(data.egrid, data.bfs_nr) && (
+                {grundbuchUrl(data.egrid, data.bfs_nr, data.kanton) && (
                   /* Die Auskunft des Grundbuchamts nennt den eingetragenen
                      Eigentümer -- genau die Angabe, die in den Listen fehlt.
                      Führt der Link auf die Anmeldung, ist das die
                      Identifikation des Portals und kein defekter Link. */
-                  <a href={grundbuchUrl(data.egrid, data.bfs_nr)!} target="_blank" rel="noreferrer">
+                  <a href={grundbuchUrl(data.egrid, data.bfs_nr, data.kanton)!} target="_blank" rel="noreferrer">
                     <Button size="sm" variant="outline"><ExternalLink className="h-3.5 w-3.5 mr-1" /> Grundbuch</Button>
                   </a>
                 )}

@@ -120,18 +120,19 @@ export function Objektansicht({ address, plzOrt, parzelle, bfsNr, gemeinde, kant
   const eigenerKanton = String(kanton ?? '').trim().toUpperCase() === 'TG';
   const einbettung = modus === 'strasse' ? streetViewEmbedUrl(lat, lon) : null;
 
-  const weiterLink =
-    modus === 'zone'
-      ? kataster
-    : modus === 'strasse' ? streetViewLinkUrl(lat, lon)
-    : swisstopoMapUrl(lat, lon);
-
-  const weiterLabel =
-    modus === 'zone'
-      ? (eigenerKanton ? 'Kataster Thurgau'
-         : parzellenLink ? 'Parzelle im Kataster' : 'ÖREB-Kataster')
-    : modus === 'strasse' ? 'Street View'
-    : 'swisstopo';
+  // Bisher zeigte die Kachel nur den Link zum gerade gewaehlten Reiter --
+  // wer den Kataster wollte, musste erst auf "Zone" wechseln. Die drei
+  // Ziele haengen aber nicht am Bild, sondern am Ort: sie stehen jetzt
+  // alle drei nebeneinander da.
+  const links = [
+    { label: 'swisstopo', href: swisstopoMapUrl(lat, lon) },
+    {
+      label: eigenerKanton ? 'Kataster TG'
+        : parzellenLink ? 'Parzelle im Kataster' : 'ÖREB-Kataster',
+      href: kataster,
+    },
+    { label: 'Street View', href: streetViewLinkUrl(lat, lon) },
+  ];
 
   return (
     <div className={rahmen}>
@@ -206,15 +207,20 @@ export function Objektansicht({ address, plzOrt, parzelle, bfsNr, gemeinde, kant
         ))}
       </div>
 
-      <a
-        href={weiterLink}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={e => e.stopPropagation()}
-        className="absolute bottom-1 right-1 flex items-center gap-1 rounded-full bg-background/85 px-2 py-0.5 text-[11px] font-medium backdrop-blur"
-      >
-        {weiterLabel} <ExternalLink className="h-3 w-3" />
-      </a>
+      <div className="absolute inset-x-1 bottom-1 flex flex-wrap justify-end gap-1">
+        {links.map(l => (
+          <a
+            key={l.label}
+            href={l.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={e => e.stopPropagation()}
+            className="flex items-center gap-1 rounded-full bg-background/85 px-2 py-0.5 text-[11px] font-medium backdrop-blur"
+          >
+            {l.label} <ExternalLink className="h-3 w-3" />
+          </a>
+        ))}
+      </div>
     </div>
   );
 }

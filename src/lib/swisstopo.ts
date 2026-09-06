@@ -145,11 +145,35 @@ export function oerebThurgauUrl(lat: number, lon: number): string {
     'oereb_ortsplanung_landwirt',
     'oereb_ortsplanung_bauzonen',
     'oereb_ortsplanung_ueberlagernd',
+    'oereb_kleinsiedlungen',
   ].join(',');
+  // Die Liegenschaften liegen voll deckend zuoberst, die Zonen darunter
+  // leicht durchscheinend -- sonst verdeckt die Bauzone die Grenze, um
+  // die es geht. Das Fadenkreuz setzt die Marke auf das Grundstueck,
+  // damit die Auskunft ohne Suchen aufgeht.
+  const deckung = ['1', '0.9', '0.9', '0.9', '0.9', '0.9', '0.9'].join(',');
   return (
     'https://map.geo.tg.ch/apps/mf-geoadmin3/?lang=de&topic=oereb' +
     `&bgLayer=basemap_farbig&E=${e.toFixed(2)}&N=${n.toFixed(2)}` +
-    `&zoom=9&layers=${ebenen}`
+    `&zoom=8&layers=${ebenen}&layers_opacity=${deckung}&crosshair=marker`
+  );
+}
+
+/**
+ * Grundbuchvermessung des Kantons Thurgau.
+ *
+ * Der Zuercher Weg fuehrt ueber das Portal Objektwesen; im Thurgau gibt
+ * es das nicht. Dort steht die Vermessung im kantonalen Kartendienst,
+ * Thema "grundbuchvermessung" mit den Ebenen "grundbuch" und
+ * "av_komplett". Angesteuert wird wie beim Kataster ueber
+ * Landeskoordinaten.
+ */
+export function grundbuchThurgauUrl(lat: number, lon: number): string {
+  const { e, n } = wgs84NachLv95(lat, lon);
+  return (
+    'https://map.geo.tg.ch/apps/mf-geoadmin3/?lang=de&topic=grundbuchvermessung' +
+    `&bgLayer=basemap_farbig&E=${e.toFixed(2)}&N=${n.toFixed(2)}` +
+    '&zoom=8&layers=grundbuch,av_komplett&crosshair=marker'
   );
 }
 

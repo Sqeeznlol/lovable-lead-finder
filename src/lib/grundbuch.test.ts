@@ -8,6 +8,22 @@ describe('grundbuchUrl', () => {
     );
   });
 
+  it('führt im Thurgau in den kantonalen Kartendienst', () => {
+    // Diessenhofen, Parzelle 454. Das Zürcher Portal kennt dieses
+    // Grundstück nicht -- es zeigte bisher ein fremdes gleicher Nummer.
+    const url = grundbuchUrl('CH770977292983', 4545, 'TG')!;
+    expect(url).toContain('map.geo.tg.ch');
+    expect(url).toContain('topic=grundbuchvermessung');
+    expect(url).toContain('layers=grundbuch,av_komplett');
+    expect(url).toContain('swisssearch=CH770977292983');
+    expect(url).not.toContain('objektwesen.zh.ch');
+  });
+
+  it('braucht im Thurgau keine Gemeindenummer, aber den EGRID', () => {
+    expect(grundbuchUrl('CH770977292983', null, 'TG')).toContain('map.geo.tg.ch');
+    expect(grundbuchUrl(null, 4545, 'tg')).toBeNull();
+  });
+
   it('liefert nichts, wenn eine der beiden Angaben fehlt', () => {
     // Ein Link ohne Gemeindenummer führt ins Leere -- dann lieber keiner.
     expect(grundbuchUrl('CH592077140849', null)).toBeNull();

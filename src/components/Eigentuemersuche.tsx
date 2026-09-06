@@ -138,7 +138,7 @@ export function Eigentuemersuche({ objekte }: { objekte: Chance[] }) {
         <ul className="divide-y">
           {objekte.map(c => {
             const bfs = c.bfsNr || (c.gemeinde ? bfsNachGemeinde[c.gemeinde] : '');
-            const link = grundbuchUrl(c.egrid, bfs);
+            const link = grundbuchUrl(c.egrid, bfs, c.kanton);
             return (
               <li key={c.id} className="space-y-2 p-4">
                 <div className="flex items-start justify-between gap-3">

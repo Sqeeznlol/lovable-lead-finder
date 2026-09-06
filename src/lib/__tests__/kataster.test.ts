@@ -42,3 +42,13 @@ describe('Kataster je Kanton', () => {
     expect(Math.abs(n - 1282652.13)).toBeLessThan(20);
   });
 });
+
+describe('ÖREB Thurgau: Marke und Deckung', () => {
+  it('setzt das Fadenkreuz und legt die Liegenschaft zuoberst', () => {
+    const url = katasterUrl('TG', 47.68724060058594, 8.749064445495605);
+    expect(url).toContain('crosshair=marker');
+    expect(url).toContain('oereb_kleinsiedlungen');
+    expect(url).toContain('layers_opacity=1,0.9,0.9,0.9,0.9,0.9,0.9');
+    expect(url).toContain('zoom=8');
+  });
+});

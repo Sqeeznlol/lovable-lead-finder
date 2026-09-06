@@ -16,9 +16,22 @@ const PORTAL = 'https://portal.objektwesen.zh.ch/aks/detail/success';
 export function grundbuchUrl(
   egrid?: string | null,
   bfsNr?: string | number | null,
+  kanton?: string | null,
 ): string | null {
   const e = String(egrid ?? '').trim();
   const b = String(bfsNr ?? '').trim();
+  // Der Thurgau kennt das Zürcher Portal nicht. Bis heute führte auch
+  // dort jeder Link nach Zürich -- und zeigte irgendein fremdes
+  // Grundstück. Im Thurgau steht die Vermessung im kantonalen
+  // Kartendienst; gesucht wird dort über den EGRID, genau wie von Hand.
+  if (String(kanton ?? '').trim().toUpperCase() === 'TG') {
+    if (!e) return null;
+    return (
+      'https://map.geo.tg.ch/apps/mf-geoadmin3/?lang=de&topic=grundbuchvermessung' +
+      '&bgLayer=basemap_farbig&zoom=8&layers=grundbuch,av_komplett' +
+      `&swisssearch=${encodeURIComponent(e)}`
+    );
+  }
   if (!e || !b) return null;
   return `${PORTAL}?egrid=${encodeURIComponent(e)}&bfsNr=${encodeURIComponent(b)}`;
 }
