@@ -200,8 +200,13 @@ jobs:
           # "x4401_221_gngde", nicht "W2". Die Bezeichnung und die
           # Hauptnutzung stehen in einer eigenen Tabelle des Modells --
           # ohne sie ist das Ergebnis für einen Anruf unbrauchbar.
-          typebene=$(ogrinfo -so "$xtf,/tmp/Nutzungsplanung_V1_2.ili" 2>/dev/null \
-            | grep -o '[A-Za-z_0-9.]*Typ_Grundnutzung' | head -1)
+          # Ohne "|| true" beendet ein erfolgloses grep unter
+          # "set -e" den ganzen Schritt -- genau das ist hier passiert.
+          alle=$(ogrinfo -so "$xtf,/tmp/Nutzungsplanung_V1_2.ili" 2>/dev/null \
+                 | sed -n 's/^[0-9]*: //p' | cut -d' ' -f1 || true)
+          echo "### Vorhandene Ebenen"
+          echo "$alle"
+          typebene=$(echo "$alle" | grep -i 'typ_grundnutzung' | head -1 || true)
           echo "Typenebene: ${typebene:-nicht gefunden}"
           # In eine eigene Datei: an die Zonendatei angehängt versucht
           # GDAL, die Spalten der bestehenden Ebene zu erweitern, und
