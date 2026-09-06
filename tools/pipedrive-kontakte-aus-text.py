@@ -139,10 +139,18 @@ def main() -> None:
 
     arbeit: list[tuple[dict, dict]] = []
     for d in deals:
+        # Steht derselbe Name in "Eigentümer 1" und "Eigentümer 2",
+        # ist es trotzdem ein Mensch.
+        gesehen: set[str] = set()
         for f in dealfelder:
             gelesen = lesen(str(d.get(f['key']) or ''))
-            if gelesen:
-                arbeit.append((d, gelesen))
+            if not gelesen:
+                continue
+            schluessel = gelesen['name'].lower()
+            if schluessel in gesehen:
+                continue
+            gesehen.add(schluessel)
+            arbeit.append((d, gelesen))
 
     print(f'## {len(arbeit)} Namen gefunden')
     print()
