@@ -35,6 +35,17 @@ PIPEDRIVE = 'https://api.pipedrive.com/v1'
 # "CH" und zwölf Ziffern -- so sieht eine EGRID aus.
 EGRID = re.compile(r'\bCH\d{12}\b')
 
+# Die Parzellennummer steht selten allein. Im Kontaktfeld "Grundstück"
+# steht zum Beispiel
+#
+#   1, Grundstück: Liegenschaft Nr. 1344 ( CH136677062815 )
+#
+# Gesucht ist die 1344. Ohne diese Regel landete die ganze Zeile im
+# Titel -- "Parz. 1, Grundstück: Liegenschaft Nr. 1344 ( CH... )".
+NUMMER = re.compile(
+    r'(?:Liegenschaft|Grundst(?:ü|ue)ck|Parzelle)\s*(?:Nr\.?)?\s*'
+    r'\b([A-Z]{0,3}\d{1,6}[a-z]?)\b')
+
 
 def get(pfad: str, token: str, **params) -> dict:
     params['api_token'] = token
@@ -161,7 +172,15 @@ def parzelle_von(deal: dict, personen: dict, feld: str | None) -> str:
     """
     if not feld:
         return ''
-    return str(person_von(deal, personen).get(feld) or '').strip()
+    roh = str(person_von(deal, personen).get(feld) or '').strip()
+    if not roh:
+        return ''
+    # Steht dort nur die Nummer, ist sie es schon.
+    if re.fullmatch(r'[A-Z]{0,3}\d{1,6}[a-z]?', roh):
+        return roh
+    ohne_egrid = EGRID.sub('', roh)
+    treffer = NUMMER.search(ohne_egrid)
+    return treffer.group(1) if treffer else ''
 
 
 def egrid_von(deal: dict, felder: list, personen: dict) -> str:
