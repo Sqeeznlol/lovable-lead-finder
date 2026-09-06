@@ -1,0 +1,86 @@
+# =====================================================================
+# Edge-Funktionen ausliefern
+# =====================================================================
+# Die Funktionen unter supabase/functions laufen bei Supabase, nicht auf
+# der Webseite. Eine Änderung an ihnen wirkt deshalb nicht dadurch, dass
+# sie auf main liegt -- sie muss hochgeladen werden.
+#
+# Genau daran hing heute schon einmal ein halber Tag, nur mit Vercel:
+# der Code war richtig, lag auf main und stand trotzdem nirgends. Damit
+# das hier nicht dasselbe wird, lädt dieser Ablauf sie bei jeder
+# Änderung selbst hoch und sagt hinterher, welche.
+#
+# Gebraucht wird ein Zugriffstoken von Supabase:
+#   Konto -> Account -> Access Tokens -> Generate new token
+#   im Repository als Secret SUPABASE_ACCESS_TOKEN hinterlegen
+# Fehlt es, bricht der Ablauf nicht ab, sondern sagt es -- ein rotes
+# Kreuz für etwas, das niemand gesetzt hat, wäre eine Falschmeldung.
+# =====================================================================
+
+name: Funktionen ausliefern
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+      - '.github/workflows/funktionen.yml'
+  workflow_dispatch:
+
+jobs:
+  ausliefern:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Token vorhanden?
+        id: pruefen
+        env:
+          TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          if [ -z "${TOKEN:-}" ]; then
+            {
+              echo "### Kein Zugriffstoken hinterlegt"
+              echo ""
+              echo "Erwartet wird das Secret \`SUPABASE_ACCESS_TOKEN\`."
+              echo "Zu holen unter Supabase → Account → Access Tokens."
+              echo ""
+              echo "Solange es fehlt, müssen die Funktionen von Hand"
+              echo "hochgeladen werden: \`supabase functions deploy\`."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo 'weiter=nein' >> "$GITHUB_OUTPUT"
+          else
+            echo 'weiter=ja' >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: supabase/setup-cli@v1
+        if: steps.pruefen.outputs.weiter == 'ja'
+        with:
+          version: latest
+
+      - name: Hochladen
+        if: steps.pruefen.outputs.weiter == 'ja'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Die Projektkennung steht im Repository (supabase/config.toml)
+          # und ist kein Geheimnis -- sie steht in jeder Adresse.
+          projekt=$(grep -oP 'project_id\s*=\s*"\K[^"]+' supabase/config.toml)
+          echo "### Ausgeliefert nach $projekt" >> "$GITHUB_STEP_SUMMARY"
+
+          for pfad in supabase/functions/*/; do
+            name=$(basename "$pfad")
+            [ -f "$pfad/index.ts" ] || continue
+            # Die Funktionen werden vom Browser aufgerufen, teils ohne
+            # Anmeldung -- die Prüfung des JWT übernimmt die Funktion
+            # selbst, wie bisher.
+            if supabase functions deploy "$name" \
+                 --project-ref "$projekt" --no-verify-jwt; then
+              echo "- $name ✓" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "- $name **fehlgeschlagen**" >> "$GITHUB_STEP_SUMMARY"
+              fehler=1
+            fi
+          done
+          exit "${fehler:-0}"
