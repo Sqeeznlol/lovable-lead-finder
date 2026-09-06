@@ -234,9 +234,14 @@ def main() -> None:
             if nr in kasten:
                 text += ' ' + texte(kasten[nr])
         treffer = EGRID.search(text)
-        if treffer:
+        if treffer and treffer.group(0) in objekte:
             zu_deal.setdefault(treffer.group(0), d)
             continue
+        # Eine EGRID, die die Datenbank nicht kennt, ist keine
+        # Zuordnung. Dann bleibt die Parzelle -- vorher fielen diese
+        # Deals durch, weil die EGRID als Treffer galt.
+        if treffer:
+            zu_deal.setdefault(treffer.group(0), d)
         schluessel = parzellenschluessel(d.get('title') or '')
         e = ueber_parzelle.get(schluessel or '')
         if e:
