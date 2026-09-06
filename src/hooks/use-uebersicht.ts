@@ -88,24 +88,29 @@ export interface Uebersicht {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const potenzialVon = (p: any) => calculatePotential(p);
 
-export function useUebersicht() {
+export function useUebersicht(kanton?: string) {
+  // Je Kanton ein eigener Schlüssel: sonst erscheinen beim Umschalten
+  // für einen Moment die Zahlen des vorigen.
+  const schluessel = `uebersicht.${kanton ?? 'alle'}`;
   return useQuery({
-    queryKey: ['uebersicht'],
+    queryKey: ['uebersicht', kanton ?? 'alle'],
     // Eine halbe Stunde: der Bestand ändert sich nicht im Minutentakt,
     // und jeder Aufruf kostete bisher vierzig Abfragen samt Neurechnung.
     staleTime: 30 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
     // Beim Öffnen steht sofort das Ergebnis der letzten Rechnung da.
     // Neu gerechnet wird im Hintergrund, ohne dass die Seite leer wird.
-    initialData: () => lesen<Uebersicht>('uebersicht'),
-    initialDataUpdatedAt: () => lesen<number>('uebersicht.zeit'),
+    initialData: () => lesen<Uebersicht>(schluessel),
+    initialDataUpdatedAt: () => lesen<number>(`${schluessel}.zeit`),
     queryFn: async (): Promise<Uebersicht> => {
       // Auch hier genügt die Schätzung: die Zahl steht als Fussnote
       // ("259'000 Objekte im Bestand") und muss nicht auf die Zeile
       // genau stimmen, aber sofort dastehen.
-      const { count: total } = await supabase
+      let zaehlung = supabase
         .from('properties')
         .select('id', { count: 'estimated', head: true });
+      if (kanton) zaehlung = zaehlung.eq('kanton', kanton);
+      const { count: total } = await zaehlung;
 
       const chancen: Chance[] = [];
       const nachEmpfehlung: Record<Empfehlung, number> = {
@@ -121,10 +126,12 @@ export function useUebersicht() {
       // noch verlässlich.
       const SEITE = 1000;
       for (let von = 0; von < 40000; von += SEITE) {
-        const { data, error } = await supabase
+        let abfrage = supabase
           .from('properties')
           .select(FELDER)
-          .eq('ausgeschlossen', false)
+          .eq('ausgeschlossen', false);
+        if (kanton) abfrage = abfrage.eq('kanton', kanton);
+        const { data, error } = await abfrage
           .not('hnf_delta', 'is', null)
           .order('hnf_delta', { ascending: false, nullsFirst: false })
           .range(von, von + SEITE - 1);
@@ -218,8 +225,8 @@ export function useUebersicht() {
       };
       // Nur das Ergebnis wird abgelegt, nicht die vierzigtausend Zeilen,
       // aus denen es entstand.
-      schreiben('uebersicht', ergebnis);
-      schreiben('uebersicht.zeit', Date.now());
+      schreiben(schluessel, ergebnis);
+      schreiben(`${schluessel}.zeit`, Date.now());
       return ergebnis;
     },
   });

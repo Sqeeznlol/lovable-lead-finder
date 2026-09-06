@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useMasterProperties, useGemeindeStats, type MasterFilters } from '@/hooks/use-master';
+import { useCanton } from '@/hooks/use-canton';
 import { MasterFiltersBar } from './MasterFilters';
 import { GemeindeSidebar } from './GemeindeSidebar';
 import { PropertyDetailDialog } from './PropertyDetailDialog';
@@ -65,7 +66,11 @@ export function MasterList() {
   // abarbeitet, schaltet sie dazu.
   const [gemeindenOffen, setGemeindenOffen] = useState(false);
 
-  const { data, isLoading } = useMasterProperties(filters);
+  // Der gewählte Kanton gehört in die Abfrage, nicht nur in die
+  // Überschrift: seit Thurgau dazukam, stünden sonst beide Bestände
+  // vermischt in derselben Liste.
+  const { current } = useCanton();
+  const { data, isLoading } = useMasterProperties({ ...filters, kanton: current });
   const total = data?.total ?? 0;
   const totalPages = Math.ceil(total / (filters.pageSize ?? 50));
 

@@ -5,6 +5,10 @@ import type { Tables } from '@/integrations/supabase/types';
 export type Property = Tables<'properties'>;
 
 export interface MasterFilters {
+  /** Kantonskürzel. Die Auswahl oben war bisher blosse Beschriftung --
+   *  seit Thurgau dazukam, standen beide Bestände vermischt in der
+   *  Liste. */
+  kanton?: string | null;
   search?: string;
   gemeinde?: string | null;     // null = Alle
   bezirk?: string | null;
@@ -100,6 +104,7 @@ function applyFilters<T>(
   if (f.followUpDue) q = q.lte('follow_up_at', new Date().toISOString());
   if (f.hasNote === 'mit') q = q.not('notes', 'is', null);
   if (f.hasNote === 'ohne') q = q.is('notes', null);
+  if (f.kanton) q = q.eq('kanton', f.kanton);
   if (f.listId) q = q.eq('list_id', f.listId);
   if (f.source) q = q.eq('source_file', f.source);
   return q as T;
