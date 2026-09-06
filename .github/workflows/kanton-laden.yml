@@ -491,8 +491,12 @@ jobs:
           echo "Probe: $erste"
 
           rm -f /tmp/probe.gpkg
+          # INTERLIS 1 schreibt das Koordinatensystem nicht in die Datei;
+          # ohne Angabe bricht das Werkzeug ab. 2056 ist LV95, das
+          # Schweizer Bezugssystem seit 2016.
           java -jar "$jar" --dbfile /tmp/probe.gpkg \
             --modeldir "/tmp/av;http://models.interlis.ch/;https://models.geo.admin.ch/" \
+            --defaultSrsCode 2056 \
             --import "$erste" 2>&1 | tail -25
 
           echo
