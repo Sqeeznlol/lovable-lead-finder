@@ -37,8 +37,9 @@ on:
           - umziehen-schreiben  # Pipelines anlegen und Deals einordnen
           - kontakte     # Namen, Adresse und Kartenlink prüfen (Probelauf)
           - kontakte-schreiben  # dasselbe, aber tatsächlich schreiben
+          - deal         # Einen einzelnen Deal ansehen (Nummer in 'grenze')
       grenze:
-        description: 'Höchstzahl Objekte beim Abgleich'
+        description: 'Höchstzahl Objekte -- bei "deal" die Deal-Nummer'
         required: false
         default: '50'
 
@@ -102,6 +103,10 @@ jobs:
               ;;
             umziehen-schreiben)
               python3 tools/pipedrive-umziehen.py --schreiben \
+                | tee -a "$GITHUB_STEP_SUMMARY"
+              ;;
+            deal)
+              python3 tools/pipedrive-deal.py "${{ inputs.grenze }}" \
                 | tee -a "$GITHUB_STEP_SUMMARY"
               ;;
             kontakte)
