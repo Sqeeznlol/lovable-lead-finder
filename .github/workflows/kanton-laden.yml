@@ -283,12 +283,16 @@ jobs:
           done
           ogrinfo -so -al /tmp/arbeit.sqlite 2>/dev/null \
             | grep -E 'Layer name|Feature Count' | paste - -
+          # Ohne die Grundstücke fehlen EGRID und Parzellennummer -- dann
+          # ist das Ergebnis wertlos.
+          ogrinfo -so /tmp/arbeit.sqlite grundstueck > /dev/null 2>&1 \
+            || { echo "Ebene grundstueck fehlt."; exit 1; }
 
           # Wie die Geometriespalte heisst, sagt die Datei selbst; darauf
           # zu raten hat diesen Ablauf schon mehrfach einen Lauf gekostet.
-          gsp=$(ogrinfo -so -al /tmp/arbeit.sqlite flaechen 2>/dev/null \
+          gsp=$(ogrinfo -so /tmp/arbeit.sqlite flaechen 2>/dev/null \
                 | sed -n 's/^Geometry Column = //p' | head -1)
-          gsz=$(ogrinfo -so -al /tmp/arbeit.sqlite zonen 2>/dev/null \
+          gsz=$(ogrinfo -so /tmp/arbeit.sqlite zonen 2>/dev/null \
                 | sed -n 's/^Geometry Column = //p' | head -1)
           echo "Geometrie: flaechen.${gsp:?} zonen.${gsz:?}"
 
