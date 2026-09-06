@@ -39,7 +39,7 @@ GEBRAUCHT = {
     'Kanton': 'varchar',
     'Zone': 'varchar',
     'Grundstück m²': 'double',
-    'HNF m²': 'double',
+    'Mehr Wohnfläche m²': 'double',
     'Baujahr': 'double',
     'ÖREB Kataster': 'varchar',
 }

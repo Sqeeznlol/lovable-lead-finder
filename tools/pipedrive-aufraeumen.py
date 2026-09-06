@@ -41,6 +41,12 @@ import urllib.request
 
 PIPEDRIVE = 'https://api.pipedrive.com/v1'
 
+# Alter Name -> neuer Name. "HNF" ist die Hauptnutzflaeche, und was im
+# Feld steht, ist nicht einmal sie, sondern ihr Zuwachs: wie viel
+# Wohnflaeche auf der Parzelle noch dazukaeme. Genau das ist das
+# Argument am Telefon -- und genau das las man dem Kuerzel nicht an.
+UMBENENNEN = {'HNF m²': 'Mehr Wohnfläche m²'}
+
 # Felder am Kontakt, die Herkunft tragen und keine Aufgabe sind.
 HERKUNFT = ('Objektinfo', 'Grundstück', 'Fläche', 'Grundbuch')
 
@@ -133,6 +139,20 @@ def main() -> None:
             sende(f'/personFields/{f["id"]}', token,
                   {'add_visible_flag': False}, 'PUT')
     print()
+
+    # -------------------------------------------- 2b. Klarere Namen
+    umzubenennen = [f for f in dealfelder
+                    if f.get('name') in UMBENENNEN
+                    and f.get('name') != UMBENENNEN[f['name']]]
+    if umzubenennen:
+        print(f'## {len(umzubenennen)} Felder heissen missverständlich')
+        print()
+        for f in umzubenennen:
+            neu = UMBENENNEN[f['name']]
+            print(f'- `{f["name"]}` wird `{neu}`')
+            if args.schreiben:
+                sende(f'/dealFields/{f["id"]}', token, {'name': neu}, 'PUT')
+        print()
 
     # ------------------------------------------------ 3. EGID anlegen
     schluessel = {f['name']: f['key'] for f in dealfelder if f.get('name')}
