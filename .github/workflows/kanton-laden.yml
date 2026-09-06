@@ -174,11 +174,24 @@ jobs:
                 || inputs.schritt == 'verschneiden' }}
         run: |
           set -euo pipefail
-          xtf=$(find /tmp/npl -name '*.xtf' | head -1)
 
-          # Der Ebenenname trägt den vollen Pfad im Modell. Ein blosses
-          # "Grundnutzung_Zonenflaeche" trifft nichts -- der erste Versuch
-          # lieferte deshalb eine leere Datei von zwei Kilobyte.
+          # Zwei Wege wurden gebraucht, weil jeder für sich zu wenig
+          # liefert:
+          #
+          #   GDAL bringt die Zonenflächen mit Umriss, aber in der Fläche
+          #   steht nur ein Schlüssel wie "x4401_221_gngde". Die
+          #   Typentabelle mit "W2" faltet GDAL in dieselbe Ebene und
+          #   verwirft dabei ihre Spalten.
+          #
+          #   ili2gpkg liest die Typentabelle richtig, brach aber ab: die
+          #   Typen verweisen auf einen Katalog des Bundes, der nicht in
+          #   derselben Datei steht. "--skipReferenceErrors" lässt diese
+          #   Verweise offen -- gebraucht werden Bezeichnung und
+          #   Abkürzung, nicht der Katalogeintrag.
+          #
+          # Also: Umrisse von GDAL, Namen von ili2gpkg.
+
+          xtf=$(find /tmp/npl -name '*.xtf' | head -1)
           ebene=$(ogrinfo -so "$xtf,/tmp/Nutzungsplanung_V1_2.ili" 2>/dev/null \
             | grep -o '[A-Za-z_0-9.]*Grundnutzung_Zonenflaeche' | head -1)
           echo "Ebene: ${ebene:-nicht gefunden}"
@@ -187,20 +200,9 @@ jobs:
             exit 1
           fi
 
-          # Nur die Grundnutzung: das sind die Zonen, in denen gebaut wird.
           ogr2ogr -f GPKG /tmp/zonen.gpkg \
             "$xtf,/tmp/Nutzungsplanung_V1_2.ili" \
             -nln zonen "$ebene"
-
-          # Zum Zonennamen: In der Fläche steht nur ein Schlüssel wie
-          # "x4401_221_gngde". Die Bezeichnung ("W2") steht in der
-          # Typentabelle, und die ist mit beiden Werkzeugen nicht
-          # herauszulösen: GDAL faltet sie in die Zonenfläche und
-          # verwirft ihre Spalten, ili2gpkg bricht ab, weil die Typen auf
-          # einen Katalog des Bundes in einer eigenen Datei verweisen.
-          # Der Schlüssel trägt die Gemeindenummer und eine laufende
-          # Nummer -- die Zuordnung zu "W2" folgt getrennt, sie hält den
-          # Rest nicht auf.
 
           ls -lh /tmp/zonen.gpkg
           n=$(ogrinfo -so -al /tmp/zonen.gpkg 2>/dev/null \
@@ -209,6 +211,36 @@ jobs:
           if [ "${n:-0}" -lt 1000 ]; then
             echo "Zu wenige Zonenflächen -- erwartet werden Zehntausende." >&2
             exit 1
+          fi
+
+          echo
+          echo "### Zonennamen holen"
+          curl -sSL -o /tmp/ili2gpkg.zip \
+            "https://downloads.interlis.ch/ili2gpkg/ili2gpkg-5.1.1.zip"
+          unzip -o -q /tmp/ili2gpkg.zip -d /tmp/ili2gpkg
+          jar=$(find /tmp/ili2gpkg -name 'ili2gpkg*.jar' | head -1)
+          modelldir="/tmp;http://models.interlis.ch/;https://models.geo.admin.ch/"
+
+          rm -f /tmp/zonentyp.gpkg
+          java -jar "$jar" --dbfile /tmp/zonentyp.gpkg \
+            --modeldir "$modelldir" --defaultSrsCode 2056 \
+            --models Nutzungsplanung_V1_2 --createBasketCol --schemaimport \
+            > /tmp/zschema.log 2>&1 || tail -5 /tmp/zschema.log
+          java -jar "$jar" --dbfile /tmp/zonentyp.gpkg \
+            --modeldir "$modelldir" --defaultSrsCode 2056 \
+            --createBasketCol --disableValidation --skipReferenceErrors \
+            --import "$xtf" > /tmp/zimport.log 2>&1 || tail -5 /tmp/zimport.log
+
+          if ogrinfo -so /tmp/zonentyp.gpkg typ_grundnutzung > /dev/null 2>&1; then
+            echo "Spalten:"
+            ogrinfo -so /tmp/zonentyp.gpkg typ_grundnutzung 2>/dev/null \
+              | sed -n '/^Feature Count/p;/^[a-z_0-9]*:/p'
+            echo "Proben:"
+            ogr2ogr -f CSV /vsistdout/ /tmp/zonentyp.gpkg typ_grundnutzung \
+              -limit 5 -lco GEOMETRY=NO 2>/dev/null || true
+          else
+            echo "Typentabelle weiterhin nicht lesbar -- es bleibt beim Schlüssel."
+            rm -f /tmp/zonentyp.gpkg
           fi
 
       - name: Ergebnis bereitstellen
@@ -278,6 +310,12 @@ jobs:
 
           ogr2ogr -f GPKG /tmp/arbeit.gpkg -append -nln zonen \
             /tmp/zonen.gpkg zonen
+          if [ -f /tmp/zonentyp.gpkg ]; then
+            ogr2ogr -f GPKG /tmp/arbeit.gpkg -append -nln zonentyp \
+              /tmp/zonentyp.gpkg -dialect sqlite \
+              -sql "SELECT T_Id AS typ_id, bezeichnung, abkuerzung
+                    FROM typ_grundnutzung"
+          fi
 
           # Ohne räumlichen Index vergleicht die Datenbank jede der
           # 140'000 Parzellen mit jeder der 57'000 Zonen -- acht
@@ -301,8 +339,7 @@ jobs:
           if ogrinfo -so /tmp/arbeit.gpkg zonentyp > /dev/null 2>&1; then
             ogr2ogr -f SQLite /tmp/arbeit.sqlite -append \
               -dsco SPATIALITE=YES -nln zonentyp /tmp/arbeit.gpkg zonentyp
-            namen_wahl="t.bezeichnung AS zone_name, t.abkuerzung AS zone_kurz,
-                        t.hauptnutzung_ch AS hauptnutzung,"
+            namen_wahl="t.bezeichnung AS zone_name, t.abkuerzung AS zone_kurz,"
             namen_join="LEFT JOIN zonentyp t ON t.typ_id = z.typ"
           fi
           echo "Zonennamen: ${namen_wahl:-keine}"
