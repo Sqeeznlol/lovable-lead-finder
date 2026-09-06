@@ -176,46 +176,34 @@ jobs:
           set -euo pipefail
           xtf=$(find /tmp/npl -name '*.xtf' | head -1)
 
-          # Auch hier das amtliche Werkzeug statt GDAL. GDAL faltet die
-          # Typentabelle in die Zonenfläche hinein und verwirft dabei
-          # genau die Spalten, um die es geht ("Failed to add new
-          # definition to existing layers ... Abkuerzung, Bemerkungen").
-          # Übrig bliebe ein Schlüssel wie "x4401_221_gngde" -- für ein
-          # Telefonat wertlos, denn niemand ruft wegen "x4401_221" an,
-          # sondern wegen einer W2 mit ungenutzten Geschossen.
-          curl -sSL -o /tmp/ili2gpkg.zip \
-            "https://downloads.interlis.ch/ili2gpkg/ili2gpkg-5.1.1.zip"
-          unzip -o -q /tmp/ili2gpkg.zip -d /tmp/ili2gpkg
-          jar=$(find /tmp/ili2gpkg -name 'ili2gpkg*.jar' | head -1)
+          # Der Ebenenname trägt den vollen Pfad im Modell. Ein blosses
+          # "Grundnutzung_Zonenflaeche" trifft nichts -- der erste Versuch
+          # lieferte deshalb eine leere Datei von zwei Kilobyte.
+          ebene=$(ogrinfo -so "$xtf,/tmp/Nutzungsplanung_V1_2.ili" 2>/dev/null \
+            | grep -o '[A-Za-z_0-9.]*Grundnutzung_Zonenflaeche' | head -1)
+          echo "Ebene: ${ebene:-nicht gefunden}"
+          if [ -z "$ebene" ]; then
+            echo "Die Ebene mit den Zonen liess sich nicht finden." >&2
+            exit 1
+          fi
 
-          modelldir="/tmp;http://models.interlis.ch/;https://models.geo.admin.ch/"
-          rm -f /tmp/zonen.gpkg
-          java -jar "$jar" --dbfile /tmp/zonen.gpkg \
-            --modeldir "$modelldir" --defaultSrsCode 2056 \
-            --models Nutzungsplanung_V1_2 --createBasketCol --schemaimport \
-            > /tmp/zschema.log 2>&1 || { tail -20 /tmp/zschema.log; exit 1; }
-          java -jar "$jar" --dbfile /tmp/zonen.gpkg \
-            --modeldir "$modelldir" --defaultSrsCode 2056 \
-            --disableValidation --createBasketCol --import "$xtf" \
-            > /tmp/zimport.log 2>&1 || true
-          grep -iE 'error|failed' /tmp/zimport.log | head -10 \
-            || echo "(Einlesen ohne Fehler)"
+          # Nur die Grundnutzung: das sind die Zonen, in denen gebaut wird.
+          ogr2ogr -f GPKG /tmp/zonen.gpkg \
+            "$xtf,/tmp/Nutzungsplanung_V1_2.ili" \
+            -nln zonen "$ebene"
+
+          # Zum Zonennamen: In der Fläche steht nur ein Schlüssel wie
+          # "x4401_221_gngde". Die Bezeichnung ("W2") steht in der
+          # Typentabelle, und die ist mit beiden Werkzeugen nicht
+          # herauszulösen: GDAL faltet sie in die Zonenfläche und
+          # verwirft ihre Spalten, ili2gpkg bricht ab, weil die Typen auf
+          # einen Katalog des Bundes in einer eigenen Datei verweisen.
+          # Der Schlüssel trägt die Gemeindenummer und eine laufende
+          # Nummer -- die Zuordnung zu "W2" folgt getrennt, sie hält den
+          # Rest nicht auf.
 
           ls -lh /tmp/zonen.gpkg
-          echo "### Ebenen"
-          ogrinfo -so -al /tmp/zonen.gpkg 2>/dev/null \
-            | grep -E 'Layer name|Feature Count' | paste - - \
-            | grep -iE 'zonenflaeche|typ_grundnutzung' || true
-
-          for e in grundnutzung_zonenflaeche typ_grundnutzung; do
-            echo "--- Spalten von $e"
-            ogrinfo -so /tmp/zonen.gpkg "$e" 2>&1 \
-              | sed -n '/^[a-z_0-9]*:/p' || true
-            ogr2ogr -f CSV /vsistdout/ /tmp/zonen.gpkg "$e" \
-              -limit 3 -lco GEOMETRY=NO 2>/dev/null || true
-          done
-
-          n=$(ogrinfo -so /tmp/zonen.gpkg grundnutzung_zonenflaeche 2>/dev/null \
+          n=$(ogrinfo -so -al /tmp/zonen.gpkg 2>/dev/null \
             | grep -oP 'Feature Count: \K[0-9]+' | head -1)
           echo "Zonenflächen: ${n:-0}"
           if [ "${n:-0}" -lt 1000 ]; then
@@ -289,12 +277,7 @@ jobs:
               JOIN grundstueck g ON g.T_Id = l.liegenschaft_von"
 
           ogr2ogr -f GPKG /tmp/arbeit.gpkg -append -nln zonen \
-            /tmp/zonen.gpkg grundnutzung_zonenflaeche
-          ogr2ogr -f GPKG /tmp/arbeit.gpkg -append -nln zonentyp \
-            /tmp/zonen.gpkg -dialect sqlite \
-            -sql "SELECT T_Id AS typ_id, bezeichnung, abkuerzung,
-                         hauptnutzung_ch
-                  FROM typ_grundnutzung"
+            /tmp/zonen.gpkg zonen
 
           # Ohne räumlichen Index vergleicht die Datenbank jede der
           # 140'000 Parzellen mit jeder der 57'000 Zonen -- acht
