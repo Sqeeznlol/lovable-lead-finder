@@ -48,6 +48,7 @@ on:
           - zonentypen   # Nur die Zonennamen aus der Datei lesen
           - einspielen   # Verschnitt in die Datenbank (Probelauf)
           - einspielen-schreiben   # dasselbe, aber tatsächlich schreiben
+          - gwr          # Gebäuderegister ansehen: Adressen, Baujahr, Geschosse
 
 jobs:
   laden:
@@ -733,3 +734,40 @@ jobs:
           psql "$DB" -X -q -c "
             select kanton, count(*) from public.properties
             group by 1 order by 2 desc;"
+
+      # =============================================================
+      # Gebäude- und Wohnungsregister
+      # =============================================================
+      # Die amtliche Vermessung kennt Parzellen, aber keine Häuser: kein
+      # Baujahr, keine Geschosse, keine Adresse. Genau die drei
+      # entscheiden am Telefon, ob sich ein Anruf lohnt.
+      #
+      # Das Register führt der Bund, kantonsweise und frei abrufbar. Es
+      # trägt die EGID je Gebäude und die EGRID der Parzelle darunter --
+      # damit lässt es sich an den Verschnitt hängen.
+      #
+      # Der erste Lauf sieht nur nach: welche Dateien, welche Spalten.
+      # Auf Spaltennamen zu raten hat in diesem Vorhaben schon genug
+      # Läufe gekostet.
+      - name: Register ansehen
+        if: ${{ startsWith(inputs.schritt, 'gwr') }}
+        env:
+          KANTON: ${{ inputs.kanton }}
+        run: |
+          set -euo pipefail
+          klein=$(echo "$KANTON" | tr 'A-Z' 'a-z')
+          curl -sSL -o /tmp/gwr.zip \
+            "https://public.madd.bfs.admin.ch/${klein}.zip"
+          ls -lh /tmp/gwr.zip
+          file /tmp/gwr.zip
+          mkdir -p /tmp/gwr && unzip -o -q /tmp/gwr.zip -d /tmp/gwr
+          echo "### Dateien"
+          find /tmp/gwr -type f -printf '%p  %s Bytes\n' | sort
+          echo
+          for f in /tmp/gwr/*.csv; do
+            echo "### $(basename "$f")  --  $(( $(wc -l < "$f") - 1 )) Zeilen"
+            head -1 "$f" | tr '\t;' '\n\n' | nl | head -40
+            echo "-- erste Zeile:"
+            sed -n '2p' "$f" | cut -c1-400
+            echo
+          done
