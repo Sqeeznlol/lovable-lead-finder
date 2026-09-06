@@ -110,6 +110,7 @@ export function Uebersicht() {
                     parzelle={c.parzelle}
                     bfsNr={c.bfsNr}
                     gemeinde={c.gemeinde}
+                    kanton={c.kanton}
                     className="hidden h-36 w-52 shrink-0 sm:block"
                   />
 

@@ -90,6 +90,8 @@ export function swisstopoMapUrl(lat: number, lon: number, zoom = 12): string {
  * über die ganze Parzelle oder nur über die Hälfte" genügt sie -- und sie ist
  * frei und ohne Schlüssel abrufbar.
  */
+import { wgs84NachLv95 } from './koordinaten';
+
 export const ZONEN_ZOOM = 17;
 
 export function bauzonenTileUrl(lat: number, lon: number, zoom = ZONEN_ZOOM): string {
@@ -118,6 +120,56 @@ export function oerebParzelleUrl(
   const ort = String(bfsNr ?? '').trim();
   if (!nr || !ort) return null;
   return `https://maps.zh.ch/?locate=parz&locations=${encodeURIComponent(ort)},${encodeURIComponent(nr)}&topic=OerebKatasterZH`;
+}
+
+/**
+ * ÖREB-Kataster des Kantons Thurgau an einer Stelle.
+ *
+ * Der Thurgau führt einen eigenen Kataster, und er kennt die Zürcher
+ * Parzellennummern nicht: ein Link auf maps.zh.ch zeigte für ein
+ * Thurgauer Grundstück irgendeine Zürcher Parzelle mit derselben
+ * Nummer -- schlimmer als kein Link, weil er beim Telefonieren
+ * glaubwürdig aussieht.
+ *
+ * Angesteuert wird über Landeskoordinaten statt über die
+ * Parzellennummer; das Portal sucht keine Nummern, es zeigt Orte. Die
+ * Ebenen sind die des Themas "oereb": Liegenschaften, Bauzonen,
+ * Schutzzonen, Landwirtschaft.
+ */
+export function oerebThurgauUrl(lat: number, lon: number): string {
+  const { e, n } = wgs84NachLv95(lat, lon);
+  const ebenen = [
+    'oereb_liegenschaften-gfi',
+    'oereb_ortsplanung_weitere_bauzonen',
+    'oereb_ortsplanung_schutz_bauzonen',
+    'oereb_ortsplanung_landwirt',
+    'oereb_ortsplanung_bauzonen',
+    'oereb_ortsplanung_ueberlagernd',
+  ].join(',');
+  return (
+    'https://map.geo.tg.ch/apps/mf-geoadmin3/?lang=de&topic=oereb' +
+    `&bgLayer=basemap_farbig&E=${e.toFixed(2)}&N=${n.toFixed(2)}` +
+    `&zoom=9&layers=${ebenen}`
+  );
+}
+
+/**
+ * Der Kataster des richtigen Kantons.
+ *
+ * Bis heute führte jeder Link auf Zürich -- auch für die 137'214
+ * Thurgauer Objekte, die seit heute in der Liste stehen.
+ */
+export function katasterUrl(
+  kanton: string | null | undefined,
+  lat: number,
+  lon: number,
+  parzelle?: string | null,
+  bfsNr?: string | number | null,
+): string {
+  if (String(kanton ?? '').trim().toUpperCase() === 'TG') {
+    return oerebThurgauUrl(lat, lon);
+  }
+  return oerebParzelleUrl(parzelle, bfsNr) ?? oerebUrl(lat, lon);
 }
 
 /** ÖREB-Kataster an einer Stelle, wenn keine Parzellennummer bekannt ist. */
