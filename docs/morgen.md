@@ -51,61 +51,59 @@ Solange sie fehlen, wirken die Zonenausschlüsse nur in der Übersicht
 (die im Browser rechnet), nicht in der Masterliste (die die Spalte
 `ausgeschlossen` aus der Datenbank liest).
 
-## Thurgau -- Schritte eins bis drei sind fertig
+## Thurgau -- fertig, ohne Potenzialrechnung
 
-Die Quelle ist frei abrufbar; das Kantonskürzel steckt im Pfad, für Zug
-oder Aargau gilt dieselbe Adresse.
+Am 6. September durchgelaufen und in der Datenbank:
 
-    https://geodienste.ch/downloads/interlis/npl_nutzungsplanung/TG/
-      npl_nutzungsplanung_v1_2_TG_lv95.zip      41.5 MB
-    https://geodienste.ch/downloads/interlis/av/TG/
-      av_TG_lv95.zip                           159.5 MB
+    137'214  Parzellen mit EGRID, Nummer, Gemeindenummer, Fläche
+              und Zonenanteil
+     73'191  davon mit Adresse
+     60'382  mit Baujahr, 65'454 mit Geschossen, 63'349 mit Wohnungen
+    137'214  mit Zonenname im Klartext ("W2 Wohnzone 2a")
 
-In der Nacht auf den 6. September durchgelaufen:
+Drei Dinge waren dafür zu lösen, und alle drei waren derselbe Fehler in
+verschiedener Verkleidung -- etwas wurde nicht angesehen, sondern
+geraten:
 
-    56'810   Zonenflächen
-    140'275  Grundstücke
-    137'233  Parzellenflächen mit Umriss
-    193'642  Ergebniszeilen: je Parzelle und Zone die Fläche
-             und der Anteil in Prozent
+  * **Der Zonenname.** Gesucht wurde tagelang eine Tabelle
+    "Typ_Grundnutzung". Die gibt es in diesem Modell nicht. Sie heisst
+    "Nutzungsplanung_V1_2.Geobasisdaten.Typ" (2'202 Stück, je Gemeinde)
+    und ".Typ_Kt" (134, kantonsweit) und lag von Anfang an in derselben
+    Datei. Sichtbar wurde das erst, als die Diagnoseliste im Protokoll
+    nicht mehr nach acht Zeilen abbrach.
 
-Eine Zeile sieht so aus:
+  * **Adressen und Gebäudedaten.** Die Vermessung kennt keine Häuser.
+    Das Gebäude- und Wohnungsregister des Bundes schon, kantonsweise
+    frei abrufbar unter public.madd.bfs.admin.ch/tg.zip -- mit EGID je
+    Gebäude und EGRID der Parzelle, also direkt anhängbar. 124'126
+    Gebäude, 126'220 Eingänge.
 
-    CH842026777174, Parzelle 776, TG4401, 171'348 m² gesamt,
-    davon 2'144 m² (1 %) in der einen und 4'266 m² (2 %) in
-    der nächsten Zone
+  * **Der ÖREB-Link.** Er wurde selbst gebaut und brauchte dafür die
+    Gemeindenummer, die oft fehlt. Dabei stand der fertige Link längst
+    in der Spalte housing_stat_url.
 
-Genau darauf kommt es an: eine Parzelle kann zur Hälfte Wohnzone und zur
-Hälfte Wald sein, bebauen lässt sich nur der Zonenanteil. In Zürich war
-das anfangs übersehen worden, mit dem Ergebnis von Margen in
-Milliardenhöhe.
+Offen bleibt allein die **Ausnützungsziffer**: ohne sie keine
+Potenzialrechnung, kein hnf_delta, keine Marge. Für Zürich liefert das
+die kantonale Bauordnung, im Thurgau regeln es die Gemeinden je
+einzeln. Julian rechnet das selbst.
 
-Zwei Dinge waren dabei zu lösen und sind es wert, notiert zu werden:
+## Ein Index, drei Mal vergessen
 
-  * GDAL liest die Amtliche Vermessung nur halb -- die Spalten heissen
-    Field01 bis Field09 und die Grundstücksgrenzen bleiben lose Linien.
-    Ohne Flächen ist jede Rechnung wertlos. Die Umwandlung läuft deshalb
-    über ili2gpkg aus der amtlichen INTERLIS-Werkzeugkette. Das gilt für
-    jeden weiteren Kanton.
-  * Ohne räumlichen Index vergleicht die Datenbank jede der 140'000
-    Parzellen mit jeder der 57'000 Zonen. Ein Lauf lief eine halbe
-    Stunde ohne eine einzige Zeile. Mit Index dauert es zwei Minuten.
+Derselbe Fehler an drei Stellen desselben Tages, und er kostete jedes
+Mal Stunden:
 
-Offen:
+  1. **Verschneiden** -- ohne räumlichen Index verglich die Datenbank
+     jede der 140'000 Parzellen mit jeder der 57'000 Zonen. Ein Lauf
+     lief eine halbe Stunde ohne eine einzige Zeile.
+  2. **Einspielen** -- die Vorschau verglich 193'642 Zeilen mit
+     259'057 und brach nach zwei Minuten ab.
+  3. **Die Webseite** -- die Abfrage "gib mir die Objekte des Kantons"
+     lief in die Frist von PostgREST und lieferte dem Browser
+     HTTP 500 statt Daten. Thurgau war deshalb in der Datenbank, aber
+     nicht auf der Seite zu sehen.
 
-1. Zonenname. In der Zonenfläche steht nur ein Schlüssel wie
-   "x4401_221_gngde", nicht "W2". Die Bezeichnung steht in einer
-   Typentabelle, die sich mit keinem der beiden Werkzeuge herauslösen
-   liess: GDAL faltet sie in die Zonenfläche und verwirft ihre Spalten,
-   ili2gpkg bricht ab, weil die Typen auf einen Katalog des Bundes in
-   einer eigenen Datei verweisen. Ohne den Namen lässt sich nicht
-   rechnen, wie hoch gebaut werden darf -- das ist die nächste Aufgabe.
-2. Adressen und Gebäudedaten (Baujahr, Geschosse, Wohnungen) fehlen.
-3. In die Datenbank schreiben, `kanton = TG`.
-
-Die Zwischenstände liegen als Artefakte am Lauf "Kanton laden"; die
-Umwandlung der Vermessung dauert eine halbe Stunde und muss dank
-"schritt: verschneiden" nicht wiederholt werden.
+Merksatz für den nächsten Kanton: **Wer eine Spalte filtert, legt
+vorher den Index an.**
 
 ## Pipedrive
 
