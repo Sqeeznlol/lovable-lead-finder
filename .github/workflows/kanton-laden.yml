@@ -568,15 +568,18 @@ jobs:
         if: ${{ inputs.schritt == 'zonentypen' }}
         run: |
           set -euo pipefail
-          xtf=$(find /tmp/npl -name '*.xtf' | head -1)
-          ls -lh "$xtf"
+          echo "### Alle Dateien der Lieferung"
+          # Bisher wurde blind die erste XTF-Datei genommen. In ihr steht
+          # keine Typentabelle -- gut möglich, dass sie in einer zweiten
+          # liegt, die dabei ist.
+          find /tmp/npl -type f -printf '%p  %s Bytes\n' | sort
           echo
-          echo "### Anfang der Datei"
-          head -c 1500 "$xtf"
-          echo
-          echo
-          echo "### Leser"
-          python3 tools/zonentypen.py "$xtf" /tmp/zonentypen.csv || true
+          echo "### Leser über alle XTF-Dateien"
+          for f in $(find /tmp/npl -name '*.xtf' | sort); do
+            echo "-- $f"
+            python3 tools/zonentypen.py "$f" /tmp/zonentypen.csv 2>&1 \
+              | head -8 || true
+          done
           echo
           echo "### Ergebnis"
           head -10 /tmp/zonentypen.csv
