@@ -59,6 +59,7 @@ on:
           - pruefen      # Alle Felder und einen Deal mit Feldnamen zeigen
           - aufraeumen   # Feldnamen, ÖREB-Link, EGID, Zone (Probelauf)
           - aufraeumen-schreiben   # dasselbe, aber tatsächlich schreiben
+          - kontaktfelder-weg      # Objektinfo/Grundstück/Grundbuch löschen
       grenze:
         description: 'Höchstzahl Objekte -- bei "deal" die Deal-Nummer'
         required: false
@@ -148,7 +149,7 @@ jobs:
               python3 tools/pipedrive-fuellen.py --objekte /tmp/objekte.csv \
                 $zusatz | tee -a "$GITHUB_STEP_SUMMARY"
               ;;
-            aufraeumen|aufraeumen-schreiben)
+            aufraeumen|aufraeumen-schreiben|kontaktfelder-weg)
               sudo apt-get install -y -qq postgresql-client
               psql "$SUPABASE_DB_URL" -X -q --csv -c "
                 select egrid,
@@ -161,6 +162,10 @@ jobs:
               zusatz=""
               [ "${{ inputs.aufgabe }}" = "aufraeumen-schreiben" ] \
                 && zusatz="--schreiben"
+              # Loeschen erst nach Sicherung: die Datei wird unten als
+              # Artefakt abgelegt und bleibt 90 Tage abrufbar.
+              [ "${{ inputs.aufgabe }}" = "kontaktfelder-weg" ] \
+                && zusatz="--schreiben --felder-loeschen"
               python3 tools/pipedrive-aufraeumen.py --objekte /tmp/objekte.csv \
                 $zusatz | tee -a "$GITHUB_STEP_SUMMARY"
               ;;
@@ -302,3 +307,14 @@ jobs:
               python3 tools/pipedrive-analyse.py | tee -a "$GITHUB_STEP_SUMMARY"
               ;;
           esac
+
+      # Was aus Pipedrive verschwindet, muss anderswo bleiben: die
+      # Grundbuchtexte der Thurgauer Kontakte sind die Quelle, aus der
+      # Titel, Parzelle und EGRID stammen.
+      - name: Sicherung aufbewahren
+        if: always() && inputs.aufgabe == 'kontaktfelder-weg'
+        uses: actions/upload-artifact@v4
+        with:
+          name: kontaktfelder
+          path: /tmp/kontaktfelder.json
+          retention-days: 90
