@@ -57,6 +57,8 @@ on:
           - abgleich     # ZH-Objekte mit Pipedrive abgleichen (Probelauf)
           - abgleich-schreiben     # dasselbe, aber tatsächlich schreiben
           - pruefen      # Alle Felder und einen Deal mit Feldnamen zeigen
+          - aufraeumen   # Feldnamen, ÖREB-Link, EGID, Zone (Probelauf)
+          - aufraeumen-schreiben   # dasselbe, aber tatsächlich schreiben
       grenze:
         description: 'Höchstzahl Objekte -- bei "deal" die Deal-Nummer'
         required: false
@@ -144,6 +146,21 @@ jobs:
               [ "${{ inputs.aufgabe }}" = "fuellen-schreiben" ] \
                 && zusatz="--schreiben"
               python3 tools/pipedrive-fuellen.py --objekte /tmp/objekte.csv \
+                $zusatz | tee -a "$GITHUB_STEP_SUMMARY"
+              ;;
+            aufraeumen|aufraeumen-schreiben)
+              sudo apt-get install -y -qq postgresql-client
+              psql "$SUPABASE_DB_URL" -X -q --csv -c "
+                select egrid,
+                       coalesce(parzelle, plot_number, '') as parzelle,
+                       coalesce(bfs_nr::text,'')      as bfs_nr,
+                       coalesce(gwr_egid::text,'')    as gwr_egid
+                from properties where egrid is not null" > /tmp/objekte.csv
+              wc -l /tmp/objekte.csv
+              zusatz=""
+              [ "${{ inputs.aufgabe }}" = "aufraeumen-schreiben" ] \
+                && zusatz="--schreiben"
+              python3 tools/pipedrive-aufraeumen.py --objekte /tmp/objekte.csv \
                 $zusatz | tee -a "$GITHUB_STEP_SUMMARY"
               ;;
             pruefen)
