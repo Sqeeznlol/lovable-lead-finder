@@ -200,27 +200,24 @@ jobs:
           # "x4401_221_gngde", nicht "W2". Die Bezeichnung und die
           # Hauptnutzung stehen in einer eigenen Tabelle des Modells --
           # ohne sie ist das Ergebnis für einen Anruf unbrauchbar.
-          # Ohne "|| true" beendet ein erfolgloses grep unter
-          # "set -e" den ganzen Schritt -- genau das ist hier passiert.
-          alle=$(ogrinfo -so "$xtf,/tmp/Nutzungsplanung_V1_2.ili" 2>/dev/null \
-                 | sed -n 's/^[0-9]*: //p' | cut -d' ' -f1 || true)
-          echo "### Vorhandene Ebenen"
-          echo "$alle"
-          typebene=$(echo "$alle" | grep -i 'typ_grundnutzung' | head -1 || true)
-          echo "Typenebene: ${typebene:-nicht gefunden}"
-          # In eine eigene Datei: an die Zonendatei angehängt versucht
-          # GDAL, die Spalten der bestehenden Ebene zu erweitern, und
-          # verwirft sie dann.
-          if [ -n "$typebene" ]; then
-            rm -f /tmp/zonentyp.gpkg
-            ogr2ogr -f GPKG /tmp/zonentyp.gpkg \
-              "$xtf,/tmp/Nutzungsplanung_V1_2.ili" \
-              -nln zonentyp "$typebene"
+          # Die Typentabelle liegt im selben Themenbereich wie die
+          # Zonenflächen -- ihr Name ergibt sich daraus, statt ihn zu
+          # suchen. Die Suche danach hat zweimal den ganzen Schritt
+          # abgebrochen, weil ein erfolgloses grep unter "set -e" zählt.
+          typebene="${ebene%Grundnutzung_Zonenflaeche}Typ_Grundnutzung"
+          echo "Typenebene: $typebene"
+          rm -f /tmp/zonentyp.gpkg
+          ogr2ogr -f GPKG /tmp/zonentyp.gpkg \
+            "$xtf,/tmp/Nutzungsplanung_V1_2.ili" \
+            -nln zonentyp "$typebene" || true
+          if [ -f /tmp/zonentyp.gpkg ]; then
             echo "Spalten der Typenebene:"
             ogrinfo -so /tmp/zonentyp.gpkg zonentyp 2>/dev/null \
               | sed -n '/^Feature Count/p;/^[A-Za-z_0-9]*: /p'
             ogr2ogr -f CSV /vsistdout/ /tmp/zonentyp.gpkg zonentyp \
               -limit 3 -lco GEOMETRY=NO 2>/dev/null || true
+          else
+            echo "Typentabelle nicht gefunden -- es bleibt beim Schlüssel."
           fi
 
           ls -lh /tmp/zonen.gpkg
@@ -301,8 +298,8 @@ jobs:
 
           ogr2ogr -f GPKG /tmp/arbeit.gpkg -append -nln zonen \
             /tmp/zonen.gpkg zonen
-          ogr2ogr -f GPKG /tmp/arbeit.gpkg -append -nln zonentyp \
-            /tmp/zonentyp.gpkg zonentyp
+          [ -f /tmp/zonentyp.gpkg ] && ogr2ogr -f GPKG /tmp/arbeit.gpkg \
+            -append -nln zonentyp /tmp/zonentyp.gpkg zonentyp
 
           # Ohne räumlichen Index vergleicht die Datenbank jede der
           # 140'000 Parzellen mit jeder der 57'000 Zonen -- acht
@@ -313,11 +310,23 @@ jobs:
           # Übriggebliebenen werden genau gerechnet.
           echo "### In eine SpatiaLite-Datenbank umziehen"
           rm -f /tmp/arbeit.sqlite
-          for e in parzellen zonen zonentyp; do
+          for e in parzellen zonen; do
             ogr2ogr -f SQLite /tmp/arbeit.sqlite -append \
               -dsco SPATIALITE=YES -lco SPATIAL_INDEX=YES \
               -nln "$e" /tmp/arbeit.gpkg "$e"
           done
+
+          # Die Typentabelle hat keine Geometrie und kommt ohne Index
+          # dazu -- sie liefert nur den Namen zum Schlüssel.
+          namen_wahl=""
+          namen_join=""
+          if ogrinfo -so /tmp/arbeit.gpkg zonentyp > /dev/null 2>&1; then
+            ogr2ogr -f SQLite /tmp/arbeit.sqlite -append \
+              -dsco SPATIALITE=YES -nln zonentyp /tmp/arbeit.gpkg zonentyp
+            namen_wahl="t.Bezeichnung AS zone_name, t.Abkuerzung AS zone_kurz,"
+            namen_join="LEFT JOIN zonentyp t ON t.TID = z.typ"
+          fi
+          echo "Zonennamen: ${namen_wahl:-keine}"
 
           echo "### Was in der Arbeitsdatenbank steht"
           for e in parzellen zonen; do
@@ -350,12 +359,14 @@ jobs:
                 g.art                                  AS art,
                 g.flaechenmass                         AS flaeche_m2,
                 z.Typ                                  AS zone_typ,
+                $namen_wahl
                 ROUND(ST_Area(ST_Intersection(g.$gsp, z.$gsz)))
                                                        AS zone_m2,
                 ROUND(100.0 * ST_Area(ST_Intersection(g.$gsp, z.$gsz))
                       / NULLIF(g.flaechenmass, 0))     AS anteil_prozent
               FROM parzellen g
               JOIN zonen z
+              $namen_join
               WHERE z.ROWID IN (
                       SELECT ROWID FROM SpatialIndex
                       WHERE f_table_name = 'zonen'
