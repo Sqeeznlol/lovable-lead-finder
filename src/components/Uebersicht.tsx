@@ -65,7 +65,7 @@ export function Uebersicht() {
         <Kennzahl
           icon={<PhoneCall className="h-5 w-5" />}
           wert={e.anrufen.toLocaleString('de-CH')}
-          label="Anrufen"
+          label="Abfragen"
           hinweis="Potenzial, Eigentümer und Anlass sprechen dafür"
           betont
         />
@@ -79,7 +79,7 @@ export function Uebersicht() {
           icon={<TrendingUp className="h-5 w-5" />}
           wert={chf(data.margeSumme, 0)}
           label="Marge im Bestand"
-          hinweis="Summe über Anrufen und Prüfen, lagegerecht gerechnet"
+          hinweis="Summe über Abfragen und Prüfen, lagegerecht gerechnet"
         />
         <Kennzahl
           icon={<UserSearch className="h-5 w-5" />}
@@ -92,16 +92,63 @@ export function Uebersicht() {
       {/* Die knappste Ressource im Ablauf: fünf Grundbuchabfragen am Tag. */}
       <Eigentuemersuche objekte={data.nachschlagen} />
 
+      {/* Eigentümer bekannt, Nummer nicht: der Zwischenstand, an dem
+          die Kette hängen bleibt. Er gehört sichtbar gemacht, sonst
+          liegt er zwischen den Objekten und fällt niemandem auf. */}
+      {(() => {
+        const offen = data.topChancen.filter(
+          (c: Chance) => c.eigentuemer && !c.telefon);
+        if (offen.length === 0) return null;
+        return (
+          <Card>
+            <CardContent className="p-0">
+              <div className="flex items-center gap-2 border-b p-5">
+                <UserSearch className="h-4 w-4 text-muted-foreground" />
+                <h2 className="font-serif">Eigentümer bekannt, Nummer fehlt</h2>
+                <span className="ml-auto text-xs text-muted-foreground">
+                  {offen.length}
+                </span>
+              </div>
+              <ul className="divide-y">
+                {offen.map((c: Chance) => (
+                  <li key={c.id} className="flex items-baseline justify-between gap-3 p-4">
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium">{c.address}</span>
+                      <span className="block truncate text-sm text-muted-foreground">
+                        {c.eigentuemer}
+                      </span>
+                    </span>
+                    <a
+                      href={`https://tel.search.ch/?was=${encodeURIComponent(c.eigentuemer || '')}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="shrink-0 text-sm underline underline-offset-4"
+                    >
+                      Nummer suchen
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        );
+      })()}
+
       <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
         {/* Konkrete Adressen */}
         <Card>
           <CardContent className="p-0">
             <div className="flex items-center gap-2 border-b p-5">
               <Building2 className="h-4 w-4 text-primary" />
-              <h2 className="font-serif">Die nächsten Anrufe</h2>
+              <h2 className="font-serif">Die nächsten Objekte</h2>
             </div>
+            {/* Hier steht, was als Nächstes abzufragen ist -- nicht,
+                wen man anruft. Angerufen wird in Pipedrive, und dorthin
+                kommt ein Objekt erst, wenn Eigentümer und Nummer
+                feststehen. Wer schon einen Eigentümer hat, aber keine
+                Nummer, steht deshalb im Abschnitt darunter. */}
             <ul className="divide-y">
-              {data.topChancen.map((c: Chance) => (
+              {data.topChancen.filter((c: Chance) => c.telefon || !c.eigentuemer).map((c: Chance) => (
                 <li key={c.id} className="flex items-start gap-4 p-4 transition-colors hover:bg-muted/40">
                   {/* Drei Blicke auf dasselbe Grundstück, umschaltbar:
                       von oben, mit den Bauzonen darüber, und von der
@@ -252,7 +299,7 @@ export function Uebersicht() {
                     <p className="font-medium">{g.gemeinde}</p>
                     <p className="text-xs text-muted-foreground">
                       {g.lage} · {g.chancen} Chancen
-                      {g.anrufen > 0 ? `, davon ${g.anrufen} zum Anrufen` : ''}
+                      {g.anrufen > 0 ? `, davon ${g.anrufen} zum Abfragen` : ''}
                     </p>
                   </div>
                   <span className="shrink-0 font-semibold tabular-nums">{chf(g.margeSumme, 0)}</span>

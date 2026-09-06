@@ -278,8 +278,16 @@ export function beurteile(p: AkquiseInput): AkquiseUrteil {
   };
 }
 
+/**
+ * Was hier zu tun ist -- und hier wird nicht telefoniert.
+ *
+ * Die Arbeit teilt sich auf zwei Orte: wohntraums.life wertet die
+ * Daten aus und beschafft Eigentümer und Nummer, Pipedrive führt die
+ * Gespräche. "Anrufen" stand deshalb an der falschen Stelle: gemeint
+ * war immer "dieses Grundstück lohnt die Abfrage".
+ */
 export const EMPFEHLUNG_LABEL: Record<Empfehlung, string> = {
-  anrufen: 'Anrufen',
+  anrufen: 'Abfragen',
   pruefen: 'Prüfen',
   zurueckstellen: 'Zurückstellen',
   nein: 'Nein',

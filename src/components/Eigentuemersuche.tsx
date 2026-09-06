@@ -11,6 +11,8 @@ import { grundbuchUrl, verkauftNie, ARCHIV_STATUS } from '@/lib/grundbuch';
 import { useStartEigentuemerLookup, useExtensionAvailable } from '@/hooks/use-eigentuemer-lookup';
 import { protokolliere } from '@/lib/protokoll';
 import { AuskunftEinfuegen } from '@/components/AuskunftEinfuegen';
+import { leseAuskunft, zerlegeZeile } from '@/lib/eigentuemer';
+import { weiterverarbeiten } from '@/hooks/use-eigentuemer-lookup';
 import type { Chance } from '@/hooks/use-uebersicht';
 
 /** Wie viele Auskünfte das Portal pro Tag freigibt. */
@@ -87,15 +89,35 @@ export function Eigentuemersuche({ objekte }: { objekte: Chance[] }) {
   const uebrig = Math.max(PRO_TAG - verbraucht, 0);
 
   const eintragen = async (c: Chance) => {
-    const name = (entwurf[c.id] || '').trim();
-    if (!name) return;
+    const roh = (entwurf[c.id] || '').trim();
+    if (!roh) return;
     setSpeichert(c.id);
+
+    // Eingefügt wird der Wortlaut aus dem Portal -- eine ganze Zeile
+    // mit Rechtsform, Handelsregisternummer und Anteil. Sie ungeteilt
+    // als Namen zu speichern, sah in der Liste aus wie ein Eigentümer
+    // und war für die Telefonsuche wertlos.
+    const gelesen = leseAuskunft(roh);
+    const erster = gelesen[0] ?? zerlegeZeile(roh);
+    const name = erster.name || roh;
+    const plzOrt = [erster.plz, erster.ort].filter(Boolean).join(' ');
 
     const oeffentlich = verkauftNie(name);
     const { error } = await supabase
       .from('properties')
       .update({
         owner_name: name,
+        owner_address: [erster.address, plzOrt].filter(Boolean).join(', ') || null,
+        eigentuemer_name: name,
+        eigentuemer_adresse: erster.address || null,
+        eigentuemer_plz_ort: plzOrt || null,
+        eigentuemer_fetched_at: new Date().toISOString(),
+        owners_json: gelesen.length > 0
+          ? gelesen.map(o => ({
+              name: o.name, fullName: o.name, address: o.address,
+              plz: o.plz, ort: o.ort, ownershipType: o.ownershipType,
+            }))
+          : null,
         // Die öffentliche Hand verkauft nicht -- das Objekt ist erledigt,
         // sobald der Name feststeht.
         ...(oeffentlich
@@ -108,16 +130,24 @@ export function Eigentuemersuche({ objekte }: { objekte: Chance[] }) {
       })
       .eq('id', c.id);
 
-    setSpeichert(null);
     if (error) {
+      setSpeichert(null);
       toast({ title: 'Fehler', description: error.message, variant: 'destructive' });
       return;
     }
+
+    void protokolliere('eigentuemer', name, c.kanton);
     toast({
       title: oeffentlich ? '✓ Eingetragen und archiviert' : '✓ Eigentümer eingetragen',
       description: oeffentlich ? 'Öffentliche Hand — verkauft nicht' : name,
     });
     setEntwurf(e => ({ ...e, [c.id]: '' }));
+
+    // Weiter wie nach einer Abfrage: Nummer suchen, und erst mit
+    // Nummer nach Pipedrive.
+    if (!oeffentlich) await weiterverarbeiten(c.id, toast);
+
+    setSpeichert(null);
     qc.invalidateQueries({ queryKey: ['uebersicht'] });
     qc.invalidateQueries({ queryKey: ['master'] });
   };
