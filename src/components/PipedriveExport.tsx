@@ -123,6 +123,7 @@ export function PipedriveExport() {
           notes: p.notes,
           status: p.status,
           google_maps_url: p.google_maps_url,
+          kanton: p.kanton,
           kategorie: p.kategorie,
           wohnungen: p.wohnungen ? Number(p.wohnungen) : null,
         }));

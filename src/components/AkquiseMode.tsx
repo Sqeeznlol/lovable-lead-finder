@@ -344,6 +344,7 @@ export function AkquiseMode() {
             notes: current.notes,
             status: newStatus,
             google_maps_url: current.google_maps_url,
+            kanton: current.kanton,
             kategorie: current.kategorie,
             wohnungen: current.wohnungen ? Number(current.wohnungen) : null,
             denkmalschutz: current.denkmalschutz,
@@ -352,7 +353,7 @@ export function AkquiseMode() {
           const { data: pushData, error: pushErr } = await supabase.functions.invoke('pipedrive-push', { body: { properties: batch } });
           if (!pushErr && pushData?.summary?.created > 0) {
             await updateProp.mutateAsync({ id: current.id, status: 'Exportiert' });
-            toast({ title: `🚀 Auto-Pipeline: Telefon gefunden + Pipedrive Lead erstellt` });
+            toast({ title: `🚀 Auto-Pipeline: Telefon gefunden + Deal in Pipedrive angelegt` });
           } else {
             toast({ title: `✅ Telefon auto-gefunden (Pipedrive: ${pushErr ? 'Fehler' : 'Duplikat'})` });
           }

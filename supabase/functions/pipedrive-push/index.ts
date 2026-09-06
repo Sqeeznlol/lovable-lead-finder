@@ -7,6 +7,24 @@ const corsHeaders = {
 
 const PIPEDRIVE_BASE = 'https://api.pipedrive.com/v1';
 
+// Wohin ein abgefragtes Objekt geht.
+//
+// Bis hierher legte dieser Ablauf Leads an -- die Eingangsliste von
+// Pipedrive. Im Konto standen deshalb 0 Leads und 424 Deals: gearbeitet
+// wird mit Deals, die Leads sah niemand an. Sie hinterliessen nur 55
+// Labels, eines je Zone und Quartier, mit denen sich nichts mehr
+// filtern liess.
+//
+// Jetzt entsteht ein Deal, und wo er landet, entscheidet die
+// Telefonnummer: mit Nummer kann angerufen werden, ohne muss zuerst
+// gesucht werden. Die Kennungen stammen aus dem Lauf "pipelines"
+// (tools/pipedrive-pipelines.py) -- sie sind kontospezifisch und
+// stehen deshalb hier und nicht in einer Vermutung.
+const PIPELINE_AKQUISE = 20;
+const STAGE_NEU = 82;
+const PIPELINE_SEARCH = 24;
+const STAGE_SUCHEN = 91;
+
 // Pipedrive custom field keys (shared between Deals & Leads)
 const FIELD_ZONE = '6283f1bd5f9e2220c96dfebf3904e789c9850773';
 const FIELD_BAUJAHR = 'd8e495e217d7f56099b33cf339612f0bb58bb2b7';
@@ -63,6 +81,7 @@ const PropertySchema = z.object({
   notes: z.string().nullish(),
   status: z.string(),
   google_maps_url: z.string().nullish(),
+  kanton: z.string().nullish(),
   kategorie: z.string().nullish(),
   wohnungen: z.number().nullish(),
   denkmalschutz: z.string().nullish(),
@@ -92,34 +111,9 @@ async function pipedrivePost(path: string, token: string, body: unknown) {
   return res.json();
 }
 
-// --- Lead Label Cache ---
-
-const labelCache = new Map<string, string>();
-
-async function getOrCreateLeadLabel(token: string, zone: string): Promise<string | undefined> {
-  if (!zone) return undefined;
-  if (labelCache.has(zone)) return labelCache.get(zone);
-
-  const res = await pipedriveGet('/leadLabels', token);
-  const labels = res?.data || [];
-  for (const label of labels) {
-    if (label.name === zone) {
-      labelCache.set(zone, label.id);
-      return label.id;
-    }
-  }
-
-  const createRes = await pipedrivePost('/leadLabels', token, {
-    name: zone,
-    color: 'blue',
-  });
-  const newId = createRes?.data?.id;
-  if (newId) {
-    labelCache.set(zone, newId);
-    return newId;
-  }
-  return undefined;
-}
+// Die Zonen-Labels sind mit den Leads weggefallen: 55 Stück, eines je
+// Zone und Quartier, mit denen sich nichts mehr filtern liess. Die Zone
+// steht als eigenes Feld am Deal.
 
 // --- Name Parsing ---
 
@@ -247,9 +241,33 @@ async function upsertPerson(
   return personRes?.data?.id;
 }
 
+/**
+ * Alle Eigentümer wörtlich, so wie das Portal sie ausgibt.
+ *
+ * In der Pipeline "Search" wird von Hand nachgesucht. Dafür nützt eine
+ * aufbereitete Zeile wenig -- gebraucht wird der Wortlaut: Schreibweise
+ * des Namens, Adresse, Art des Eigentums. Danach wird gesucht, und ein
+ * geglätteter Name führt in die Irre.
+ */
+function buildEigentuemerRoh(prop: z.infer<typeof PropertySchema>): string {
+  const owners = Array.isArray(prop.owners_json) ? prop.owners_json : [];
+  if (owners.length === 0) return '';
+  const zeilen = owners.map((o, i) => {
+    const teile = [
+      o.fullName || [o.firstName, o.lastName].filter(Boolean).join(' '),
+      o.address || [o.street, o.streetNumber, o.plz, o.ort].filter(Boolean).join(' '),
+      o.ownershipType || o.type || '',
+      o.phone || '',
+    ].filter(Boolean);
+    return `${i + 1}. ${teile.join(' | ')}`;
+  });
+  return `<br/><b>Eigentümer wörtlich aus dem Portal:</b><br/><pre>${
+    zeilen.join('\n')}</pre>`;
+}
+
 // --- Build rich notes HTML ---
 
-function buildLeadNotes(prop: z.infer<typeof PropertySchema>): string {
+function buildNotiz(prop: z.infer<typeof PropertySchema>): string {
   const lines: string[] = [];
 
   // Address & maps
@@ -332,7 +350,33 @@ function buildLeadNotes(prop: z.infer<typeof PropertySchema>): string {
   // User notes
   if (prop.notes) lines.push(`<br/><b>Notizen:</b> ${prop.notes}`);
 
+  const roh = buildEigentuemerRoh(prop);
+  if (roh) lines.push(roh);
+
   return lines.join('<br/>');
+}
+
+/**
+ * Der Kataster des richtigen Kantons.
+ *
+ * Bis hierher trug jeder Deal einen Zürcher Link -- auch die
+ * Thurgauer. Der zeigte dort irgendeine Zürcher Parzelle gleicher
+ * Nummer: schlimmer als kein Link, weil er beim Telefonieren
+ * glaubwürdig aussieht.
+ */
+function katasterLink(prop: z.infer<typeof PropertySchema>): string | null {
+  const kanton = String(prop.kanton ?? '').trim().toUpperCase();
+  if (kanton === 'TG') {
+    // Der Thurgau sucht über den EGRID, nicht über die Parzellennummer.
+    if (!prop.egrid) return null;
+    return 'https://map.geo.tg.ch/apps/mf-geoadmin3/?lang=de&topic=oereb'
+      + '&bgLayer=basemap_farbig&zoom=8'
+      + `&swisssearch=${encodeURIComponent(prop.egrid)}`;
+  }
+  if (prop.parzelle && prop.bfs_nr) {
+    return `https://maps.zh.ch/?locate=parz&locations=${prop.bfs_nr},${prop.parzelle}&topic=OerebKatasterZH`;
+  }
+  return null;
 }
 
 // --- Main Handler ---
@@ -359,7 +403,7 @@ Deno.serve(async (req) => {
     }
 
     const exportedAddresses = new Set<string>();
-    const results: { propertyId: string; leadId?: string; personId?: number; person2Id?: number; orgId?: number; skipped?: boolean; error?: string }[] = [];
+    const results: { propertyId: string; dealId?: number; personId?: number; person2Id?: number; orgId?: number; skipped?: boolean; error?: string }[] = [];
 
     for (const prop of parsed.data.properties) {
       try {
@@ -385,7 +429,7 @@ Deno.serve(async (req) => {
           .filter(Boolean).join(' ');
         const parzelle = String(prop.parzelle || prop.plot_number || '').trim();
         const hinten = [prop.address, ortsteil].filter(Boolean).join(', ');
-        const leadTitle = parzelle && prop.address
+        const dealTitel = parzelle && prop.address
           ? `Parz. ${parzelle} · ${hinten}`
           : parzelle
             ? [`Parz. ${parzelle}`, ortsteil].filter(Boolean).join(', ')
@@ -423,41 +467,41 @@ Deno.serve(async (req) => {
           person2Id = await upsertPerson(PIPEDRIVE_API_TOKEN, prop.owner_name_2, prop.owner_phone_2, orgId, owner2Struct);
         }
 
-        // 5. Create Lead with custom fields + zone label
-        const labelId = await getOrCreateLeadLabel(PIPEDRIVE_API_TOKEN, prop.zone || '');
-        const leadData: Record<string, unknown> = {
-          title: leadTitle,
-          organization_id: orgId,
+        // 5. Deal anlegen -- in Akquise, wenn angerufen werden kann,
+        //    sonst in Search, wo der Eigentümer von Hand gesucht wird.
+        const hatNummer = isValidPhone(prop.owner_phone)
+          || isValidPhone(prop.owner_phone_2)
+          || owners.some(o => isValidPhone(o.phone));
+        const dealData: Record<string, unknown> = {
+          title: dealTitel,
+          org_id: orgId,
+          pipeline_id: hatNummer ? PIPELINE_AKQUISE : PIPELINE_SEARCH,
+          stage_id: hatNummer ? STAGE_NEU : STAGE_SUCHEN,
         };
-        if (personId) leadData.person_id = personId;
-        if (labelId) leadData.label_ids = [labelId];
+        if (personId) dealData.person_id = personId;
 
         // Custom fields
-        if (prop.zone) leadData[FIELD_ZONE] = prop.zone;
-        if (prop.baujahr) leadData[FIELD_BAUJAHR] = prop.baujahr;
-        if (prop.gebaeudeflaeche) leadData[FIELD_HNF] = Math.round(prop.gebaeudeflaeche);
-        if (prop.area) leadData[FIELD_GRUNDSTUECK] = Math.round(prop.area);
-        if (prop.geschosse) leadData[FIELD_GESCHOSSE] = prop.geschosse;
-        if (prop.egrid) leadData[FIELD_EGRID] = prop.egrid;
-        if (prop.gwr_egid) leadData[FIELD_EGID] = prop.gwr_egid;
-        if (prop.gemeinde) leadData[FIELD_GEMEINDE] = prop.gemeinde;
-        // ÖREB Kataster link
-        if (prop.parzelle && prop.bfs_nr) {
-          leadData[FIELD_OEREB] = `https://maps.zh.ch/?locate=parz&locations=${prop.bfs_nr},${prop.parzelle}&topic=OerebKatasterZH`;
-        }
+        if (prop.zone) dealData[FIELD_ZONE] = prop.zone;
+        if (prop.baujahr) dealData[FIELD_BAUJAHR] = prop.baujahr;
+        if (prop.gebaeudeflaeche) dealData[FIELD_HNF] = Math.round(prop.gebaeudeflaeche);
+        if (prop.area) dealData[FIELD_GRUNDSTUECK] = Math.round(prop.area);
+        if (prop.geschosse) dealData[FIELD_GESCHOSSE] = prop.geschosse;
+        if (prop.egrid) dealData[FIELD_EGRID] = prop.egrid;
+        if (prop.gwr_egid) dealData[FIELD_EGID] = prop.gwr_egid;
+        if (prop.gemeinde) dealData[FIELD_GEMEINDE] = prop.gemeinde;
+        const kataster = katasterLink(prop);
+        if (kataster) dealData[FIELD_OEREB] = kataster;
 
-        // Parzelle, Wohnungen, Kategorie
-        if (prop.parzelle) leadData[FIELD_PARZELLE] = prop.parzelle;
-        if (prop.denkmalschutz) leadData[FIELD_DENKMALSCHUTZ] = prop.denkmalschutz;
-        if (prop.isos) leadData[FIELD_ISOS] = prop.isos;
+        if (prop.parzelle) dealData[FIELD_PARZELLE] = prop.parzelle;
+        if (prop.denkmalschutz) dealData[FIELD_DENKMALSCHUTZ] = prop.denkmalschutz;
+        if (prop.isos) dealData[FIELD_ISOS] = prop.isos;
 
         // Google Maps link for Pipedrive
         const fullAddr = prop.address + (prop.plz_ort ? ', ' + prop.plz_ort : '');
-        leadData[FIELD_GOOGLE_PIPE] = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddr)}`;
+        dealData[FIELD_GOOGLE_PIPE] = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddr)}`;
 
         // Owner custom fields (1-5), rest goes into notes
         const ownerFields = [FIELD_OWNER_1, FIELD_OWNER_2, FIELD_OWNER_3, FIELD_OWNER_4, FIELD_OWNER_5];
-        // Build display strings for each owner
         const ownerDisplays: string[] = [];
         if (prop.owner_name) ownerDisplays.push(prop.owner_name);
         if (prop.owner_name_2) ownerDisplays.push(prop.owner_name_2);
@@ -466,30 +510,32 @@ Deno.serve(async (req) => {
           const oName = o.fullName || [o.firstName, o.lastName].filter(Boolean).join(' ');
           if (oName) ownerDisplays.push(oName);
         }
-        // Assign first 5 to custom fields
         for (let oi = 0; oi < Math.min(ownerDisplays.length, 5); oi++) {
-          leadData[ownerFields[oi]] = ownerDisplays[oi];
+          dealData[ownerFields[oi]] = ownerDisplays[oi];
         }
 
-        console.log('Creating lead:', JSON.stringify({ title: leadTitle, person_id: personId, organization_id: orgId }));
-        const leadRes = await pipedrivePost('/leads', PIPEDRIVE_API_TOKEN, leadData);
-        const leadId = leadRes?.data?.id;
+        console.log('Deal anlegen:', JSON.stringify({
+          title: dealTitel, pipeline_id: dealData.pipeline_id,
+          stage_id: dealData.stage_id, person_id: personId,
+        }));
+        const dealRes = await pipedrivePost('/deals', PIPEDRIVE_API_TOKEN, dealData);
+        const dealId = dealRes?.data?.id;
 
-        if (!leadId) {
-          console.error('Lead creation failed:', JSON.stringify(leadRes));
-          results.push({ propertyId: prop.id, error: `Lead creation failed: ${JSON.stringify(leadRes)}` });
+        if (!dealId) {
+          console.error('Deal creation failed:', JSON.stringify(dealRes));
+          results.push({ propertyId: prop.id, error: `Deal creation failed: ${JSON.stringify(dealRes)}` });
           continue;
         }
 
         // 6. Add rich note with all details, links, owner info
-        const noteContent = buildLeadNotes(prop);
+        const noteContent = buildNotiz(prop);
         await pipedrivePost('/notes', PIPEDRIVE_API_TOKEN, {
-          lead_id: leadId,
+          deal_id: dealId,
           content: noteContent,
         });
 
         exportedAddresses.add(prop.address);
-        results.push({ propertyId: prop.id, leadId, personId, person2Id, orgId: orgId || undefined });
+        results.push({ propertyId: prop.id, dealId, personId, person2Id, orgId: orgId || undefined });
       } catch (err) {
         results.push({ propertyId: prop.id, error: String(err) });
       }
