@@ -116,10 +116,15 @@ export function useMasterProperties(filters: MasterFilters) {
       // ob sich ein Anruf lohnt.
       const sortBy = filters.sortBy ?? 'hnf_delta';
       const sortDir = filters.sortDir ?? 'desc';
+      // "exact" zählt bei jeder Seite alle 259'000 Zeilen durch -- das
+      // dauert länger als das Laden der fünfzig Zeilen, die angezeigt
+      // werden, und lief bisher regelmässig ins Zeitlimit. Für die
+      // Seitenzahl unten reicht eine Schätzung; sie stammt aus der
+      // Statistik der Datenbank und ist sofort da.
       let q = applyFilters(
         supabase
           .from('properties')
-          .select('*', { count: 'exact' }),
+          .select('*', { count: 'estimated' }),
         filters,
       );
       q = q.order(sortBy, { ascending: sortDir === 'asc', nullsFirst: false });
