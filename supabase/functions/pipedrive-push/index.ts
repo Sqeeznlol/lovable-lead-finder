@@ -368,13 +368,23 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Title: "W5 · 450m² · Zürich"
-        const titleParts = [
-          prop.zone || '',
-          prop.gebaeudeflaeche ? `${Math.round(prop.gebaeudeflaeche)}m²` : '',
-          prop.gemeinde || prop.plz_ort || '',
-        ].filter(Boolean);
-        const leadTitle = titleParts.join(' · ') || prop.address;
+        // Der Titel muss beim Anruf tragen: Adresse zuerst -- das ist
+        // der erste Satz am Telefon --, dann Postleitzahl und Ort, weil
+        // es über mehrere Kantone Dorfstrassen zuhauf gibt, und zuletzt
+        // die Parzellennummer, ohne die weder Grundbuch noch ÖREB
+        // aufzurufen sind.
+        //
+        // Zone und Fläche standen früher hier. Sie beantworten die Frage
+        // "welches Haus ist das" nicht, und die Fläche ändert sich mit
+        // jeder Neuberechnung.
+        const ortsteil = [prop.plz, prop.gemeinde || prop.plz_ort]
+          .filter(Boolean).join(' ');
+        const parzelle = prop.parzelle || prop.plot_number || '';
+        const leadTitle = [
+          [prop.address || (parzelle ? `Parz. ${parzelle}` : ''), ortsteil]
+            .filter(Boolean).join(', '),
+          prop.address && parzelle ? `Parz. ${parzelle}` : '',
+        ].filter(Boolean).join(' · ') || prop.address;
 
         // 1. Duplicate check via org
         const existingOrgId = await findExistingOrg(PIPEDRIVE_API_TOKEN, prop.address);

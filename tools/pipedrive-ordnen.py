@@ -66,6 +66,9 @@ def alle(pfad: str, token: str, **params) -> list:
 # Ein Titel, der nur eine Fläche nennt, benennt kein Grundstück.
 NUR_FLAECHE = re.compile(r'^\s*[\d\'.,]+\s*m²', re.IGNORECASE)
 
+# "8903 Birmensdorf (ZH)" -- vier Ziffern, dann der Ort.
+PLZ_ORT = re.compile(r'\b(\d{4})\s+(.+)$')
+
 
 def aus_organisation(name: str) -> str:
     """Die Adresse aus dem Organisationsnamen holen.
@@ -77,6 +80,44 @@ def aus_organisation(name: str) -> str:
     n = re.sub(r'^\s*Liegenschaft:\s*', '', name or '')
     n = re.sub(r'\s*\[[^\]]*\]\s*$', '', n)
     return n.strip()
+
+
+def gewuenschter_titel(alt: str, org: str, parzelle: str) -> str:
+    """Adresse, Postleitzahl mit Ort, Parzellennummer.
+
+    Am Telefon beginnt das Gespräch mit der Adresse; die Postleitzahl
+    macht sie über mehrere Kantone eindeutig -- Dorfstrassen gibt es
+    zuhauf; und ohne Parzellennummer lässt sich weder das Grundbuch
+    noch der ÖREB-Kataster aufrufen.
+
+    Nicht im Titel: der Eigentümername (er steht im Kontakt, und ein
+    Eigentümer kann mehrere Parzellen haben -- dann stünde dreimal
+    dasselbe da) und die Marge (sie ändert sich mit jeder Neuberechnung
+    und der Titel logte danach).
+    """
+    # Was schon dasteht, ist die beste Quelle -- ausser es nennt bloss
+    # eine Fläche. Dann hilft der Name der Organisation weiter.
+    grundlage = alt.strip()
+    if NUR_FLAECHE.match(grundlage) or not grundlage:
+        grundlage = aus_organisation(org)
+    if not grundlage:
+        return ''
+
+    # Eine bereits angehängte Parzelle wird neu gebildet, nicht verdoppelt.
+    grundlage = re.sub(r'\s*·\s*Parz\.?\s*\S+\s*$', '', grundlage).strip()
+
+    teile = [t.strip() for t in grundlage.split(',') if t.strip()]
+    adresse = teile[0] if teile else ''
+    ort = next((t for t in teile[1:] if PLZ_ORT.search(t)), '')
+    if not ort and len(teile) > 1:
+        ort = teile[-1]
+    # Der alte Export trennte den Ort mit einem Mittelpunkt statt Komma.
+    if not ort and '·' in adresse:
+        adresse, _, ort = (x.strip() for x in adresse.partition('·'))
+
+    kopf = ', '.join(x for x in (adresse, ort) if x)
+    nr = (parzelle or '').strip()
+    return f'{kopf} · Parz. {nr}' if nr and kopf else kopf
 
 
 def main() -> None:
@@ -94,24 +135,21 @@ def main() -> None:
     print()
 
     # ------------------------------------------------------------ Titel
+    felder = get('/dealFields', token).get('data') or []
+    parzellenfeld = next((f['key'] for f in felder
+                          if f.get('name') == 'Parzelle'), None)
+
     zu_aendern: list[tuple[dict, str]] = []
     for d in deals:
         titel = (d.get('title') or '').strip()
-        if not NUR_FLAECHE.match(titel):
-            continue
         org = d.get('org_id') or {}
-        neu = aus_organisation(org.get('name') if isinstance(org, dict) else '')
-        if not neu:
-            continue
-        # Ort aus dem alten Titel behalten, falls er dort steht.
-        rest = titel.split('·', 1)
-        ort = rest[1].strip() if len(rest) > 1 else ''
-        if ort and ort.lower() not in neu.lower():
-            neu = f'{neu} · {ort}'
-        if neu != titel:
+        parzelle = str(d.get(parzellenfeld) or '') if parzellenfeld else ''
+        neu = gewuenschter_titel(
+            titel, org.get('name') if isinstance(org, dict) else '', parzelle)
+        if neu and neu != titel:
             zu_aendern.append((d, neu))
 
-    print(f'## Titel — {len(zu_aendern)} von {len(deals)} benennen nur eine Fläche')
+    print(f'## Titel — {len(zu_aendern)} von {len(deals)} werden umbenannt')
     print()
     for d, neu in zu_aendern[:25]:
         print(f'- `{d.get("title")}` → `{neu}`')
@@ -119,14 +157,12 @@ def main() -> None:
         print(f'- … und {len(zu_aendern) - 25} weitere')
     print()
 
-    ohne_hilfe = [d for d in deals
-                  if NUR_FLAECHE.match((d.get('title') or '').strip())
-                  and not aus_organisation(
-                      (d.get('org_id') or {}).get('name', '')
-                      if isinstance(d.get('org_id'), dict) else '')]
-    if ohne_hilfe:
-        print(f'> Bei {len(ohne_hilfe)} Deals hilft auch die Organisation')
-        print('> nicht weiter -- dort fehlt die Adresse ganz.')
+    ohne_parzelle = sum(1 for d in deals
+                        if not (str(d.get(parzellenfeld) or '').strip()
+                                if parzellenfeld else ''))
+    if ohne_parzelle:
+        print(f'> Bei {ohne_parzelle} Deals fehlt die Parzellennummer.')
+        print('> Sie bekommen Adresse und Ort, mehr ist nicht bekannt.')
         print()
 
     # ----------------------------------------------------------- Adresse
