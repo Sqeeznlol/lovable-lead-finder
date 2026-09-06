@@ -397,13 +397,20 @@ jobs:
           echo "Vom Bund: $(wc -c < /tmp/vom-bund.ili 2>/dev/null || echo 0) Bytes"
           echo
 
+          echo "### Kopf der Datei -- welches Modell sie verlangt"
+          head -8 "$erste"
+          echo
+
           for m in "$mitgeliefert" /tmp/vom-bund.ili; do
             [ -s "$m" ] || continue
             echo "=============== $m"
-            # Ohne 2>/dev/null -- genau darum geht es.
-            ogrinfo -so "$erste,$m" Liegenschaften__Grundstueck 2>&1 | head -25
-            echo
-            echo "--- Liegenschaft"
-            ogrinfo -so "$erste,$m" Liegenschaften__Liegenschaft 2>&1 | head -25
-            echo
+            for e in Liegenschaften__Grundstueck Liegenschaften__Liegenschaft \
+                     Liegenschaften__Liegenschaft_Geometrie; do
+              echo "--- $e"
+              # Die Warnungen betreffen die Fixpunkt-Tabellen, die uns
+              # nicht interessieren, und verdecken sonst die Antwort.
+              ogrinfo -so "$erste,$m" "$e" 2>&1 \
+                | grep -v '^Warning 1: No ' | head -20
+              echo
+            done
           done
