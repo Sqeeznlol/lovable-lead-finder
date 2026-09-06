@@ -49,6 +49,8 @@ on:
           - einspielen   # Verschnitt in die Datenbank (Probelauf)
           - einspielen-schreiben   # dasselbe, aber tatsächlich schreiben
           - gwr          # Gebäuderegister ansehen: Adressen, Baujahr, Geschosse
+          - gwr-probe    # Register laden und zeigen, was sich verbinden liesse
+          - gwr-schreiben          # Adressen und Gebäudedaten übernehmen
 
 jobs:
   laden:
@@ -771,3 +773,150 @@ jobs:
             sed -n '2p' "$f" | cut -c1-400
             echo
           done
+
+      # =============================================================
+      # Register in die Datenbank
+      # =============================================================
+      # Je Parzelle stehen mehrere Gebäude im Register. Zusammengefasst
+      # wird so, wie beim Anruf gefragt wird: die Adresse und das
+      # Baujahr des grössten Hauses -- danach sucht man die Liegenschaft
+      # --, die höchste Geschosszahl, und Wohnungen wie Grundfläche
+      # aufsummiert, weil beides zusammen die Parzelle beschreibt.
+      #
+      # Die Kennzahlen sind Schlüssel, keine Wörter: 1004 heisst
+      # "Bestehend". Die Übersetzung liegt derselben Lieferung bei.
+      - name: Register einspielen
+        if: ${{ startsWith(inputs.schritt, 'gwr-') }}
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+          KANTON: ${{ inputs.kanton }}
+        run: |
+          set -euo pipefail
+          [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
+          sudo apt-get install -y -qq postgresql-client
+
+          klein=$(echo "$KANTON" | tr 'A-Z' 'a-z')
+          curl -sSL -o /tmp/gwr.zip \
+            "https://public.madd.bfs.admin.ch/${klein}.zip"
+          mkdir -p /tmp/gwr && unzip -o -q /tmp/gwr.zip -d /tmp/gwr
+
+          psql "$DB" -v ON_ERROR_STOP=1 -X -q -c "
+            drop table if exists public.gwr_gebaeude;
+            drop table if exists public.gwr_eingang;
+            drop table if exists public.gwr_kodes;
+            create table public.gwr_gebaeude (
+              egid text, gdekt text, ggdenr text, ggdename text, egrid text,
+              lgbkr text, lparz text, lparzsx text, ltyp text, gebnr text,
+              gbez text, gkode text, gkodn text, gksce text, gstat text,
+              gkat text, gklas text, gbauj text, gbaum text, gbaup text,
+              gabbj text, garea text, gvol text, gvolnorm text, gvolsce text,
+              gastw text, ganzwhg text, gazzi text, gschutzr text, gebf text,
+              gwaerzh1 text, genh1 text, gwaersceh1 text, gwaerdath1 text,
+              gwaerzh2 text, genh2 text, gwaersceh2 text, gwaerdath2 text,
+              gwaerzw1 text, genw1 text, gwaerscew1 text, gwaerdatw1 text,
+              gwaerzw2 text, genw2 text, gwaerscew2 text, gwaerdatw2 text,
+              gexpdat text);
+            create table public.gwr_eingang (
+              egid text, edid text, egaid text, deinr text, esid text,
+              strname text, strnamk text, strindx text, strsp text,
+              stroffiziel text, dplz4 text, dplzz text, dplzname text,
+              dkode text, dkodn text, doffadr text, dexpdat text);
+            create table public.gwr_kodes (
+              cecodid text, cmerkm text, codtxtld text, codtxtkd text,
+              codtxtlf text, codtxtkf text, codtxtli text, codtxtki text,
+              cexpdat text);"
+
+          for t in gebaeude:gebaeude_batiment_edificio \
+                   eingang:eingang_entree_entrata \
+                   kodes:kodes_codes_codici; do
+            ziel="public.gwr_${t%%:*}"; datei="/tmp/gwr/${t##*:}.csv"
+            echo "-- $ziel aus $(basename "$datei")"
+            psql "$DB" -v ON_ERROR_STOP=1 -X -q \
+              -c "\\copy $ziel from '$datei' with (format csv, header true, delimiter E'\\t')"
+          done
+
+          psql "$DB" -v ON_ERROR_STOP=1 -X -q -c "
+            create index on public.gwr_gebaeude (egrid);
+            create index on public.gwr_eingang (egid);
+            analyze public.gwr_gebaeude; analyze public.gwr_eingang;"
+
+          echo "### Was geladen wurde"
+          psql "$DB" -X -q -c "
+            select (select count(*) from public.gwr_gebaeude) as gebaeude,
+                   (select count(distinct egrid) from public.gwr_gebaeude
+                    where egrid <> '') as parzellen,
+                   (select count(*) from public.gwr_eingang) as eingaenge;"
+
+          echo "### Wie viele Objekte lassen sich verbinden"
+          psql "$DB" -X -q -c "
+            set local statement_timeout = '15min';
+            select count(*) as treffer
+            from public.properties p
+            join public.gwr_gebaeude g on g.egrid = p.egrid
+            where p.kanton = '$KANTON';"
+
+          if [ "${{ inputs.schritt }}" != "gwr-schreiben" ]; then
+            echo ""
+            echo "**Probelauf** -- properties wurde nicht berührt."
+            exit 0
+          fi
+
+          echo "### Schreiben"
+          psql "$DB" -v ON_ERROR_STOP=1 -X -q -c "
+            set local statement_timeout = '30min';
+            with haupt as (
+              -- Das grösste Gebäude gibt Adresse und Baujahr; danach
+              -- sucht man die Liegenschaft.
+              select distinct on (g.egrid)
+                     g.egrid, g.egid, g.ggdename, g.ggdenr,
+                     nullif(g.gbauj,'')::int  as baujahr,
+                     nullif(g.gstat,'')       as gstat,
+                     nullif(g.gkat,'')        as gkat,
+                     e.strname, e.deinr, e.dplz4, e.dplzname
+              from public.gwr_gebaeude g
+              left join public.gwr_eingang e
+                     on e.egid = g.egid and e.edid = '0'
+              where g.egrid <> ''
+              order by g.egrid, nullif(g.garea,'')::numeric desc nulls last),
+            summe as (
+              select egrid,
+                     count(*)                                as anzahl,
+                     max(nullif(gastw,'')::int)              as geschosse,
+                     sum(nullif(ganzwhg,'')::int)            as wohnungen,
+                     sum(nullif(garea,'')::numeric)          as flaeche
+              from public.gwr_gebaeude where egrid <> '' group by egrid)
+            update public.properties p set
+              address     = case when p.address like 'Parzelle %'
+                                  and h.strname is not null
+                                 then trim(h.strname || ' ' ||
+                                           coalesce(h.deinr,''))
+                                 else p.address end,
+              plz         = coalesce(p.plz, h.dplz4),
+              gemeinde    = coalesce(p.gemeinde, h.ggdename),
+              bfs_nr      = coalesce(p.bfs_nr, h.ggdenr),
+              gwr_egid    = coalesce(p.gwr_egid, h.egid),
+              baujahr     = coalesce(p.baujahr, h.baujahr),
+              geschosse   = coalesce(p.geschosse, s.geschosse),
+              wohnungen   = coalesce(p.wohnungen, s.wohnungen),
+              gebaeudeflaeche = coalesce(p.gebaeudeflaeche, s.flaeche),
+              gebaeude_anzahl = coalesce(p.gebaeude_anzahl, s.anzahl),
+              geb_status  = coalesce(p.geb_status, (
+                              select k.codtxtld from public.gwr_kodes k
+                              where k.cmerkm = 'GSTAT'
+                                and k.cecodid = h.gstat)),
+              gebaeudeart = coalesce(p.gebaeudeart, (
+                              select k.codtxtld from public.gwr_kodes k
+                              where k.cmerkm = 'GKAT'
+                                and k.cecodid = h.gkat))
+            from haupt h join summe s on s.egrid = h.egrid
+            where p.egrid = h.egrid and p.kanton = '$KANTON';"
+
+          echo "### Ergebnis"
+          psql "$DB" -X -q -c "
+            select count(*) as objekte,
+                   count(*) filter (where address not like 'Parzelle %')
+                     as mit_adresse,
+                   count(baujahr) as mit_baujahr,
+                   count(geschosse) as mit_geschossen,
+                   count(wohnungen) as mit_wohnungen
+            from public.properties where kanton = '$KANTON';"
