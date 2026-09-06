@@ -456,19 +456,25 @@ describe('Thurgauer Zonen: was nicht bebaubar ist', () => {
     expect(istAusgeschlossen({ zone: z })).toBe(true);
   });
 
-  // Die Gegenprobe ist die wichtigere: eine Wohn- und Arbeitszone
-  // enthält das Wort "Arbeitszone" und fiel bisher mit heraus, obwohl
-  // dort gerade Wohnraum entstehen darf.
-  const bleibt = [
+  // Die Wohn- und Arbeitszone gehört auch heraus: eine Mischzone ist
+  // kein Zielobjekt.
+  it.each([
     'WA2 Wohn- und Arbeitszone 2',
     'WA3 Wohn- und Arbeitszone WA3',
     'WA 3 Wohn- und Arbeitszone dreigeschossiger Erscheinung',
+  ])('nimmt die Mischzone "%s" heraus', z => {
+    expect(istAusgeschlossen({ zone: z })).toBe(true);
+  });
+
+  const bleibt = [
     'W2a Wohnzone 2a',
     'D Dorfzone',
     'DK Dorfkernzone',
     'Z Zentrumszone',
     'A Altstadtzone',
     'W80 Wohnzone 80',
+    // Ein Gewerbeanteil macht aus einer Wohnzone keine Gewerbezone.
+    'Wohnzone mit Gewerbeanteil',
   ];
   it.each(bleibt)('lässt "%s" in der Liste', z => {
     expect(istAusgeschlossen({ zone: z })).toBe(false);

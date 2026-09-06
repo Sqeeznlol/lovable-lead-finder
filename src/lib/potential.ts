@@ -101,7 +101,7 @@ const NICHT_BAUZONE = /landwirtschaft|landschaftsschutz|\bwald\b|waldzone|forstz
  * keine Wohnnutzung zulässt, geht das nicht -- die Objekte gehören deshalb
  * gar nicht erst in die Arbeitsliste, auch wenn dort baulich Reserve läge.
  */
-const KEINE_WOHNNUTZUNG = /gewerbezone|gewerbe|industrie|arbeitszone|(zone f(ü|ue)r )?(ö|oe)ffentliche(n)? (bauten|zwecke)|(ö|oe)ffentliche bauten/i;
+const KEINE_WOHNNUTZUNG = /gewerbezone|industriezone|industrie|arbeitszone|(zone f(ü|ue)r )?(ö|oe)ffentliche(n)? (bauten|zwecke)|(ö|oe)ffentliche bauten/i;
 
 /**
  * Zonen-Kürzel, wie sie einzelne Gemeinden führen -- Winterthur schreibt
@@ -181,10 +181,11 @@ export function parseZone(raw?: string | null): ParsedZone {
   }
 
   if (NICHT_BAUZONE.test(text)) return { ...leer, zonenflaeche, anteilProzent, keineBauzone: true };
-  // "Wohn- und Arbeitszone" enthält "Arbeitszone" -- und war damit bisher
-  // ausgeschlossen, obwohl dort gerade Wohnraum entstehen darf. Steht
-  // "Wohn" im Namen, schlägt das die Gewerberegel.
-  if (KEINE_WOHNNUTZUNG.test(text) && !/wohn/i.test(text)) {
+  // Die Wohn- und Arbeitszone fällt mit heraus -- so entschieden, nicht
+  // aus Versehen: eine Mischzone ist kein Zielobjekt. Geprüft wird auf
+  // den Zonentyp ("Arbeitszone", "Gewerbezone"), nicht auf das blosse
+  // Wort "Gewerbe": eine "Wohnzone mit Gewerbeanteil" bleibt drin.
+  if (KEINE_WOHNNUTZUNG.test(text)) {
     return { ...leer, zonenflaeche, anteilProzent, keineWohnnutzung: true };
   }
 
