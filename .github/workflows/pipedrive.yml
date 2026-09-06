@@ -154,7 +154,8 @@ jobs:
                 select egrid,
                        coalesce(parzelle, plot_number, '') as parzelle,
                        coalesce(bfs_nr::text,'')      as bfs_nr,
-                       coalesce(gwr_egid::text,'')    as gwr_egid
+                       coalesce(gwr_egid::text,'')    as gwr_egid,
+                       coalesce(housing_stat_url,'')  as housing_stat_url
                 from properties where egrid is not null" > /tmp/objekte.csv
               wc -l /tmp/objekte.csv
               zusatz=""

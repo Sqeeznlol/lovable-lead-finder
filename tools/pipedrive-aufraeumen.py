@@ -52,6 +52,11 @@ HERKUNFT = ('Objektinfo', 'Grundstück', 'Fläche', 'Grundbuch')
 
 EGRID = re.compile(r'\bCH\d{12}\b')
 
+# Die EGID stand nirgends als Feld -- nur im kaputten OEREB-Link, als
+# "...egid.html?egid=1061,1319". In der Datenbank ist gwr_egid fuer
+# viele Objekte 0, und eine Null ist keine Gebaeudenummer.
+IM_LINK = re.compile(r'egid=(\d+)')
+
 
 def get(pfad: str, token: str, **params) -> dict:
     params['api_token'] = token
@@ -129,15 +134,19 @@ def main() -> None:
 
     # -------------------------------- 2. Herkunftsfelder aus dem Formular
     personfelder = get('/personFields', token).get('data') or []
+    # Nicht add_visible_flag: das steuert nur das Anlegen-Formular. Was
+    # den Block "Bitte ausfuellen" fuellt, ist details_visible_flag --
+    # sichtbar in der Detailansicht und leer.
     stoerend = [f for f in personfelder
-                if f.get('name') in HERKUNFT and f.get('add_visible_flag')]
+                if f.get('name') in HERKUNFT and f.get('details_visible_flag')]
     print(f'## {len(stoerend)} Kontaktfelder fordern "Bitte ausfüllen"')
     print()
     for f in stoerend:
-        print(f'- `{f["name"]}` verschwindet aus dem Formular, Inhalt bleibt')
+        print(f'- `{f["name"]}` verschwindet aus der Ansicht, Inhalt bleibt')
         if args.schreiben:
             sende(f'/personFields/{f["id"]}', token,
-                  {'add_visible_flag': False}, 'PUT')
+                  {'details_visible_flag': False,
+                   'add_visible_flag': False}, 'PUT')
     print()
 
     # -------------------------------------------- 2b. Klarere Namen
@@ -209,8 +218,21 @@ def main() -> None:
             neu[k_zone] = kurz
             zonen += 1
 
+        # Der kaputte Link ist bei manchen Deals schon ersetzt, die
+        # EGID darin also verloren. Ihre Quelle steht aber in der
+        # Datenbank: housing_stat_url zeigt auf genau dieses Gebaeude.
         egid = (o.get('gwr_egid') or '').strip()
-        if k_egid and egid and not str(d.get(k_egid) or '').strip():
+        if egid in ('0', '0.0', ''):
+            gefunden = (IM_LINK.search(o.get('housing_stat_url') or '')
+                        or IM_LINK.search(alt))
+            egid = gefunden.group(1) if gefunden else ''
+        if egid in ('0', '0.0'):
+            egid = ''
+        vorher = str(d.get(k_egid) or '').strip()
+        if k_egid and vorher in ('0', '0.0') and not egid:
+            neu[k_egid] = ''       # eine Null ist keine Gebaeudenummer
+            egids += 1
+        elif k_egid and egid and vorher in ('', '0', '0.0') and vorher != egid:
             neu[k_egid] = egid
             egids += 1
 
