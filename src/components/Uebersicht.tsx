@@ -2,6 +2,7 @@ import { PhoneCall, Search, Building2, MapPin, Map, Camera, Loader2, TrendingUp,
 import { Objektansicht } from '@/components/Objektansicht';
 import { Eigentuemersuche } from '@/components/Eigentuemersuche';
 import { Card, CardContent } from '@/components/ui/card';
+import { useCanton } from '@/hooks/use-canton';
 import { useUebersicht, type Chance } from '@/hooks/use-uebersicht';
 import { EMPFEHLUNG_LABEL, type Empfehlung } from '@/lib/akquise';
 import { zoneKurzform } from '@/lib/potential';
@@ -27,7 +28,10 @@ const stil: Record<Empfehlung, string> = {
  * Gemeinden, in denen sich die Chancen häufen.
  */
 export function Uebersicht() {
-  const { data, isLoading } = useUebersicht();
+  // Ohne den Kanton zeigte die Übersicht Zürcher Chancen, auch wenn
+  // oben Thurgau gewählt war.
+  const { current } = useCanton();
+  const { data, isLoading } = useUebersicht(current);
 
   if (isLoading || !data) {
     return (
