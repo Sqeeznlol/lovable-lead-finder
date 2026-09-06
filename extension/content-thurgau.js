@@ -75,6 +75,65 @@
     return m ? m[0] : '';
   }
 
+  /**
+   * Den richtigen Vorschlag im Suchfeld anklicken.
+   *
+   * Der Link mit swisssearch zoomt nicht selbst -- er öffnet ein
+   * Vorschlagsfeld mit zwei Einträgen:
+   *
+   *     EGRID CH770977292983 (Gde. Diessenhofen)
+   *     Projektierter EGRID CH770977292983 (Gde. Diessenhofen)
+   *
+   * Gemeint ist der erste. Der zweite ist ein geplanter Stand und
+   * gehört einem Grundstück, das es so noch nicht gibt.
+   *
+   * Gesucht wird über den Text, nicht über Klassennamen: der Text
+   * steht fest, die Klassen ändern sich mit jeder neuen Fassung der
+   * Karte.
+   */
+  function vorschlagKlicken(egrid) {
+    if (!egrid) return false;
+    const kandidaten = [...document.querySelectorAll(
+      'li, a, div[role="option"], .ga-search-result, .tt-suggestion')];
+    const treffer = kandidaten.find(el => {
+      const t = (el.innerText || '').trim();
+      return t.includes(egrid) && !/^projektiert/i.test(t);
+    });
+    if (!treffer) return false;
+    treffer.click();
+    log('Vorschlag angeklickt');
+    return true;
+  }
+
+  /**
+   * In die Mitte der Karte klicken.
+   *
+   * Nach dem Zoom liegt die gesuchte Parzelle dort -- die Karte
+   * zentriert auf das, was sie gefunden hat. Ein Klick darauf öffnet
+   * die Objekt-Information.
+   *
+   * Das ist der einzige Teil, den ich von hier aus nicht prüfen kann:
+   * ob die Karte den Klick eines Skripts annimmt, zeigt erst der
+   * Versuch. Nimmt sie ihn nicht an, bleibt der Balken -- dann klickt
+   * ein Mensch, und es geht trotzdem weiter.
+   */
+  function karteAnklicken() {
+    const karte = document.querySelector(
+      '.ol-viewport, canvas, #map, .ga-map');
+    if (!karte) return false;
+    const r = karte.getBoundingClientRect();
+    const x = r.left + r.width / 2;
+    const y = r.top + r.height / 2;
+    for (const art of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) {
+      karte.dispatchEvent(new MouseEvent(art, {
+        bubbles: true, cancelable: true, clientX: x, clientY: y,
+        view: window, button: 0,
+      }));
+    }
+    log('in die Karte geklickt');
+    return true;
+  }
+
   async function job() {
     return new Promise(r => chrome.runtime.sendMessage({ type: 'GET_JOB' }, r));
   }
@@ -86,14 +145,28 @@
     // Der Balken ist immer da: er ist der Weg, wenn die Automatik an
     // einer geänderten Seite scheitert.
     const melde = window.akquiseBalken?.(
-      'Bauraum — Parzelle anklicken, Nummer bestätigen. Übernahme läuft '
-      + 'dann von selbst.');
+      'Bauraum — die Parzelle wird gesucht und angeklickt. Geht das '
+      + 'Fenster nicht auf: Parzelle anklicken, dann übernehmen.');
 
     if (!auftrag) { log('kein Auftrag'); return; }
 
-    // Mobilnummer eintragen, sobald das Feld da ist. Angeklickt wird
-    // die Parzelle von Hand -- welcher Punkt der Karte gemeint ist,
-    // weiss nur, wer sie sieht.
+    // Erst den Vorschlag anklicken, damit die Karte auf die Parzelle
+    // zoomt. Das Feld braucht einen Moment, bis es die Vorschläge hat.
+    let gezoomt = false;
+    for (let i = 0; i < 20 && !gezoomt; i++) {
+      gezoomt = vorschlagKlicken(auftrag.egrid);
+      if (!gezoomt) await sleep(500);
+    }
+    if (gezoomt) {
+      // Der Zoom braucht seine Zeit; erst danach liegt die Parzelle
+      // in der Mitte.
+      await sleep(2500);
+      karteAnklicken();
+    } else {
+      log('kein Vorschlag gefunden -- Parzelle von Hand anklicken');
+    }
+
+    // Mobilnummer eintragen, sobald das Feld da ist.
     for (let i = 0; i < 240 && !auszug(); i++) {
       const feld = document.querySelector('#gb_sms');
       if (feld && !feld.value && auftrag.phoneNumber) {

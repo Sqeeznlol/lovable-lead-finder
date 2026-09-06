@@ -1,0 +1,63 @@
+# =====================================================================
+# Die Extension als fertiges Paket
+# =====================================================================
+# Sie liegt als Ordner im Repository, und Chrome will genau das haben.
+# Ohne diesen Ablauf muss man das ganze Projekt als ZIP laden, nur um
+# an fünf Dateien zu kommen -- und das bei jeder Änderung.
+#
+# Hier entsteht bei jedem Push ein Paket, das nur die Extension
+# enthält. Es hängt am Lauf und ist über die Actions-Seite zu holen.
+# =====================================================================
+
+name: Extension packen
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'extension/**'
+      - '.github/workflows/extension.yml'
+  workflow_dispatch:
+
+jobs:
+  packen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fassung ablesen
+        id: fassung
+        run: |
+          set -euo pipefail
+          v=$(grep -oP '"version"\s*:\s*"\K[^"]+' extension/manifest.json)
+          echo "nummer=$v" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Extension $v"
+            echo ""
+            echo "Unter **Artifacts** liegt \`extension-$v.zip\`."
+            echo ""
+            echo "Entpacken, dann in \`chrome://extensions\`:"
+            echo "Entwicklermodus ein → *Entpackte Erweiterung laden* →"
+            echo "den entpackten Ordner wählen."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Dateien prüfen
+        run: |
+          set -euo pipefail
+          # Ein Manifest, das eine Datei nennt, die es nicht gibt, laesst
+          # Chrome die ganze Erweiterung verweigern -- und zwar erst beim
+          # Laden, auf dem Rechner, an dem niemand mehr etwas aendern
+          # kann.
+          fehlt=0
+          for f in $(grep -oP '"[a-z0-9_.-]+\.js"' extension/manifest.json \
+                     | tr -d '"' | sort -u); do
+            [ -f "extension/$f" ] || { echo "fehlt: $f"; fehlt=1; }
+          done
+          for f in extension/*.js; do node --check "$f"; done
+          exit $fehlt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extension-${{ steps.fassung.outputs.nummer }}
+          path: extension/
+          if-no-files-found: error
