@@ -217,3 +217,44 @@ Die letzte Zahl ist der eigentliche Engpass. Bei fünf Auskünften am Tag
 dauert es für 2'710 Anruf-Kandidaten rund zwei Jahre. Wenn die Akquise
 schneller werden soll, führt der Weg über einen anderen Bezug der
 Eigentümerdaten, nicht über mehr Export.
+
+## Was beim Ausrollen zu beachten ist
+
+**Vercel baut die Live-Seite nur bei einem direkten Push auf `main`.**
+Ein Squash-Merge einer Pull Request erzeugt zwar den Commit auf `main`,
+aber kein Production-Deployment -- belegt am 6. September: von
+fünfzehn gemergten Änderungen wurde eine einzige live, und das war die
+eine, die direkt gepusht wurde.
+
+Woran man erkennt, dass etwas live ist: in der Liste der Deployments
+trägt der Eintrag das blaue Badge **Production** und als Branch
+**main**. Ein Eintrag mit *Preview* und einem `claude/...`-Branch ist
+nur ein Probebau und ändert an der Seite nichts.
+
+Zwei Dinge, die dabei Stunden gekostet haben:
+
+  * **Ein Redeploy holt keine neuen Commits.** Er baut denselben
+    Quellstand noch einmal. Wer den aktuellen Stand live will, braucht
+    einen neuen Build, keinen erneuten.
+
+  * **Der Zwischenspeicher im Browser hält dreissig Minuten.** Kommt
+    ein Feld dazu, liest die neue Anwendung so lange alte Zeilen ohne
+    dieses Feld weiter -- und kein Neuladen hilft, weil das Neuladen ja
+    gerade übersprungen wird. Deshalb trägt die Ablage eine Fassung im
+    Namen (`bauraum.v2.`), die bei jeder Änderung der Form steigt.
+
+## Jeder Kanton hat seinen eigenen Kataster
+
+Der ÖREB-Link führte auch bei Thurgauer Objekten auf `maps.zh.ch` und
+zeigte dort eine Zürcher Parzelle mit derselben Nummer -- schlimmer als
+kein Link, weil er beim Telefonieren glaubwürdig aussieht.
+
+Der Thurgau führt `map.geo.tg.ch`. Das Portal sucht keine
+Parzellennummern, es zeigt Orte, und es rechnet in Landeskoordinaten;
+die Umrechnung aus Längen- und Breitengrad steht in
+`src/lib/koordinaten.ts`. Fünf Tests in
+`src/lib/__tests__/kataster.test.ts` halten den Fall fest, damit ihn
+niemand mehr von Hand nachklicken muss.
+
+Für Zug, Aargau und Luzern gilt dasselbe, sobald sie dazukommen: erst
+das Portal des Kantons suchen, dann den Link bauen.
