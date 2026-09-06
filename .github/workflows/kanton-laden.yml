@@ -655,6 +655,15 @@ jobs:
           psql "$DB" -v ON_ERROR_STOP=1 -X -q \
             -c "\\copy public.verschnitt_tg ($kopf) from '/tmp/verschnitten.csv' with (format csv, header true)"
 
+          # Ohne Index vergleicht die Datenbank 193'642 Zeilen mit
+          # 259'057 -- derselbe Fehler wie beim Verschneiden, nur eine
+          # Ebene höher. Der erste Versuch brach nach zwei Minuten ab.
+          # Und die Voreinstellung bricht jede längere Abfrage ab;
+          # 137'000 Zeilen einzufügen dauert länger als das.
+          psql "$DB" -v ON_ERROR_STOP=1 -X -q -c "
+            create index on public.verschnitt_tg (egrid);
+            analyze public.verschnitt_tg;"
+
           echo "### Was geladen wurde"
           psql "$DB" -X -q -c "
             select count(*) as zeilen,
@@ -669,25 +678,30 @@ jobs:
 
           if [ "${{ inputs.schritt }}" != "einspielen-schreiben" ]; then
             echo "### Was geschrieben würde"
+            # Ein Join, kein Unterausdruck je Zeile: sonst schlägt die
+            # Datenbank 137'000 Mal in 259'057 Zeilen nach.
             psql "$DB" -X -q -c "
+              set local statement_timeout = '15min';
               with haupt as (
-                select distinct on (egrid) *
+                select distinct on (egrid) egrid
                 from public.verschnitt_tg
                 where egrid is not null and egrid <> ''
                 order by egrid, zone_m2 desc nulls last)
               select count(*) as neue_objekte,
-                     count(*) filter (
-                       where egrid in (select egrid from public.properties
-                                       where egrid is not null))
-                       as davon_schon_vorhanden
-              from haupt;"
+                     count(p.egrid) as davon_schon_vorhanden
+              from haupt h
+              left join public.properties p on p.egrid = h.egrid;"
             echo ""
             echo "**Probelauf** -- die Tabelle properties wurde nicht berührt."
             exit 0
           fi
 
           echo "### Schreiben"
+          # 137'000 Zeilen, und an jeder hängt der Auslöser, der
+          # Ausnützung und Marge rechnet. Das dauert länger als die
+          # voreingestellte Frist einer Abfrage.
           psql "$DB" -v ON_ERROR_STOP=1 -X -q -c "
+            set local statement_timeout = '30min';
             with haupt as (
               select distinct on (egrid) *
               from public.verschnitt_tg
