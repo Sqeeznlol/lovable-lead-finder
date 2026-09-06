@@ -112,17 +112,20 @@ jobs:
                 count(*) filter (where zonen > 1) as mehrere_zonen,
                 count(*)                          as parzellen
               from je;"
+            # Der Klartext steht nicht im Verschnitt, sondern im
+            # Bestand: dorthin wurden die Zonennamen geschrieben. Der
+            # Verschnitt sagt nur, welche Parzelle eindeutig ist.
             frage "Zonen im Thurgau (nur Parzellen mit genau einer Zone)" "
               with eindeutig as (
                 select egrid from public.verschnitt_tg
                 group by egrid having count(*) = 1
               )
-              select coalesce(nullif(v.zone_name,''), v.zone_typ, '(ohne Namen)')
-                       as zone,
-                     count(*)                     as parzellen,
-                     round(avg(v.flaeche_m2))     as flaeche_schnitt_m2
-              from public.verschnitt_tg v
-              join eindeutig e on e.egrid = v.egrid
+              select coalesce(nullif(trim(p.zone),''), '(ohne Zone)') as zone,
+                     count(*)                  as parzellen,
+                     round(avg(p.area))        as flaeche_schnitt_m2
+              from public.properties p
+              join eindeutig e on e.egrid = p.egrid
+              where p.kanton = 'TG'
               group by 1 order by 2 desc;"
 
           elif [ "${{ inputs.frage }}" = "arten" ]; then
