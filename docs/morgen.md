@@ -283,12 +283,25 @@ zufällig klickte. Der Ablauf ist deshalb umgestellt:
      Hand nachsehen, und niemand telefoniert mehr mit einer Seite, die
      eine Woche alt ist.
 
-  4. **Der Ablauf "Ausliefern" baut selbst und liefert ab**, sobald im
-     Repository `VERCEL_TOKEN`, `VERCEL_ORG_ID` und `VERCEL_PROJECT_ID`
-     hinterlegt sind. Fehlen sie, sagt er das und hört auf. Solange
-     bleibt die Git-Anbindung von Vercel der einzige Weg -- und die
-     hat schon einmal einen halben Tag lang nichts gebaut.
+  4. **Ausgeliefert wird allein über die Git-Anbindung von Vercel.**
+     Ein zweiter Weg über GitHub Actions war kurz da und ist wieder
+     weg: er würde jeden Push doppelt ausliefern und damit genau die
+     Grenze reissen, an der es hing.
 
-Bleibt sie wieder stehen, hilft in Vercel *Promote to Production* auf
-einem fertigen Preview: das bringt einen bereits gebauten Stand live,
-ohne neu zu bauen, und kostet deshalb kein Kontingent.
+Denn es hing nicht an der Anbindung. Am Repository hingen zwei
+Vercel-Projekte, `bauraum` und `lovable-lead-finder`; jeder Push zählte
+doppelt, und die hundert Auslieferungen am Tag waren am Nachmittag
+aufgebraucht -- gemeldet wurde das nur beim zweiten Projekt
+("Deployment rate limited -- retry in 24 hours"), während das erste
+schlicht nichts mehr baute. Seit `lovable-lead-finder` gelöscht ist,
+baut Vercel wieder auf jeden Push.
+
+Die Lehre ist nicht "Vercel ist unzuverlässig", sondern: **ein
+Repository, ein Projekt.** Wer ein zweites anhängt, halbiert das
+Kontingent, ohne dass es irgendwo als Zähler auftaucht -- die
+Nutzungsseite rechnet über dreissig Tage und kennt diese Tagesgrenze
+gar nicht.
+
+Bleibt die Auslieferung doch einmal stehen, hilft in Vercel *Promote to
+Production* auf einem fertigen Preview: das bringt einen bereits
+gebauten Stand live, ohne neu zu bauen, und kostet kein Kontingent.
