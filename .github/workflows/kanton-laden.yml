@@ -290,10 +290,17 @@ jobs:
 
           # Wie die Geometriespalte heisst, sagt die Datei selbst; darauf
           # zu raten hat diesen Ablauf schon mehrfach einen Lauf gekostet.
-          gsp=$(ogrinfo -so /tmp/arbeit.sqlite flaechen 2>/dev/null \
-                | sed -n 's/^Geometry Column = //p' | head -1)
-          gsz=$(ogrinfo -so /tmp/arbeit.sqlite zonen 2>/dev/null \
-                | sed -n 's/^Geometry Column = //p' | head -1)
+          # SpatiaLite führt selbst Buch darüber, wie die Geometriespalte
+          # jeder Tabelle heisst. Diese Tabelle zu fragen ist verlässlich;
+          # aus der Textausgabe von ogrinfo zu lesen war es nicht.
+          spalte() {
+            ogrinfo -q /tmp/arbeit.sqlite -sql \
+              "SELECT f_geometry_column FROM geometry_columns
+               WHERE f_table_name = '$1'" 2>/dev/null \
+              | sed -n 's/.*= //p' | head -1
+          }
+          gsp=$(spalte flaechen)
+          gsz=$(spalte zonen)
           echo "Geometrie: flaechen.${gsp:?} zonen.${gsz:?}"
 
           echo
