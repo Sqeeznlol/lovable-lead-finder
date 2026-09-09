@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { zoneKurzform } from '@/lib/potential';
+import { verkauftNie } from '@/lib/grundbuch';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 
 export type Property = Tables<'properties'>;
@@ -224,20 +225,26 @@ export function useOffeneNummern(limit = 200) {
   return useQuery({
     queryKey: ['properties', 'offene-nummern', limit],
     queryFn: async () => {
+      // Getrennt wird hier, nicht in der Abfrage.
+      //
+      // "leer oder null" liess sich in PostgREST nur als
+      // Oder-Verknuepfung schreiben, und deren Schreibweise fuer den
+      // leeren Wert ist wacklig: schlaegt sie fehl, kommt eine leere
+      // Liste zurueck, und niemand sieht einen Fehler. Es sind eine
+      // Handvoll Zeilen -- die zu sortieren kostet nichts.
       const { data, error } = await supabase
         .from('properties')
         .select('*')
-        .eq('is_queried', false)
+        .is('pipedrive_deal_id', null)
         .not('owner_name', 'is', null)
         .neq('owner_name', '')
-        // Nicht nur null: aeltere Zeilen tragen eine leere Zeichenkette
-        // als Nummer. Sie fielen aus dieser Liste heraus und lagen
-        // damit nirgends -- weder hier noch in Pipedrive.
-        .or('owner_phone.is.null,owner_phone.eq.')
         .order('marge_chf', { ascending: false, nullsFirst: false })
-        .limit(limit);
+        .limit(500);
       if (error) throw error;
-      return data as Property[];
+      return (data as Property[])
+        .filter(p => !String(p.owner_phone ?? '').trim())
+        .filter(p => p.preselection_status !== 'Ausschliessen')
+        .slice(0, limit);
     },
     staleTime: 15 * 1000,
   });
@@ -246,11 +253,9 @@ export function useOffeneNummern(limit = 200) {
 /**
  * Was fertig ist und auf den Deal wartet.
  *
- * Eigentümer da, Nummer da, noch keine Deal-Nummer. Das ist der
- * Zustand, in dem ein Objekt alles hat, was ein Anruf braucht -- und
- * genau der war bisher nirgends zu sehen: die Objekte verliessen
- * "Nummern" und tauchten erst in Pipedrive wieder auf, wenn der Push
- * gelang. Ging er schief, lagen sie dazwischen.
+ * Eigentuemer da, Nummer da, noch keine Deal-Nummer. Dieser Zustand
+ * war nirgends zu sehen: die Objekte verliessen "Nummern" und tauchten
+ * in Pipedrive auf -- wenn der Push gelang.
  */
 export function useBereitFuerPipedrive(limit = 200) {
   return useQuery({
@@ -260,16 +265,18 @@ export function useBereitFuerPipedrive(limit = 200) {
         .from('properties')
         .select('*')
         .is('pipedrive_deal_id', null)
-        .eq('ausgeschlossen', false)
-        .neq('preselection_status', 'Ausschliessen')
         .not('owner_name', 'is', null)
         .neq('owner_name', '')
-        .not('owner_phone', 'is', null)
-        .neq('owner_phone', '')
         .order('marge_chf', { ascending: false, nullsFirst: false })
-        .limit(limit);
+        .limit(500);
       if (error) throw error;
-      return data as Property[];
+      return (data as Property[])
+        .filter(p => !!String(p.owner_phone ?? '').trim())
+        .filter(p => p.preselection_status !== 'Ausschliessen')
+        // Die oeffentliche Hand verkauft nicht -- ein Deal dazu ist
+        // eine Zeile, die niemand anruft.
+        .filter(p => !verkauftNie(p.owner_name))
+        .slice(0, limit);
     },
     staleTime: 15 * 1000,
   });

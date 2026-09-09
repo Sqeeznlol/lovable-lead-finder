@@ -66,26 +66,26 @@ export function Uebersicht() {
           icon={<PhoneCall className="h-5 w-5" />}
           wert={e.anrufen.toLocaleString('de-CH')}
           label="Abfragen"
-          hinweis="Potenzial, Eigentümer und Anlass sprechen dafür"
+          hinweis="Unter den 5'000 mit dem grössten Flächenzuwachs"
           betont
         />
         <Kennzahl
           icon={<Search className="h-5 w-5" />}
           wert={e.pruefen.toLocaleString('de-CH')}
           label="Prüfen"
-          hinweis="Lohnt sich, braucht aber einen zweiten Blick"
+          hinweis="Lohnt sich, braucht einen zweiten Blick — dieselben 5'000"
         />
         <Kennzahl
           icon={<TrendingUp className="h-5 w-5" />}
           wert={chf(data.margeSumme, 0)}
           label="Marge im Bestand"
-          hinweis="Summe über Abfragen und Prüfen, lagegerecht gerechnet"
+          hinweis="Über die 5'000 grössten, lagegerecht gerechnet"
         />
         <Kennzahl
           icon={<UserSearch className="h-5 w-5" />}
           wert={data.ohneEigentuemer.toLocaleString('de-CH')}
           label="Eigentümer fehlt"
-          hinweis="Hier ist der nächste Schritt die Recherche"
+          hinweis="Ohne Eigentümer — der nächste Schritt ist die Abfrage"
         />
       </div>
 
