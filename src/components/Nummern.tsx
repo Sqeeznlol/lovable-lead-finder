@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Phone, ExternalLink, Loader2, Check } from 'lucide-react';
+import { Phone, ExternalLink, Loader2, Check, ArrowRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,8 +26,31 @@ export function Nummern() {
   const { data, isLoading } = useOffeneNummern(200);
   const [entwurf, setEntwurf] = useState<Record<string, string>>({});
   const [speichert, setSpeichert] = useState<string | null>(null);
+  // Wohin es ging: sonst verschwindet die Zeile, und niemand weiss,
+  // ob der Deal entstanden ist oder etwas schiefging.
+  const [uebergeben, setUebergeben] = useState<
+    { adresse: string; name: string; dealId?: string | null }[]>([]);
   const { toast } = useToast();
   const qc = useQueryClient();
+
+  // Beim Öffnen die letzten Übergaben zeigen -- auch die von gestern.
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from('properties')
+        .select('address, owner_name, pipedrive_deal_id, last_export_at')
+        .not('pipedrive_deal_id', 'is', null)
+        .order('last_export_at', { ascending: false, nullsFirst: false })
+        .limit(8);
+      if (data?.length) {
+        setUebergeben(data.map(d => ({
+          adresse: d.address,
+          name: d.owner_name ?? '',
+          dealId: d.pipedrive_deal_id,
+        })));
+      }
+    })();
+  }, []);
 
   const eintragen = async (id: string, adresse: string) => {
     const nummer = (entwurf[id] || '').trim();
@@ -48,6 +71,20 @@ export function Nummern() {
     // Von hier an dasselbe wie nach einer gefundenen Nummer: Deal
     // anlegen, Objekt ablegen. Kein zweiter Knopf.
     await weiterverarbeiten(id, toast);
+
+    // Nachsehen, was daraus wurde -- die Zeile verschwindet gleich,
+    // und ohne diesen Eintrag bliebe offen, wohin.
+    const { data: danach } = await supabase
+      .from('properties')
+      .select('owner_name, pipedrive_deal_id')
+      .eq('id', id)
+      .maybeSingle();
+    setUebergeben(v => [{
+      adresse,
+      name: danach?.owner_name ?? '',
+      dealId: danach?.pipedrive_deal_id ?? null,
+    }, ...v].slice(0, 8));
+
     setSpeichert(null);
     setEntwurf(e => ({ ...e, [id]: '' }));
     qc.invalidateQueries({ queryKey: ['properties'] });
@@ -75,6 +112,46 @@ export function Nummern() {
           steht, entsteht der Deal in Pipedrive — Akquise, Phase „Neu".
         </p>
       </div>
+
+      {/* Wohin die Leads gegangen sind. Ohne das ist die Frage
+          berechtigt: "jetzt ist er weg -- wo?" */}
+      {uebergeben.length > 0 && (
+        <Card>
+          <CardContent className="p-0">
+            <div className="flex items-center gap-2 border-b p-5">
+              <ArrowRight className="h-4 w-4 text-muted-foreground" />
+              <h2 className="font-serif">Nach Pipedrive übergeben</h2>
+              <span className="ml-auto text-xs text-muted-foreground">
+                Akquise · Phase „Neu"
+              </span>
+            </div>
+            <ul className="divide-y">
+              {uebergeben.map((u, i) => (
+                <li key={`${u.adresse}-${i}`} className="flex items-baseline justify-between gap-3 px-5 py-2 text-sm">
+                  <span className="min-w-0">
+                    <span className="font-medium">{u.adresse}</span>
+                    {u.name && <span className="text-muted-foreground"> · {u.name}</span>}
+                  </span>
+                  {u.dealId ? (
+                    <a
+                      href={`https://bauraum.pipedrive.com/deal/${u.dealId}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="shrink-0 underline underline-offset-4"
+                    >
+                      Deal {u.dealId} öffnen
+                    </a>
+                  ) : (
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      kein Deal entstanden
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
 
       {offen.length === 0 ? (
         <Card>

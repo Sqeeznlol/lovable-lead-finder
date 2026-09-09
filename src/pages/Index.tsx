@@ -48,13 +48,16 @@ const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: st
   // Nummer fehlt. Im Akquise-Modus lag er zwischen allem anderen, und
   // wer ihn suchte, fand ihn nicht.
   { id: 'nummern', label: 'Nummern', icon: Phone },
-  { id: 'akquise', label: 'Akquise-Modus', icon: Zap },
   { id: 'phones', label: 'Telefone', icon: Phone },
   { id: 'admin', label: 'Admin', icon: Shield },
 ];
 
 /** Die stillgelegten Reiter -- erreichbar, aber nicht mehr im Weg. */
 const stillgelegt: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  // Der Akquise-Modus stammt aus der Zeit, als hier telefoniert wurde.
+  // Heute macht die Uebersicht die Abfrage und "Nummern" die Suche;
+  // dazwischen bleibt nichts, was er noch tun muesste.
+  { id: 'akquise', label: 'Akquise-Modus', icon: Zap },
   { id: 'dashboard', label: 'Kennzahlen', icon: LayoutDashboard },
   { id: 'vorauswahl', label: 'Vorauswahl', icon: Eye },
   { id: 'telsuche', label: 'Telefon-Suche', icon: Search },
@@ -63,7 +66,7 @@ const stillgelegt: { id: Tab; label: string; icon: React.ComponentType<{ classNa
 ];
 
 // Primary tabs visible in the iPhone bottom bar
-const mobileBottomTabs: Tab[] = ['uebersicht', 'master', 'nummern', 'akquise'];
+const mobileBottomTabs: Tab[] = ['uebersicht', 'master', 'nummern', 'phones'];
 
 export default function Index() {
   const [active, setActive] = useState<Tab>('uebersicht');

@@ -148,19 +148,27 @@ export async function weiterverarbeiten(
     return;
   }
 
-  // 3. Erst jetzt aus der Liste nehmen.
+  // 3. Erst jetzt aus der Liste nehmen -- mit der Deal-Nummer.
+  //
+  // Ohne sie verschwindet das Objekt einfach, und niemand kann
+  // nachsehen, wo es gelandet ist. Mit ihr fuehrt ein Link direkt
+  // dorthin.
+  const dealId = push?.results?.[0]?.dealId;
   await supabase.from('properties')
     .update({
       is_queried: true,
       queried_at: new Date().toISOString(),
       status: 'Exportiert',
+      last_export_at: new Date().toISOString(),
+      ...(dealId ? { pipedrive_deal_id: String(dealId) } : {}),
     })
     .eq('id', propertyId);
 
   void protokolliere('deal', `${p.address} — Akquise`, p.kanton);
   toast({
     title: '📞 Deal in Akquise angelegt',
-    description: `${p.owner_name} · ${telefon}`,
+    description: `${p.owner_name} · ${telefon}`
+      + (dealId ? ` · Deal ${dealId}` : ''),
   });
 }
 
