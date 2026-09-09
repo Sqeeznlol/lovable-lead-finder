@@ -259,9 +259,14 @@ export function useDistinctValues(field: 'bezirk' | 'plz' | 'zone' | 'kategorie'
   return useQuery({
     queryKey: ['master', 'distinct', field],
     queryFn: async () => {
-      const { data } = await supabase.from('properties').select(field).not(field, 'is', null).limit(100000);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const arr = (data || []).map((d: any) => d[field]).filter(Boolean) as string[];
+      // Hunderttausend Zeilen fuer eine Auswahlliste: das laedt jedes
+      // Mal mehrere Megabyte, nur um daraus ein paar Dutzend Namen zu
+      // machen. Fuenftausend reichen fuer jede Liste, die ein Mensch
+      // aufklappt.
+      const { data } = await supabase
+        .from('properties').select(field).not(field, 'is', null).limit(5000);
+      const zeilen = (data ?? []) as unknown as Record<string, unknown>[];
+      const arr = zeilen.map(d => d[field]).filter(Boolean) as string[];
       return Array.from(new Set(arr)).sort();
     },
     staleTime: 5 * 60 * 1000,

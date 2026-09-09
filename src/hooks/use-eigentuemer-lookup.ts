@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { verkauftNie, ARCHIV_STATUS } from '@/lib/grundbuch';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { portalUrl } from '@/lib/portal';
@@ -68,8 +69,8 @@ async function grundVonFunktion(fehler: unknown): Promise<string> {
  * verlangt eine Entscheidung.
  *
  * Also läuft es hier durch: Nummer suchen, Deal anlegen, Objekt aus der
- * Liste nehmen. Ob der Deal in Akquise landet oder in Search,
- * entscheidet die gefundene Nummer -- das tut der Push.
+ * Liste nehmen. Ohne Nummer entsteht kein Deal -- das Objekt bleibt
+ * unter "Nummern" stehen, bis eine da ist.
  *
  * Schlägt ein Schritt fehl, bleibt das Objekt in der Liste. Ein halb
  * abgelegtes Objekt wäre schlimmer als eines, das noch dasteht.
@@ -84,6 +85,27 @@ export async function weiterverarbeiten(
     .eq('id', propertyId)
     .maybeSingle();
   if (!p) return;
+
+  // 0. Wer nie verkauft, braucht keinen Deal.
+  //
+  // Die Regel gab es beim Eintragen von Hand, aber nicht auf dem Weg
+  // ueber Extension und Lesezeichen: "Stadt Winterthur" waere dort
+  // durchgelaufen, haette eine Telefonsuche ausgeloest und einen Deal
+  // erzeugt, den niemand anruft.
+  if (verkauftNie(p.owner_name ?? p.eigentuemer_name)) {
+    await supabase.from('properties')
+      .update({
+        preselection_status: ARCHIV_STATUS,
+        preselection_note: 'Öffentliche Hand als Eigentümerin — verkauft nicht',
+        preselection_decided_at: new Date().toISOString(),
+      })
+      .eq('id', propertyId);
+    toast({
+      title: 'Öffentliche Hand — ins Archiv',
+      description: `${p.owner_name ?? p.eigentuemer_name} verkauft nicht.`,
+    });
+    return;
+  }
 
   // 1. Telefonnummer suchen -- nur, wenn noch keine dasteht.
   let telefon = p.owner_phone || '';

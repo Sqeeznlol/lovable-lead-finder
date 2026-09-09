@@ -230,7 +230,10 @@ export function useOffeneNummern(limit = 200) {
         .eq('is_queried', false)
         .not('owner_name', 'is', null)
         .neq('owner_name', '')
-        .is('owner_phone', null)
+        // Nicht nur null: aeltere Zeilen tragen eine leere Zeichenkette
+        // als Nummer. Sie fielen aus dieser Liste heraus und lagen
+        // damit nirgends -- weder hier noch in Pipedrive.
+        .or('owner_phone.is.null,owner_phone.eq.')
         .order('marge_chf', { ascending: false, nullsFirst: false })
         .limit(limit);
       if (error) throw error;
