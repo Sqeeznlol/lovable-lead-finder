@@ -65,21 +65,28 @@ const PropertySchema = z.object({
   owner_name_2: z.string().nullish(),
   owner_address_2: z.string().nullish(),
   owner_phone_2: z.string().nullish(),
+  // Jedes Feld darf fehlen *und* null sein. "optional" allein liess
+  // eine Zeile durchfallen, in der etwa die Adresse null steht -- und
+  // die ganze Pruefung scheiterte mit 400, ohne dass am Bildschirm
+  // stand, woran. Solche Zeilen entstehen bei jeder Auskunft, die
+  // keine Strasse nennt.
   owners_json: z.array(z.object({
-    fullName: z.string().optional(),
-    firstName: z.string().optional(),
-    lastName: z.string().optional(),
-    street: z.string().optional(),
-    streetNumber: z.string().optional(),
-    plz: z.string().optional(),
-    ort: z.string().optional(),
-    address: z.string().optional(),
-    phone: z.string().optional(),
-    ownershipType: z.string().optional(),
-    type: z.string().optional(),
-  })).nullish(),
+    name: z.string().nullish(),
+    fullName: z.string().nullish(),
+    firstName: z.string().nullish(),
+    lastName: z.string().nullish(),
+    street: z.string().nullish(),
+    streetNumber: z.string().nullish(),
+    plz: z.string().nullish(),
+    ort: z.string().nullish(),
+    address: z.string().nullish(),
+    phone: z.string().nullish(),
+    ownershipType: z.string().nullish(),
+    type: z.string().nullish(),
+  }).passthrough()).nullish(),
   notes: z.string().nullish(),
-  status: z.string(),
+  // Der Status kann fehlen; das ist kein Grund, den Deal abzulehnen.
+  status: z.string().nullish(),
   google_maps_url: z.string().nullish(),
   kanton: z.string().nullish(),
   kategorie: z.string().nullish(),
@@ -397,7 +404,13 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const parsed = BodySchema.safeParse(body);
     if (!parsed.success) {
-      return new Response(JSON.stringify({ error: parsed.error.flatten().fieldErrors }), {
+      // Der Rumpf nennt das Feld, an dem es lag. Ohne ihn steht am
+      // Bildschirm nur "non-2xx status code".
+      console.error('Pruefung fehlgeschlagen:', JSON.stringify(parsed.error.issues));
+      return new Response(JSON.stringify({
+        error: 'Feldprüfung fehlgeschlagen',
+        felder: parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`),
+      }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }

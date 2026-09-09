@@ -37,6 +37,28 @@ interface StartArgs {
 }
 
 /**
+ * Warum die Funktion nein gesagt hat.
+ *
+ * "Edge Function returned a non-2xx status code" nennt den Grund
+ * nicht. Er steht im Rumpf der Antwort -- ein fehlender Token, ein
+ * Feld, das die Prüfung nicht passiert, eine Absage von Pipedrive.
+ * Ohne ihn sucht man im Nebel; deshalb wird er herausgeholt.
+ */
+async function grundVonFunktion(fehler: unknown): Promise<string> {
+  const kurz = String((fehler as { message?: string })?.message || fehler);
+  const antwort = (fehler as { context?: Response })?.context;
+  try {
+    if (antwort && typeof antwort.text === 'function') {
+      const text = (await antwort.text()).slice(0, 400);
+      if (text) return `${kurz} — ${text}`;
+    }
+  } catch {
+    /* Dann bleibt es bei der kurzen Meldung. */
+  }
+  return kurz;
+}
+
+/**
  * Was nach der Abfrage von selbst passiert.
  *
  * Bis hierher endete die Arbeit mit dem Eigentümernamen in der
@@ -118,8 +140,9 @@ export async function weiterverarbeiten(
     toast({
       title: 'Pipedrive: kein Deal angelegt',
       description: pushErr
-        ? String(pushErr.message || pushErr)
-        : 'Vermutlich schon vorhanden — das Objekt bleibt in der Liste.',
+        ? await grundVonFunktion(pushErr)
+        : (push?.results?.[0]?.error
+           ?? 'Vermutlich schon vorhanden — das Objekt bleibt in der Liste.'),
       variant: 'destructive',
     });
     return;
