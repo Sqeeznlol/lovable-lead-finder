@@ -22,7 +22,7 @@ import { Input } from '@/components/ui/input';
  * wenigstens kein lesbares Passwort.
  */
 const PRUEFSUMME =
-  'eebaa3310cd2feae48028a4fdf99510b5feab971d6950af94a2789c9ccf34d68';
+  '507d612b2c4f424fe4600f9898598b16d19bf302dbe4e7caef4ba35873f83d36';
 
 /** Einmal am Tag reicht -- der Riegel soll nicht zur Plage werden. */
 const SCHLUESSEL = 'bauraum.admin.offen';
