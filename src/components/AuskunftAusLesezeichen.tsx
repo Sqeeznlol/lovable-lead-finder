@@ -1,10 +1,11 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { leseAuskunft } from '@/lib/eigentuemer';
 import { weiterverarbeiten } from '@/hooks/use-eigentuemer-lookup';
 import { protokolliere } from '@/lib/protokoll';
+import { useAuth } from '@/hooks/use-auth';
 import { naechsteParzelle, naechsteAdresse } from '@/lib/naechste';
 
 /**
@@ -22,18 +23,32 @@ export function AuskunftAusLesezeichen() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const laeuft = useRef(false);
+  const { user, loading } = useAuth();
+  // Eine Meldung, die wieder verschwindet, taugt hier nicht: der Tag
+  // geht auf, etwas geschieht -- oder eben nicht --, und man sieht
+  // nichts mehr. Der Stand bleibt stehen, bis man ihn wegklickt.
+  const [stand, setStand] = useState<{ art: 'lauft' | 'gut' | 'fehler'; text: string } | null>(null);
 
   useEffect(() => {
     const hash = window.location.hash;
-    if (!hash.startsWith('#auskunft=') || laeuft.current) return;
+    if (!hash.startsWith('#auskunft=')) return;
+    // Erst anmelden lassen: ohne Sitzung liest die Datenbank nichts,
+    // und der Auszug waere verloren.
+    if (loading) return;
+    if (!user) {
+      setStand({ art: 'fehler', text: 'Nicht angemeldet — bitte anmelden, dann nochmals übernehmen.' });
+      return;
+    }
+    if (laeuft.current) return;
     laeuft.current = true;
+    setStand({ art: 'lauft', text: 'Auskunft wird übernommen …' });
 
     (async () => {
       let daten: { text?: string; egrid?: string; parzelle?: string };
       try {
         daten = JSON.parse(decodeURIComponent(hash.slice('#auskunft='.length)));
       } catch {
-        toast({ title: 'Auskunft unleserlich', variant: 'destructive' });
+        setStand({ art: 'fehler', text: 'Auskunft unleserlich.' });
         return;
       }
       // Die Adresse aufräumen, damit ein Neuladen nicht alles wiederholt.
@@ -41,21 +56,13 @@ export function AuskunftAusLesezeichen() {
 
       const gelesen = leseAuskunft(daten.text || '');
       if (gelesen.length === 0) {
-        toast({
-          title: 'Keine Eigentümer erkannt',
-          description: 'Im Portal die Zeilen markieren und nochmals klicken.',
-          variant: 'destructive',
-        });
+        setStand({ art: 'fehler', text: 'Keine Eigentümer erkannt — im Portal die Zeilen markieren und nochmals klicken.' });
         return;
       }
 
       if (!daten.egrid) {
-        toast({
-          title: 'Keine EGRID im Auszug',
-          description: `${gelesen[0].name} — ohne EGRID lässt sich nicht `
-            + 'sagen, zu welchem Grundstück das gehört.',
-          variant: 'destructive',
-        });
+        setStand({ art: 'fehler', text: `${gelesen[0].name} — keine EGRID im Auszug, `
+          + 'damit lässt sich das Grundstück nicht zuordnen.' });
         return;
       }
 
@@ -66,11 +73,7 @@ export function AuskunftAusLesezeichen() {
         .maybeSingle();
 
       if (!objekt) {
-        toast({
-          title: 'Objekt nicht im Bestand',
-          description: `Zu ${daten.egrid} steht nichts in der Datenbank.`,
-          variant: 'destructive',
-        });
+        setStand({ art: 'fehler', text: `Zu ${daten.egrid} steht nichts im Bestand.` });
         return;
       }
 
@@ -94,14 +97,15 @@ export function AuskunftAusLesezeichen() {
         .eq('id', objekt.id);
 
       if (error) {
-        toast({ title: 'Speichern fehlgeschlagen', description: error.message, variant: 'destructive' });
+        setStand({ art: 'fehler', text: `Speichern fehlgeschlagen: ${error.message}` });
         return;
       }
 
       void protokolliere('eigentuemer', erster.name);
-      toast({
-        title: `✓ ${gelesen.length > 1 ? gelesen.length + ' Eigentümer' : erster.name}`,
-        description: objekt.address,
+      setStand({
+        art: 'gut',
+        text: `${erster.name}${gelesen.length > 1 ? ` und ${gelesen.length - 1} weitere` : ''}`
+          + ` — eingetragen bei ${objekt.address}`,
       });
 
       await weiterverarbeiten(objekt.id, toast);
@@ -139,19 +143,37 @@ export function AuskunftAusLesezeichen() {
       );
 
       if (!naechste) {
-        toast({ title: 'Nichts mehr offen', description: 'Alle Objekte tragen einen Eigentümer.' });
+        setStand(v => ({ art: 'gut', text: `${v?.text ?? ''} · nichts mehr offen` }));
         return;
       }
 
       const adresse = naechsteAdresse(naechste);
       const auf = window.open(adresse, '_blank');
-      toast({
-        title: auf ? 'Weiter zur nächsten Parzelle' : 'Nächste Parzelle bereit',
-        description: `${naechste.address ?? ''}${naechste.parzelle ? ` · Parz. ${naechste.parzelle}` : ''}`
-          + (auf ? '' : ' — Popup blockiert, Knopf unten in der Liste.'),
-      });
+      setStand(v => ({
+        art: 'gut',
+        text: `${v?.text ?? ''} · weiter mit ${naechste.address ?? ''}`
+          + `${naechste.parzelle ? ` (Parz. ${naechste.parzelle})` : ''}`
+          + (auf ? '' : ' — das Fenster wurde blockiert, Popups erlauben'),
+      }));
     })();
-  }, [toast, qc]);
+  }, [toast, qc, user, loading]);
 
-  return null;
+  if (!stand) return null;
+
+  const farbe = stand.art === 'gut'
+    ? 'bg-emerald-600'
+    : stand.art === 'fehler' ? 'bg-destructive' : 'bg-foreground';
+
+  return (
+    <div className={`fixed inset-x-0 top-0 z-[100] flex items-center gap-3 px-4 py-2 text-sm text-background ${farbe}`}>
+      <span className="min-w-0 flex-1">{stand.text}</span>
+      <button
+        type="button"
+        onClick={() => setStand(null)}
+        className="shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold underline underline-offset-2"
+      >
+        schliessen
+      </button>
+    </div>
+  );
 }

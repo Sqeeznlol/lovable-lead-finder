@@ -11,6 +11,7 @@ function ausfuehren(seitentext: string) {
   Object.defineProperty(document.body, 'innerText', {
     value: seitentext, configurable: true,
   });
+  vi.useFakeTimers();
   const geoeffnet: string[] = [];
   const alt = window.open;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -24,6 +25,10 @@ function ausfuehren(seitentext: string) {
   // eslint-disable-next-line no-eval
   (0, eval)(code);
 
+  // Ohne Auszug wartet es auf die Karte -- die Uhr vorstellen, damit
+  // der Test nicht dreissig Sekunden dasteht.
+  vi.advanceTimersByTime(40_000);
+  vi.useRealTimers();
   window.open = alt;
   const daten = geoeffnet.length
     ? JSON.parse(decodeURIComponent(geoeffnet[0].split('#auskunft=')[1]))
@@ -51,10 +56,13 @@ Grundstück: Liegenschaft Nr. 669 ( CH932977092161 )`);
     expect(daten.text).toBe('Simon Gränicher,  Widacherring 10, 6102 Malters, 1/1');
   });
 
-  it('sagt es, wenn nichts dasteht', () => {
-    const { daten, gewarnt } = ausfuehren('Irgendeine Seite ohne Auszug.');
+  it('sagt es im Balken, wenn nichts erscheint', () => {
+    // Ohne Auszug versucht es die Parzelle selbst auszuwählen. Kommt
+    // nichts, steht das im Balken -- kein stiller Fehlschlag.
+    const { daten } = ausfuehren('Irgendeine Seite ohne Auszug.');
     expect(daten).toBeNull();
-    expect(gewarnt[0]).toContain('keine Eigentümer gefunden');
+    expect(document.getElementById('bauraum-hinweis')?.textContent)
+      .toContain('kein Auszug erschienen');
   });
 
   it('trägt nichts an den Server -- alles steht hinter der Raute', () => {
