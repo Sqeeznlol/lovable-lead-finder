@@ -58,6 +58,43 @@ jobs:
         with:
           version: latest
 
+      - name: Geheimnisse der Funktionen setzen
+        if: steps.pruefen.outputs.weiter == 'ja'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          # Der Name des Secrets weicht je nach Anlage ab -- geprueft
+          # werden mehrere, genommen der erste, der etwas enthaelt.
+          A: ${{ secrets.PIPEDRIVE_API_TOKEN }}
+          B: ${{ secrets.PIPEDRIVEAPITOKEN }}
+          C: ${{ secrets.PIPEDRIVE_TOKEN }}
+          D: ${{ secrets.PIPEDRIVETOKEN }}
+          E: ${{ secrets.PIPEDRIVE }}
+        run: |
+          set -euo pipefail
+          # Die Funktion laeuft bei Supabase und kennt die
+          # GitHub-Secrets nicht. Ohne diesen Schritt antwortet sie
+          # "PIPEDRIVE_API_TOKEN not configured" -- und der Deal
+          # entsteht nie.
+          token=""
+          for kandidat in "${A:-}" "${B:-}" "${C:-}" "${D:-}" "${E:-}"; do
+            if [ -n "$kandidat" ]; then token="$kandidat"; break; fi
+          done
+          if [ -z "$token" ]; then
+            echo "Kein Pipedrive-Token unter den geprueften Namen." \
+              >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          projekt=$(grep -oP 'project_id\s*=\s*"\K[^"]+' supabase/config.toml)
+          # Der Wert erscheint nirgends: --env-file statt Kommandozeile,
+          # und die Datei wird gleich wieder geloescht.
+          umask 077
+          printf 'PIPEDRIVE_API_TOKEN=%s\n' "$token" > /tmp/funktionen.env
+          supabase secrets set --env-file /tmp/funktionen.env \
+            --project-ref "$projekt" > /dev/null
+          rm -f /tmp/funktionen.env
+          echo "Pipedrive-Token bei den Funktionen hinterlegt." \
+            >> "$GITHUB_STEP_SUMMARY"
+
       - name: Hochladen
         if: steps.pruefen.outputs.weiter == 'ja'
         env:
