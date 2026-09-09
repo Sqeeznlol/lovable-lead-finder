@@ -19,6 +19,8 @@ import { CantonTabs } from '@/components/CantonTabs';
 import { KeyboardShortcutsOverlay } from '@/components/KeyboardShortcutsOverlay';
 import { AdminSchloss } from '@/components/AdminSchloss';
 import { Protokoll } from '@/components/Protokoll';
+import { Lesezeichen } from '@/components/Lesezeichen';
+import { AuskunftAusLesezeichen } from '@/components/AuskunftAusLesezeichen';
 import { useCanton } from '@/hooks/use-canton';
 import { usePlatform } from '@/hooks/use-platform';
 import { useMidnightReset } from '@/hooks/use-phones';
@@ -166,6 +168,7 @@ export default function Index() {
               <AdminSchloss>
               <div className="space-y-6">
                 <AdminSettings />
+                <Lesezeichen />
                 <Protokoll />
                 <div className="rounded-2xl border border-dashed p-5">
                   <p className="text-sm font-medium">Stillgelegte Bereiche</p>

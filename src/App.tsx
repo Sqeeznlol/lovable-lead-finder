@@ -9,6 +9,7 @@ import { Torwaechter } from "@/components/Torwaechter";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { CantonProvider } from "@/hooks/use-canton";
 import { useEigentuemerLookupListener } from "@/hooks/use-eigentuemer-lookup";
+import { AuskunftAusLesezeichen } from "@/components/AuskunftAusLesezeichen";
 const Index = lazy(() => import("./pages/Index.tsx"));
 const SwipePage = lazy(() => import("./pages/SwipePage.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
@@ -24,7 +25,9 @@ const queryClient = new QueryClient({
 
 function GlobalListeners() {
   useEigentuemerLookupListener();
-  return null;
+  // Das Lesezeichen bringt die Auskunft hinter der Raute mit; hier
+  // wird sie entgegengenommen, gleich auf welcher Seite man landet.
+  return <AuskunftAusLesezeichen />;
 }
 
 const App = () => (
