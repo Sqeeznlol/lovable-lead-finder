@@ -20,12 +20,13 @@ import { KeyboardShortcutsOverlay } from '@/components/KeyboardShortcutsOverlay'
 import { AdminSchloss } from '@/components/AdminSchloss';
 import { Protokoll } from '@/components/Protokoll';
 import { Lesezeichen } from '@/components/Lesezeichen';
+import { Nummern } from '@/components/Nummern';
 import { AuskunftAusLesezeichen } from '@/components/AuskunftAusLesezeichen';
 import { useCanton } from '@/hooks/use-canton';
 import { usePlatform } from '@/hooks/use-platform';
 import { useMidnightReset } from '@/hooks/use-phones';
 
-type Tab = 'uebersicht' | 'dashboard' | 'master' | 'vorauswahl' | 'akquise' | 'telsuche' | 'properties' | 'import' | 'masterimport' | 'phones' | 'export' | 'admin';
+type Tab = 'nummern' | 'uebersicht' | 'dashboard' | 'master' | 'vorauswahl' | 'akquise' | 'telsuche' | 'properties' | 'import' | 'masterimport' | 'phones' | 'export' | 'admin';
 
 // Zehn Reiter waren neun zu viel. Was der neue Ablauf selbst erledigt,
 // braucht keinen eigenen Ort mehr:
@@ -43,6 +44,10 @@ type Tab = 'uebersicht' | 'dashboard' | 'master' | 'vorauswahl' | 'akquise' | 't
 const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'uebersicht', label: 'Übersicht', icon: LayoutDashboard },
   { id: 'master', label: 'Abfrage', icon: Database },
+  // Der Zwischenstand braucht einen eigenen Ort: Eigentümer da,
+  // Nummer fehlt. Im Akquise-Modus lag er zwischen allem anderen, und
+  // wer ihn suchte, fand ihn nicht.
+  { id: 'nummern', label: 'Nummern', icon: Phone },
   { id: 'akquise', label: 'Akquise-Modus', icon: Zap },
   { id: 'phones', label: 'Telefone', icon: Phone },
   { id: 'admin', label: 'Admin', icon: Shield },
@@ -58,7 +63,7 @@ const stillgelegt: { id: Tab; label: string; icon: React.ComponentType<{ classNa
 ];
 
 // Primary tabs visible in the iPhone bottom bar
-const mobileBottomTabs: Tab[] = ['uebersicht', 'master', 'akquise', 'phones'];
+const mobileBottomTabs: Tab[] = ['uebersicht', 'master', 'nummern', 'akquise'];
 
 export default function Index() {
   const [active, setActive] = useState<Tab>('uebersicht');
@@ -156,6 +161,7 @@ export default function Index() {
             {active === 'uebersicht' && <Uebersicht />}
             {active === 'dashboard' && <Dashboard />}
             {active === 'master' && <MasterList />}
+            {active === 'nummern' && <Nummern />}
             {active === 'masterimport' && <MasterImport />}
             {active === 'vorauswahl' && <Vorauswahl />}
             {active === 'akquise' && <AkquiseMode />}
