@@ -155,9 +155,14 @@
 
     // Der Balken ist immer da: er ist der Weg, wenn die Automatik an
     // einer geänderten Seite scheitert.
+    const rest = await new Promise(r =>
+      chrome.storage?.local?.get('reihe', x => r((x.reihe || []).length)));
     const melde = window.akquiseBalken?.(
-      'Bauraum — die Parzelle wird gesucht und angeklickt. Geht das '
-      + 'Fenster nicht auf: Parzelle anklicken, dann übernehmen.');
+      rest > 0
+        ? `Bauraum — Reihe läuft, noch ${rest} Parzellen. Geht ein `
+          + 'Fenster nicht auf: Parzelle anklicken, dann übernehmen.'
+        : 'Bauraum — die Parzelle wird gesucht und angeklickt. Geht das '
+          + 'Fenster nicht auf: Parzelle anklicken, dann übernehmen.');
 
     if (!auftrag) { log('kein Auftrag'); return; }
 

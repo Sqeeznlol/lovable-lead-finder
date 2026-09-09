@@ -8,15 +8,23 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { gemeindeBfsNr } from '@/lib/swisstopo';
 import { grundbuchUrl, verkauftNie, ARCHIV_STATUS } from '@/lib/grundbuch';
-import { useStartEigentuemerLookup, useExtensionAvailable } from '@/hooks/use-eigentuemer-lookup';
+import { useStartEigentuemerLookup, useExtensionAvailable, useReiheAbfragen } from '@/hooks/use-eigentuemer-lookup';
 import { protokolliere } from '@/lib/protokoll';
 import { AuskunftEinfuegen } from '@/components/AuskunftEinfuegen';
 import { leseAuskunft, zerlegeZeile } from '@/lib/eigentuemer';
 import { weiterverarbeiten } from '@/hooks/use-eigentuemer-lookup';
 import type { Chance } from '@/hooks/use-uebersicht';
 
-/** Wie viele Auskünfte das Portal pro Tag freigibt. */
-const PRO_TAG = 5;
+/**
+ * Wie viele Auskünfte das Portal pro Tag freigibt.
+ *
+ * Zürich fünf, der Thurgau rund zwanzig. Die Zahl ist der Grund, warum
+ * die Reihenfolge zählt -- und im Thurgau der Grund, warum sich eine
+ * ganze Reihe in einem Zug lohnt.
+ */
+const PRO_TAG_JE_KANTON: Record<string, number> = { ZH: 5, TG: 20 };
+const proTag = (kanton?: string | null) =>
+  PRO_TAG_JE_KANTON[String(kanton ?? '').trim().toUpperCase()] ?? 5;
 
 const heute = () => new Date().toISOString().slice(0, 10);
 const SCHLUESSEL = 'grundbuch.abfragen.';
@@ -62,6 +70,7 @@ export function Eigentuemersuche({ objekte }: { objekte: Chance[] }) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const starten = useStartEigentuemerLookup();
+  const reihe = useReiheAbfragen();
   const mitExtension = useExtensionAvailable();
 
   const gemeinden = [...new Set(objekte.map(o => o.gemeinde).filter(Boolean) as string[])];
@@ -86,7 +95,11 @@ export function Eigentuemersuche({ objekte }: { objekte: Chance[] }) {
 
   if (objekte.length === 0) return null;
 
-  const uebrig = Math.max(PRO_TAG - verbraucht, 0);
+  // Alle Objekte der Liste stammen aus demselben Kanton -- die
+  // Auswahl oben filtert danach.
+  const kanton = objekte[0]?.kanton ?? null;
+  const proTagHier = proTag(kanton);
+  const uebrig = Math.max(proTagHier - verbraucht, 0);
 
   const eintragen = async (c: Chance) => {
     const roh = (entwurf[c.id] || '').trim();
@@ -190,9 +203,36 @@ export function Eigentuemersuche({ objekte }: { objekte: Chance[] }) {
             <UserSearch className="h-4 w-4 text-primary" />
             <h2 className="font-serif">Heute nachschlagen</h2>
           </div>
-          <span className="text-xs text-muted-foreground">
-            {uebrig} von {PRO_TAG} Abfragen übrig
-          </span>
+          <div className="ml-auto flex items-center gap-3">
+            <span className="text-xs text-muted-foreground">
+              {uebrig} von {proTagHier} Abfragen übrig
+            </span>
+            {mitExtension && uebrig > 1 && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const naechste = objekte
+                    .filter(o => o.egrid)
+                    .slice(0, uebrig)
+                    .map(o => ({
+                      propertyId: o.id,
+                      egrid: o.egrid,
+                      bfsNr: o.bfsNr || bfsNachGemeinde[o.gemeinde ?? ''] || '',
+                      kanton: o.kanton,
+                      address: o.address,
+                    }));
+                  if (reihe(naechste)) {
+                    for (let i = 0; i < naechste.length; i++) zaehlen();
+                    setVerbraucht(gezaehlt());
+                  }
+                }}
+              >
+                <UserSearch className="mr-1 h-3.5 w-3.5" />
+                Reihe abfragen ({Math.min(uebrig, objekte.filter(o => o.egrid).length)})
+              </Button>
+            )}
+          </div>
         </div>
 
         <p className="border-b px-5 py-3 text-xs leading-relaxed text-muted-foreground">

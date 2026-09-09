@@ -295,4 +295,53 @@ export function useStartEigentuemerLookup() {
   }, [extensionAvailable, toast]);
 }
 
+/**
+ * Eine ganze Reihe von Parzellen abfragen.
+ *
+ * Der Thurgau gibt rund zwanzig Auskünfte am Tag frei, und die
+ * SMS-Bestätigung gilt für die ganze Sitzung. Danach ist jede weitere
+ * Abfrage nur noch: Adresse wechseln, Vorschlag anklicken, ablesen --
+ * das muss niemand zwanzig Mal von Hand anfangen.
+ *
+ * Der erste Code wird von Hand eingegeben; ab dem zweiten Grundstück
+ * läuft es durch.
+ */
+export function useReiheAbfragen() {
+  const { toast } = useToast();
+  const extensionAvailable = useExtensionAvailable();
+
+  return useCallback((objekte: StartArgs[]) => {
+    const brauchbar = objekte.filter(o => o.egrid);
+    if (brauchbar.length === 0) {
+      toast({ title: 'Nichts abzufragen', variant: 'destructive' });
+      return false;
+    }
+    if (!extensionAvailable) {
+      toast({
+        title: 'Extension fehlt',
+        description: 'Die Reihe läuft nur mit der Extension.',
+        variant: 'destructive',
+      });
+      return false;
+    }
+    window.dispatchEvent(new CustomEvent('akquise-start-reihe', {
+      detail: {
+        objekte: brauchbar.map(o => ({
+          propertyId: o.propertyId,
+          egrid: o.egrid,
+          bfsNr: o.bfsNr || '',
+          kanton: o.kanton || 'ZH',
+          address: o.address || '',
+        })),
+        phoneNumber: getMyPhone(),
+      },
+    }));
+    toast({
+      title: `🤖 Reihe gestartet — ${brauchbar.length} Parzellen`,
+      description: 'Den SMS-Code einmal eingeben, dann läuft es durch.',
+    });
+    return true;
+  }, [extensionAvailable, toast]);
+}
+
 export { PHONE_LS_KEY };

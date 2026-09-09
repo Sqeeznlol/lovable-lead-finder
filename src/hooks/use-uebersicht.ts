@@ -253,7 +253,10 @@ export function useUebersicht(kanton?: string) {
         nachEmpfehlung,
         margeSumme,
         topChancen: chancen.slice(0, 15),
-        nachschlagen: chancen.filter(c => !c.eigentuemer).slice(0, 5),
+        // Der Thurgau gibt rund zwanzig Auskünfte am Tag frei, Zürich
+        // fünf. Fünfundzwanzig Zeilen decken beides ab, ohne dass
+        // jemand blättert.
+        nachschlagen: chancen.filter(c => !c.eigentuemer).slice(0, 25),
         topGemeinden,
         ohneEigentuemer,
       };
