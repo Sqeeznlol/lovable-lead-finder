@@ -179,12 +179,6 @@ export function PipedriveBereit() {
                       <span className="text-muted-foreground"> · {p.owner_phone}</span>
                     </p>
                   </div>
-                  <a
-                    href={`tel:${String(p.owner_phone ?? '').replace(/\s+/g, '')}`}
-                    className="shrink-0 text-sm underline underline-offset-4"
-                  >
-                    anrufen
-                  </a>
                 </li>
               ))}
             </ul>
