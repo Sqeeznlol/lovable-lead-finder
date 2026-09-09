@@ -243,6 +243,38 @@ export function useOffeneNummern(limit = 200) {
   });
 }
 
+/**
+ * Was fertig ist und auf den Deal wartet.
+ *
+ * Eigentümer da, Nummer da, noch keine Deal-Nummer. Das ist der
+ * Zustand, in dem ein Objekt alles hat, was ein Anruf braucht -- und
+ * genau der war bisher nirgends zu sehen: die Objekte verliessen
+ * "Nummern" und tauchten erst in Pipedrive wieder auf, wenn der Push
+ * gelang. Ging er schief, lagen sie dazwischen.
+ */
+export function useBereitFuerPipedrive(limit = 200) {
+  return useQuery({
+    queryKey: ['properties', 'bereit-pipedrive', limit],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('properties')
+        .select('*')
+        .is('pipedrive_deal_id', null)
+        .eq('ausgeschlossen', false)
+        .neq('preselection_status', 'Ausschliessen')
+        .not('owner_name', 'is', null)
+        .neq('owner_name', '')
+        .not('owner_phone', 'is', null)
+        .neq('owner_phone', '')
+        .order('marge_chf', { ascending: false, nullsFirst: false })
+        .limit(limit);
+      if (error) throw error;
+      return data as Property[];
+    },
+    staleTime: 15 * 1000,
+  });
+}
+
 export function usePreselectedProperties(limit: number, listId?: string | null) {
   return useQuery({
     queryKey: ['properties', 'preselected', limit, listId],

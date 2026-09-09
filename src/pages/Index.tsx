@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { Building2, LayoutDashboard, Upload, Phone, Menu, X, Zap, Search, FileSpreadsheet, Eye, Shield, Share, Plus, Database } from 'lucide-react';
+import { Building2, LayoutDashboard, Upload, Phone, Menu, X, Zap, Search, FileSpreadsheet, Eye, Shield, Share, Plus, Database, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 const Uebersicht = lazy(() => import('@/components/Uebersicht').then(m => ({ default: m.Uebersicht })));
@@ -21,12 +21,13 @@ import { AdminSchloss } from '@/components/AdminSchloss';
 import { Protokoll } from '@/components/Protokoll';
 import { Lesezeichen } from '@/components/Lesezeichen';
 import { Nummern } from '@/components/Nummern';
+import { PipedriveBereit } from '@/components/PipedriveBereit';
 import { AuskunftAusLesezeichen } from '@/components/AuskunftAusLesezeichen';
 import { useCanton } from '@/hooks/use-canton';
 import { usePlatform } from '@/hooks/use-platform';
 import { useMidnightReset } from '@/hooks/use-phones';
 
-type Tab = 'nummern' | 'uebersicht' | 'dashboard' | 'master' | 'vorauswahl' | 'akquise' | 'telsuche' | 'properties' | 'import' | 'masterimport' | 'phones' | 'export' | 'admin';
+type Tab = 'pipedrive' | 'nummern' | 'uebersicht' | 'dashboard' | 'master' | 'vorauswahl' | 'akquise' | 'telsuche' | 'properties' | 'import' | 'masterimport' | 'phones' | 'export' | 'admin';
 
 // Zehn Reiter waren neun zu viel. Was der neue Ablauf selbst erledigt,
 // braucht keinen eigenen Ort mehr:
@@ -48,12 +49,16 @@ const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: st
   // Nummer fehlt. Im Akquise-Modus lag er zwischen allem anderen, und
   // wer ihn suchte, fand ihn nicht.
   { id: 'nummern', label: 'Nummern', icon: Phone },
-  { id: 'phones', label: 'Telefone', icon: Phone },
+  // Der letzte Schritt vor dem Anruf: fertige Leads, die auf den Deal
+  // warten. Vorher war dieser Zustand unsichtbar.
+  { id: 'pipedrive', label: 'Pipedrive', icon: Send },
   { id: 'admin', label: 'Admin', icon: Shield },
 ];
 
 /** Die stillgelegten Reiter -- erreichbar, aber nicht mehr im Weg. */
 const stillgelegt: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  // Die Telefonverwaltung ist eine Einstellung, kein Arbeitsschritt.
+  { id: 'phones', label: 'Telefone', icon: Phone },
   // Der Akquise-Modus stammt aus der Zeit, als hier telefoniert wurde.
   // Heute macht die Uebersicht die Abfrage und "Nummern" die Suche;
   // dazwischen bleibt nichts, was er noch tun muesste.
@@ -66,7 +71,7 @@ const stillgelegt: { id: Tab; label: string; icon: React.ComponentType<{ classNa
 ];
 
 // Primary tabs visible in the iPhone bottom bar
-const mobileBottomTabs: Tab[] = ['uebersicht', 'master', 'nummern', 'phones'];
+const mobileBottomTabs: Tab[] = ['uebersicht', 'master', 'nummern', 'pipedrive'];
 
 export default function Index() {
   const [active, setActive] = useState<Tab>('uebersicht');
@@ -165,6 +170,7 @@ export default function Index() {
             {active === 'dashboard' && <Dashboard />}
             {active === 'master' && <MasterList />}
             {active === 'nummern' && <Nummern />}
+            {active === 'pipedrive' && <PipedriveBereit />}
             {active === 'masterimport' && <MasterImport />}
             {active === 'vorauswahl' && <Vorauswahl />}
             {active === 'akquise' && <AkquiseMode />}
