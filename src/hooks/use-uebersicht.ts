@@ -132,16 +132,17 @@ export function useUebersicht(kanton?: string) {
       // jemand die Seite für kaputt hielt. Die Seiten hängen aber nicht
       // voneinander ab -- also gehen sie zu acht gleichzeitig los.
       // Vierzigtausend Zeilen lesen, um fünfundzwanzig zu zeigen: das
-      // war der Grund, warum die Seite so lange lud. Gelesen werden
-      // jetzt fünftausend -- die mit dem grössten Flächenzuwachs, und
-      // danach ist die Liste ohnehin sortiert. Alles Weitere stünde
-      // nie in den ersten Zeilen.
+      // war der Grund, warum die Seite so lange lud. Erst fünftausend,
+      // jetzt zweitausend -- sortiert nach Flächenzuwachs, und nach
+      // den ersten zweitausend steht in der Liste nichts mehr, was
+      // jemand ansähe.
       //
-      // Die Zahlen oben zählen damit über diese fünftausend, nicht
-      // über den ganzen Bestand. Der Hinweis unter ihnen sagt das.
+      // Zwei Abfragen gleichzeitig, eine Wartezeit. Die Zahlen oben
+      // zählen über diese zweitausend; der Hinweis unter ihnen sagt
+      // das.
       const SEITE = 1000;
-      const SEITEN = 5;
-      const GLEICHZEITIG = 5;
+      const SEITEN = 2;
+      const GLEICHZEITIG = 2;
 
       const seite = async (von: number) => {
         let abfrage = supabase

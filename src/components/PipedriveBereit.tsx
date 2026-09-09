@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, Send, ExternalLink, Check } from 'lucide-react';
+import { Loader2, Send, ExternalLink, Archive } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { useBereitFuerPipedrive } from '@/hooks/use-properties';
+import { useBereitFuerPipedrive, useUebertragen } from '@/hooks/use-properties';
 
 /**
  * Die fertigen Leads, bereit für Pipedrive.
@@ -21,6 +21,7 @@ import { useBereitFuerPipedrive } from '@/hooks/use-properties';
  */
 export function PipedriveBereit() {
   const { data, isLoading, refetch } = useBereitFuerPipedrive(200);
+  const { data: archiv, refetch: archivNeu } = useUebertragen(30);
   const [gewaehlt, setGewaehlt] = useState<Set<string>>(new Set());
   const [laeuft, setLaeuft] = useState(false);
   const [ergebnis, setErgebnis] = useState<string[]>([]);
@@ -89,6 +90,7 @@ export function PipedriveBereit() {
     setGewaehlt(new Set());
     setLaeuft(false);
     await refetch();
+    await archivNeu();
     qc.invalidateQueries({ queryKey: ['uebersicht'] });
     qc.invalidateQueries({ queryKey: ['master'] });
     toast({
@@ -186,16 +188,6 @@ export function PipedriveBereit() {
         </Card>
       )}
 
-      <p className="text-xs text-muted-foreground">
-        <Check className="mr-1 inline h-3 w-3" />
-        Was übertragen wurde, steht danach in Pipedrive unter Akquise ·
-        Neu. <a
-          href="https://bauraum.pipedrive.com/pipeline/20"
-          target="_blank"
-          rel="noreferrer"
-          className="underline underline-offset-4"
-        >Pipeline öffnen <ExternalLink className="inline h-3 w-3" /></a>
-      </p>
     </div>
   );
 }

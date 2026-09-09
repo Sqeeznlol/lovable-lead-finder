@@ -66,20 +66,20 @@ export function Uebersicht() {
           icon={<PhoneCall className="h-5 w-5" />}
           wert={e.anrufen.toLocaleString('de-CH')}
           label="Abfragen"
-          hinweis="Unter den 5'000 mit dem grössten Flächenzuwachs"
+          hinweis="Unter den 2'000 mit dem grössten Flächenzuwachs"
           betont
         />
         <Kennzahl
           icon={<Search className="h-5 w-5" />}
           wert={e.pruefen.toLocaleString('de-CH')}
           label="Prüfen"
-          hinweis="Lohnt sich, braucht einen zweiten Blick — dieselben 5'000"
+          hinweis="Lohnt sich, braucht einen zweiten Blick — dieselben 2'000"
         />
         <Kennzahl
           icon={<TrendingUp className="h-5 w-5" />}
           wert={chf(data.margeSumme, 0)}
           label="Marge im Bestand"
-          hinweis="Über die 5'000 grössten, lagegerecht gerechnet"
+          hinweis="Über die 2'000 grössten, lagegerecht gerechnet"
         />
         <Kennzahl
           icon={<UserSearch className="h-5 w-5" />}

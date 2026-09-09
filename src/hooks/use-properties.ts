@@ -221,6 +221,12 @@ export function useUnqueriedProperties(limit: number, listId?: string | null, is
  * Hier zählt nicht die Grösse, sondern der Zustand: Eigentümer
  * bekannt, Nummer offen. Das sind wenige, und sie gehören nach vorn.
  */
+/** Nur was die beiden Listen zeigen -- nicht neunzig Spalten. */
+const LISTENFELDER =
+  'id, address, plz, plz_ort, gemeinde, kanton, parzelle, egrid, bfs_nr, ' +
+  'owner_name, owner_address, owner_phone, marge_chf, preselection_status, ' +
+  'pipedrive_deal_id, last_export_at';
+
 export function useOffeneNummern(limit = 200) {
   return useQuery({
     queryKey: ['properties', 'offene-nummern', limit],
@@ -234,14 +240,14 @@ export function useOffeneNummern(limit = 200) {
       // Handvoll Zeilen -- die zu sortieren kostet nichts.
       const { data, error } = await supabase
         .from('properties')
-        .select('*')
+        .select(LISTENFELDER)
         .is('pipedrive_deal_id', null)
         .not('owner_name', 'is', null)
         .neq('owner_name', '')
         .order('marge_chf', { ascending: false, nullsFirst: false })
-        .limit(500);
+        .limit(300);
       if (error) throw error;
-      return (data as Property[])
+      return (data as unknown as Property[])
         .filter(p => !String(p.owner_phone ?? '').trim())
         .filter(p => p.preselection_status !== 'Ausschliessen')
         .slice(0, limit);
@@ -263,14 +269,14 @@ export function useBereitFuerPipedrive(limit = 200) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('properties')
-        .select('*')
+        .select(LISTENFELDER)
         .is('pipedrive_deal_id', null)
         .not('owner_name', 'is', null)
         .neq('owner_name', '')
         .order('marge_chf', { ascending: false, nullsFirst: false })
-        .limit(500);
+        .limit(300);
       if (error) throw error;
-      return (data as Property[])
+      return (data as unknown as Property[])
         .filter(p => !!String(p.owner_phone ?? '').trim())
         .filter(p => p.preselection_status !== 'Ausschliessen')
         // Die oeffentliche Hand verkauft nicht -- ein Deal dazu ist
@@ -279,6 +285,30 @@ export function useBereitFuerPipedrive(limit = 200) {
         .slice(0, limit);
     },
     staleTime: 15 * 1000,
+  });
+}
+
+/**
+ * Was schon uebertragen wurde.
+ *
+ * Nach dem Push verschwand die Zeile, und beim naechsten Mal war nicht
+ * zu sehen, was gestern schon hinuebergegangen ist -- die Gefahr,
+ * dasselbe zweimal zu schicken, entsteht genau dort.
+ */
+export function useUebertragen(limit = 30) {
+  return useQuery({
+    queryKey: ['properties', 'uebertragen', limit],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('properties')
+        .select(LISTENFELDER)
+        .not('pipedrive_deal_id', 'is', null)
+        .order('last_export_at', { ascending: false, nullsFirst: false })
+        .limit(limit);
+      if (error) throw error;
+      return data as unknown as Property[];
+    },
+    staleTime: 30 * 1000,
   });
 }
 
