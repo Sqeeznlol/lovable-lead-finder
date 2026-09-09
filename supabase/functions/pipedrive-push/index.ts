@@ -26,24 +26,54 @@ const PIPELINE_SEARCH = 24;
 const STAGE_SUCHEN = 91;
 
 // Pipedrive custom field keys (shared between Deals & Leads)
-const FIELD_ZONE = '6283f1bd5f9e2220c96dfebf3904e789c9850773';
-const FIELD_BAUJAHR = 'd8e495e217d7f56099b33cf339612f0bb58bb2b7';
-const FIELD_HNF = '7773ad912df15700b104f5057012a28cbc6b220a';
-const FIELD_GRUNDSTUECK = 'caf47d7ebeb687f75a0d0e4a069073846f0a37b9';
-const FIELD_GESCHOSSE = 'df02438b21bc6d823e3abf7dc7d4a71f2239724e';
-const FIELD_EGRID = 'd210ce9334d6812187af1be8b71b7c97f6afd8db';
-const FIELD_EGID = '0c81850c8b58b9d88b9ff57b919824bc8f7b6c91';
-const FIELD_GEMEINDE = 'e9bd061887c619b93d0ad759dfbef11e55e4c58a';
-const FIELD_OEREB = '6579ea588f2ed43f6f76b239e3a5d2fe7e65be59';
-const FIELD_OWNER_1 = 'e57bb30238d4f5aa2feeb1c102dfd51c5688928c';
-const FIELD_OWNER_2 = 'ea0de3fe875f87c3e9bde1eb7416030016d18125';
-const FIELD_OWNER_3 = 'd312bedebdad79dfcdeacc7f3912ff3bfd8306a7';
-const FIELD_OWNER_4 = '00586e2f3149ab8f3d6cebb55b7ec626630cb9d0';
-const FIELD_OWNER_5 = '0c4c530966d09ae4874184dc0c4eef6f4532ff90';
-const FIELD_GOOGLE_PIPE = '8318ae128ecd86600b20dc02b3a72537f4c9fd8a';
-const FIELD_PARZELLE = '101c2348b81c4a6ea14b716fb3ce029becce0acd';
-const FIELD_DENKMALSCHUTZ = '61c1072a5b0e13a65eda73367f3575e559d5d3c9';
-const FIELD_ISOS = 'a08848e0744572436ab47ed520e8b1b980e6a19f';
+/**
+ * Die eigenen Felder eines Deals -- abgefragt, nicht eingetragen.
+ *
+ * Hier standen achtzehn feste Schluessel. Sie stammten aus der Zeit,
+ * als der Push Leads anlegte; bei Deals gibt es einige davon nicht,
+ * und andere wurden beim Aufraeumen geloescht. Pipedrive lehnte den
+ * ganzen Deal ab:
+ *
+ *     Invalid field(s) in the payload: 0c81850c…, 61c1072a…, …
+ *
+ * Ein Schluessel im Code ist eine Behauptung ueber ein fremdes Konto.
+ * Gefragt wird jetzt nach dem Namen, den man im Konto sieht, und was
+ * es nicht gibt, wird weggelassen statt den Deal zu verhindern.
+ */
+const FELDNAMEN = {
+  zone: 'Zone',
+  baujahr: 'Baujahr',
+  hnf: 'Mehr Wohnfläche m²',
+  grundstueck: 'Grundstück m²',
+  geschosse: 'Geschosse',
+  egrid: 'EGRID',
+  egid: 'EGID',
+  gemeinde: 'Gemeinde',
+  oereb: 'ÖREB Kataster',
+  parzelle: 'Parzelle',
+  kanton: 'Kanton',
+  denkmalschutz: 'Denkmalschutz',
+  isos: 'ISOS',
+  maps: 'Google Maps',
+  eigentuemer1: 'Eigentümer 1',
+  eigentuemer2: 'Eigentümer 2',
+} as const;
+
+type Feldname = keyof typeof FELDNAMEN;
+
+async function feldSchluessel(token: string): Promise<Partial<Record<Feldname, string>>> {
+  const antwort = await pipedriveGet('/dealFields', token);
+  const vorhanden = new Map<string, string>();
+  for (const f of (antwort?.data ?? [])) {
+    if (f?.name && f?.key) vorhanden.set(String(f.name).trim(), String(f.key));
+  }
+  const raus: Partial<Record<Feldname, string>> = {};
+  for (const [zweck, name] of Object.entries(FELDNAMEN) as [Feldname, string][]) {
+    const key = vorhanden.get(name);
+    if (key) raus[zweck] = key;
+  }
+  return raus;
+}
 
 const PropertySchema = z.object({
   id: z.string(),
@@ -415,6 +445,10 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Einmal je Lauf: welche eigenen Felder es im Konto gibt.
+    const felder = await feldSchluessel(PIPEDRIVE_API_TOKEN);
+    console.log('Eigene Deal-Felder gefunden:', Object.keys(felder).join(', '));
+
     const exportedAddresses = new Set<string>();
     const results: { propertyId: string; dealId?: number; personId?: number; person2Id?: number; orgId?: number; skipped?: boolean; error?: string }[] = [];
 
@@ -480,9 +514,9 @@ Deno.serve(async (req) => {
         const orgId = orgRes?.data?.id;
 
         // Extract structured owners from owners_json
-        const owners = Array.isArray(prop.owners_json) ? prop.owners_json : [];
-        const owner1Struct = owners.length > 0 ? owners[0] : null;
-        const owner2Struct = owners.length > 1 ? owners[1] : null;
+        const ownersRoh = Array.isArray(prop.owners_json) ? prop.owners_json : [];
+        const owner1Struct = ownersRoh.length > 0 ? ownersRoh[0] : null;
+        const owner2Struct = ownersRoh.length > 1 ? ownersRoh[1] : null;
 
         // 3. Create/update Person 1 ONLY if they have a valid phone number
         let personId: number | undefined;
@@ -500,7 +534,7 @@ Deno.serve(async (req) => {
         //    sonst in Search, wo der Eigentümer von Hand gesucht wird.
         const hatNummer = isValidPhone(prop.owner_phone)
           || isValidPhone(prop.owner_phone_2)
-          || owners.some(o => isValidPhone(o.phone));
+          || ownersRoh.some(o => isValidPhone(o.phone));
         const dealData: Record<string, unknown> = {
           title: dealTitel,
           org_id: orgId,
@@ -509,28 +543,34 @@ Deno.serve(async (req) => {
         };
         if (personId) dealData.person_id = personId;
 
-        // Custom fields
-        if (prop.zone) dealData[FIELD_ZONE] = prop.zone;
-        if (prop.baujahr) dealData[FIELD_BAUJAHR] = prop.baujahr;
-        if (prop.gebaeudeflaeche) dealData[FIELD_HNF] = Math.round(prop.gebaeudeflaeche);
-        if (prop.area) dealData[FIELD_GRUNDSTUECK] = Math.round(prop.area);
-        if (prop.geschosse) dealData[FIELD_GESCHOSSE] = prop.geschosse;
-        if (prop.egrid) dealData[FIELD_EGRID] = prop.egrid;
-        if (prop.gwr_egid) dealData[FIELD_EGID] = prop.gwr_egid;
-        if (prop.gemeinde) dealData[FIELD_GEMEINDE] = prop.gemeinde;
-        const kataster = katasterLink(prop);
-        if (kataster) dealData[FIELD_OEREB] = kataster;
+        // Eigene Felder: nur, was es im Konto wirklich gibt.
+        const setze = (zweck: Feldname, wert: unknown) => {
+          const key = felder[zweck];
+          if (key && wert !== null && wert !== undefined && wert !== '') {
+            dealData[key] = wert;
+          }
+        };
 
-        if (prop.parzelle) dealData[FIELD_PARZELLE] = prop.parzelle;
-        if (prop.denkmalschutz) dealData[FIELD_DENKMALSCHUTZ] = prop.denkmalschutz;
-        if (prop.isos) dealData[FIELD_ISOS] = prop.isos;
+        setze('zone', prop.zone);
+        setze('baujahr', prop.baujahr);
+        setze('hnf', prop.gebaeudeflaeche ? Math.round(prop.gebaeudeflaeche) : null);
+        setze('grundstueck', prop.area ? Math.round(prop.area) : null);
+        setze('geschosse', prop.geschosse);
+        setze('egrid', prop.egrid);
+        setze('egid', prop.gwr_egid);
+        setze('gemeinde', prop.gemeinde);
+        setze('parzelle', prop.parzelle);
+        setze('kanton', prop.kanton);
+        setze('denkmalschutz', prop.denkmalschutz);
+        setze('isos', prop.isos);
+        setze('oereb', katasterLink(prop));
 
-        // Google Maps link for Pipedrive
         const fullAddr = prop.address + (prop.plz_ort ? ', ' + prop.plz_ort : '');
-        dealData[FIELD_GOOGLE_PIPE] = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddr)}`;
+        setze('maps', `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddr)}`);
 
-        // Owner custom fields (1-5), rest goes into notes
-        const ownerFields = [FIELD_OWNER_1, FIELD_OWNER_2, FIELD_OWNER_3, FIELD_OWNER_4, FIELD_OWNER_5];
+        // Die Eigentümer stehen ohnehin in der Notiz; die Felder sind
+        // eine Bequemlichkeit, kein Muss.
+        const owners = Array.isArray(prop.owners_json) ? prop.owners_json : [];
         const ownerDisplays: string[] = [];
         if (prop.owner_name) ownerDisplays.push(prop.owner_name);
         if (prop.owner_name_2) ownerDisplays.push(prop.owner_name_2);
@@ -539,9 +579,8 @@ Deno.serve(async (req) => {
           const oName = o.fullName || [o.firstName, o.lastName].filter(Boolean).join(' ');
           if (oName) ownerDisplays.push(oName);
         }
-        for (let oi = 0; oi < Math.min(ownerDisplays.length, 5); oi++) {
-          dealData[ownerFields[oi]] = ownerDisplays[oi];
-        }
+        setze('eigentuemer1', ownerDisplays[0]);
+        setze('eigentuemer2', ownerDisplays[1]);
 
         console.log('Deal anlegen:', JSON.stringify({
           title: dealTitel, pipeline_id: dealData.pipeline_id,
