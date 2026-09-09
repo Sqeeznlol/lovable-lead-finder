@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { leseAuskunft } from '@/lib/eigentuemer';
 import { weiterverarbeiten } from '@/hooks/use-eigentuemer-lookup';
 import { protokolliere } from '@/lib/protokoll';
+import { naechsteParzelle, naechsteAdresse } from '@/lib/naechste';
 
 /**
  * Nimmt entgegen, was das Lesezeichen aus dem Portal mitbringt.
@@ -107,6 +108,48 @@ export function AuskunftAusLesezeichen() {
       qc.invalidateQueries({ queryKey: ['uebersicht'] });
       qc.invalidateQueries({ queryKey: ['master'] });
       qc.invalidateQueries({ queryKey: ['properties'] });
+
+      // Und weiter, ohne dass jemand die Liste sucht: das nächste
+      // Grundstück nach Potenzial, im Portal seines Kantons. Ein
+      // Fenster von selbst aufzumachen verbieten die meisten Browser
+      // ausserhalb eines Klicks -- deshalb steht daneben ein Knopf,
+      // und der Versuch bleibt der Versuch.
+      const { data: weitere } = await supabase
+        .from('properties')
+        .select('id, egrid, bfs_nr, kanton, address, parzelle, owner_name, marge_chf')
+        .eq('ausgeschlossen', false)
+        .eq('is_queried', false)
+        .is('owner_name', null)
+        .not('egrid', 'is', null)
+        .order('marge_chf', { ascending: false, nullsFirst: false })
+        .limit(20);
+
+      const naechste = naechsteParzelle(
+        (weitere || []).map(w => ({
+          id: w.id,
+          egrid: w.egrid,
+          bfsNr: w.bfs_nr,
+          kanton: w.kanton,
+          address: w.address,
+          parzelle: w.parzelle,
+          eigentuemer: w.owner_name,
+          marge: w.marge_chf,
+        })),
+        [objekt.id],
+      );
+
+      if (!naechste) {
+        toast({ title: 'Nichts mehr offen', description: 'Alle Objekte tragen einen Eigentümer.' });
+        return;
+      }
+
+      const adresse = naechsteAdresse(naechste);
+      const auf = window.open(adresse, '_blank');
+      toast({
+        title: auf ? 'Weiter zur nächsten Parzelle' : 'Nächste Parzelle bereit',
+        description: `${naechste.address ?? ''}${naechste.parzelle ? ` · Parz. ${naechste.parzelle}` : ''}`
+          + (auf ? '' : ' — Popup blockiert, Knopf unten in der Liste.'),
+      });
     })();
   }, [toast, qc]);
 
