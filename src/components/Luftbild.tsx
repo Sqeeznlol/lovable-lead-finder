@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ExternalLink, ImageOff, Loader2 } from 'lucide-react';
 import { geocode, luftbildTileUrl, swisstopoMapUrl, type GeoCoords } from '@/lib/swisstopo';
+import { FENSTER } from '@/lib/fenster';
 
 interface Props {
   address: string;
@@ -69,8 +70,7 @@ export function Luftbild({ address, plzOrt, className }: Props) {
       />
       <a
         href={swisstopoMapUrl(coords.lat, coords.lon)}
-        target="_blank"
-        rel="noopener noreferrer"
+        target={FENSTER.karte}
         className="absolute bottom-2 right-2 flex items-center gap-1 rounded-full bg-background/85 px-2.5 py-1 text-xs font-medium backdrop-blur transition-opacity"
       >
         swisstopo <ExternalLink className="h-3 w-3" />

@@ -25,6 +25,7 @@ import { getOerebParzelleUrl } from '@/lib/oereb';
 import { PotenzialPanel } from '@/components/PotenzialPanel';
 import { Luftbild } from '@/components/Luftbild';
 import { potentialScore, istAusgeschlossen, zoneKurzform } from '@/lib/potential';
+import { FENSTER } from '@/lib/fenster';
 
 type ViewMode = 'card' | 'table';
 
@@ -563,7 +564,7 @@ export function Vorauswahl() {
                         <MapPin className="h-10 w-10 text-muted-foreground/40" />
                         <p className="text-muted-foreground text-sm">Keine Kartenvorschau verfügbar</p>
                         {current.google_maps_url && (
-                          <a href={current.google_maps_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1">
+                          <a href={current.google_maps_url} target={FENSTER.karte} className="text-xs text-primary hover:underline flex items-center gap-1">
                             <ExternalLink className="h-3 w-3" /> In Google Maps öffnen
                           </a>
                         )}
@@ -588,8 +589,7 @@ export function Vorauswahl() {
                       >
                         <a
                           href={getOerebParzelleUrl(current.parzelle, current.bfs_nr) || undefined}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                          target={FENSTER.portal}
                           aria-disabled={!getOerebParzelleUrl(current.parzelle, current.bfs_nr)}
                         >
                           <ExternalLink className="h-4 w-4" /> ÖREB Kataster öffnen
@@ -598,8 +598,7 @@ export function Vorauswahl() {
                       {current.egrid && current.bfs_nr && (
                         <a
                           href={`https://maps.zh.ch/?topic=DLGOWfarbigZH&offlayers=bezirkslabels&scale=500&egrid=${current.egrid}&bfsnr=${current.bfs_nr}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                          target={FENSTER.portal}
                           className="inline-flex items-center gap-1.5 bg-accent/10 text-accent-foreground border border-accent/20 rounded-lg px-3 py-2 text-sm font-medium hover:bg-accent/20 transition-colors"
                         >
                           <ExternalLink className="h-3.5 w-3.5" /> Eigentümer GIS
@@ -629,7 +628,7 @@ export function Vorauswahl() {
                     </div>
                     {googleMapsUrl && (
                       <div className="flex justify-end">
-                        <a href={googleMapsUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
+                        <a href={googleMapsUrl} target={FENSTER.karte} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
                           <ExternalLink className="h-3 w-3" /> Google Maps öffnen
                         </a>
                       </div>

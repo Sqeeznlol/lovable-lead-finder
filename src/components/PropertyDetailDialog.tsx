@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Tables } from '@/integrations/supabase/types';
 import { useStartEigentuemerLookup, useExtensionAvailable } from '@/hooks/use-eigentuemer-lookup';
+import { FENSTER } from '@/lib/fenster';
 
 type Property = Tables<'properties'>;
 
@@ -207,26 +208,24 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
                 <a
                   href={data.google_maps_url || `https://www.google.com/maps/search/?api=1&query=${
                     encodeURIComponent([data.address, data.plz_ort || [data.plz, data.gemeinde].filter(Boolean).join(' ')].filter(Boolean).join(', '))}`}
-                  target="_blank"
-                  rel="noreferrer"
+                  target={FENSTER.karte}
                 >
                   <Button size="sm" variant="outline"><MapPin className="h-3.5 w-3.5 mr-1" /> Maps</Button>
                 </a>
                 <a
                   href={`https://www.google.com/maps/search/?api=1&query=${
                     encodeURIComponent([data.address, data.plz_ort || [data.plz, data.gemeinde].filter(Boolean).join(' ')].filter(Boolean).join(', '))}&basemap=satellite`}
-                  target="_blank"
-                  rel="noreferrer"
+                  target={FENSTER.karte}
                 >
                   <Button size="sm" variant="outline"><MapPin className="h-3.5 w-3.5 mr-1" /> Satellit</Button>
                 </a>
                 {data.gis_url && (
-                  <a href={data.gis_url} target="_blank" rel="noreferrer">
+                  <a href={data.gis_url} target={FENSTER.portal}>
                     <Button size="sm" variant="outline"><ExternalLink className="h-3.5 w-3.5 mr-1" /> GIS</Button>
                   </a>
                 )}
                 {data.housing_stat_url && (
-                  <a href={data.housing_stat_url} target="_blank" rel="noreferrer">
+                  <a href={data.housing_stat_url} target={FENSTER.portal}>
                     <Button size="sm" variant="outline"><ExternalLink className="h-3.5 w-3.5 mr-1" /> Kataster</Button>
                   </a>
                 )}
@@ -235,12 +234,12 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
                      Eigentümer -- genau die Angabe, die in den Listen fehlt.
                      Führt der Link auf die Anmeldung, ist das die
                      Identifikation des Portals und kein defekter Link. */
-                  <a href={grundbuchUrl(data.egrid, data.bfs_nr, data.kanton)!} target="_blank" rel="noreferrer">
+                  <a href={grundbuchUrl(data.egrid, data.bfs_nr, data.kanton)!} target={FENSTER.portal}>
                     <Button size="sm" variant="outline"><ExternalLink className="h-3.5 w-3.5 mr-1" /> Grundbuch</Button>
                   </a>
                 )}
                 {data.owner_name && (
-                  <a href={`https://tel.search.ch/?was=${encodeURIComponent(data.owner_name)}`} target="_blank" rel="noreferrer">
+                  <a href={`https://tel.search.ch/?was=${encodeURIComponent(data.owner_name)}`} target={FENSTER.suche}>
                     <Button size="sm" variant="outline"><Phone className="h-3.5 w-3.5 mr-1" /> Tel.search</Button>
                   </a>
                 )}

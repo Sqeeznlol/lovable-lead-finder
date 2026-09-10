@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { FENSTER, oeffne } from '../fenster';
+import { FENSTER, oeffne, benenneEigenenTab } from '../fenster';
 
 describe('oeffne', () => {
   const alt = window.open;
@@ -27,5 +27,13 @@ describe('oeffne', () => {
     (window as any).open = (_u: string, n: string) => { namen.push(n); return null; };
     oeffne('https://x.test', FENSTER.portal);
     expect(namen).not.toContain('_blank');
+  });
+});
+
+describe('Der eigene Tab', () => {
+  it('gibt sich selbst einen Namen -- sonst findet ihn niemand wieder', () => {
+    window.name = '';
+    benenneEigenenTab();
+    expect(window.name).toBe(FENSTER.app);
   });
 });

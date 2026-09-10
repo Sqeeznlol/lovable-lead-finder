@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useListFilter } from '@/hooks/use-lists';
 import { ListSelector } from '@/components/ListSelector';
 import { useAutomationSettings } from '@/hooks/use-app-settings';
+import { FENSTER, oeffne } from '@/lib/fenster';
 
 export function TelefonSuche() {
   const selectedListId = useListFilter(s => s.selectedListId);
@@ -406,12 +407,12 @@ export function TelefonSuche() {
                 Auto-Suche
               </Button>
               <Button size="sm" variant="outline" className="gap-1"
-                onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(`${parsed1.searchName} ${parsed1.street || ''} ${parsed1.streetNumber || ''} ${parsed1.ort || ort} Telefon`)}`, '_blank')}>
+                onClick={() => oeffne(`https://www.google.com/search?q=${encodeURIComponent(`${parsed1.searchName} ${parsed1.street || ''} ${parsed1.streetNumber || ''} ${parsed1.ort || ort} Telefon`)}`, FENSTER.suche)}>
                 <Search className="h-3.5 w-3.5" /> Google
                 <ExternalLink className="h-3 w-3" />
               </Button>
               <Button size="sm" variant="outline" className="gap-1"
-                onClick={() => window.open(`https://www.moneyhouse.ch/de/search?q=${encodeURIComponent(parsed1.fullName || parsed1.searchName)}`, '_blank')}>
+                onClick={() => oeffne(`https://www.moneyhouse.ch/de/search?q=${encodeURIComponent(parsed1.fullName || parsed1.searchName)}`, FENSTER.suche)}>
                 <Search className="h-3.5 w-3.5" /> Moneyhouse
                 <ExternalLink className="h-3 w-3" />
               </Button>
@@ -423,7 +424,7 @@ export function TelefonSuche() {
                   ? `Treffer: ${autoResult.foundAddress}`
                   : `Kein Treffer${autoResult.foundAddress ? ` (gefunden: ${autoResult.foundAddress})` : ''}`}
                 {autoResult.searchUrl && (
-                  <a href={autoResult.searchUrl} target="_blank" rel="noopener" className="ml-auto underline">
+                  <a href={autoResult.searchUrl} target={FENSTER.suche} className="ml-auto underline">
                     tel.search.ch
                   </a>
                 )}
@@ -459,12 +460,12 @@ export function TelefonSuche() {
                 Auto-Suche
               </Button>
               <Button size="sm" variant="outline" className="gap-1"
-                onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(`${parsed2.searchName} ${parsed2.street || ''} ${parsed2.streetNumber || ''} ${parsed2.ort || ort} Telefon`)}`, '_blank')}>
+                onClick={() => oeffne(`https://www.google.com/search?q=${encodeURIComponent(`${parsed2.searchName} ${parsed2.street || ''} ${parsed2.streetNumber || ''} ${parsed2.ort || ort} Telefon`)}`, FENSTER.suche)}>
                 <Search className="h-3.5 w-3.5" /> Google
                 <ExternalLink className="h-3 w-3" />
               </Button>
               <Button size="sm" variant="outline" className="gap-1"
-                onClick={() => window.open(`https://www.moneyhouse.ch/de/search?q=${encodeURIComponent(parsed2.fullName || parsed2.searchName)}`, '_blank')}>
+                onClick={() => oeffne(`https://www.moneyhouse.ch/de/search?q=${encodeURIComponent(parsed2.fullName || parsed2.searchName)}`, FENSTER.suche)}>
                 <Search className="h-3.5 w-3.5" /> Moneyhouse
                 <ExternalLink className="h-3 w-3" />
               </Button>

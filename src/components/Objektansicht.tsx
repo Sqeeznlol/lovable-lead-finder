@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ExternalLink, ImageOff, Loader2 } from 'lucide-react';
+import { FENSTER } from '@/lib/fenster';
 import {
   geocode,
   luftbildTileUrl,
@@ -177,8 +178,7 @@ export function Objektansicht({ address, plzOrt, parzelle, bfsNr, gemeinde, kant
         ) : (
           <a
             href={streetViewLinkUrl(lat, lon)}
-            target="_blank"
-            rel="noopener noreferrer"
+            target={FENSTER.karte}
             className="grid h-full w-full place-items-center gap-1 p-3 text-center transition-colors hover:bg-muted/60"
           >
             <ExternalLink className="h-4 w-4 text-muted-foreground" />
@@ -212,8 +212,7 @@ export function Objektansicht({ address, plzOrt, parzelle, bfsNr, gemeinde, kant
           <a
             key={l.label}
             href={l.href}
-            target="_blank"
-            rel="noopener noreferrer"
+            target={FENSTER.portal}
             onClick={e => e.stopPropagation()}
             className="flex items-center gap-1 rounded-full bg-background/85 px-2 py-0.5 text-[11px] font-medium backdrop-blur"
           >

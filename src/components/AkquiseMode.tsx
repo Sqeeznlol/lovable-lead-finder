@@ -778,8 +778,7 @@ export function AkquiseMode() {
                   {googleMapsUrl ? (
                     <a
                       href={googleMapsUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      target={FENSTER.karte}
                       className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-12 px-4 py-2"
                     >
                       <ExternalLink className="h-4 w-4" />
@@ -817,11 +816,11 @@ export function AkquiseMode() {
                                 <Badge className={`${ownerTypeColor(ownerType)} text-xs`}>{ownerTypeLabel(ownerType)}</Badge>
                               )}
                               <Button size="sm" variant="outline" className="h-7 text-xs gap-1"
-                                onClick={() => window.open(telSearchUrlParsed(owner.parsed, ownerOrt), '_blank')}>
+                                onClick={() => oeffne(telSearchUrlParsed(owner.parsed, ownerOrt), FENSTER.suche)}>
                                 <Search className="h-3 w-3" /> tel.search
                               </Button>
                               <Button size="sm" variant="outline" className="h-7 text-xs gap-1"
-                                onClick={() => window.open(opendiUrlParsed(owner.parsed), '_blank')}>
+                                onClick={() => oeffne(opendiUrlParsed(owner.parsed), FENSTER.suche)}>
                                 <Search className="h-3 w-3" /> Opendi
                               </Button>
                             </>

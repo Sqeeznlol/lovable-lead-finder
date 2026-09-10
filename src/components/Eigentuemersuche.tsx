@@ -14,6 +14,7 @@ import { AuskunftEinfuegen } from '@/components/AuskunftEinfuegen';
 import { leseAuskunft, zerlegeZeile } from '@/lib/eigentuemer';
 import { weiterverarbeiten } from '@/hooks/use-eigentuemer-lookup';
 import type { Chance } from '@/hooks/use-uebersicht';
+import { FENSTER } from '@/lib/fenster';
 
 /**
  * Wie viele Auskünfte das Portal pro Tag freigibt.
@@ -289,8 +290,7 @@ export function Eigentuemersuche({ objekte }: { objekte: Chance[] }) {
                   ) : link ? (
                     <a
                       href={link}
-                      target="_blank"
-                      rel="noreferrer"
+                      target={FENSTER.portal}
                       onClick={() => { zaehlen(); setVerbraucht(gezaehlt()); }}
                     >
                       <Button size="sm" variant="outline">

@@ -10,6 +10,7 @@ import { GemeindeSidebar } from './GemeindeSidebar';
 import { PropertyDetailDialog } from './PropertyDetailDialog';
 import { beurteile, EMPFEHLUNG_LABEL, type Empfehlung } from '@/lib/akquise';
 import { LAGE_LABEL } from '@/lib/gemeinden-zh';
+import { FENSTER } from '@/lib/fenster';
 
 const m2 = (v: number | null | undefined) =>
   v == null ? '—' : `${Math.round(Number(v)).toLocaleString('de-CH')} m²`;
@@ -282,7 +283,7 @@ export function MasterList() {
                       <td className="whitespace-nowrap p-3 text-right">
                         <div className="inline-flex gap-2">
                           {p.google_maps_url && (
-                            <a href={p.google_maps_url} target="_blank" rel="noreferrer"
+                            <a href={p.google_maps_url} target={FENSTER.karte}
                                onClick={e => e.stopPropagation()}
                                title="Bei Google Maps ansehen"
                                className="inline-flex text-muted-foreground hover:text-foreground">
@@ -290,7 +291,7 @@ export function MasterList() {
                             </a>
                           )}
                           {p.gis_url && (
-                            <a href={p.gis_url} target="_blank" rel="noreferrer"
+                            <a href={p.gis_url} target={FENSTER.portal}
                                onClick={e => e.stopPropagation()}
                                title="Parzelle im GIS des Kantons Zürich"
                                className="inline-flex text-muted-foreground hover:text-foreground">

@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useBereitFuerPipedrive, useUebertragen, usePostObjekte } from '@/hooks/use-properties';
 import { Brief } from '@/components/Brief';
+import { FENSTER } from '@/lib/fenster';
 
 /**
  * Die fertigen Leads, bereit für Pipedrive.
@@ -301,8 +302,7 @@ export function PipedriveBereit() {
                   </span>
                   <a
                     href={`https://bauraum.pipedrive.com/deal/${p.pipedrive_deal_id}`}
-                    target="_blank"
-                    rel="noreferrer"
+                    target={FENSTER.pipedrive}
                     className="shrink-0 underline underline-offset-4"
                   >
                     Deal {p.pipedrive_deal_id}

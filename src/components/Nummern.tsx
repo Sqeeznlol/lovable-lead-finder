@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useOffeneNummern } from '@/hooks/use-properties';
 import { weiterverarbeiten } from '@/hooks/use-eigentuemer-lookup';
 import { Objektansicht } from '@/components/Objektansicht';
+import { FENSTER } from '@/lib/fenster';
 
 /**
  * Der Zwischenstand, an dem die Kette hängt.
@@ -156,8 +157,7 @@ export function Nummern() {
                   {u.dealId ? (
                     <a
                       href={`https://bauraum.pipedrive.com/deal/${u.dealId}`}
-                      target="_blank"
-                      rel="noreferrer"
+                      target={FENSTER.pipedrive}
                       className="shrink-0 underline underline-offset-4"
                     >
                       Deal {u.dealId} öffnen
@@ -229,8 +229,7 @@ export function Nummern() {
                         <a
                           href={`https://tel.search.ch/?was=${encodeURIComponent(name)}${
                             p.owner_address ? `&wo=${encodeURIComponent(p.owner_address)}` : ''}`}
-                          target="_blank"
-                          rel="noreferrer"
+                          target={FENSTER.suche}
                         >
                           <Button size="sm" variant="outline">
                             <ExternalLink className="mr-1 h-3.5 w-3.5" /> tel.search.ch
@@ -239,8 +238,7 @@ export function Nummern() {
                         <a
                           href={`https://www.google.com/search?q=${encodeURIComponent(
                             `${name} ${p.owner_address ?? ''} Telefon`)}`}
-                          target="_blank"
-                          rel="noreferrer"
+                          target={FENSTER.suche}
                         >
                           <Button size="sm" variant="outline">
                             <ExternalLink className="mr-1 h-3.5 w-3.5" /> Google
@@ -250,8 +248,7 @@ export function Nummern() {
                         {/\b(AG|GmbH|SA|Sàrl|Genossenschaft|Stiftung)\b/.test(name) && (
                           <a
                             href={`https://www.zefix.ch/de/search/entity/list?name=${encodeURIComponent(name)}`}
-                            target="_blank"
-                            rel="noreferrer"
+                            target={FENSTER.suche}
                           >
                             <Button size="sm" variant="outline">
                               <ExternalLink className="mr-1 h-3.5 w-3.5" /> Zefix

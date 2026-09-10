@@ -13,6 +13,7 @@ import { fetchAllProperties, useProperties, useGemeinden, useZones, useUpdatePro
 import { useToast } from '@/hooks/use-toast';
 import { getOerebParzelleUrl } from '@/lib/oereb';
 import { exportTimestamp } from '@/lib/export-utils';
+import { FENSTER } from '@/lib/fenster';
 
 const STATUSES = ['Alle', 'Neu', 'Eigentümer ermittelt', 'Kontaktiert', 'Interesse', 'Kein Interesse', 'Abgeschlossen', 'Ausgeblendet'];
 
@@ -354,17 +355,17 @@ export function PropertyList() {
                   <TableCell>
                     <div className="flex gap-1">
                       {portalLink(p) && (
-                        <a href={portalLink(p)!} target="_blank" rel="noopener noreferrer" title="Eigentümerauskunft">
+                        <a href={portalLink(p)!} target={FENSTER.portal} title="Eigentümerauskunft">
                           <Home className="h-3.5 w-3.5 text-primary hover:text-primary/80" />
                         </a>
                       )}
                       {p.google_maps_url && (
-                        <a href={p.google_maps_url} target="_blank" rel="noopener noreferrer" title="Google Maps">
+                        <a href={p.google_maps_url} target={FENSTER.karte} title="Google Maps">
                           <MapPin className="h-3.5 w-3.5 text-accent hover:text-accent/80" />
                         </a>
                       )}
                       {p.streetview_url && (
-                        <a href={p.streetview_url} target="_blank" rel="noopener noreferrer" title="Streetview">
+                        <a href={p.streetview_url} target={FENSTER.karte} title="Streetview">
                           <ExternalLink className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
                         </a>
                       )}
@@ -451,7 +452,7 @@ function EditDialog({ property, onClose, onSave }: {
               {property.wohnungen && <span>Wohnungen: {Number(property.wohnungen)}</span>}
             </div>
             {portalUrl && (
-              <a href={portalUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-xs inline-flex items-center gap-1 mt-2">
+              <a href={portalUrl} target={FENSTER.portal} className="text-primary hover:underline text-xs inline-flex items-center gap-1 mt-2">
                 Eigentümerauskunft öffnen <ExternalLink className="h-3 w-3" />
               </a>
             )}

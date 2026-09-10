@@ -16,9 +16,27 @@
 export const FENSTER = {
   app: 'bauraum-app',
   portal: 'bauraum-portal',
+  karte: 'bauraum-karte',
+  suche: 'bauraum-suche',
+  pipedrive: 'bauraum-pipedrive',
 } as const;
 
 export type Fenstername = typeof FENSTER[keyof typeof FENSTER];
+
+/**
+ * Der eigene Tab braucht auch einen Namen.
+ *
+ * Ein Tab heisst nur dann so, wie man ihn genannt hat, wenn er selbst
+ * benannt geoeffnet wurde. Der Tab, in dem die Anwendung von Hand
+ * aufgemacht wird, hat keinen -- und deshalb landete das Lesezeichen
+ * jedes Mal in einem neuen "Bauraum"-Tab statt in diesem hier. Ein Tab
+ * darf sich selbst benennen; genau das passiert beim Start.
+ */
+export function benenneEigenenTab(): void {
+  if (typeof window !== 'undefined' && window.name !== FENSTER.app) {
+    window.name = FENSTER.app;
+  }
+}
 
 /**
  * Eine Adresse in ihrem Fenster öffnen.
