@@ -192,6 +192,119 @@ export function PipedriveBereit() {
         </Card>
       )}
 
+      {/* Wo der Anruf nicht geht. Der Brief steht hier und nicht in
+          "Nummern": dort wird gesucht, hier wird verschickt. */}
+      {(post ?? []).length > 0 && (
+        <Card>
+          <CardContent className="p-0">
+            <div className="flex items-center gap-2 border-b p-5">
+              <Mail className="h-4 w-4 text-primary" />
+              <h2 className="font-serif">Post — Brief statt Anruf</h2>
+              <span className="ml-auto text-xs text-muted-foreground">
+                {(post ?? []).length}
+              </span>
+            </div>
+            <ul className="divide-y">
+              {(post ?? []).map(p => (
+                <li key={p.id} className="flex flex-wrap items-center gap-3 p-4">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium leading-tight">{p.address}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {p.parzelle ? `Parzelle ${p.parzelle} · ` : ''}
+                      {p.plz_ort || [p.plz, p.gemeinde].filter(Boolean).join(' ')}
+                    </p>
+                    <p className="mt-1 text-sm">
+                      <span className="font-medium">{p.owner_name}</span>
+                      {p.owner_address && (
+                        <span className="text-muted-foreground"> · {p.owner_address}</span>
+                      )}
+                    </p>
+                  </div>
+                  <Button size="sm" onClick={() => setBrief(p.id)}>
+                    <Printer className="mr-1 h-3.5 w-3.5" /> Brief
+                  </Button>
+
+                  {brief === p.id && (
+                    <Brief
+                      offen
+                      onClose={() => setBrief(null)}
+                      empfaenger={[
+                        {
+                          name: p.owner_name ?? '',
+                          adresse: p.owner_address ?? null,
+                          plzOrt: null,
+                        },
+                        // Ein zweiter Eigentümer, falls einer eingetragen
+                        // ist: dann richtet sich der Brief an beide.
+                        ...(Array.isArray(p.owners_json) && p.owners_json.length > 1
+                          ? [{
+                              name: String(
+                                (p.owners_json[1] as { fullName?: string; name?: string })?.fullName
+                                ?? (p.owners_json[1] as { name?: string })?.name ?? ''),
+                            }]
+                          : []),
+                      ].filter(e => e.name)}
+                      objekt={{
+                        address: p.address,
+                        parzelle: p.parzelle,
+                        plz: p.plz,
+                        gemeinde: p.gemeinde,
+                        plzOrt: p.plz_ort,
+                      }}
+                    />
+                  )}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Was schon drüben ist -- sichtbar, damit niemand dasselbe ein
+          zweites Mal schickt. Zum Nachsehen, nicht zum Tun: hier gibt
+          es keine Auswahl und keinen Knopf. */}
+      {(archiv ?? []).length > 0 && (
+        <Card>
+          <CardContent className="p-0">
+            <div className="flex items-center gap-2 border-b p-5">
+              <Archive className="h-4 w-4 text-muted-foreground" />
+              <h2 className="font-serif">Bereits gepusht</h2>
+              <span className="ml-auto text-xs text-muted-foreground">
+                {(archiv ?? []).length}
+              </span>
+            </div>
+            <ul className="divide-y">
+              {(archiv ?? []).map(p => (
+                <li key={p.id} className="flex items-baseline justify-between gap-3 px-5 py-2 text-sm">
+                  <span className="min-w-0">
+                    <span className="font-medium">{p.address}</span>
+                    {p.owner_name && (
+                      <span className="text-muted-foreground"> · {p.owner_name}</span>
+                    )}
+                    {p.last_export_at && (
+                      <span className="text-muted-foreground">
+                        {' · '}
+                        {new Date(p.last_export_at).toLocaleDateString('de-CH', {
+                          day: '2-digit', month: '2-digit',
+                        })}
+                      </span>
+                    )}
+                  </span>
+                  <a
+                    href={`https://bauraum.pipedrive.com/deal/${p.pipedrive_deal_id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="shrink-0 underline underline-offset-4"
+                  >
+                    Deal {p.pipedrive_deal_id}
+                    <ExternalLink className="ml-1 inline h-3 w-3" />
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
