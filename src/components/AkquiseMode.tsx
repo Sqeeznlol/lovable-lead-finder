@@ -18,6 +18,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { supabase } from '@/integrations/supabase/client';
 import { getMyPhone } from '@/hooks/use-eigentuemer-lookup';
 import { portalUrl } from '@/lib/portal';
+import { FENSTER, oeffne } from '@/lib/fenster';
 import { gehoertInDenAkquiseModus, nurNummerFehlt } from '@/lib/akquise-liste';
 
 interface OwnerEntry {
@@ -220,7 +221,7 @@ export function AkquiseMode() {
       }
       if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
         e.preventDefault();
-        if (gisLink) { window.open(gisLink, '_blank'); setGisOpened(true); }
+        if (gisLink) { oeffne(gisLink, FENSTER.portal); setGisOpened(true); }
         return;
       }
       if ((e.ctrlKey || e.metaKey) && e.key === 'h') {
@@ -669,7 +670,7 @@ export function AkquiseMode() {
                     } else {
                       // Fallback: open portal manually + copy phone to clipboard
                       try { navigator.clipboard.writeText(phoneNumber); } catch { /* noop */ }
-                      const win = window.open(adresse, '_blank', 'noopener,noreferrer');
+                      const win = oeffne(adresse, FENSTER.portal);
                       if (!win) {
                         toast({ title: 'Popup blockiert', description: 'Bitte Popups für diese Seite erlauben.', variant: 'destructive' });
                         setAutoStatus(null);
@@ -805,7 +806,7 @@ export function AkquiseMode() {
                 <div className="flex gap-3">
                   <Button
                     onClick={() => {
-                      if (gisLink) { window.open(gisLink, '_blank'); setGisOpened(true); }
+                      if (gisLink) { oeffne(gisLink, FENSTER.portal); setGisOpened(true); }
                     }}
                     disabled={!gisLink || remaining <= 0}
                     className="flex-1 h-12 text-base gap-2"

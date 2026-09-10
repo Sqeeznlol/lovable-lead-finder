@@ -4,6 +4,7 @@ import { verkauftNie, ARCHIV_STATUS } from '@/lib/grundbuch';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { portalUrl } from '@/lib/portal';
+import { FENSTER, oeffne } from '@/lib/fenster';
 import { protokolliere } from '@/lib/protokoll';
 
 const PHONE_LS_KEY = 'sqeeztraum.my_phone';
@@ -311,7 +312,7 @@ export function useStartEigentuemerLookup() {
 
     if (!extensionAvailable) {
       // Fallback: open portal manually
-      window.open(adresse, '_blank', 'noopener,noreferrer');
+      oeffne(adresse, FENSTER.portal);
       toast({
         title: 'Extension nicht installiert',
         description: 'Portal in neuem Tab geöffnet — Daten manuell übernehmen.',
@@ -320,7 +321,7 @@ export function useStartEigentuemerLookup() {
     }
 
     if (!phone) {
-      window.open(adresse, '_blank', 'noopener,noreferrer');
+      oeffne(adresse, FENSTER.portal);
       toast({
         title: 'Telefonnummer fehlt',
         description: 'Hinterlege "Meine Telefonnummer" in Einstellungen für Auto-Fill.',

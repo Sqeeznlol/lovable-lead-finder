@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { FENSTER, oeffne } from '@/lib/fenster';
 import { ExternalLink, Check, Phone, SkipForward, ChevronRight, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -73,7 +74,7 @@ export function QueryQueue() {
 
   const openPortal = () => {
     if (portalUrl) {
-      window.open(portalUrl, '_blank');
+      oeffne(portalUrl, FENSTER.portal);
       setPortalOpened(true);
     }
   };

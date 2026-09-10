@@ -46,7 +46,7 @@ export function lesezeichenCode(ziel: string): string {
     var parz = (t.match(/Liegenschaft\\s+Nr\\.\\s*(\\S+)/i) || [])[1] || '';
     var daten = { text: block, egrid: egrid, parzelle: parz };
     melde('übernommen: ' + (egrid || 'ohne EGRID') + ' — wird eingetragen.');
-    window.open('${ziel}/#auskunft=' + encodeURIComponent(JSON.stringify(daten)), '_blank');
+    window.open('${ziel}/#auskunft=' + encodeURIComponent(JSON.stringify(daten)), 'bauraum-app');
   }
   function vorschlag(){
     var el = [].slice.call(document.querySelectorAll('li,a,div[role="option"],.ga-search-result,.tt-suggestion'));

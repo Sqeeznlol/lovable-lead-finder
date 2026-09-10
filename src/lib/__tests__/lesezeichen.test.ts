@@ -13,9 +13,12 @@ function ausfuehren(seitentext: string) {
   });
   vi.useFakeTimers();
   const geoeffnet: string[] = [];
+  const namen: string[] = [];
   const alt = window.open;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (window as any).open = (u: string) => { geoeffnet.push(u); return null; };
+  (window as any).open = (u: string, n: string) => {
+    geoeffnet.push(u); namen.push(n); return null;
+  };
   const gewarnt: string[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (window as any).alert = (m: string) => { gewarnt.push(m); };
@@ -33,7 +36,7 @@ function ausfuehren(seitentext: string) {
   const daten = geoeffnet.length
     ? JSON.parse(decodeURIComponent(geoeffnet[0].split('#auskunft=')[1]))
     : null;
-  return { daten, gewarnt };
+  return { daten, gewarnt, namen };
 }
 
 describe('lesezeichenCode', () => {
@@ -54,6 +57,15 @@ Grundstück: Liegenschaft Nr. 669 ( CH932977092161 )`);
     // erst recht nicht -- sie tragen Postleitzahlen und sähen sonst
     // wie weitere Eigentümer aus.
     expect(daten.text).toBe('Simon Gränicher,  Widacherring 10, 6102 Malters, 1/1');
+  });
+
+  it('öffnet die Anwendung immer im selben Tab', () => {
+    // Sonst steht nach zehn Abfragen die Leiste voll und niemand
+    // weiss mehr, welcher Tab welcher ist.
+    const { namen } = ausfuehren(`Eigentümerinformationen
+Simon Gränicher,  Widacherring 10, 6102 Malters, 1/1
+Zusätzliche Informationen`);
+    expect(namen).toEqual(['bauraum-app']);
   });
 
   it('sagt es im Balken, wenn nichts erscheint', () => {

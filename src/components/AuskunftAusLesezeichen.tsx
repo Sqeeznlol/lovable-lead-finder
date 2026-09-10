@@ -7,6 +7,7 @@ import { weiterverarbeiten } from '@/hooks/use-eigentuemer-lookup';
 import { protokolliere } from '@/lib/protokoll';
 import { useAuth } from '@/hooks/use-auth';
 import { naechsteParzelle, naechsteAdresse } from '@/lib/naechste';
+import { FENSTER, oeffne } from '@/lib/fenster';
 
 /**
  * Nimmt entgegen, was das Lesezeichen aus dem Portal mitbringt.
@@ -148,7 +149,9 @@ export function AuskunftAusLesezeichen() {
       }
 
       const adresse = naechsteAdresse(naechste);
-      const auf = window.open(adresse, '_blank');
+      // Immer derselbe Tab: sonst steht nach zehn Abfragen die
+      // Leiste voll.
+      const auf = oeffne(adresse, FENSTER.portal);
       setStand(v => ({
         art: 'gut',
         text: `${v?.text ?? ''} · weiter mit ${naechste.address ?? ''}`
