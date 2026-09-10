@@ -231,3 +231,29 @@ input, textarea, select {
     --tw-ring-color: hsl(var(--foreground) / 0.05);
   }
 }
+
+/* =====================================================================
+   Der Brief beim Drucken
+   =====================================================================
+   Gedruckt wird die Seite selbst, nicht ein zweites Fenster: einen
+   Fenster-Sperrer gibt es in jedem Browser, eine Druckvorschau nicht.
+   Ausgeblendet wird deshalb alles ausser dem Brief. */
+@media print {
+  body * { visibility: hidden; }
+  .brief-druck, .brief-druck * { visibility: visible; }
+  .brief-druck {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    border: 0;
+    padding: 2cm;
+    width: 100%;
+  }
+  /* Das Textfeld soll wie Text aussehen, nicht wie ein Formular, und
+     seinen ganzen Inhalt zeigen -- ein Rollbalken druckt nicht mit. */
+  .brief-text {
+    height: auto !important;
+    overflow: visible !important;
+    resize: none !important;
+  }
+}

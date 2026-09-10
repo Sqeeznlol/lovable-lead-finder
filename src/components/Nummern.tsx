@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Phone, ExternalLink, Loader2, Check, ArrowRight } from 'lucide-react';
+import { Phone, ExternalLink, Loader2, Check, ArrowRight, Mail } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -51,6 +51,27 @@ export function Nummern() {
       }
     })();
   }, []);
+
+  /**
+   * Keine Nummer zu finden -- dann Brief.
+   *
+   * Sonst stehen solche Objekte ewig hier und werden bei jedem
+   * Durchgang neu erfolglos gesucht.
+   */
+  const aufPost = async (id: string, adresse: string) => {
+    setSpeichert(id);
+    const { error } = await supabase
+      .from('properties')
+      .update({ status: 'Post', phone_search_status: 'not_found' })
+      .eq('id', id);
+    setSpeichert(null);
+    if (error) {
+      toast({ title: 'Fehler', description: error.message, variant: 'destructive' });
+      return;
+    }
+    qc.invalidateQueries({ queryKey: ['properties'] });
+    toast({ title: '✉️ Auf Post gesetzt', description: `${adresse} — steht unter Pipedrive · Post` });
+  };
 
   const eintragen = async (id: string, adresse: string) => {
     const nummer = (entwurf[id] || '').trim();
@@ -248,6 +269,15 @@ export function Nummern() {
                         placeholder="079 123 45 67"
                         className="h-9 w-full sm:w-44"
                       />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => aufPost(p.id, p.address)}
+                        disabled={speichert === p.id}
+                        title="Keine Nummer zu finden — per Brief anschreiben"
+                      >
+                        <Mail className="mr-1 h-3.5 w-3.5" /> Post
+                      </Button>
                       <Button
                         size="sm"
                         onClick={() => eintragen(p.id, p.address)}

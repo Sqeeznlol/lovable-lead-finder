@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, Send, ExternalLink, Archive } from 'lucide-react';
+import { Loader2, Send, ExternalLink, Archive, Mail, Printer } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { useBereitFuerPipedrive, useUebertragen } from '@/hooks/use-properties';
+import { useBereitFuerPipedrive, useUebertragen, usePostObjekte } from '@/hooks/use-properties';
+import { Brief } from '@/components/Brief';
 
 /**
  * Die fertigen Leads, bereit für Pipedrive.
@@ -22,6 +23,9 @@ import { useBereitFuerPipedrive, useUebertragen } from '@/hooks/use-properties';
 export function PipedriveBereit() {
   const { data, isLoading, refetch } = useBereitFuerPipedrive(200);
   const { data: archiv, refetch: archivNeu } = useUebertragen(30);
+  const { data: post } = usePostObjekte(100);
+  // Für welches Objekt der Brief gerade offen ist.
+  const [brief, setBrief] = useState<string | null>(null);
   const [gewaehlt, setGewaehlt] = useState<Set<string>>(new Set());
   const [laeuft, setLaeuft] = useState(false);
   const [ergebnis, setErgebnis] = useState<string[]>([]);

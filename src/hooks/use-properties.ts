@@ -312,6 +312,31 @@ export function useUebertragen(limit = 30) {
   });
 }
 
+/**
+ * Wo der Anruf nicht geht: Brief.
+ *
+ * Nicht jede Nummer laesst sich finden -- alte Eintraege, Firmen ohne
+ * Eintrag, Erbengemeinschaften. Statt solche Objekte ewig unter
+ * "Nummern" stehen zu lassen, wandern sie auf Post.
+ */
+export function usePostObjekte(limit = 100) {
+  return useQuery({
+    queryKey: ['properties', 'post', limit],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('properties')
+        .select(LISTENFELDER + ', owners_json')
+        .eq('status', 'Post')
+        .is('pipedrive_deal_id', null)
+        .order('marge_chf', { ascending: false, nullsFirst: false })
+        .limit(limit);
+      if (error) throw error;
+      return data as unknown as Property[];
+    },
+    staleTime: 30 * 1000,
+  });
+}
+
 export function usePreselectedProperties(limit: number, listId?: string | null) {
   return useQuery({
     queryKey: ['properties', 'preselected', limit, listId],
