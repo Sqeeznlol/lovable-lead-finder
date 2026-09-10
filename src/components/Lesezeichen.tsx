@@ -17,14 +17,16 @@ export function Lesezeichen() {
     <div className="rounded-2xl border p-5">
       <div className="flex items-center gap-2">
         <Bookmark className="h-4 w-4 text-muted-foreground" />
-        <p className="text-sm font-medium">Auskunft übernehmen — ohne Extension</p>
+        <p className="text-sm font-medium">Einrichten: Eigentümer übernehmen</p>
       </div>
 
       <p className="mt-1 text-sm text-muted-foreground">
-        Den Knopf in die Lesezeichenleiste ziehen. Im Grundbuchportal ein
-        Klick darauf, sobald die Auskunft offen ist: der Eigentümer wird
-        gelesen und hier eingetragen. Die Abfrage läuft dabei über deinen
-        eigenen Anschluss, nicht über einen Server.
+        Einmal einrichten, dann steht es jedem zur Verfügung, der hier
+        arbeitet: den Knopf in die Lesezeichenleiste <b>ziehen</b> (nicht
+        klicken). Im Grundbuchportal genügt danach ein Klick darauf --
+        die Parzelle wird ausgewählt, der Eigentümer gelesen und hier
+        eingetragen. Die Abfrage läuft über den eigenen Anschluss, nicht
+        über einen Server.
       </p>
 
       <a

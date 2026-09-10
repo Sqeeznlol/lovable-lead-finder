@@ -180,10 +180,16 @@ export default function Index() {
             {active === 'import' && <CsvImport />}
             {active === 'phones' && <PhoneManager />}
             {active === 'admin' && (
-              <AdminSchloss>
               <div className="space-y-6">
-                <AdminSettings />
+                {/* Vor dem Passwort: das Lesezeichen ist kein
+                    Einstellungswert, sondern ein Werkzeug, das jeder
+                    einmal in seine Leiste zieht. Wer es holt, soll
+                    nicht erst den Admin-Zugang brauchen. */}
                 <Lesezeichen />
+
+                <AdminSchloss>
+                <div className="space-y-6">
+                <AdminSettings />
                 <Protokoll />
                 <div className="rounded-2xl border border-dashed p-5">
                   <p className="text-sm font-medium">Stillgelegte Bereiche</p>
@@ -221,7 +227,8 @@ export default function Index() {
                   </Button>
                 </div>
               </div>
-              </AdminSchloss>
+                </AdminSchloss>
+              </div>
             )}
           </Suspense>
         </div>
