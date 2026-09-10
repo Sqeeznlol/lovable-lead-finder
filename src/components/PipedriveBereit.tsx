@@ -194,9 +194,8 @@ export function PipedriveBereit() {
 
       {/* Wo der Anruf nicht geht. Der Brief steht hier und nicht in
           "Nummern": dort wird gesucht, hier wird verschickt. */}
-      {(post ?? []).length > 0 && (
-        <Card>
-          <CardContent className="p-0">
+      <Card>
+        <CardContent className="p-0">
             <div className="flex items-center gap-2 border-b p-5">
               <Mail className="h-4 w-4 text-primary" />
               <h2 className="font-serif">Post — Brief statt Anruf</h2>
@@ -204,6 +203,13 @@ export function PipedriveBereit() {
                 {(post ?? []).length}
               </span>
             </div>
+            {(post ?? []).length === 0 && (
+              <p className="p-10 text-center text-muted-foreground">
+                Noch kein Brief fällig. Objekte kommen hierher, wenn du
+                unter „Nummern" auf „Post" klickst — dort, wo sich keine
+                Telefonnummer finden lässt.
+              </p>
+            )}
             <ul className="divide-y">
               {(post ?? []).map(p => (
                 <li key={p.id} className="flex flex-wrap items-center gap-3 p-4">
@@ -256,16 +262,14 @@ export function PipedriveBereit() {
                 </li>
               ))}
             </ul>
-          </CardContent>
-        </Card>
-      )}
+        </CardContent>
+      </Card>
 
       {/* Was schon drüben ist -- sichtbar, damit niemand dasselbe ein
           zweites Mal schickt. Zum Nachsehen, nicht zum Tun: hier gibt
           es keine Auswahl und keinen Knopf. */}
-      {(archiv ?? []).length > 0 && (
-        <Card>
-          <CardContent className="p-0">
+      <Card>
+        <CardContent className="p-0">
             <div className="flex items-center gap-2 border-b p-5">
               <Archive className="h-4 w-4 text-muted-foreground" />
               <h2 className="font-serif">Bereits gepusht</h2>
@@ -273,6 +277,11 @@ export function PipedriveBereit() {
                 {(archiv ?? []).length}
               </span>
             </div>
+            {(archiv ?? []).length === 0 && (
+              <p className="p-10 text-center text-muted-foreground">
+                Noch nichts übertragen.
+              </p>
+            )}
             <ul className="divide-y">
               {(archiv ?? []).map(p => (
                 <li key={p.id} className="flex items-baseline justify-between gap-3 px-5 py-2 text-sm">
@@ -302,9 +311,8 @@ export function PipedriveBereit() {
                 </li>
               ))}
             </ul>
-          </CardContent>
-        </Card>
-      )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

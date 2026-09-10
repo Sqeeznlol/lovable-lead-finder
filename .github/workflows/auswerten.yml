@@ -129,6 +129,13 @@ jobs:
                 count(*) filter (where pipedrive_deal_id is not null)
                                                         as mit_deal
               from properties;"
+            # Der Bereich "Post" zeigt nur, was status='Post' traegt.
+            # Steht hier 0, ist der Bereich leer -- und damit unsichtbar.
+            frage "Wie die Objekte auf status verteilt sind" "
+              select coalesce(status,'(leer)') as status, count(*)
+              from properties
+              where coalesce(owner_name,'') <> ''
+              group by 1 order by 2 desc;"
             frage "Die zuletzt bearbeiteten Objekte" "
               select left(address, 28) as adresse,
                      coalesce(kanton,'')                as kt,
