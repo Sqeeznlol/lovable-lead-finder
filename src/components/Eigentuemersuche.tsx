@@ -236,9 +236,10 @@ export function Eigentuemersuche({ objekte }: { objekte: Chance[] }) {
         </div>
 
         <p className="border-b px-5 py-3 text-xs leading-relaxed text-muted-foreground">
-          Das Grundbuchportal bestätigt jede Auskunft per SMS und gibt fünf pro
-          Tag frei. Hier stehen die fünf Objekte, bei denen sich das heute am
-          meisten lohnt — grösste Marge, Eigentümer noch offen.
+          Das Grundbuchportal bestätigt jede Auskunft per SMS und gibt
+          {' '}{proTagHier} pro Tag frei. Hier stehen die Objekte, bei denen
+          sich das heute am meisten lohnt — grösste Marge, Eigentümer noch
+          offen.
         </p>
 
         <ul className="divide-y">

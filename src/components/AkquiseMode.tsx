@@ -348,58 +348,18 @@ export function AkquiseMode() {
         owners_json: ownersJson as any,
       });
 
-      // Sobald eine Nummer dasteht, geht es nach Pipedrive -- gleich,
-      // ob die Suche sie gefunden oder jemand sie eingetippt hat. Die
-      // Einschraenkung auf gefundene Nummern liess die von Hand
-      // eingetragenen liegen, und niemand sah es.
-      if (hasAnyPhone) {
-        try {
-          setAutoStatus('📤 Push zu Pipedrive...');
-          const batch = [{
-            id: current.id,
-            address: current.address,
-            plz_ort: current.plz_ort,
-            gemeinde: current.gemeinde,
-            zone: current.zone,
-            baujahr: current.baujahr,
-            gebaeudeflaeche: current.gebaeudeflaeche ? Number(current.gebaeudeflaeche) : null,
-            area: current.area ? Number(current.area) : null,
-            geschosse: current.geschosse ? Number(current.geschosse) : null,
-            egrid: current.egrid,
-            gwr_egid: current.gwr_egid,
-            parzelle: current.parzelle,
-            bfs_nr: current.bfs_nr,
-            owner_name: o1?.parsed.fullName || o1?.raw || null,
-            owner_address: o1?.parsed.address || null,
-            owner_phone: finalPhone1,
-            owner_name_2: o2?.parsed.fullName || o2?.raw || null,
-            owner_address_2: o2?.parsed.address || null,
-            owner_phone_2: finalPhone2,
-            owners_json: ownersJson,
-            notes: current.notes,
-            status: newStatus,
-            google_maps_url: current.google_maps_url,
-            kanton: current.kanton,
-            kategorie: current.kategorie,
-            wohnungen: current.wohnungen ? Number(current.wohnungen) : null,
-            denkmalschutz: current.denkmalschutz,
-            isos: current.isos,
-          }];
-          const { data: pushData, error: pushErr } = await supabase.functions.invoke('pipedrive-push', { body: { properties: batch } });
-          if (!pushErr && pushData?.summary?.created > 0) {
-            await updateProp.mutateAsync({ id: current.id, status: 'Exportiert' });
-            toast({ title: `🚀 Auto-Pipeline: Telefon gefunden + Deal in Pipedrive angelegt` });
-          } else {
-            toast({ title: `✅ Telefon auto-gefunden (Pipedrive: ${pushErr ? 'Fehler' : 'Duplikat'})` });
-          }
-        } catch (e) {
-          toast({ title: '✅ Telefon gefunden – Pipedrive-Push fehlgeschlagen', variant: 'destructive' });
-        } finally {
-          setAutoStatus(null);
-        }
-      } else {
-        toast({ title: hasAnyOwner ? (hasAnyPhone ? '✅ Mit Telefon gespeichert' : '✅ Eigentümer gespeichert') : '✅ Kein Ergebnis – weiter' });
-      }
+      // Nach Pipedrive geht nichts von selbst.
+      //
+      // Hier stand ein automatischer Push, sobald eine Nummer da war.
+      // Das war eine Auslegung, keine Anweisung: gepusht wird im
+      // Reiter "Pipedrive", von Hand und mit Auswahl. Ein Deal, der
+      // ungefragt entsteht, laesst sich nicht zurueckholen.
+      setAutoStatus(null);
+      toast({
+        title: hasAnyOwner
+          ? (hasAnyPhone ? '✅ Mit Telefon gespeichert' : '✅ Eigentümer gespeichert')
+          : '✅ Kein Ergebnis – weiter',
+      });
       moveToNext();
     } catch (err) {
       toast({ title: 'Speichern fehlgeschlagen', description: (err as Error)?.message || 'Unbekannter Fehler', variant: 'destructive' });

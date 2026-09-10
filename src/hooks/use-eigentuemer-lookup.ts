@@ -38,27 +38,6 @@ interface StartArgs {
   plzOrt?: string | null;
 }
 
-/**
- * Warum die Funktion nein gesagt hat.
- *
- * "Edge Function returned a non-2xx status code" nennt den Grund
- * nicht. Er steht im Rumpf der Antwort -- ein fehlender Token, ein
- * Feld, das die Prüfung nicht passiert, eine Absage von Pipedrive.
- * Ohne ihn sucht man im Nebel; deshalb wird er herausgeholt.
- */
-async function grundVonFunktion(fehler: unknown): Promise<string> {
-  const kurz = String((fehler as { message?: string })?.message || fehler);
-  const antwort = (fehler as { context?: Response })?.context;
-  try {
-    if (antwort && typeof antwort.text === 'function') {
-      const text = (await antwort.text()).slice(0, 400);
-      if (text) return `${kurz} — ${text}`;
-    }
-  } catch {
-    /* Dann bleibt es bei der kurzen Meldung. */
-  }
-  return kurz;
-}
 
 /**
  * Was nach der Abfrage von selbst passiert.
@@ -130,70 +109,28 @@ export async function weiterverarbeiten(
           .eq('id', propertyId);
       }
     } catch {
-      /* Ohne Nummer geht der Deal nach Search -- das ist kein Fehler. */
+      /* Ohne Nummer bleibt es bei der Suche von Hand. */
     }
   }
 
-  // 2. Ohne Nummer kein Deal.
+  // 2. Hier ist Schluss.
   //
-  // Vorher ging das Objekt auch ohne Nummer nach Pipedrive, in die
-  // Pipeline "Search". Das ist jetzt anders: gepusht wird erst, wenn
-  // die Nummer hier steht. Ein Deal, den niemand anrufen kann, ist
-  // eine Zeile in einer Liste, die ohnehin zu lang ist.
-  //
-  // Das Objekt bleibt so lange stehen, wo es ist -- sichtbar, mit dem
-  // Eigentümer, aber ohne Nummer.
-  if (!telefon) {
-    await supabase.from('properties')
-      .update({ status: 'Telefonnummer gesucht' })
-      .eq('id', propertyId);
-    toast({
-      title: 'Keine Nummer gefunden',
-      description: `${p.owner_name} — das Objekt bleibt in der Liste, `
-        + 'bis eine Nummer da ist.',
-    });
-    return;
-  }
-
-  const { data: push, error: pushErr } = await supabase.functions.invoke(
-    'pipedrive-push',
-    { body: { properties: [{ ...p, owner_phone: telefon }] } },
-  );
-  if (pushErr || !(push?.summary?.created > 0)) {
-    toast({
-      title: 'Pipedrive: kein Deal angelegt',
-      description: pushErr
-        ? await grundVonFunktion(pushErr)
-        : (push?.results?.[0]?.error
-           ?? 'Vermutlich schon vorhanden — das Objekt bleibt in der Liste.'),
-      variant: 'destructive',
-    });
-    return;
-  }
-
-  // 3. Erst jetzt aus der Liste nehmen -- mit der Deal-Nummer.
-  //
-  // Ohne sie verschwindet das Objekt einfach, und niemand kann
-  // nachsehen, wo es gelandet ist. Mit ihr fuehrt ein Link direkt
-  // dorthin.
-  const dealId = push?.results?.[0]?.dealId;
+  // Der Deal entsteht nicht von selbst. Gepusht wird im Reiter
+  // "Pipedrive", von Hand, mit Auswahl -- weil das eine Entscheidung
+  // ist und keine Folge. Was hier passiert, ist Beschaffung:
+  // Eigentümer, Nummer. Mehr nicht.
   await supabase.from('properties')
-    .update({
-      is_queried: true,
-      queried_at: new Date().toISOString(),
-      status: 'Exportiert',
-      last_export_at: new Date().toISOString(),
-      ...(dealId ? { pipedrive_deal_id: String(dealId) } : {}),
-    })
+    .update({ status: telefon ? 'Telefon gefunden' : 'Telefonnummer gesucht' })
     .eq('id', propertyId);
 
-  void protokolliere('deal', `${p.address} — Akquise`, p.kanton);
   toast({
-    title: '📞 Deal in Akquise angelegt',
-    description: `${p.owner_name} · ${telefon}`
-      + (dealId ? ` · Deal ${dealId}` : ''),
+    title: telefon ? '📞 Nummer gefunden' : 'Keine Nummer gefunden',
+    description: telefon
+      ? `${p.owner_name} · ${telefon} — bereit für Pipedrive`
+      : `${p.owner_name} — steht unter "Nummern", bis eine Nummer da ist.`,
   });
 }
+
 
 /**
  * Globally persists Eigentümer data returned from the Chrome extension into the

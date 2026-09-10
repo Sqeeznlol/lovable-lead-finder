@@ -98,8 +98,19 @@ export function useUebersicht(kanton?: string) {
     queryKey: ['uebersicht', kanton ?? 'alle'],
     // Eine halbe Stunde: der Bestand ändert sich nicht im Minutentakt,
     // und jeder Aufruf kostete bisher vierzig Abfragen samt Neurechnung.
-    staleTime: 30 * 60 * 1000,
+    // Eine halbe Stunde galt der Zwischenspeicher als frisch -- und
+    // damit stand ein Objekt, dessen Eigentümer längst eingetragen
+    // war, weiter unter "Heute nachschlagen". Genau das ist passiert:
+    // Waltalingerstrasse 19 lag zugleich in der Abfrageliste und in
+    // Pipedrive.
+    //
+    // Der gespeicherte Stand wird weiter sofort gezeigt -- die Seite
+    // bleibt schnell --, gilt aber nach einer halben Minute als alt
+    // und wird im Hintergrund neu geholt.
+    staleTime: 30 * 1000,
     gcTime: 60 * 60 * 1000,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
     // Beim Öffnen steht sofort das Ergebnis der letzten Rechnung da.
     // Neu gerechnet wird im Hintergrund, ohne dass die Seite leer wird.
     initialData: () => lesen<Uebersicht>(schluessel),
