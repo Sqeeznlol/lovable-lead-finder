@@ -77,7 +77,8 @@ Grundstück: Liegenschaft Nr. 669 ( CH932977092161 )`);
     // weiss mehr, welcher Tab welcher ist.
     const { namen } = ausfuehren(`Eigentümerinformationen
 Simon Gränicher,  Widacherring 10, 6102 Malters, 1/1
-Zusätzliche Informationen`);
+Zusätzliche Informationen
+Grundstück: Liegenschaft Nr. 669 ( CH932977092161 )`);
     expect(namen).toEqual(['bauraum-app']);
   });
 
@@ -113,5 +114,35 @@ describe('Nach dem Senden', () => {
     const erste = nachrichten[0] as { bauraum?: string; daten?: { egrid?: string } };
     expect(erste?.bauraum).toBe('auskunft');
     expect(erste?.daten?.egrid).toBe('CH610929297717');
+  });
+});
+
+describe('Die Nummer des Grundstuecks', () => {
+  // Der Fall, der Rudolf Gubler bei der Alten Basadingerstrasse 3
+  // hat landen lassen: oben auf der Seite steht noch die Nummer der
+  // zuvor angezeigten Parzelle.
+  const seite = 'CH770977292983 (Gde. Diessenhofen)\n'
+    + 'Grundbuch-Auszug\nEigentümerinformationen\n'
+    + 'Rudolf Gubler, Grabenstrasse 12, 8253 Diessenhofen, 1/1\n'
+    + 'Zusätzliche Informationen\nGrundbuch: Nr. 4545 Diessenhofen\n'
+    + 'Grundstück: Liegenschaft Nr. 447 ( CH627728290920 )\nDisclaimer';
+
+  it('nimmt die aus dem Auszug, nicht die erste auf der Seite', () => {
+    const { daten } = ausfuehren(seite);
+    expect(daten?.egrid).toBe('CH627728290920');
+    expect(daten?.parzelle).toBe('447');
+  });
+
+  it('schickt gar nichts, wenn zwei Nummern im Auszug stehen', () => {
+    // Zwei verschiedene Nummern und keine Zeile, die eine davon der
+    // Parzelle zuordnet: dann ist jede Wahl geraten.
+    const { daten, namen } = ausfuehren(
+      'Eigentümerinformationen\n'
+      + 'Rudolf Gubler, Grabenstrasse 12, 8253 Diessenhofen, 1/1\n'
+      + 'Zusätzliche Informationen\nCH770977292983\nCH627728290920\nDisclaimer');
+    expect(daten).toBeNull();
+    expect(namen).toEqual([]);
+    expect(document.getElementById('bauraum-hinweis')?.textContent)
+      .toContain('nicht eindeutig');
   });
 });

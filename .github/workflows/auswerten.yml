@@ -28,6 +28,7 @@ on:
           - potenzial    # Wo ueberall ein Potenzial gerechnet wurde
           - zonen-tg     # Zonen im Thurgau, nur eindeutig zugeordnete Parzellen
           - kette        # Wo die abgefragten Objekte gerade stehen
+          - eigentuemer  # Jede eingetragene Auskunft, zum Nachpruefen
       egrid:
         description: 'Nur für "objekt": die EGRID, z.B. CH707709971116'
         required: false
@@ -150,6 +151,23 @@ jobs:
               where coalesce(owner_name,'') <> ''
               order by coalesce(eigentuemer_fetched_at, updated_at) desc nulls last
               limit 12;"
+
+          elif [ "${{ inputs.frage }}" = "eigentuemer" ]; then
+            # Das Lesezeichen hat eine Zeitlang die erste Nummer der
+            # Seite genommen statt die des Auszugs. Dann steht ein
+            # Eigentuemer beim falschen Grundstueck. Hier steht alles
+            # nebeneinander, was zum Nachpruefen noetig ist.
+            frage "Jede eingetragene Auskunft" "
+              select left(address, 26)                        as objekt,
+                     coalesce(parzelle,'')                    as parz,
+                     coalesce(egrid,'')                       as egrid,
+                     left(coalesce(owner_name,''), 24)        as eigentuemer,
+                     left(coalesce(eigentuemer_adresse,''), 26) as eig_adresse,
+                     coalesce(eigentuemer_plz_ort,'')         as eig_ort,
+                     to_char(eigentuemer_fetched_at, 'DD.MM HH24:MI') as wann
+              from properties
+              where coalesce(owner_name,'') <> ''
+              order by eigentuemer_fetched_at desc nulls last;"
 
           elif [ "${{ inputs.frage }}" = "zonen-tg" ]; then
             # Eine Parzelle kann zur Hälfte Wohnzone und zur Hälfte Wald

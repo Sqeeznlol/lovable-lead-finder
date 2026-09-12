@@ -105,12 +105,28 @@ export function AuskunftAusLesezeichen() {
 
       const { data: objekt } = await supabase
         .from('properties')
-        .select('id, address')
+        .select('id, address, parzelle')
         .eq('egrid', daten.egrid)
         .maybeSingle();
 
       if (!objekt) {
         setStand({ art: 'fehler', text: `Zu ${daten.egrid} steht nichts im Bestand.` });
+        return;
+      }
+
+      // Zweite Sicherung: die Parzelle aus dem Auszug muss die des
+      // Objekts sein. Eine falsche Nummer traegt den Eigentuemer sonst
+      // bei einem fremden Grundstueck ein, und das faellt erst auf,
+      // wenn jemand die falsche Person anruft.
+      const ausAuszug = String(daten.parzelle ?? '').replace(/\D/g, '');
+      const imBestand = String(objekt.parzelle ?? '').replace(/\D/g, '');
+      if (ausAuszug && imBestand && ausAuszug !== imBestand) {
+        setStand({
+          art: 'fehler',
+          text: `Nicht eingetragen: der Auszug nennt Parzelle ${daten.parzelle}, `
+            + `zu ${daten.egrid} steht im Bestand Parzelle ${objekt.parzelle} `
+            + `(${objekt.address}).`,
+        });
         return;
       }
 

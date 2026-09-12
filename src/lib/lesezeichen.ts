@@ -19,6 +19,15 @@
  * aus: Vorschlag anklicken, in die Karte klicken, warten. Das erspart
  * die zwei Klicks, die vorher dazwischenlagen.
  *
+ * Die Nummer des Grundstuecks wird nicht irgendwo auf der Seite
+ * gesucht, sondern in der Zeile, die sie mit der Parzelle zusammen
+ * nennt: "Liegenschaft Nr. 447 ( CH627728290920 )". Die erste Nummer
+ * auf der Seite ist naemlich nicht zwingend die des Auszugs -- so ist
+ * Rudolf Gubler von der Grabenstrasse 12 bei der Alten
+ * Basadingerstrasse 3 gelandet. Laesst sich die Zuordnung nicht
+ * eindeutig lesen, wird nichts geschickt: kein Eintrag ist besser als
+ * ein falscher.
+ *
  * Nach dem Senden holt es die Anwendung nach vorn und schickt ihr den
  * Auszug ein zweites Mal als Nachricht. Das ist kein Guertel zum
  * Hosentraeger, sondern der Weg zurueck: an einer Nachricht haengt die
@@ -51,12 +60,31 @@ export function lesezeichenCode(ziel: string): string {
     d.textContent = 'Bauraum — ' + m;
     if (!d.parentNode) document.body.appendChild(d);
   }
-  function senden(block){
+  function kennung(){
     var t = text();
-    var egrid = (t.match(/\\bCH\\d{12}\\b/) || [])[0] || '';
-    var parz = (t.match(/Liegenschaft\\s+Nr\\.\\s*(\\S+)/i) || [])[1] || '';
+    var i = t.search(/Grundbuch-Auszug|Eigent(ü|ue)mer(informationen|innen)/i);
+    var j = t.search(/Disclaimer/i);
+    var bereich = i < 0 ? t : t.slice(i, j > i ? j : i + 3000);
+    var m = bereich.match(/Liegenschaft\\s+Nr\\.\\s*(\\S+?)\\s*\\(\\s*(CH\\d{12})\\s*\\)/i);
+    if (m) return { parzelle: m[1], egrid: m[2] };
+    var alle = bereich.match(/\\bCH\\d{12}\\b/g) || [];
+    var eindeutig = alle.filter(function(x, k){ return alle.indexOf(x) === k; });
+    if (eindeutig.length === 1) {
+      var p = (bereich.match(/Liegenschaft\\s+Nr\\.\\s*(\\S+)/i) || [])[1] || '';
+      return { parzelle: p, egrid: eindeutig[0] };
+    }
+    return null;
+  }
+  function senden(block){
+    var k = kennung();
+    if (!k) {
+      melde('die Parzellennummer im Auszug ist nicht eindeutig — nichts übernommen.');
+      return;
+    }
+    var egrid = k.egrid;
+    var parz = k.parzelle;
     var daten = { text: block, egrid: egrid, parzelle: parz };
-    melde('übernommen: ' + (egrid || 'ohne EGRID') + ' — wird eingetragen.');
+    melde('übernommen: Parzelle ' + parz + ' (' + egrid + ') — wird eingetragen.');
     var app = window.open('${ziel}/#auskunft=' + encodeURIComponent(JSON.stringify(daten)), 'bauraum-app');
     if (app) {
       try { app.focus(); } catch (e) {}
