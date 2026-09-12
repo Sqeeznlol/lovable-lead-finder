@@ -16,8 +16,13 @@ function ausfuehren(seitentext: string) {
   const namen: string[] = [];
   const alt = window.open;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const nachrichten: unknown[] = [];
   (window as any).open = (u: string, n: string) => {
-    geoeffnet.push(u); namen.push(n); return null;
+    geoeffnet.push(u); namen.push(n);
+    // Eine Attrappe der Anwendung: das Lesezeichen schickt ihr den
+    // Auszug anschliessend als Nachricht, und hier wird gezaehlt, ob
+    // das auch geschieht.
+    return { focus() {}, postMessage(d: unknown) { nachrichten.push(d); } };
   };
   // Das Lesezeichen schliesst am Ende seinen eigenen Tab. In jsdom
   // wuerde das Dokument dabei verschwinden und jeder weitere Test
@@ -44,7 +49,7 @@ function ausfuehren(seitentext: string) {
   const daten = geoeffnet.length
     ? JSON.parse(decodeURIComponent(geoeffnet[0].split('#auskunft=')[1]))
     : null;
-  return { daten, gewarnt, namen, geschlossen };
+  return { daten, gewarnt, namen, geschlossen, nachrichten };
 }
 
 describe('lesezeichenCode', () => {
@@ -97,12 +102,16 @@ Zusätzliche Informationen`);
 });
 
 describe('Nach dem Senden', () => {
-  it('schliesst das Portal hinter sich -- der Tag hat seine Arbeit getan', () => {
-    const { daten, geschlossen } = ausfuehren(
+  it('schickt den Auszug auch als Nachricht -- daran haengt der Weg zurueck', () => {
+    const { daten, nachrichten } = ausfuehren(
       'Grundbuch-Auszug\nEigentümerinformationen\n'
       + 'Cetin Demirciler, Landenbergerstrasse 1, 8253 Diessenhofen, 1/1\n'
       + 'Zusätzliche Informationen\nGrundstück: Liegenschaft Nr. 540 ( CH610929297717 )');
     expect(daten?.egrid).toBe('CH610929297717');
-    expect(geschlossen).toBe(1);
+    // An der Nachricht haengt die Absenderkennung; ueber sie schickt
+    // die Anwendung diesen Tag zur naechsten Parzelle.
+    const erste = nachrichten[0] as { bauraum?: string; daten?: { egrid?: string } };
+    expect(erste?.bauraum).toBe('auskunft');
+    expect(erste?.daten?.egrid).toBe('CH610929297717');
   });
 });

@@ -20,10 +20,39 @@ import { FENSTER, oeffne } from '@/lib/fenster';
  * Zugeordnet wird über die EGRID. Sie steht im Auszug und ist
  * schweizweit eindeutig; über die Adresse wäre es geraten.
  */
+/**
+ * Von wem eine Nachricht angenommen wird.
+ *
+ * Eine Nachricht loest hier eine Schreiboperation aus. Sie darf also
+ * nicht von irgendeiner Seite kommen, die zufaellig ein Fenster auf
+ * wohntraums.life offen hat -- nur von den Portalen, aus denen ein
+ * Auszug ueberhaupt stammen kann.
+ */
+const PORTALE = [
+  'https://map.geo.tg.ch',
+  'https://maps.zh.ch',
+  'https://portal.objektwesen.zh.ch',
+];
+
+/**
+ * Woran ein Auszug wiedererkannt wird.
+ *
+ * Er kommt mit Absicht zweimal -- einmal hinter der Raute, einmal als
+ * Nachricht. Beide Wege muessen denselben Auszug als denselben
+ * erkennen, sonst traegt er sich doppelt ein und es geht zweimal
+ * weiter zur naechsten Parzelle.
+ */
+function merkmal(d: { egrid?: string; text?: string }): string {
+  return `${d.egrid ?? ''}|${(d.text ?? '').slice(0, 60)}`;
+}
+
 export function AuskunftAusLesezeichen() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const laeuft = useRef<string | null>(null);
+  // Der Tag, aus dem der Auszug kam. Ueber ihn geht es weiter -- ohne
+  // ihn muesste ein neuer aufgehen.
+  const portalTag = useRef<Window | null>(null);
   const { user, loading } = useAuth();
   // Eine Meldung, die wieder verschwindet, taugt hier nicht: der Tag
   // geht auf, etwas geschieht -- oder eben nicht --, und man sieht
@@ -36,9 +65,10 @@ export function AuskunftAusLesezeichen() {
     // beim Laden hinsieht, sieht diesen zweiten Auszug nie. Genau so
     // blieb der Balken beim ersten Eigentuemer stehen, waehrend oben
     // schon der zweite in der Adresse stand.
-    const verarbeite = () => {
-    const hash = window.location.hash;
-    if (!hash.startsWith('#auskunft=')) return;
+    const uebernimm = (
+      rohdaten: { text?: string; egrid?: string; parzelle?: string },
+      merkmal: string,
+    ) => {
     // Erst anmelden lassen: ohne Sitzung liest die Datenbank nichts,
     // und der Auszug waere verloren.
     if (loading) return;
@@ -47,21 +77,19 @@ export function AuskunftAusLesezeichen() {
       return;
     }
     // Der Riegel gilt fuer diesen einen Auszug, nicht fuer alle
-    // folgenden: sonst ist nach dem ersten fuer immer zu.
-    if (laeuft.current === hash) return;
-    laeuft.current = hash;
+    // folgenden: sonst ist nach dem ersten fuer immer zu. Er faengt
+    // auch ab, dass Raute und Nachricht denselben Auszug zweimal
+    // eintragen -- sie kommen mit Absicht beide.
+    if (laeuft.current === merkmal) return;
+    laeuft.current = merkmal;
     setStand({ art: 'lauft', text: 'Auskunft wird übernommen …' });
 
     (async () => {
-      let daten: { text?: string; egrid?: string; parzelle?: string };
-      try {
-        daten = JSON.parse(decodeURIComponent(hash.slice('#auskunft='.length)));
-      } catch {
-        setStand({ art: 'fehler', text: 'Auskunft unleserlich.' });
-        return;
-      }
+      const daten = rohdaten;
       // Die Adresse aufräumen, damit ein Neuladen nicht alles wiederholt.
-      window.history.replaceState(null, '', window.location.pathname);
+      if (window.location.hash.startsWith('#auskunft=')) {
+        window.history.replaceState(null, '', window.location.pathname);
+      }
 
       const gelesen = leseAuskunft(daten.text || '');
       if (gelesen.length === 0) {
@@ -157,9 +185,20 @@ export function AuskunftAusLesezeichen() {
       }
 
       const adresse = naechsteAdresse(naechste);
-      // Immer derselbe Tab: sonst steht nach zehn Abfragen die
-      // Leiste voll.
-      const auf = oeffne(adresse, FENSTER.portal);
+      // Zuerst der Tag, aus dem der Auszug kam: ihn zu schicken macht
+      // keinen neuen auf, und er funktioniert auch dann, wenn das
+      // Portal von Hand geoeffnet wurde -- ueber den Fensternamen
+      // waere ein solcher Tag nicht zu erreichen.
+      let auf: Window | null = null;
+      try {
+        if (portalTag.current && !portalTag.current.closed) {
+          portalTag.current.location.href = adresse;
+          auf = portalTag.current;
+        }
+      } catch {
+        auf = null;
+      }
+      if (!auf) auf = oeffne(adresse, FENSTER.portal);
       setStand(v => ({
         art: 'gut',
         text: `${v?.text ?? ''} · weiter mit ${naechste.address ?? ''}`
@@ -169,9 +208,35 @@ export function AuskunftAusLesezeichen() {
     })();
     };
 
-    verarbeite();
-    window.addEventListener('hashchange', verarbeite);
-    return () => window.removeEventListener('hashchange', verarbeite);
+    const ausRaute = () => {
+      const hash = window.location.hash;
+      if (!hash.startsWith('#auskunft=')) return;
+      try {
+        const d = JSON.parse(decodeURIComponent(hash.slice('#auskunft='.length)));
+        uebernimm(d, merkmal(d));
+      } catch {
+        setStand({ art: 'fehler', text: 'Auskunft unleserlich.' });
+      }
+    };
+
+    const ausNachricht = (e: MessageEvent) => {
+      if (!PORTALE.includes(e.origin)) return;
+      const d = e.data as { bauraum?: string; daten?: { text?: string; egrid?: string } };
+      if (!d || d.bauraum !== 'auskunft' || !d.daten) return;
+      // Den Absender merken, bevor irgendetwas laeuft: ueber ihn geht
+      // es nachher zur naechsten Parzelle weiter.
+      portalTag.current = e.source as Window | null;
+      try { (e.source as Window)?.postMessage({ bauraum: 'erhalten' }, e.origin); } catch { /* egal */ }
+      uebernimm(d.daten, merkmal(d.daten));
+    };
+
+    ausRaute();
+    window.addEventListener('hashchange', ausRaute);
+    window.addEventListener('message', ausNachricht);
+    return () => {
+      window.removeEventListener('hashchange', ausRaute);
+      window.removeEventListener('message', ausNachricht);
+    };
   }, [toast, qc, user, loading]);
 
   if (!stand) return null;

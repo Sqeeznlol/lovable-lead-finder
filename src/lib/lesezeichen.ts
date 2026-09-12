@@ -19,11 +19,16 @@
  * aus: Vorschlag anklicken, in die Karte klicken, warten. Das erspart
  * die zwei Klicks, die vorher dazwischenlagen.
  *
- * Nach dem Senden holt es die Anwendung nach vorn und schliesst das
- * Portal hinter sich. Ein Tag, der seine Arbeit getan hat, muss nicht
- * stehen bleiben -- die Anwendung macht ohnehin gleich den naechsten
- * auf. Schliessen darf sich nur, was ein Skript geoeffnet hat: wer das
- * Portal von Hand aufmacht, behaelt es, und das ist kein Fehler.
+ * Nach dem Senden holt es die Anwendung nach vorn und schickt ihr den
+ * Auszug ein zweites Mal als Nachricht. Das ist kein Guertel zum
+ * Hosentraeger, sondern der Weg zurueck: an einer Nachricht haengt die
+ * Absenderkennung, und damit kann die Anwendung genau diesen Tag zur
+ * naechsten Parzelle schicken -- auch einen, den niemand von ihr
+ * geoeffnet hat. Gemessen: ueber den Fensternamen allein geht das
+ * nicht, da entsteht jedes Mal ein dritter Tag.
+ *
+ * Geschickt wird, bis die Anwendung bestaetigt, hoechstens zehn
+ * Sekunden lang: beim ersten Mal laedt sie erst noch.
  *
  * Im erzeugten Code stehen keine Kommentare mit "//": er wird auf eine
  * Zeile gezogen, und ein solcher Kommentar verschluckt dann den Rest.
@@ -53,8 +58,17 @@ export function lesezeichenCode(ziel: string): string {
     var daten = { text: block, egrid: egrid, parzelle: parz };
     melde('übernommen: ' + (egrid || 'ohne EGRID') + ' — wird eingetragen.');
     var app = window.open('${ziel}/#auskunft=' + encodeURIComponent(JSON.stringify(daten)), 'bauraum-app');
-    if (app) { try { app.focus(); } catch (e) {} }
-    setTimeout(function(){ try { window.close(); } catch (e) {} }, 400);
+    if (app) {
+      try { app.focus(); } catch (e) {}
+      var n = 0;
+      var uhr2 = setInterval(function(){
+        try { app.postMessage({ bauraum: 'auskunft', daten: daten }, '${ziel}'); } catch (e) {}
+        if (++n > 20) clearInterval(uhr2);
+      }, 500);
+      window.addEventListener('message', function(e){
+        if (e.data && e.data.bauraum === 'erhalten') { clearInterval(uhr2); melde('eingetragen.'); }
+      });
+    }
   }
   function vorschlag(){
     var el = [].slice.call(document.querySelectorAll('li,a,div[role="option"],.ga-search-result,.tt-suggestion'));
