@@ -23,7 +23,7 @@ import { FENSTER, oeffne } from '@/lib/fenster';
 export function AuskunftAusLesezeichen() {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const laeuft = useRef(false);
+  const laeuft = useRef<string | null>(null);
   const { user, loading } = useAuth();
   // Eine Meldung, die wieder verschwindet, taugt hier nicht: der Tag
   // geht auf, etwas geschieht -- oder eben nicht --, und man sieht
@@ -31,6 +31,12 @@ export function AuskunftAusLesezeichen() {
   const [stand, setStand] = useState<{ art: 'lauft' | 'gut' | 'fehler'; text: string } | null>(null);
 
   useEffect(() => {
+    // Beim zweiten Mal ist dieser Tag schon offen. Dann laedt nichts
+    // neu, es wechselt nur der Teil hinter der Raute -- und wer nur
+    // beim Laden hinsieht, sieht diesen zweiten Auszug nie. Genau so
+    // blieb der Balken beim ersten Eigentuemer stehen, waehrend oben
+    // schon der zweite in der Adresse stand.
+    const verarbeite = () => {
     const hash = window.location.hash;
     if (!hash.startsWith('#auskunft=')) return;
     // Erst anmelden lassen: ohne Sitzung liest die Datenbank nichts,
@@ -40,8 +46,10 @@ export function AuskunftAusLesezeichen() {
       setStand({ art: 'fehler', text: 'Nicht angemeldet — bitte anmelden, dann nochmals übernehmen.' });
       return;
     }
-    if (laeuft.current) return;
-    laeuft.current = true;
+    // Der Riegel gilt fuer diesen einen Auszug, nicht fuer alle
+    // folgenden: sonst ist nach dem ersten fuer immer zu.
+    if (laeuft.current === hash) return;
+    laeuft.current = hash;
     setStand({ art: 'lauft', text: 'Auskunft wird übernommen …' });
 
     (async () => {
@@ -159,6 +167,11 @@ export function AuskunftAusLesezeichen() {
           + (auf ? '' : ' — das Fenster wurde blockiert, Popups erlauben'),
       }));
     })();
+    };
+
+    verarbeite();
+    window.addEventListener('hashchange', verarbeite);
+    return () => window.removeEventListener('hashchange', verarbeite);
   }, [toast, qc, user, loading]);
 
   if (!stand) return null;

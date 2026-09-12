@@ -19,6 +19,12 @@
  * aus: Vorschlag anklicken, in die Karte klicken, warten. Das erspart
  * die zwei Klicks, die vorher dazwischenlagen.
  *
+ * Nach dem Senden holt es die Anwendung nach vorn und schliesst das
+ * Portal hinter sich. Ein Tag, der seine Arbeit getan hat, muss nicht
+ * stehen bleiben -- die Anwendung macht ohnehin gleich den naechsten
+ * auf. Schliessen darf sich nur, was ein Skript geoeffnet hat: wer das
+ * Portal von Hand aufmacht, behaelt es, und das ist kein Fehler.
+ *
  * Im erzeugten Code stehen keine Kommentare mit "//": er wird auf eine
  * Zeile gezogen, und ein solcher Kommentar verschluckt dann den Rest.
  */
@@ -46,7 +52,9 @@ export function lesezeichenCode(ziel: string): string {
     var parz = (t.match(/Liegenschaft\\s+Nr\\.\\s*(\\S+)/i) || [])[1] || '';
     var daten = { text: block, egrid: egrid, parzelle: parz };
     melde('übernommen: ' + (egrid || 'ohne EGRID') + ' — wird eingetragen.');
-    window.open('${ziel}/#auskunft=' + encodeURIComponent(JSON.stringify(daten)), 'bauraum-app');
+    var app = window.open('${ziel}/#auskunft=' + encodeURIComponent(JSON.stringify(daten)), 'bauraum-app');
+    if (app) { try { app.focus(); } catch (e) {} }
+    setTimeout(function(){ try { window.close(); } catch (e) {} }, 400);
   }
   function vorschlag(){
     var el = [].slice.call(document.querySelectorAll('li,a,div[role="option"],.ga-search-result,.tt-suggestion'));

@@ -19,6 +19,13 @@ function ausfuehren(seitentext: string) {
   (window as any).open = (u: string, n: string) => {
     geoeffnet.push(u); namen.push(n); return null;
   };
+  // Das Lesezeichen schliesst am Ende seinen eigenen Tab. In jsdom
+  // wuerde das Dokument dabei verschwinden und jeder weitere Test
+  // scheitern -- hier wird nur festgehalten, dass es versucht wurde.
+  let geschlossen = 0;
+  const altClose = window.close;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (window as any).close = () => { geschlossen += 1; };
   const gewarnt: string[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (window as any).alert = (m: string) => { gewarnt.push(m); };
@@ -33,10 +40,11 @@ function ausfuehren(seitentext: string) {
   vi.advanceTimersByTime(40_000);
   vi.useRealTimers();
   window.open = alt;
+  window.close = altClose;
   const daten = geoeffnet.length
     ? JSON.parse(decodeURIComponent(geoeffnet[0].split('#auskunft=')[1]))
     : null;
-  return { daten, gewarnt, namen };
+  return { daten, gewarnt, namen, geschlossen };
 }
 
 describe('lesezeichenCode', () => {
@@ -85,5 +93,16 @@ Zusätzliche Informationen`);
     // angemeldeten Sitzung auf der Seite.
     expect(roh.toLowerCase()).not.toContain('apikey');
     expect(roh).not.toContain('eyJ');
+  });
+});
+
+describe('Nach dem Senden', () => {
+  it('schliesst das Portal hinter sich -- der Tag hat seine Arbeit getan', () => {
+    const { daten, geschlossen } = ausfuehren(
+      'Grundbuch-Auszug\nEigentümerinformationen\n'
+      + 'Cetin Demirciler, Landenbergerstrasse 1, 8253 Diessenhofen, 1/1\n'
+      + 'Zusätzliche Informationen\nGrundstück: Liegenschaft Nr. 540 ( CH610929297717 )');
+    expect(daten?.egrid).toBe('CH610929297717');
+    expect(geschlossen).toBe(1);
   });
 });
