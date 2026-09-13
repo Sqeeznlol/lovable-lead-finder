@@ -171,11 +171,23 @@ jobs:
               *yafinyvlnjldxvwgtofw*) echo "yafinyvlnjldxvwgtofw: das ist das Datenbank-Secret" >> "$GITHUB_STEP_SUMMARY" ;;
               *)                      echo "yafinyvlnjldxvwgtofw: nicht das Datenbank-Secret" >> "$GITHUB_STEP_SUMMARY" ;;
             esac
-            for REF in yafinyvlnjldxvwgtofw "$SEITE"; do
+            for REF in yafinyvlnjldxvwgtofw ohabximzclorjaanpbxq "$SEITE"; do
               ST=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 \
                    "https://$REF.supabase.co/rest/v1/" || echo 000)
               echo "erreichbar $REF:  HTTP $ST" >> "$GITHUB_STEP_SUMMARY"
             done
+            # Was die ausgelieferte Seite benutzt, steht nicht in .env,
+            # sondern im Buendel, das im Browser laeuft. Nur das
+            # entscheidet, welche Instanz wirklich gebraucht wird.
+            HTML=$(curl -sL --max-time 30 https://wohntraums.life/ || true)
+            JS=$(printf '%s' "$HTML" | grep -o '/assets/[^"]*\.js' | head -1)
+            if [ -n "$JS" ]; then
+              GEFUNDEN=$(curl -sL --max-time 60 "https://wohntraums.life$JS" \
+                         | grep -o '[a-z0-9]\{20\}\.supabase\.co' | sort -u | tr '\n' ' ')
+              echo "im Buendel der Seite:  ${GEFUNDEN:-nichts gefunden}" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "im Buendel der Seite:  Buendel nicht gefunden" >> "$GITHUB_STEP_SUMMARY"
+            fi
             echo '```' >> "$GITHUB_STEP_SUMMARY"
             cat "$GITHUB_STEP_SUMMARY"
             exit 0
