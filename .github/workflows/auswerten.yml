@@ -29,6 +29,7 @@ on:
           - zonen-tg     # Zonen im Thurgau, nur eindeutig zugeordnete Parzellen
           - kette        # Wo die abgefragten Objekte gerade stehen
           - eigentuemer  # Jede eingetragene Auskunft, zum Nachpruefen
+          - instanzen    # Zeigen Seite und Datenbank auf dasselbe Projekt?
       egrid:
         description: 'Nur für "objekt": die EGRID, z.B. CH707709971116'
         required: false
@@ -151,6 +152,33 @@ jobs:
               where coalesce(owner_name,'') <> ''
               order by coalesce(eigentuemer_fetched_at, updated_at) desc nulls last
               limit 12;"
+
+          elif [ "${{ inputs.frage }}" = "instanzen" ]; then
+            # Es gibt mehr als ein Supabase-Projekt. Die Frage ist
+            # nicht, wie sie heissen, sondern ob Seite und Datenbank
+            # auf dasselbe zeigen. Ausgegeben wird deshalb nur ja oder
+            # nein -- die Verbindungsangabe selbst nie.
+            SEITE=$(grep -o 'https://[a-z0-9]*\.supabase\.co' .env | head -1 \
+                    | sed 's|https://||; s|\.supabase\.co||')
+            echo "### Wohin zeigt was" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "Seite (.env):        $SEITE" >> "$GITHUB_STEP_SUMMARY"
+            case "$DB" in
+              *"$SEITE"*) echo "Datenbank-Secret:    dasselbe Projekt" >> "$GITHUB_STEP_SUMMARY" ;;
+              *)          echo "Datenbank-Secret:    EIN ANDERES Projekt" >> "$GITHUB_STEP_SUMMARY" ;;
+            esac
+            case "$DB" in
+              *yafinyvlnjldxvwgtofw*) echo "yafinyvlnjldxvwgtofw: das ist das Datenbank-Secret" >> "$GITHUB_STEP_SUMMARY" ;;
+              *)                      echo "yafinyvlnjldxvwgtofw: nicht das Datenbank-Secret" >> "$GITHUB_STEP_SUMMARY" ;;
+            esac
+            for REF in yafinyvlnjldxvwgtofw "$SEITE"; do
+              ST=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 \
+                   "https://$REF.supabase.co/rest/v1/" || echo 000)
+              echo "erreichbar $REF:  HTTP $ST" >> "$GITHUB_STEP_SUMMARY"
+            done
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            cat "$GITHUB_STEP_SUMMARY"
+            exit 0
 
           elif [ "${{ inputs.frage }}" = "eigentuemer" ]; then
             # Das Lesezeichen hat eine Zeitlang die erste Nummer der
