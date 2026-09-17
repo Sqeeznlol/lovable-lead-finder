@@ -46,8 +46,11 @@ function ausfuehren(seitentext: string) {
   vi.useRealTimers();
   window.open = alt;
   window.close = altClose;
-  const daten = geoeffnet.length
-    ? JSON.parse(decodeURIComponent(geoeffnet[0].split('#auskunft=')[1]))
+  // Im Reihenmodus oeffnet es die Anwendung ohne Auszug in der
+  // Adresse; nur die Aufrufe mit Auszug tragen Daten.
+  const mitAuszug = geoeffnet.filter(u => u.includes('#auskunft='));
+  const daten = mitAuszug.length
+    ? JSON.parse(decodeURIComponent(mitAuszug[0].split('#auskunft=')[1]))
     : null;
   return { daten, gewarnt, namen, geschlossen, nachrichten };
 }
@@ -82,13 +85,18 @@ Grundstück: Liegenschaft Nr. 669 ( CH932977092161 )`);
     expect(namen).toEqual(['bauraum-app']);
   });
 
-  it('sagt es im Balken, wenn nichts erscheint', () => {
-    // Ohne Auszug versucht es die Parzelle selbst auszuwählen. Kommt
-    // nichts, steht das im Balken -- kein stiller Fehlschlag.
-    const { daten } = ausfuehren('Irgendeine Seite ohne Auszug.');
+  it('holt sich die Reihe, wenn kein Auszug dasteht', () => {
+    // Ohne Auszug auf dem Schirm faengt der Reihenmodus an: die
+    // Anwendung wird gefragt, was abzuarbeiten ist. Antwortet sie
+    // nicht -- wie hier, wo niemand zuhoert --, steht das im Balken
+    // statt dass es still stehen bleibt.
+    const { daten, nachrichten } = ausfuehren('Irgendeine Seite ohne Auszug.');
     expect(daten).toBeNull();
+    const bitte = nachrichten.filter(
+      (n): n is { bauraum: string } => (n as { bauraum?: string })?.bauraum === 'reihe-bitte');
+    expect(bitte.length).toBeGreaterThan(0);
     expect(document.getElementById('bauraum-hinweis')?.textContent)
-      .toContain('kein Auszug erschienen');
+      .toContain('antwortet nicht');
   });
 
   it('trägt nichts an den Server -- alles steht hinter der Raute', () => {

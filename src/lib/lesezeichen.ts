@@ -42,7 +42,7 @@
  * Im erzeugten Code stehen keine Kommentare mit "//": er wird auf eine
  * Zeile gezogen, und ein solcher Kommentar verschluckt dann den Rest.
  */
-export function lesezeichenCode(ziel: string): string {
+export function lesezeichenCode(ziel: string, kanton = ''): string {
   const quelle = `(function(){
   function text(){ return document.body.innerText || ''; }
   function auszug(){
@@ -75,10 +75,11 @@ export function lesezeichenCode(ziel: string): string {
     }
     return null;
   }
-  function senden(block){
+  function senden(block, weiter){
     var k = kennung();
     if (!k) {
       melde('die Parzellennummer im Auszug ist nicht eindeutig — nichts übernommen.');
+      if (weiter) weiter(false);
       return;
     }
     var egrid = k.egrid;
@@ -93,10 +94,19 @@ export function lesezeichenCode(ziel: string): string {
         try { app.postMessage({ bauraum: 'auskunft', daten: daten }, '${ziel}'); } catch (e) {}
         if (++n > 20) clearInterval(uhr2);
       }, 500);
+      var fertig = false;
       window.addEventListener('message', function(e){
-        if (e.data && e.data.bauraum === 'erhalten') { clearInterval(uhr2); melde('eingetragen.'); }
+        if (e.data && e.data.bauraum === 'erhalten' && !fertig) {
+          fertig = true;
+          clearInterval(uhr2);
+          melde('eingetragen.');
+          if (weiter) weiter(true);
+        }
       });
-    }
+      setTimeout(function(){
+        if (!fertig && weiter) { fertig = true; clearInterval(uhr2); weiter(false); }
+      }, 15000);
+    } else if (weiter) { weiter(false); }
   }
   function vorschlag(){
     var el = [].slice.call(document.querySelectorAll('li,a,div[role="option"],.ga-search-result,.tt-suggestion'));
@@ -117,24 +127,101 @@ export function lesezeichenCode(ziel: string): string {
     });
     return true;
   }
+  function suchfeld(){
+    var f = [].slice.call(document.querySelectorAll('input[type=text],input[type=search],input:not([type])'));
+    return f.filter(function(e){
+      var r = e.getBoundingClientRect();
+      return r.width > 120 && r.height > 10 && e.offsetParent !== null;
+    })[0] || null;
+  }
+  function eintippen(wert){
+    var f = suchfeld();
+    if (!f) return false;
+    var setzer = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
+    if (setzer && setzer.set) setzer.set.call(f, wert); else f.value = wert;
+    f.focus();
+    ['input','change','keyup'].forEach(function(a){
+      f.dispatchEvent(new Event(a, { bubbles: true }));
+    });
+    f.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter', keyCode: 13 }));
+    return true;
+  }
+  function warte(pruefung, sekunden, dann){
+    var n = 0;
+    var uhr = setInterval(function(){
+      if (pruefung()) { clearInterval(uhr); dann(true); return; }
+      if (++n > sekunden) { clearInterval(uhr); dann(false); }
+    }, 1000);
+  }
+  function eine(glied, nummer, gesamt, dann){
+    var vorher = auszug();
+    melde(nummer + ' von ' + gesamt + ': ' + (glied.address || glied.egrid) + ' wird gesucht …');
+    if (!eintippen(glied.egrid)) { melde('kein Suchfeld gefunden.'); dann(false); return; }
+    setTimeout(function(){
+      vorschlag();
+      setTimeout(function(){
+        karte();
+        warte(function(){
+          var b = auszug();
+          var k = kennung();
+          return b && b !== vorher && k && k.egrid === glied.egrid;
+        }, 30, function(gut){
+          if (!gut) {
+            melde(nummer + ' von ' + gesamt + ': kein Auszug zu ' + glied.egrid + ' — übersprungen.');
+            dann(false);
+            return;
+          }
+          senden(auszug(), function(){ dann(true); });
+        });
+      }, 2500);
+    }, 1200);
+  }
+  function reiheAbarbeiten(reihe){
+    var i = 0, gut = 0;
+    function weiter(){
+      if (i >= reihe.length) {
+        melde('fertig: ' + gut + ' von ' + reihe.length + ' eingetragen.');
+        return;
+      }
+      var glied = reihe[i];
+      i = i + 1;
+      eine(glied, i, reihe.length, function(erfolg){
+        if (erfolg) gut = gut + 1;
+        setTimeout(weiter, 1500);
+      });
+    }
+    weiter();
+  }
+  function reiheHolen(){
+    var app = window.open('${ziel}/', 'bauraum-app');
+    if (!app) { melde('die Anwendung liess sich nicht öffnen — Popups erlauben.'); return; }
+    var da = false;
+    window.addEventListener('message', function(e){
+      if (!e.data || e.data.bauraum !== 'reihe' || da) return;
+      da = true;
+      clearInterval(uhr3);
+      var reihe = e.data.reihe || [];
+      if (!reihe.length) { melde('nichts offen — es gibt nichts abzufragen.'); return; }
+      melde(reihe.length + ' Grundstücke geholt. Es geht los.');
+      try { window.focus(); } catch (e2) {}
+      reiheAbarbeiten(reihe);
+    });
+    var m = 0;
+    var uhr3 = setInterval(function(){
+      try { app.postMessage({ bauraum: 'reihe-bitte', kanton: '${kanton}', anzahl: 20 }, '${ziel}'); } catch (e) {}
+      if (++m > 20) {
+        clearInterval(uhr3);
+        if (!da) melde('die Anwendung antwortet nicht — ist wohntraums.life angemeldet?');
+      }
+    }, 500);
+  }
+
   var sel = String(window.getSelection() || '').trim();
   var block = auszug() || (sel.length > 20 ? sel : '');
   if (block) { senden(block); return; }
 
-  melde('Parzelle wird ausgewählt …');
-  vorschlag();
-  setTimeout(function(){
-    karte();
-    var n = 0;
-    var uhr = setInterval(function(){
-      var b = auszug();
-      if (b) { clearInterval(uhr); senden(b); return; }
-      if (++n > 30) {
-        clearInterval(uhr);
-        melde('kein Auszug erschienen. Parzelle anklicken, dann nochmals auf das Lesezeichen.');
-      }
-    }, 1000);
-  }, 2500);
+  melde('Reihe wird geholt …');
+  reiheHolen();
 })();`;
   return 'javascript:' + encodeURIComponent(quelle.replace(/\s*\n\s*/g, ' '));
 }

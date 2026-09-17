@@ -7,6 +7,7 @@ import { weiterverarbeiten } from '@/hooks/use-eigentuemer-lookup';
 import { protokolliere } from '@/lib/protokoll';
 import { useAuth } from '@/hooks/use-auth';
 import { naechsteParzelle, naechsteAdresse } from '@/lib/naechste';
+import { naechsteReihe } from '@/lib/reihe';
 import { FENSTER, oeffne } from '@/lib/fenster';
 
 /**
@@ -237,8 +238,55 @@ export function AuskunftAusLesezeichen() {
 
     const ausNachricht = (e: MessageEvent) => {
       if (!PORTALE.includes(e.origin)) return;
-      const d = e.data as { bauraum?: string; daten?: { text?: string; egrid?: string } };
-      if (!d || d.bauraum !== 'auskunft' || !d.daten) return;
+      const d = e.data as {
+        bauraum?: string;
+        kanton?: string;
+        anzahl?: number;
+        daten?: { text?: string; egrid?: string };
+      };
+      if (!d) return;
+
+      // Das Lesezeichen fragt nach der Reihe, die es abarbeiten soll.
+      // Welche Grundstuecke das sind, entscheidet die Anwendung -- im
+      // Portal steht darueber nichts.
+      if (d.bauraum === 'reihe-bitte') {
+        const absender = e.source as Window | null;
+        portalTag.current = absender;
+        void (async () => {
+          const kanton = String(d.kanton ?? '').trim().toUpperCase();
+          const anzahl = Math.min(Math.max(Number(d.anzahl) || 20, 1), 20);
+          let abfrage = supabase
+            .from('properties')
+            .select('id, egrid, address, parzelle, owner_name, marge_chf')
+            .eq('ausgeschlossen', false)
+            .eq('is_queried', false)
+            .is('owner_name', null)
+            .not('egrid', 'is', null)
+            .order('marge_chf', { ascending: false, nullsFirst: false })
+            .limit(anzahl * 3);
+          if (kanton) abfrage = abfrage.eq('kanton', kanton);
+          const { data: roh } = await abfrage;
+          const reihe = naechsteReihe(
+            (roh || []).map(w => ({
+              id: w.id, egrid: w.egrid, address: w.address,
+              parzelle: w.parzelle, eigentuemer: w.owner_name, marge: w.marge_chf,
+            })),
+            anzahl,
+          );
+          try {
+            absender?.postMessage({ bauraum: 'reihe', reihe }, e.origin);
+          } catch { /* der Tag ist zu, dann eben nicht */ }
+          setStand({
+            art: reihe.length ? 'lauft' : 'fehler',
+            text: reihe.length
+              ? `Reihe geschickt: ${reihe.length} Grundstücke${kanton ? ` in ${kanton}` : ''}.`
+              : `Nichts offen${kanton ? ` in ${kanton}` : ''} — nichts zu holen.`,
+          });
+        })();
+        return;
+      }
+
+      if (d.bauraum !== 'auskunft' || !d.daten) return;
       // Den Absender merken, bevor irgendetwas laeuft: ueber ihn geht
       // es nachher zur naechsten Parzelle weiter.
       portalTag.current = e.source as Window | null;
