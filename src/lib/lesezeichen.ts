@@ -39,6 +39,12 @@
  * Geschickt wird, bis die Anwendung bestaetigt, hoechstens zehn
  * Sekunden lang: beim ersten Mal laedt sie erst noch.
  *
+ * In der Reihe wird die Adresse der Anwendung nicht mehr angefasst --
+ * dort geht alles ueber die Nachricht. Eine neue Adresse laedt die
+ * Seite neu, und bei zwanzig Grundstuecken waere das zwanzigmal die
+ * ganze Anwendung samt Anmeldung. Gemessen hat genau das dazu
+ * gefuehrt, dass nichts ankam.
+ *
  * Im erzeugten Code stehen keine Kommentare mit "//": er wird auf eine
  * Zeile gezogen, und ein solcher Kommentar verschluckt dann den Rest.
  */
@@ -86,7 +92,9 @@ export function lesezeichenCode(ziel: string, kanton = ''): string {
     var parz = k.parzelle;
     var daten = { text: block, egrid: egrid, parzelle: parz };
     melde('übernommen: Parzelle ' + parz + ' (' + egrid + ') — wird eingetragen.');
-    var app = window.open('${ziel}/#auskunft=' + encodeURIComponent(JSON.stringify(daten)), 'bauraum-app');
+    var app = weiter
+      ? window.open('', 'bauraum-app')
+      : window.open('${ziel}/#auskunft=' + encodeURIComponent(JSON.stringify(daten)), 'bauraum-app');
     if (app) {
       try { app.focus(); } catch (e) {}
       var n = 0;
