@@ -12,6 +12,12 @@
  * uebersprungen statt falsch eingetragen wird. Was offen bleibt: ob
  * das echte Portal auf dieselben Handgriffe reagiert.
  *
+ * Die Attrappe traegt dieselben Merkmale wie das Portal -- die Karte
+ * heisst ".ol-viewport", weil ThurGIS auf OpenLayers laeuft. Ein
+ * Detail, aber ohne das misst die Probe am Ziel vorbei: beim ersten
+ * Anlauf hiess sie "#karte", das Skript fand sie nicht und es sah aus,
+ * als laege der Fehler im Skript.
+ *
  * Aufruf: node tools/reihe-pruefen.mjs
  */
 import { createServer } from 'node:http';
@@ -33,7 +39,7 @@ const PARZELLEN = [
 const portalSeite = `<!doctype html><meta charset="utf-8">
 <input id="suche" type="text" style="width:400px;height:24px">
 <ul id="treffer"></ul>
-<div id="karte" style="width:500px;height:300px;background:#eee"></div>
+<div id="map" class="ol-viewport" style="width:500px;height:300px;background:#eee"></div>
 <div id="auszug"></div>
 <script>
 const P = ${JSON.stringify(PARZELLEN)};
@@ -52,7 +58,7 @@ document.getElementById('suche').addEventListener('input', e => {
   li.addEventListener('click', () => { gewaehlt = p; });
   t.appendChild(li);
 });
-document.getElementById('karte').addEventListener('click', () => {
+document.getElementById('map').addEventListener('click', () => {
   if (!gewaehlt) return;
   const p = gewaehlt;
   setTimeout(() => {
