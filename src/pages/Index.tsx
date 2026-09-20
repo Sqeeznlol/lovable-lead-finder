@@ -20,6 +20,7 @@ import { KeyboardShortcutsOverlay } from '@/components/KeyboardShortcutsOverlay'
 import { AdminSchloss } from '@/components/AdminSchloss';
 import { Protokoll } from '@/components/Protokoll';
 import { Lesezeichen } from '@/components/Lesezeichen';
+import { ErweiterungHolen } from '@/components/ErweiterungHolen';
 import { Nummern } from '@/components/Nummern';
 import { PipedriveBereit } from '@/components/PipedriveBereit';
 import { AuskunftAusLesezeichen } from '@/components/AuskunftAusLesezeichen';
@@ -186,6 +187,7 @@ export default function Index() {
                     einmal in seine Leiste zieht. Wer es holt, soll
                     nicht erst den Admin-Zugang brauchen. */}
                 <Lesezeichen />
+                <ErweiterungHolen />
 
                 <AdminSchloss>
                 <div className="space-y-6">
