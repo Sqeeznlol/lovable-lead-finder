@@ -211,7 +211,10 @@ export function Eigentuemersuche({ objekte }: { objekte: Chance[] }) {
             <span className="text-xs text-muted-foreground">
               {uebrig} von {proTagHier} Abfragen übrig
             </span>
-            {mitExtension && uebrig > 1 && (
+            {/* Auch ohne Erweiterung sichtbar: ein Knopf, der nicht
+                da ist, sieht aus wie ein Fehler. So steht wenigstens
+                da, woran es liegt. */}
+            {uebrig > 1 && (
               <>
               {/* Wie viele am Stueck. Wer zwanzig frei hat, will nicht
                   zwingend zwanzig auf einmal -- zehn und dann sehen,
@@ -224,12 +227,17 @@ export function Eigentuemersuche({ objekte }: { objekte: Chance[] }) {
                   max={uebrig}
                   value={Math.min(anzahl, uebrig)}
                   onChange={e => setAnzahl(Math.max(1, Math.min(uebrig, Number(e.target.value) || 1)))}
-                  className="w-14 rounded-md border bg-background px-2 py-1 text-right text-xs"
+                  disabled={!mitExtension}
+                  className="w-14 rounded-md border bg-background px-2 py-1 text-right text-xs disabled:opacity-50"
                 />
               </label>
               <Button
                 size="sm"
                 variant="outline"
+                disabled={!mitExtension}
+                title={mitExtension
+                  ? 'Öffnet das Portal, liest aus, trägt ein und geht weiter'
+                  : 'Dafür braucht es die Erweiterung — im Admin steht, wie sie hineinkommt'}
                 onClick={() => {
                   const naechste = objekte
                     .filter(o => o.egrid)

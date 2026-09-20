@@ -1,5 +1,8 @@
-import { Puzzle, ExternalLink } from 'lucide-react';
+import { Puzzle, ExternalLink, CheckCircle2, XCircle } from 'lucide-react';
 import { FENSTER } from '@/lib/fenster';
+import { Button } from '@/components/ui/button';
+import { useExtensionAvailable } from '@/hooks/use-eigentuemer-lookup';
+import { useState } from 'react';
 
 /**
  * Wo die Erweiterung liegt und wie sie hineinkommt.
@@ -15,12 +18,47 @@ import { FENSTER } from '@/lib/fenster';
 const PAKET = 'https://github.com/Sqeeznlol/lovable-lead-finder/actions/workflows/extension.yml';
 
 export function ErweiterungHolen() {
+  const da = useExtensionAvailable();
+  const [probe, setProbe] = useState<string | null>(null);
+
+  // Ein Probeauftrag ohne Grundstueck: er zeigt, ob die Erweiterung
+  // zuhoert. Passiert nichts, liegt es nicht am Bestand und nicht am
+  // Portal, sondern an der Erweiterung selbst -- und man sucht nicht
+  // an der falschen Stelle.
+  const probelauf = () => {
+    setProbe('Auftrag geschickt — geht gleich ein Fenster auf?');
+    window.dispatchEvent(new CustomEvent('akquise-start-reihe', {
+      detail: { objekte: [{ propertyId: 'probe', egrid: 'CH627728290920', kanton: 'TG', bfsNr: '', address: 'Probe' }] },
+    }));
+  };
+
   return (
     <div className="rounded-2xl border p-5">
       <div className="flex items-center gap-2">
         <Puzzle className="h-4 w-4 text-primary" />
         <p className="text-sm font-medium">Erweiterung: die Reihe ganz ohne Klicken</p>
+        <span className={`ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+          da ? 'bg-emerald-600/15 text-emerald-600' : 'bg-destructive/15 text-destructive'
+        }`}>
+          {da
+            ? <><CheckCircle2 className="h-3 w-3" /> erkannt</>
+            : <><XCircle className="h-3 w-3" /> nicht erkannt</>}
+        </span>
       </div>
+
+      {da && (
+        <div className="mt-3 rounded-xl border bg-muted/30 p-3">
+          <p className="text-sm">
+            Die Erweiterung läuft. In „Heute nachschlagen" steht jetzt
+            oben rechts das Feld <b>Anzahl</b> und der Knopf <b>Reihe
+            abfragen</b>.
+          </p>
+          <Button size="sm" variant="outline" className="mt-2" onClick={probelauf}>
+            Probeauftrag schicken
+          </Button>
+          {probe && <p className="mt-2 text-xs text-muted-foreground">{probe}</p>}
+        </div>
+      )}
 
       <p className="mt-1 text-sm text-muted-foreground">
         Mit ihr steht in der Übersicht ein Feld für die Anzahl und der
