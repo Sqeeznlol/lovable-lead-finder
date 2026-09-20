@@ -72,6 +72,9 @@ export function Eigentuemersuche({ objekte }: { objekte: Chance[] }) {
   const qc = useQueryClient();
   const starten = useStartEigentuemerLookup();
   const reihe = useReiheAbfragen();
+  // Wie viele Abfragen ein Durchgang umfasst. Zehn ist der Anfang,
+  // den man ueberblickt; mehr als heute frei ist, geht ohnehin nicht.
+  const [anzahl, setAnzahl] = useState(10);
   const mitExtension = useExtensionAvailable();
 
   const gemeinden = [...new Set(objekte.map(o => o.gemeinde).filter(Boolean) as string[])];
@@ -209,13 +212,28 @@ export function Eigentuemersuche({ objekte }: { objekte: Chance[] }) {
               {uebrig} von {proTagHier} Abfragen übrig
             </span>
             {mitExtension && uebrig > 1 && (
+              <>
+              {/* Wie viele am Stueck. Wer zwanzig frei hat, will nicht
+                  zwingend zwanzig auf einmal -- zehn und dann sehen,
+                  ob es laeuft, ist der vernuenftigere Anfang. */}
+              <label className="flex items-center gap-1 text-xs text-muted-foreground">
+                Anzahl
+                <input
+                  type="number"
+                  min={1}
+                  max={uebrig}
+                  value={Math.min(anzahl, uebrig)}
+                  onChange={e => setAnzahl(Math.max(1, Math.min(uebrig, Number(e.target.value) || 1)))}
+                  className="w-14 rounded-md border bg-background px-2 py-1 text-right text-xs"
+                />
+              </label>
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => {
                   const naechste = objekte
                     .filter(o => o.egrid)
-                    .slice(0, uebrig)
+                    .slice(0, Math.min(anzahl, uebrig))
                     .map(o => ({
                       propertyId: o.id,
                       egrid: o.egrid,
@@ -230,8 +248,9 @@ export function Eigentuemersuche({ objekte }: { objekte: Chance[] }) {
                 }}
               >
                 <UserSearch className="mr-1 h-3.5 w-3.5" />
-                Reihe abfragen ({Math.min(uebrig, objekte.filter(o => o.egrid).length)})
+                Reihe abfragen ({Math.min(anzahl, uebrig, objekte.filter(o => o.egrid).length)})
               </Button>
+              </>
             )}
           </div>
         </div>

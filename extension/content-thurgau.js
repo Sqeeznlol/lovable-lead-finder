@@ -82,8 +82,17 @@
    * nicht prüft, speichert den Eigentümer des Nachbarn.
    */
   function egridImAuszug() {
-    const m = auszugText().match(/\bCH\d{12}\b/);
-    return m ? m[0] : '';
+    const t = auszugText();
+    // Gelesen wird die Zeile, die Nummer und Parzelle zusammen nennt:
+    // "Liegenschaft Nr. 447 ( CH627728290920 )". Die erste Nummer auf
+    // der Seite ist nicht zwingend die des Auszugs -- oben im Suchfeld
+    // steht oft noch die vorherige.
+    const gekoppelt = t.match(
+      /Liegenschaft\s+Nr\.\s*(\S+?)\s*\(\s*(CH\d{12})\s*\)/i);
+    if (gekoppelt) return gekoppelt[2];
+    const alle = t.match(/\bCH\d{12}\b/g) || [];
+    const eindeutig = alle.filter((x, i) => alle.indexOf(x) === i);
+    return eindeutig.length === 1 ? eindeutig[0] : '';
   }
 
   /**
