@@ -87,6 +87,12 @@ export function ErweiterungHolen() {
       </ol>
 
       <p className="mt-3 text-xs text-muted-foreground">
+        <b>Zuerst einmal von Hand:</b> im Portal eine Parzelle abfragen
+        und den SMS-Code eingeben. Die Bestätigung gilt dann für die
+        Sitzung — danach läuft die Reihe ohne weitere Codes durch.
+      </p>
+
+      <p className="mt-2 text-xs text-muted-foreground">
         Beim ersten Mal mit <b>Anzahl 2</b> anfangen, nicht mit zehn.
         Dann sieht man an zwei Abfragen, ob richtig zugeordnet wird,
         ohne zehn des Tageskontingents zu riskieren.

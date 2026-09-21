@@ -315,19 +315,11 @@ export function useReiheAbfragen() {
       });
       return false;
     }
-    // Ohne Nummer traegt die Erweiterung nichts ins SMS-Feld ein, das
-    // Portal schickt keinen Code, der Auszug erscheint nie -- und nach
-    // vier Minuten hoert es still auf. Das sieht aus, als taete die
-    // Erweiterung nichts. Lieber hier sagen, was fehlt.
-    if (!getMyPhone().trim()) {
-      toast({
-        title: 'Handynummer fehlt',
-        description: 'Das Portal schickt den Code per SMS. Die Nummer steht '
-          + 'im Admin unter Einstellungen — ohne sie bleibt die Reihe stehen.',
-        variant: 'destructive',
-      });
-      return false;
-    }
+    // Keine Pruefung auf die Handynummer: die SMS-Bestaetigung macht
+    // ein Mensch einmal von Hand, danach gilt sie fuer die Sitzung und
+    // das Portal fragt nicht mehr. Die Nummer ist ein Rueckfall fuer
+    // den Fall, dass es doch fragt -- kein Grund, den Start zu
+    // verweigern.
     window.dispatchEvent(new CustomEvent('akquise-start-reihe', {
       detail: {
         objekte: brauchbar.map(o => ({
