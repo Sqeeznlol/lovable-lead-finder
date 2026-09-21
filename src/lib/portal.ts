@@ -28,13 +28,21 @@ export function portalUrl(
 ): string {
   const e = String(egrid ?? '').trim();
   if (String(kanton ?? '').trim().toUpperCase() === 'TG') {
-    const ort = koordinaten
-      ? `&E=${koordinaten.e.toFixed(2)}&N=${koordinaten.n.toFixed(2)}&crosshair=marker`
-      : '';
-    return 'https://map.geo.tg.ch/apps/mf-geoadmin3/?lang=de'
+    const karte = 'https://map.geo.tg.ch/apps/mf-geoadmin3/?lang=de'
       + '&topic=grundbuchvermessung&bgLayer=basemap_farbig&zoom=8'
-      + '&layers=grundbuch,av_komplett'
-      + `&swisssearch=${encodeURIComponent(e)}${ort}`;
+      + '&layers=grundbuch,av_komplett';
+    // Mit Koordinaten ohne Suche: "swisssearch" oeffnet das
+    // Vorschlagsfeld, und das liegt ueber der Karte -- ein Klick auf
+    // die Parzelle landet dann im Feld statt auf dem Grundstueck.
+    // Stehen E und N, ist die Karte schon am Ziel und die Nadel drauf.
+    if (koordinaten) {
+      return karte
+        + `&E=${koordinaten.e.toFixed(2)}&N=${koordinaten.n.toFixed(2)}`
+        + '&crosshair=marker';
+    }
+    // Ohne Koordinaten bleibt nur die Suche: sie zoomt nicht selbst,
+    // aber sie bietet die Parzelle zum Anklicken an.
+    return `${karte}&swisssearch=${encodeURIComponent(e)}`;
   }
   const b = String(bfsNr ?? '').trim();
   return 'https://portal.objektwesen.zh.ch/aks/detail'

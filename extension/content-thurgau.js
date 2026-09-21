@@ -175,20 +175,33 @@
 
     if (!auftrag) { log('kein Auftrag'); return; }
 
-    // Erst den Vorschlag anklicken, damit die Karte auf die Parzelle
-    // zoomt. Das Feld braucht einen Moment, bis es die Vorschläge hat.
-    let gezoomt = false;
-    for (let i = 0; i < 20 && !gezoomt; i++) {
-      gezoomt = vorschlagKlicken(auftrag.egrid);
-      if (!gezoomt) await sleep(500);
-    }
-    if (gezoomt) {
-      // Der Zoom braucht seine Zeit; erst danach liegt die Parzelle
-      // in der Mitte.
+    // Steht die Karte schon am Ziel, gibt es nichts zu suchen: die
+    // Adresse trug die Koordinaten, die Nadel sitzt auf der Parzelle.
+    // Dann waere das Warten auf ein Vorschlagsfeld, das nie kommt,
+    // zehn verlorene Sekunden -- und das Feld laege ausserdem ueber
+    // der Karte und finge den Klick ab.
+    const mitKoordinaten = /[?&]E=\d/.test(location.href);
+    if (mitKoordinaten) {
+      log('Karte steht auf der Parzelle -- direkt anklicken');
       await sleep(2500);
       karteAnklicken();
     } else {
-      log('kein Vorschlag gefunden -- Parzelle von Hand anklicken');
+      // Ohne Koordinaten bleibt die Suche: erst den Vorschlag
+      // anklicken, damit die Karte auf die Parzelle zoomt. Das Feld
+      // braucht einen Moment, bis es die Vorschläge hat.
+      let gezoomt = false;
+      for (let i = 0; i < 20 && !gezoomt; i++) {
+        gezoomt = vorschlagKlicken(auftrag.egrid);
+        if (!gezoomt) await sleep(500);
+      }
+      if (gezoomt) {
+        // Der Zoom braucht seine Zeit; erst danach liegt die Parzelle
+        // in der Mitte.
+        await sleep(2500);
+        karteAnklicken();
+      } else {
+        log('kein Vorschlag gefunden -- Parzelle von Hand anklicken');
+      }
     }
 
     // Mobilnummer eintragen, sobald das Feld da ist.

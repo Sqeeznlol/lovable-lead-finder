@@ -34,7 +34,9 @@ describe('Landeskoordinaten in der Thurgauer Adresse', () => {
     expect(url).toContain('E=2727291.75');
     expect(url).toContain('N=1279215.50');
     expect(url).toContain('crosshair=marker');
-    expect(url).toContain('swisssearch=CH738977838269');
+    // Und ohne Suche: das Vorschlagsfeld laege ueber der Karte und
+    // finge den Klick ab, der der Parzelle gilt.
+    expect(url).not.toContain('swisssearch');
   });
 
   it('kommt ohne sie aus, ohne kaputte Adresse', () => {
