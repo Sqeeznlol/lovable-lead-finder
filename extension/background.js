@@ -45,7 +45,10 @@ function naechsteInDerReihe() {
       status: 'opening_portal',
     };
     chrome.storage.local.set({ reihe: rest, currentJob: job }, () => {
-      const url = portalAdresse(naechste.kanton, naechste.egrid, naechste.bfsNr);
+      // Auch hier die fertige Adresse der Anwendung bevorzugen: sie
+      // traegt die Koordinaten, ohne die die Karte stehen bleibt.
+      const url = naechste.url
+        || portalAdresse(naechste.kanton, naechste.egrid, naechste.bfsNr);
       if (tabId) chrome.tabs.update(tabId, { url }).catch(() => {
         chrome.tabs.create({ url });
       });
@@ -70,7 +73,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       },
     }, () => {
       chrome.tabs.create({
-        url: portalAdresse(erstes.kanton, erstes.egrid, erstes.bfsNr),
+        // Die Anwendung kennt die Koordinaten des Grundstuecks und
+        // schickt die fertige Adresse mit -- dort steht die rote Nadel
+        // schon auf der Parzelle. Fehlt sie, wird wie bisher gebaut.
+        url: erstes.url || portalAdresse(erstes.kanton, erstes.egrid, erstes.bfsNr),
       });
     });
     sendResponse({ ok: true, anzahl: objekte.length });

@@ -15,13 +15,26 @@ export function portalUrl(
   kanton: string | null | undefined,
   egrid: string | null | undefined,
   bfsNr?: string | number | null,
+  /**
+   * Landeskoordinaten des Grundstuecks, wenn bekannt.
+   *
+   * Ohne sie steht die Karte irgendwo im Kanton: "swisssearch" oeffnet
+   * nur das Vorschlagsfeld, es springt nichts. Wer dann in die Mitte
+   * klickt, trifft eine fremde Parzelle oder gar nichts. Mit E und N
+   * steht die Karte auf dem Grundstueck, und "crosshair=marker" setzt
+   * die rote Nadel darauf -- genau dorthin muss der Klick.
+   */
+  koordinaten?: { e: number; n: number } | null,
 ): string {
   const e = String(egrid ?? '').trim();
   if (String(kanton ?? '').trim().toUpperCase() === 'TG') {
+    const ort = koordinaten
+      ? `&E=${koordinaten.e.toFixed(2)}&N=${koordinaten.n.toFixed(2)}&crosshair=marker`
+      : '';
     return 'https://map.geo.tg.ch/apps/mf-geoadmin3/?lang=de'
       + '&topic=grundbuchvermessung&bgLayer=basemap_farbig&zoom=8'
       + '&layers=grundbuch,av_komplett'
-      + `&swisssearch=${encodeURIComponent(e)}`;
+      + `&swisssearch=${encodeURIComponent(e)}${ort}`;
   }
   const b = String(bfsNr ?? '').trim();
   return 'https://portal.objektwesen.zh.ch/aks/detail'

@@ -238,7 +238,7 @@ export function Eigentuemersuche({ objekte }: { objekte: Chance[] }) {
                 title={mitExtension
                   ? 'Öffnet das Portal, liest aus, trägt ein und geht weiter'
                   : 'Dafür braucht es die Erweiterung — im Admin steht, wie sie hineinkommt'}
-                onClick={() => {
+                onClick={async () => {
                   const naechste = objekte
                     .filter(o => o.egrid)
                     .slice(0, Math.min(anzahl, uebrig))
@@ -248,8 +248,14 @@ export function Eigentuemersuche({ objekte }: { objekte: Chance[] }) {
                       bfsNr: o.bfsNr || bfsNachGemeinde[o.gemeinde ?? ''] || '',
                       kanton: o.kanton,
                       address: o.address,
+                      // Ohne Ort findet die Adresssuche das Falsche:
+                      // einen "Rueselweg 3" gibt es mehr als einmal.
+                      plzOrt: [o.plz, o.gemeinde].filter(Boolean).join(' '),
                     }));
-                  if (reihe(naechste)) {
+                  // Die Koordinaten werden vorher geholt, das dauert
+                  // einen Moment -- ohne Warten zaehlte der Verbrauch
+                  // auch dann, wenn der Start scheitert.
+                  if (await reihe(naechste)) {
                     for (let i = 0; i < naechste.length; i++) zaehlen();
                     setVerbraucht(gezaehlt());
                   }

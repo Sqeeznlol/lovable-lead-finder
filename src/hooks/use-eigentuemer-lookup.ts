@@ -4,6 +4,8 @@ import { verkauftNie, ARCHIV_STATUS } from '@/lib/grundbuch';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { portalUrl } from '@/lib/portal';
+import { geocode } from '@/lib/swisstopo';
+import { wgs84NachLv95 } from '@/lib/koordinaten';
 import { FENSTER, oeffne } from '@/lib/fenster';
 import { protokolliere } from '@/lib/protokoll';
 
@@ -301,7 +303,7 @@ export function useReiheAbfragen() {
   const { toast } = useToast();
   const extensionAvailable = useExtensionAvailable();
 
-  return useCallback((objekte: StartArgs[]) => {
+  return useCallback(async (objekte: StartArgs[]) => {
     const brauchbar = objekte.filter(o => o.egrid);
     if (brauchbar.length === 0) {
       toast({ title: 'Nichts abzufragen', variant: 'destructive' });
@@ -320,17 +322,35 @@ export function useReiheAbfragen() {
     // das Portal fragt nicht mehr. Die Nummer ist ein Rueckfall fuer
     // den Fall, dass es doch fragt -- kein Grund, den Start zu
     // verweigern.
+    // Die Koordinaten der Grundstuecke besorgen, bevor es losgeht.
+    // Ohne sie oeffnet der Thurgau nur das Vorschlagsfeld und die Karte
+    // bleibt, wo sie war -- der Klick in die Mitte trifft dann nichts.
+    // Mit ihnen steht die rote Nadel auf der Parzelle.
+    const mitOrt = await Promise.all(brauchbar.map(async o => {
+      const adresse = [o.address, o.plzOrt].filter(Boolean).join(', ');
+      let koordinaten: { e: number; n: number } | null = null;
+      if (String(o.kanton ?? '').trim().toUpperCase() === 'TG' && adresse) {
+        try {
+          const g = await geocode(adresse);
+          if (g) koordinaten = wgs84NachLv95(g.lat, g.lon);
+        } catch {
+          // Findet der Dienst die Adresse nicht, geht es ohne Nadel
+          // weiter -- eine Parzelle weniger bequem ist besser als
+          // keine Reihe.
+        }
+      }
+      return {
+        propertyId: o.propertyId,
+        egrid: o.egrid,
+        bfsNr: o.bfsNr || '',
+        kanton: o.kanton || 'ZH',
+        address: o.address || '',
+        url: portalUrl(o.kanton, o.egrid, o.bfsNr, koordinaten),
+      };
+    }));
+
     window.dispatchEvent(new CustomEvent('akquise-start-reihe', {
-      detail: {
-        objekte: brauchbar.map(o => ({
-          propertyId: o.propertyId,
-          egrid: o.egrid,
-          bfsNr: o.bfsNr || '',
-          kanton: o.kanton || 'ZH',
-          address: o.address || '',
-        })),
-        phoneNumber: getMyPhone(),
-      },
+      detail: { objekte: mitOrt, phoneNumber: getMyPhone() },
     }));
     toast({
       title: `🤖 Reihe gestartet — ${brauchbar.length} Parzellen`,

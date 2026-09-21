@@ -23,3 +23,30 @@ describe('portalUrl', () => {
       .toContain('objektwesen.zh.ch');
   });
 });
+
+describe('Landeskoordinaten in der Thurgauer Adresse', () => {
+  // Ohne sie oeffnet "swisssearch" nur das Vorschlagsfeld -- die Karte
+  // bleibt, wo sie war. Ein Klick in die Mitte trifft dann eine fremde
+  // Parzelle oder nichts. Der Unterschied ist an der Adresse ablesbar.
+  it('setzt E, N und die Nadel, wenn die Koordinaten bekannt sind', () => {
+    const url = portalUrl('TG', 'CH738977838269', null,
+      { e: 2727291.75, n: 1279215.5 });
+    expect(url).toContain('E=2727291.75');
+    expect(url).toContain('N=1279215.50');
+    expect(url).toContain('crosshair=marker');
+    expect(url).toContain('swisssearch=CH738977838269');
+  });
+
+  it('kommt ohne sie aus, ohne kaputte Adresse', () => {
+    const url = portalUrl('TG', 'CH738977838269');
+    expect(url).not.toContain('E=');
+    expect(url).not.toContain('crosshair');
+    expect(url).toContain('swisssearch=CH738977838269');
+  });
+
+  it('haengt sie Zuerich nicht an -- dort fuehrt ein anderes Portal', () => {
+    const url = portalUrl('ZH', 'CH1', '261', { e: 2683000, n: 1247000 });
+    expect(url).toContain('portal.objektwesen.zh.ch');
+    expect(url).not.toContain('E=');
+  });
+});
