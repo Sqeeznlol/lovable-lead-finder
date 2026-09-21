@@ -660,12 +660,12 @@ export function AkquiseMode() {
                           className="h-7 text-xs gap-1 text-muted-foreground"
                           onClick={() => {
                             const downloadExtension = () => {
-                              fetch('/akquise-extension.zip')
+                              fetch('/bauraum-erweiterung.zip')
                                 .then(res => { if (!res.ok) throw new Error('Download failed'); return res.blob(); })
                                 .then(blob => {
                                   const a = document.createElement('a');
                                   a.href = URL.createObjectURL(blob);
-                                  a.download = 'akquise-extension.zip';
+                                  a.download = 'bauraum-erweiterung.zip';
                                   a.click();
                                   URL.revokeObjectURL(a.href);
                                 })

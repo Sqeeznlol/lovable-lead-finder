@@ -22,6 +22,10 @@ on:
 jobs:
   packen:
     runs-on: ubuntu-latest
+    # Der letzte Schritt legt das Paket in die Seite und pusht es --
+    # ohne Schreibrecht scheitert das erst am Ende des Laufs.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -61,3 +65,27 @@ jobs:
           name: extension-${{ steps.fassung.outputs.nummer }}
           path: extension/
           if-no-files-found: error
+
+      # Das Paket gehoert auch in die Seite: ein Link auf diesen Ablauf
+      # verlangt ein Konto und fuehrt durch drei Seiten. Unter
+      # /bauraum-erweiterung.zip liegt es fuer jeden bereit -- und weil
+      # es hier bei jeder Aenderung neu entsteht, kann es nicht
+      # veralten. Genau das war es naemlich: auf der Seite lag 1.3.0,
+      # waehrend der Ordner bei 2.0.0 stand.
+      - name: Paket in die Seite legen
+        run: |
+          set -euo pipefail
+          # Gleicher Inhalt soll dieselbe Datei ergeben, sonst entsteht
+          # bei jedem Lauf ein Commit. Deshalb feste Zeitstempel und
+          # keine Zusatzfelder.
+          find extension -exec touch -t 202001010000 {} +
+          (cd extension && zip -X -r -q ../public/bauraum-erweiterung.zip .)
+          if git diff --quiet -- public/bauraum-erweiterung.zip; then
+            echo "Das Paket auf der Seite ist schon aktuell."
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add public/bauraum-erweiterung.zip
+          git commit -m "Paket auf der Seite auf Fassung ${{ steps.fassung.outputs.nummer }} bringen" -m "Der Download im Admin holt diese Datei. Sie entsteht bei jeder Aenderung an der Erweiterung neu, damit dort nie eine alte Fassung liegt."
+          git push

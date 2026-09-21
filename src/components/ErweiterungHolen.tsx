@@ -1,5 +1,5 @@
-import { Puzzle, ExternalLink, CheckCircle2, XCircle } from 'lucide-react';
-import { FENSTER } from '@/lib/fenster';
+import { Puzzle, CheckCircle2, XCircle, Download } from 'lucide-react';
+import { version as fassung } from '../../extension/manifest.json';
 import { Button } from '@/components/ui/button';
 import { useExtensionAvailable } from '@/hooks/use-eigentuemer-lookup';
 import { useState } from 'react';
@@ -15,7 +15,16 @@ import { useState } from 'react';
  * Chrome nimmt einen Ordner, kein ZIP: deshalb entpacken, bevor man
  * lädt. Das ist die Stelle, an der es üblicherweise klemmt.
  */
-const PAKET = 'https://github.com/Sqeeznlol/lovable-lead-finder/actions/workflows/extension.yml';
+/**
+ * Das Paket liegt in der Seite selbst, nicht auf GitHub.
+ *
+ * Ein Link auf einen Ablauf verlangt ein Konto und fuehrt durch drei
+ * Seiten. Hier liegt die Datei unter der eigenen Adresse -- und sie
+ * wird bei jedem Bau aus dem Ordner "extension" neu gepackt, kann
+ * also nicht veralten. Genau das war sie naemlich: unter dem alten
+ * Namen lag Fassung 1.3.0, waehrend der Ordner bei 2.0.0 stand.
+ */
+const PAKET = '/bauraum-erweiterung.zip';
 
 export function ErweiterungHolen() {
   const da = useExtensionAvailable();
@@ -71,20 +80,22 @@ export function ErweiterungHolen() {
 
       <ol className="mt-3 space-y-1.5 text-sm text-muted-foreground">
         <li>
-          <b>1.</b> Beim <a
-            href={PAKET}
-            target={FENSTER.portal}
-            className="underline underline-offset-4"
-          >
-            Ablauf „Extension packen" <ExternalLink className="inline h-3 w-3" />
-          </a> den obersten Lauf öffnen und unter <b>Artifacts</b> die
-          Datei <code>extension-2.0.0.zip</code> laden.
+          <b>1.</b> Unten auf <b>Herunterladen</b> — die Datei liegt auf
+          dieser Seite, kein Konto nötig.
         </li>
         <li><b>2.</b> Die Datei <b>entpacken</b> — Chrome will den Ordner, nicht das ZIP.</li>
         <li><b>3.</b> In Chrome <code>chrome://extensions</code> öffnen, oben rechts <b>Entwicklermodus</b> einschalten.</li>
         <li><b>4.</b> <b>Entpackte Erweiterung laden</b> und den entpackten Ordner wählen.</li>
         <li><b>5.</b> Diese Seite neu laden — dann steht der Knopf in der Übersicht.</li>
       </ol>
+
+      <a
+        href={PAKET}
+        download="bauraum-erweiterung.zip"
+        className="mt-3 inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-semibold text-background"
+      >
+        <Download className="h-4 w-4" /> Herunterladen — Fassung {fassung}
+      </a>
 
       <p className="mt-3 text-xs text-muted-foreground">
         <b>Zuerst einmal von Hand:</b> im Portal eine Parzelle abfragen
