@@ -241,13 +241,25 @@ export function useStartEigentuemerLookup() {
   const { toast } = useToast();
   const extensionAvailable = useExtensionAvailable();
 
-  return useCallback((args: StartArgs) => {
+  return useCallback(async (args: StartArgs) => {
     const phone = getMyPhone();
     if (!args.egrid) {
       toast({ title: 'Keine EGRID-Nummer', description: 'Property hat keine EGRID — Portal kann nicht aufgerufen werden.', variant: 'destructive' });
       return false;
     }
-    const adresse = portalUrl(args.kanton, args.egrid, args.bfsNr);
+    // Dieselben Koordinaten wie bei der Reihe: ohne sie oeffnet der
+    // Thurgau nur das Suchfeld, die Karte bleibt stehen und der Klick
+    // trifft nichts. Bisher bekam nur die Reihe sie -- der einzelne
+    // Abruf lief weiter mit der alten Adresse.
+    let koordinaten: { e: number; n: number } | null = null;
+    const volleAdresse = [args.address, args.plzOrt].filter(Boolean).join(', ');
+    if (String(args.kanton ?? '').trim().toUpperCase() === 'TG' && volleAdresse) {
+      try {
+        const g = await geocode(volleAdresse);
+        if (g) koordinaten = wgs84NachLv95(g.lat, g.lon);
+      } catch { /* ohne Nadel weiter statt gar nicht */ }
+    }
+    const adresse = portalUrl(args.kanton, args.egrid, args.bfsNr, koordinaten);
 
     if (!extensionAvailable) {
       // Fallback: open portal manually
@@ -259,16 +271,10 @@ export function useStartEigentuemerLookup() {
       return false;
     }
 
-    if (!phone) {
-      oeffne(adresse, FENSTER.portal);
-      toast({
-        title: 'Telefonnummer fehlt',
-        description: 'Hinterlege "Meine Telefonnummer" in Einstellungen für Auto-Fill.',
-        variant: 'destructive',
-      });
-      return false;
-    }
-
+    // Keine Nummer, kein Abbruch: die SMS-Bestaetigung macht ein
+    // Mensch einmal, danach gilt sie fuer die Sitzung. Hier brach es
+    // bisher ab, oeffnete nur das Portal -- und die Erweiterung bekam
+    // nie einen Auftrag. Von aussen sah das aus, als taete sie nichts.
     window.dispatchEvent(new CustomEvent('akquise-start-lookup', {
       detail: {
         egrid: args.egrid,
@@ -276,6 +282,7 @@ export function useStartEigentuemerLookup() {
         kanton: args.kanton || 'ZH',
         parzelle: args.parzelle || '',
         phoneNumber: phone,
+        url: adresse,
         propertyId: args.propertyId,
         appOrigin: window.location.hostname,
         address: args.address || '',

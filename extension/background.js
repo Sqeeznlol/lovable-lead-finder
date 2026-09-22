@@ -85,6 +85,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'START_LOOKUP') {
     const phoneNumber = (msg.phoneNumber || '').replace(/\s+/g, '');
+    // Die Anwendung schickt die fertige Adresse mit -- sie traegt die
+    // Koordinaten, ohne die die Karte nicht auf die Parzelle springt.
+    const fertigeAdresse = msg.url || '';
 
     // Store the job details
     chrome.storage.local.set({
@@ -104,7 +107,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // Parzelle suchen, SMS-Code, dann oeffnet sich das Fenster mit den
     // Eigentuemern. Der Ablauf drumherum ist derselbe.
     chrome.tabs.create({
-      url: portalAdresse(msg.kanton, msg.egrid, msg.bfsNr),
+      url: fertigeAdresse || portalAdresse(msg.kanton, msg.egrid, msg.bfsNr),
     });
     sendResponse({ ok: true });
     return true;

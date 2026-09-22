@@ -305,8 +305,11 @@ export function Eigentuemersuche({ objekte }: { objekte: Chance[] }) {
                   {mitExtension ? (
                     <Button
                       size="sm"
-                      onClick={() => {
-                        const los = starten({
+                      onClick={async () => {
+                        // Die Koordinaten werden vorher geholt; ohne
+                        // Warten zaehlte der Verbrauch auch dann, wenn
+                        // der Start gar nicht zustande kommt.
+                        const los = await starten({
                           propertyId: c.id,
                           egrid: c.egrid,
                           bfsNr: bfs,
