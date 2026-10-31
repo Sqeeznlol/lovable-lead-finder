@@ -165,3 +165,40 @@ begin
 
   raise notice 'Geometrie: Nachbarschaft gerechnet, Grenze 100 m, Ferne ohne Nachbarn.';
 end $$;
+
+-- --------------------------------------------- Geländer gegen Massenlöschung
+-- Die Oberfläche löscht einzeln und muss das weiter können; der Griff
+-- nach dem ganzen Bestand über den öffentlichen Zugang darf nicht
+-- gehen. Beides wird hier im Verhalten geprüft, nicht behauptet.
+do $$
+declare n int; fehler text;
+begin
+  -- Genug Zeilen, um die Grenze zu überschreiten.
+  insert into public.properties (address, egrid)
+  select 'Wegwerfweg ' || i, 'CHTEST' || i from generate_series(1, 30) i;
+
+  execute 'grant delete on public.properties to anon';
+
+  -- 1. Einzeln löschen muss weiter gehen.
+  set local role anon;
+  delete from public.properties where address = 'Wegwerfweg 1';
+  reset role;
+  select count(*) into n from public.properties where address = 'Wegwerfweg 1';
+  if n <> 0 then raise exception 'Einzellöschen wurde blockiert -- das Geländer sitzt zu eng'; end if;
+
+  -- 2. Alles auf einmal darf nicht gehen.
+  begin
+    set local role anon;
+    delete from public.properties where address like 'Wegwerfweg%';
+    reset role;
+    raise exception 'Massenlöschung ging durch -- das Geländer greift nicht';
+  exception
+    when insufficient_privilege then
+      reset role;
+      raise notice 'Geländer: Massenlöschung abgewiesen, Einzellöschen geht.';
+  end;
+
+  -- Der Bestand muss noch da sein.
+  select count(*) into n from public.properties where address like 'Wegwerfweg%';
+  if n <> 29 then raise exception 'Nach der abgewiesenen Löschung stehen % statt 29 Zeilen da', n; end if;
+end $$;
