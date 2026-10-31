@@ -41,6 +41,7 @@ on:
           - download         # Lässt sich der Datensatz herunterladen?
           - tempo             # Laufzeit der Abfragen der Masterliste
           - nachbarn          # Geht die Abfrage des Browsers? (ohne Inhalte)
+          - karte             # Liefert die Kartenfunktion Umrisse?
       grenze:
         description: 'Obergrenze für Durchläufe beim Nachrechnen'
         required: false
@@ -133,6 +134,53 @@ jobs:
                 | python3 -m json.tool >> "$GITHUB_STEP_SUMMARY"
               echo '```' >> "$GITHUB_STEP_SUMMARY"
               cat "$GITHUB_STEP_SUMMARY"
+              ;;
+
+            karte)
+              # Dieselbe Funktion, die src/hooks/use-karte.ts aufruft,
+              # mit demselben oeffentlichen Schluessel. Der Ausschnitt
+              # liegt ueber Diessenhofen -- dort stehen Parzellen mit
+              # Umriss.
+              #
+              # Ausgegeben wird nur die Anzahl und die Feldnamen. Die
+              # Funktion traegt ohnehin keine Eigentuemer; auch die
+              # Adressen bleiben draussen.
+              pfad="rpc/parzellen_karte"
+              status=$(curl -sS -o /tmp/karte.json -w '%{http_code}' \
+                -X POST "$URL/rest/v1/$pfad" \
+                -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+                -H "Content-Type: application/json" \
+                -d '{"p_west":8.74,"p_sued":47.68,"p_ost":8.76,"p_nord":47.70,"p_menge":500}')
+
+              echo "### Die Kartenfunktion" >> "$GITHUB_STEP_SUMMARY"
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
+              echo "HTTP $status" >> "$GITHUB_STEP_SUMMARY"
+              if [ "${status:0:1}" = "2" ]; then
+                jq -r '"Parzellen im Ausschnitt: \(.features | length)"' \
+                  /tmp/karte.json >> "$GITHUB_STEP_SUMMARY"
+                jq -r 'if (.features | length) > 0
+                       then "Felder: \(.features[0].properties | keys | join(", "))"
+                       else "keine Umrisse in diesem Ausschnitt" end' \
+                  /tmp/karte.json >> "$GITHUB_STEP_SUMMARY"
+                jq -r 'if (.features | length) > 0
+                       then "Geometrieart: \(.features[0].geometry.type)"
+                       else empty end' \
+                  /tmp/karte.json >> "$GITHUB_STEP_SUMMARY"
+                # Ein Eigentuemer darf hier gar nicht erst ankommen.
+                jq -r 'if ([.features[]?.properties | keys[]?] | map(select(. == "eigentuemer" or . == "owner_name")) | length) > 0
+                       then "FEHLER: Eigentuemer in der Kartenfunktion"
+                       else "Keine Eigentuemer in der Antwort: richtig" end' \
+                  /tmp/karte.json >> "$GITHUB_STEP_SUMMARY"
+              else
+                head -c 400 /tmp/karte.json >> "$GITHUB_STEP_SUMMARY"
+                echo >> "$GITHUB_STEP_SUMMARY"
+              fi
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
+              cat "$GITHUB_STEP_SUMMARY"
+              case "$status" in
+                2*) echo "Die Kartenfunktion antwortet." ;;
+                *)  echo "Die Kartenfunktion scheitert." >&2; exit 1 ;;
+              esac
               ;;
 
             nachbarn)
