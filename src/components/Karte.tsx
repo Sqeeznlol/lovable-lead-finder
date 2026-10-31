@@ -136,6 +136,17 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
   const karte = useRef<L.Map | null>(null);
   const grundLagen = useRef<L.TileLayer[]>([]);
   const eigenEbene = useRef<L.GeoJSON | null>(null);
+  // Die angeklickte Parzelle als eigener, kräftiger Umriss -- man soll
+  // sehen, welche gemeint ist, auch wenn sie nicht zum Bestand gehört.
+  const markiert = useRef<L.GeoJSON | null>(null);
+  function markieren(g: GeoJSON.GeoJsonObject | null) {
+    markiert.current?.remove(); markiert.current = null;
+    if (!g || !karte.current) return;
+    markiert.current = L.geoJSON(g, {
+      interactive: false,
+      style: { color: '#DC2626', weight: 4, fillColor: '#DC2626', fillOpacity: 0.15 },
+    }).addTo(karte.current);
+  }
 
   const [grund, setGrund] = useState<Grund>('kataster');
   const [bestandAn, setBestandAn] = useState(true);
@@ -222,6 +233,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
         schicht.on('mouseout', () => eigenEbene.current?.resetStyle(schicht as L.Path));
         schicht.on('click', (ev: L.LeafletMouseEvent) => {
           L.DomEvent.stopPropagation(ev);
+          markieren(f as GeoJSON.Feature);
           eigeneZeigen(String(f.id), f.properties as ParzelleEigenschaften,
             ev.latlng.lat, ev.latlng.lng);
         });
@@ -249,14 +261,23 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
     // eigenen Bestand suchen -- auch dort, wo noch kein Umriss geladen ist.
     try {
       const k = 'https://api3.geo.admin.ch/rest/services/all/MapServer/identify?geometryType=esriGeometryPoint'
-        + `&geometry=${lv.E},${lv.N}&sr=2056&tolerance=0&returnGeometry=false`
+        + `&geometry=${lv.E},${lv.N}&sr=2056&tolerance=0&returnGeometry=true&geometryFormat=geojson`
         + '&layers=all:ch.kantone.cadastralwebmap-farbe'
         + `&mapExtent=${lv.E - 300},${lv.N - 300},${lv.E + 300},${lv.N + 300}&imageDisplay=600,600,96&lang=de`;
       const kj = await (await fetch(k)).json();
+      // Antwort in LV95: für Leaflet nach WGS84 umrechnen.
+      const erster = kj?.results?.[0];
+      markieren(null);
+      if (erster?.geometry) {
+        const um = (c: unknown): unknown => Array.isArray(c) && typeof c[0] === 'number'
+          ? (([la, lo]) => [lo, la])(fromLV95(c[0] as number, c[1] as number)) : (c as unknown[]).map(um);
+        markieren({ type: 'Feature', properties: {},
+          geometry: { ...erster.geometry, coordinates: um(erster.geometry.coordinates) } } as GeoJSON.Feature);
+      }
       // Den Attributnamen kenne ich nicht sicher; die EGRID erkennt man
       // an ihrer Form, also wird nach der Form gesucht.
-      const egrid = (kj?.results ?? []).flatMap((x: { attributes?: Record<string, unknown> }) =>
-        Object.values(x.attributes ?? {})).map(String).find((v: string) => /^CH[0-9A-Z]{12}$/.test(v));
+      const egrid = (kj?.results ?? []).flatMap((x: { attributes?: Record<string, unknown>; properties?: Record<string, unknown> }) =>
+        Object.values({ ...x.attributes, ...x.properties })).map(String).find((v: string) => /^CH[0-9A-Z]{12}$/.test(v));
       if (egrid) {
         const { data: p } = await supabase.from('properties').select('*').eq('egrid', egrid).maybeSingle();
         const z = p as Record<string, unknown> | null;
