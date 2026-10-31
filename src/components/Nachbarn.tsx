@@ -25,7 +25,9 @@ export function Nachbarn({
       </div>
     );
   }
-  if (!data || data.length === 0) return null;
+  if (!data) return null;
+
+  const { umrissDa, nachbarn } = data;
 
   return (
     <div className="space-y-2">
@@ -34,13 +36,31 @@ export function Nachbarn({
         <h3 className="text-sm font-medium">
           Angrenzende Grundstücke
           <span className="ml-2 text-xs font-normal text-muted-foreground">
-            {data.length}
+            {nachbarn.length}
           </span>
         </h3>
       </div>
 
-      <div className="divide-y rounded-lg border">
-        {data.map(n => (
+      {/* Drei Faelle, und sie sind nicht dasselbe: kein Umriss
+          geladen, Umriss da aber ohne Nachbarn, oder Nachbarn.
+          Frueher erschien in den ersten beiden Faellen gar nichts --
+          dann sieht es aus, als gaebe es die Funktion nicht. */}
+      {!umrissDa && (
+        <p className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
+          Für dieses Grundstück ist noch kein Umriss eingelesen. Die
+          Nachbarn stehen erst da, wenn die amtliche Vermessung des
+          Kantons geladen ist.
+        </p>
+      )}
+      {umrissDa && nachbarn.length === 0 && (
+        <p className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
+          Keine angrenzenden Grundstücke im Bestand — die Nachbarn
+          liegen ausserhalb der geladenen Parzellen.
+        </p>
+      )}
+
+      <div className={nachbarn.length ? 'divide-y rounded-lg border' : 'hidden'}>
+        {nachbarn.map(n => (
           <button
             key={n.id}
             type="button"

@@ -42,11 +42,17 @@ interface Zeile {
   } | null;
 }
 
+export interface Nachbarschaft {
+  /** Ob für dieses Grundstück überhaupt ein Umriss gespeichert ist. */
+  umrissDa: boolean;
+  nachbarn: Nachbar[];
+}
+
 export function useNachbarn(parzelleId: string | null) {
   return useQuery({
     queryKey: ['nachbarn', parzelleId],
     enabled: !!parzelleId,
-    queryFn: async (): Promise<Nachbar[]> => {
+    queryFn: async (): Promise<Nachbarschaft> => {
       // Die erzeugten Typen kennen die neuen Tabellen noch nicht --
       // dieselbe Lage wie bei `aktivitaet` in lib/protokoll.ts. Sie
       // werden mit dem nächsten Lauf der Typerzeugung nachgezogen.
@@ -69,9 +75,23 @@ export function useNachbarn(parzelleId: string | null) {
 
       if (error) throw error;
 
-      return ((data ?? []) as unknown as Zeile[])
-        .filter(z => z.nachbar)
-        .map(z => ({ ...z.nachbar!, grenzlaenge_m: z.grenzlaenge_m }));
+      // Ohne Umriss gibt es keine Nachbarn -- und das ist etwas
+      // anderes als "hat keine". Wer das nicht unterscheidet, haelt
+      // eine noch nicht geladene Parzelle fuer eine alleinstehende.
+      // Gelesen wird der Zeitstempel, nicht der Umriss: der waere
+      // Hunderte Zeichen gross und wird hier nicht gebraucht.
+      const { data: stand } = await db
+        .from('properties')
+        .select('geometrie_stand')
+        .eq('id', parzelleId as string)
+        .maybeSingle();
+
+      return {
+        umrissDa: !!stand?.geometrie_stand,
+        nachbarn: ((data ?? []) as unknown as Zeile[])
+          .filter(z => z.nachbar)
+          .map(z => ({ ...z.nachbar!, grenzlaenge_m: z.grenzlaenge_m })),
+      };
     },
     staleTime: 5 * 60 * 1000,
   });
