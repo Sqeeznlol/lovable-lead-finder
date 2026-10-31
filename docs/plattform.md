@@ -1,4 +1,6 @@
-# Von der Akquise-Liste zur Plattform
+# Aurora -- von der Akquise-Liste zum CRM
+
+*Aurora* ist das CRM aus der Vorgabe "Strategic Vision" und "Step 2". Die Abfrage (Lead-Finder) ist ein eigenes Werkzeug daneben.
 
 Antwort auf die Anforderungen "CRM Development -- Strategic Vision" und
 "Step 2 -- Additional Opportunities for Maradona", Abschnitt 10: der

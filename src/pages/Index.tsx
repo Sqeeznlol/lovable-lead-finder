@@ -48,7 +48,7 @@ type Tab = 'pipedrive' | 'nummern' | 'karte' | 'nachbarschaft' | 'uebersicht' | 
 // öffnen, ebenso der Master-Import, den man selten und bewusst macht.
 const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'uebersicht', label: 'Übersicht', icon: LayoutDashboard },
-  { id: 'master', label: 'Abfrage', icon: Database },
+  { id: 'master', label: 'Abfrage (separat)', icon: Database },
   // Der Zwischenstand braucht einen eigenen Ort: Eigentümer da,
   // Nummer fehlt. Im Akquise-Modus lag er zwischen allem anderen, und
   // wer ihn suchte, fand ihn nicht.
@@ -114,8 +114,8 @@ export default function Index() {
               B
             </div>
             <div>
-              <h1 className="font-serif text-2xl tracking-tight text-foreground leading-none">Bauraum</h1>
-              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground mt-1.5">Immobilien · Schweiz</p>
+              <h1 className="font-serif text-2xl tracking-tight text-foreground leading-none">Aurora</h1>
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground mt-1.5">CRM · Schweiz</p>
             </div>
           </div>
         </div>
@@ -148,7 +148,7 @@ export default function Index() {
           <Button size="icon" variant="ghost" className="lg:hidden" onClick={() => setMobileOpen(!mobileOpen)}>
             {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
-          <h1 className="font-serif text-xl tracking-tight text-foreground lg:hidden">Bauraum</h1>
+          <h1 className="font-serif text-xl tracking-tight text-foreground lg:hidden">Aurora</h1>
           <div className="hidden lg:flex items-center gap-2 text-xs text-muted-foreground">
             <span className="font-mono uppercase tracking-[0.15em]">Kanton</span>
             <span className="text-foreground font-medium">{cantonName}</span>
