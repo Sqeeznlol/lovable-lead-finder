@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { grundbuchUrl, verkauftNie, ARCHIV_STATUS } from '@/lib/grundbuch';
 import { Label } from '@/components/ui/label';
 import { Objektansicht } from '@/components/Objektansicht';
+import { Nachbarn } from '@/components/Nachbarn';
 import { protokolliere } from '@/lib/protokoll';
 import { AuskunftEinfuegen } from '@/components/AuskunftEinfuegen';
 import { weiterverarbeiten } from '@/hooks/use-eigentuemer-lookup';
@@ -350,6 +351,12 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
                           onChange={e => update({ notes: e.target.value || null })} />
               </div>
             </div>
+
+            {/* Wer arrondieren will, fragt zuerst: wem gehört
+                nebenan? Die Liste steht erst da, wenn die Umrisse des
+                Kantons eingelesen sind -- vorher erscheint sie gar
+                nicht, statt leer. */}
+            <Nachbarn parzelleId={data.id} />
 
             {/* Die öffentliche Hand verkauft ihren Grundbesitz praktisch nie.
                 Steht ein solcher Eigentümer im Grundbuch, ist die Arbeit an
