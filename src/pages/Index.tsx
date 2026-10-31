@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { Building2, LayoutDashboard, Upload, Phone, Menu, X, Zap, Search, FileSpreadsheet, Eye, Shield, Share, Plus, Database, Send } from 'lucide-react';
+import { Building2, LayoutDashboard, Upload, Phone, Menu, X, Zap, Search, FileSpreadsheet, Eye, Shield, Share, Plus, Database, Send, Map } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 const Uebersicht = lazy(() => import('@/components/Uebersicht').then(m => ({ default: m.Uebersicht })));
@@ -13,6 +13,7 @@ const AkquiseMode = lazy(() => import('@/components/AkquiseMode').then(m => ({ d
 const TelefonSuche = lazy(() => import('@/components/TelefonSuche').then(m => ({ default: m.TelefonSuche })));
 const PipedriveExport = lazy(() => import('@/components/PipedriveExport').then(m => ({ default: m.PipedriveExport })));
 const Vorauswahl = lazy(() => import('@/components/Vorauswahl').then(m => ({ default: m.Vorauswahl })));
+const Nachbarschaft = lazy(() => import('@/components/Nachbarschaft').then(m => ({ default: m.Nachbarschaft })));
 const AdminSettings = lazy(() => import('@/components/AdminSettings').then(m => ({ default: m.AdminSettings })));
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CantonTabs } from '@/components/CantonTabs';
@@ -27,7 +28,7 @@ import { useCanton } from '@/hooks/use-canton';
 import { usePlatform } from '@/hooks/use-platform';
 import { useMidnightReset } from '@/hooks/use-phones';
 
-type Tab = 'pipedrive' | 'nummern' | 'uebersicht' | 'dashboard' | 'master' | 'vorauswahl' | 'akquise' | 'telsuche' | 'properties' | 'import' | 'masterimport' | 'phones' | 'export' | 'admin';
+type Tab = 'pipedrive' | 'nummern' | 'nachbarschaft' | 'uebersicht' | 'dashboard' | 'master' | 'vorauswahl' | 'akquise' | 'telsuche' | 'properties' | 'import' | 'masterimport' | 'phones' | 'export' | 'admin';
 
 // Zehn Reiter waren neun zu viel. Was der neue Ablauf selbst erledigt,
 // braucht keinen eigenen Ort mehr:
@@ -49,6 +50,11 @@ const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: st
   // Nummer fehlt. Im Akquise-Modus lag er zwischen allem anderen, und
   // wer ihn suchte, fand ihn nicht.
   { id: 'nummern', label: 'Nummern', icon: Phone },
+  // Wem gehört nebenan -- die erste Frage beim Arrondieren. Sie stand
+  // zuerst nur als Abschnitt im Objektfenster: man musste ein Objekt
+  // suchen, öffnen und nach unten scrollen, und bei einer Parzelle
+  // ohne Umriss sah man gar nichts. So fand sie niemand.
+  { id: 'nachbarschaft', label: 'Nachbarschaft', icon: Map },
   // Der letzte Schritt vor dem Anruf: fertige Leads, die auf den Deal
   // warten. Vorher war dieser Zustand unsichtbar.
   { id: 'pipedrive', label: 'Pipedrive', icon: Send },
@@ -170,6 +176,7 @@ export default function Index() {
             {active === 'dashboard' && <Dashboard />}
             {active === 'master' && <MasterList />}
             {active === 'nummern' && <Nummern />}
+            {active === 'nachbarschaft' && <Nachbarschaft />}
             {active === 'pipedrive' && <PipedriveBereit />}
             {active === 'masterimport' && <MasterImport />}
             {active === 'vorauswahl' && <Vorauswahl />}
