@@ -12,8 +12,8 @@
 insert into public.properties (address, egrid, owner_name, owner_name_2,
        owners_json, eigentuemer_adresse, eigentuemer_plz_ort, eigentuemer_fetched_at) values
 -- Dieselbe Person auf zwei Parzellen -- muss ein Akteur werden.
-('Haldenweg 2','CH1','Ewald Arnold',null,null,'Haldenweg 2','8526 Musterdorf',now()),
-('Haldenweg 3','CH2','Ewald Arnold',null,null,'Haldenweg 2','8526 Musterdorf',now()),
+('Haldenweg 2','CH1','Erwin Amrein',null,null,'Haldenweg 2','8526 Musterdorf',now()),
+('Haldenweg 3','CH2','Erwin Amrein',null,null,'Haldenweg 2','8526 Musterdorf',now()),
 -- Gleicher Name, andere Gemeinde -- zwei Menschen, kein Zusammenlegen.
 ('Seeweg 4','CH3','Hans Brunner',null,null,'Seeweg 4','8598 Seedorf',now()),
 ('Bergweg 9','CH4','Hans Brunner',null,null,'Bergweg 9','7451 Bergdorf',now()),
@@ -23,17 +23,17 @@ insert into public.properties (address, egrid, owner_name, owner_name_2,
 -- Erbengemeinschaft -- keine Person, die man anruft.
 ('Franzosenweg 11','CH7','Steiner Robert Erben',null,null,null,'8253 Musterstadt',now()),
 -- Firma auf zwei Parzellen -- Name allein genügt zum Zusammenlegen.
-('Zugerweg 62','CH8','Blattmann Metallwarenfabrik AG',null,null,'Zugerweg 64','8820 Werkdorf',now()),
-('Winterweg 53','CH9','Blattmann Metallwarenfabrik AG',null,null,'Zugerweg 64','8820 Werkdorf',now()),
+('Zugerweg 62','CH8','Lindauer Metallwarenfabrik AG',null,null,'Zugerweg 64','8820 Werkdorf',now()),
+('Winterweg 53','CH9','Lindauer Metallwarenfabrik AG',null,null,'Zugerweg 64','8820 Werkdorf',now()),
 ('Kirchweg 2','CH10','Evangelische Kirchgemeinde Musterdorf',null,null,'Kirchweg 2','8253 Musterstadt',now()),
 -- Nachname zuerst, wie im Grundbuch.
 ('Hauptweg 26','CH11','Brunner Werner Emil',null,null,null,'8598 Seedorf',now()),
 -- Ein einziges Wort -- Person oder Firma?
-('Steinweg 7','CH12','Haab',null,null,'Steinweg 48','8804 Auendorf',now()),
+('Steinweg 7','CH12','Rieder',null,null,'Steinweg 48','8804 Auendorf',now()),
 -- owners_json hat Vorrang vor den Textfeldern.
 ('Doppelweg 1','CH13','WIRD IGNORIERT','AUCH IGNORIERT',
- '[{"name":"Anna Maria Keller","address":"Doppelweg 1","plz":"8400","ort":"Doppeldorf","ownershipType":"Miteigentum"},
-   {"name":"Moosfeld AG","address":"Hauptweg 36","plz":"8598","ort":"Seedorf","ownershipType":"Miteigentum"}]'::jsonb,
+ '[{"name":"Anna Maria Frei","address":"Doppelweg 1","plz":"8400","ort":"Doppeldorf","ownershipType":"Miteigentum"},
+   {"name":"Talacker AG","address":"Hauptweg 36","plz":"8598","ort":"Seedorf","ownershipType":"Miteigentum"}]'::jsonb,
  null,null,now()),
 ('Zweiweg 5','CH14','Peter Gerber','Rita Gerber',null,'Zweiweg 5','8400 Doppeldorf',now());
 
@@ -42,10 +42,10 @@ select * from public.eigentuemer_uebernehmen();
 do $$
 declare n int; m text;
 begin
-  select count(*) into n from akteur where name='Ewald Arnold';
-  if n <> 1 then raise exception 'Ewald Arnold: % Akteure statt 1', n; end if;
-  select count(*) into n from eigentum e join akteur a on a.id=e.akteur_id where a.name='Ewald Arnold';
-  if n <> 2 then raise exception 'Ewald Arnold: % Parzellen statt 2', n; end if;
+  select count(*) into n from akteur where name='Erwin Amrein';
+  if n <> 1 then raise exception 'Erwin Amrein: % Akteure statt 1', n; end if;
+  select count(*) into n from eigentum e join akteur a on a.id=e.akteur_id where a.name='Erwin Amrein';
+  if n <> 2 then raise exception 'Erwin Amrein: % Parzellen statt 2', n; end if;
 
   select count(*) into n from akteur where name='Hans Brunner';
   if n <> 2 then raise exception 'Hans Brunner: % statt 2 -- verschiedene PLZ sind verschiedene Menschen', n; end if;
@@ -59,9 +59,9 @@ begin
   select art into m from akteur where name='Steiner Robert Erben';
   if m <> 'gemeinschaft' then raise exception 'Erbengemeinschaft als % eingestuft', m; end if;
 
-  select art into m from akteur where name like 'Blattmann%';
+  select art into m from akteur where name like 'Lindauer%';
   if m <> 'firma' then raise exception 'AG als % eingestuft', m; end if;
-  select count(*) into n from eigentum e join akteur a on a.id=e.akteur_id where a.name like 'Blattmann%';
+  select count(*) into n from eigentum e join akteur a on a.id=e.akteur_id where a.name like 'Lindauer%';
   if n <> 2 then raise exception 'Firma: % Parzellen statt 2', n; end if;
 
   select art into m from akteur where name like 'Evangelische%';
@@ -69,7 +69,7 @@ begin
 
   if not (select name_umgedreht from akteur where name='Brunner Werner Emil')
     then raise exception 'Nachname-zuerst nicht erkannt'; end if;
-  if (select art_sicher from akteur where name='Haab')
+  if (select art_sicher from akteur where name='Rieder')
     then raise exception 'Einzelwort gilt faelschlich als sicher'; end if;
 
   select count(*) into n from akteur where name like '%IGNORIERT%';

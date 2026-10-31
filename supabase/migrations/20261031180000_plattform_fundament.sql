@@ -67,7 +67,7 @@ comment on column public.properties.geometrie is
 create table if not exists public.akteur (
   id          uuid primary key default gen_random_uuid(),
   -- 'gemeinschaft' steht für Erbengemeinschaften. Im Bestand stehen
-  -- Einträge wie "Keller Robert Erben" -- das ist keine Person, die
+  -- Einträge wie "Steiner Robert Erben" -- das ist keine Person, die
   -- man anruft, sondern eine unbekannte Zahl von Erben. Sie als
   -- Person zu führen hiesse, einen Toten ins Telefonverzeichnis zu
   -- schreiben.

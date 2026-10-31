@@ -9,23 +9,23 @@
 -- 31. Oktober standen 114 Auskünfte im Bestand, und sie zeigen vier
 -- Dinge, die man sonst übersieht:
 --
---   "Keller Robert Erben"       eine Erbengemeinschaft, keine Person
---   "Rutishauser Werner Emil"   Nachname zuerst, Grundbuch-Schreibweise
---   "Moosfeld AG", "L + B AG"   Firmen
---   "Ewald Arnold" zweimal      derselbe Mensch, zwei Parzellen
+--   "Steiner Robert Erben"       eine Erbengemeinschaft, keine Person
+--   "Brunner Werner Emil"   Nachname zuerst, Grundbuch-Schreibweise
+--   "Talacker AG", "K + M AG"   Firmen
+--   "Erwin Amrein" zweimal      derselbe Mensch, zwei Parzellen
 --
 -- Zwei Regeln ergeben sich daraus, und beide sind vorsichtig:
 --
 --   * Eine Erbengemeinschaft wird nicht zur Person. Wer "Erben"
 --     anruft, ruft niemanden an.
 --   * Personen werden nur zusammengeführt, wenn Name *und*
---     Postleitzahl übereinstimmen. Zwei "Hans Rutishauser" in zwei
+--     Postleitzahl übereinstimmen. Zwei "Hans Brunner" in zwei
 --     Gemeinden sind zwei Menschen. Firmen dagegen über den Namen
 --     allein -- sonst stünde dieselbe AG mehrfach da, und genau das
 --     soll das Modell ja beenden.
 --
 -- Die Schreibweise des Namens wird *nicht* umgedreht. Aus
--- "Rutishauser Werner Emil" automatisch "Werner Emil Rutishauser" zu
+-- "Brunner Werner Emil" automatisch "Werner Emil Brunner" zu
 -- machen hiesse raten, welches Wort der Nachname ist -- und ein
 -- falsch zusammengelegter Eigentümer ist schlimmer als zwei getrennte.
 -- Solche Fälle stehen in `eigentuemer_zu_pruefen` und gehören einem
@@ -40,7 +40,7 @@ alter table public.akteur
 
 -- ------------------------------------------------- Art eines Namens
 -- Reihenfolge ist wichtig: "Erben" schlägt alles, sonst würde
--- "Hanhart Ernst Erben" als Person durchgehen.
+-- "Steiner Ernst Erben" als Person durchgehen.
 create or replace function public.akteur_art(p_name text)
 returns text
 language sql
@@ -70,9 +70,9 @@ immutable
 set search_path to 'public'
 as $$
   -- Im Grundbuch steht oft der Nachname zuerst. Erkennbar ist das
-  -- nicht sicher -- "Keller Robert" und "Robert Keller" sehen gleich
+  -- nicht sicher -- "Steiner Robert" und "Robert Steiner" sehen gleich
   -- aus. Markiert wird nur, was drei Wörter hat und mit einem
-  -- häufigen Vornamen *endet*: "Rutishauser Werner Emil".
+  -- häufigen Vornamen *endet*: "Brunner Werner Emil".
   select p_name ~* '^\S+\s+\S+\s+\S+$'
      and p_name ~* '\m(emil|ernst|werner|hans|peter|robert|maria|anna|rosa|fritz|walter|otto|paul|karl|josef|heinrich)\M\s*$';
 $$;
@@ -160,7 +160,7 @@ begin
                                art_sicher, name_umgedreht)
     select e.art, e.name, e.adresse, e.plz, e.ort,
            'uebernahme properties',
-           -- Ein einzelnes Wort sagt zu wenig: "Haab" steht so im
+           -- Ein einzelnes Wort sagt zu wenig: "Rieder" steht so im
            -- Bestand und kann Person oder Firma sein.
            e.name ~ '\s',
            public.akteur_name_umgedreht(e.name)
