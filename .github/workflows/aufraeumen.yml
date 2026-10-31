@@ -1,0 +1,102 @@
+# =====================================================================
+# Aufräumen
+# =====================================================================
+# Am 31. Oktober stand die Datenbank plötzlich auf nur-lesen:
+#
+#     ERROR: cannot execute CREATE TABLE in a read-only transaction
+#
+# Das macht Supabase, wenn die Platte voll ist. Ursache war die
+# Zwischentabelle `geo_eingang`: 137'269 Parzellenumrisse als Text,
+# liegengeblieben nach einem abgestürzten Lauf.
+#
+# Dieser Ablauf misst, wohin der Platz geht, und räumt genau die
+# Tabellen weg, die als Zwischenlager gedacht waren. Er löscht nichts
+# anderes -- die Namen stehen hier und nicht in einer Eingabe.
+#
+# Zum Lesemodus: solange er gilt, scheitert jedes Schreiben. Er lässt
+# sich für die eigene Sitzung abschalten, lange genug zum Aufräumen.
+# =====================================================================
+name: Aufräumen
+
+on:
+  workflow_dispatch:
+    inputs:
+      schritt:
+        description: 'Was getan werden soll'
+        required: true
+        default: 'messen'
+        type: choice
+        options:
+          - messen       # Nur nachsehen, wohin der Platz geht
+          - zwischenlager-weg   # geo_eingang entfernen und Platz zurückgeben
+
+jobs:
+  aufraeumen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Werkzeuge
+        run: sudo apt-get install -y -qq postgresql-client
+
+      - name: Aufräumen
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
+
+          # Jede Anweisung mit abgeschaltetem Lesemodus. Das gilt nur
+          # fuer diese Sitzung und nur so lange, wie sie dauert.
+          lauf() {
+            psql "$DB" -v ON_ERROR_STOP=1 -X -q \
+              -c "set default_transaction_read_only = off;" \
+              -c "set statement_timeout = '20min';" \
+              -c "$1"
+          }
+
+          echo "### Steht die Datenbank auf nur-lesen?" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+          psql "$DB" -X -c "show default_transaction_read_only;" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
+          echo "### Wie gross die Datenbank ist" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+          psql "$DB" -X -c \
+            "select pg_size_pretty(pg_database_size(current_database())) as gesamt;" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
+          echo "### Die zehn groessten Tabellen" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+          psql "$DB" -X -c \
+            "select c.relname as tabelle,
+                    pg_size_pretty(pg_total_relation_size(c.oid)) as gesamt,
+                    pg_size_pretty(pg_relation_size(c.oid))       as daten,
+                    pg_size_pretty(pg_indexes_size(c.oid))        as indizes
+               from pg_class c
+               join pg_namespace n on n.oid = c.relnamespace
+              where n.nspname = 'public' and c.relkind = 'r'
+              order by pg_total_relation_size(c.oid) desc
+              limit 10;" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
+          if [ "${{ inputs.schritt }}" = "zwischenlager-weg" ]; then
+            echo "### Zwischenlager entfernen" \
+              | tee -a "$GITHUB_STEP_SUMMARY"
+            # Nur diese eine Tabelle, und sie steht hier im Klartext.
+            lauf "drop table if exists public.geo_eingang;"
+            echo "geo_eingang entfernt." | tee -a "$GITHUB_STEP_SUMMARY"
+
+            # DROP gibt den Platz an das Dateisystem zurueck, VACUUM
+            # danach noch die Freiraeume in den uebrigen Tabellen.
+            lauf "vacuum (analyze) public.properties;"
+            echo "properties aufgeraeumt und neu vermessen." \
+              | tee -a "$GITHUB_STEP_SUMMARY"
+
+            echo "### Danach" | tee -a "$GITHUB_STEP_SUMMARY"
+            psql "$DB" -X -c \
+              "select pg_size_pretty(pg_database_size(current_database())) as gesamt;" \
+              | tee -a "$GITHUB_STEP_SUMMARY"
+            psql "$DB" -X -c "show default_transaction_read_only;" \
+              | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
