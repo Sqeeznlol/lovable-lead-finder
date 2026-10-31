@@ -142,7 +142,9 @@ jobs:
           fi
 
       - name: Nutzungsplanung holen
-        if: ${{ inputs.schritt != 'parzellen' }}
+        if: ${{ inputs.schritt != 'parzellen'
+                && inputs.schritt != 'geometrie'
+                && inputs.schritt != 'geometrie-schreiben' }}
         env:
           KANTON: ${{ inputs.kanton }}
         run: |
@@ -158,7 +160,9 @@ jobs:
           find /tmp/npl -type f -printf '%p  %s Bytes\n' | head -20
 
       - name: Modell holen
-        if: ${{ inputs.schritt != 'parzellen' }}
+        if: ${{ inputs.schritt != 'parzellen'
+                && inputs.schritt != 'geometrie'
+                && inputs.schritt != 'geometrie-schreiben' }}
         run: |
           set -euo pipefail
           # GDAL braucht das Datenmodell, um die Klassen zu benennen.
@@ -170,7 +174,9 @@ jobs:
           wc -c /tmp/Nutzungsplanung_V1_2.ili
 
       - name: Nachsehen, was drinsteckt
-        if: ${{ inputs.schritt != 'parzellen' }}
+        if: ${{ inputs.schritt != 'parzellen'
+                && inputs.schritt != 'geometrie'
+                && inputs.schritt != 'geometrie-schreiben' }}
         run: |
           set -euo pipefail
           xtf=$(find /tmp/npl -name '*.xtf' | head -1)
