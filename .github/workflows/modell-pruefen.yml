@@ -91,6 +91,13 @@ jobs:
                       kanton text,
                       area numeric,
                       zone text);"
+          # Das Geländer gegen Massenlöschung sitzt auf beiden
+          # Tabellen, in denen Personendaten stehen.
+          $PSQL -c "create table public.phone_numbers (
+                      id uuid primary key default gen_random_uuid(),
+                      property_id uuid references public.properties(id)
+                        on delete cascade,
+                      nummer text);"
 
       - name: Migrationen einspielen
         run: |
