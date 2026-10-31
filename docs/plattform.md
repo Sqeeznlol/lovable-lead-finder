@@ -266,6 +266,92 @@ kommen Grössenordnungen dazu. Was daraus folgt:
 
 ---
 
+## 4a. Die Karte über die ganze Schweiz
+
+Zielbild ist eine Karte über das ganze Land, nicht über zwei Kantone.
+Das ist keine spätere Erweiterung, sondern eine Entscheidung, die
+*jetzt* zwei Dinge festlegt.
+
+### Die Karte lässt sich nicht als JSON ausliefern
+
+Heute holt die Anwendung Zeilen über PostgREST als JSON. Gemessen am
+31. Oktober: schon bei 396'271 Zeilen (ZH + TG) läuft die Abfrage in
+die Zeitgrenze (`57014`). Eine Karte über die ganze Schweiz bedeutet
+Millionen von Polygonen -- der Weg trägt das nicht, auch mit jedem
+Index nicht.
+
+Dafür gibt es genau eine übliche Antwort: **Vektorkacheln**. PostGIS
+rechnet mit `ST_AsMVT` je Zoomstufe und Kachel ein fertiges Paket,
+der Browser lädt nur, was im Bild ist. Das ist ein anderer
+Auslieferungsweg als alles, was die Anwendung heute tut, und er gehört
+deshalb in die Planung, bevor die Geometrie eingelesen wird -- die
+Speicherung und die Indizes richten sich danach.
+
+Was daraus folgt: Die Karte ist kein Bildschirm, den man am Schluss
+dazubaut. Sie ist ein eigener Dienst.
+
+### Landesweite Karte heisst nicht landesweites Produkt
+
+Diese beiden Dinge sind zu trennen, sonst verspricht der Vertrieb
+etwas, das die Daten nicht hergeben:
+
+| | Reichweite heute |
+|---|---|
+| **Grundkarte, Luftbild, Geokodierung** | **Schweizweit.** `src/lib/swisstopo.ts` nutzt `api3.geo.admin.ch` -- Bundesdaten, gratis, ohne Schlüssel und ohne Kontingent. Dieser Teil ist bereits national. |
+| **Parzellengeometrie** | Über geodienste.ch grundsätzlich schweizweit harmonisiert, aber **je Kanton** verfügbar und **je Kanton** lizenziert. 26 Abklärungen, nicht eine. |
+| **Baugesuche** | ZH offen und täglich, TG erst ab 2027. Für die übrigen Kantone ungeprüft. |
+| **Eigentümer** | Je Kanton ein eigenes Portal, je Kanton ein eigener Ablauf. |
+| **ÖREB-Kataster** | `src/lib/oereb.ts` zeigt heute **fest auf Zürich** (`maps.zh.ch`, `OerebKatasterZH`). |
+
+Die Karte kann also früh landesweit sein. *Maradona Monitor* kann es
+nicht -- der hängt an den Baugesuchen, und die sind kantonal.
+
+### Was der Code dafür braucht
+
+Das Datenmodell trägt es bereits: EGRID ist schweizweit eindeutig und
+schon heute der Schlüssel, `kanton` ist eine Spalte. Kein Neubau.
+
+Zwei Stellen sind aber hart begrenzt:
+
+- `src/hooks/use-canton.tsx` führt `CantonId` als festen Typ über
+  **fünf** Kantone (`'ZH' | 'TG' | 'ZG' | 'AG' | 'LU'`), davon zwei
+  aktiv. Für die Schweiz müssen es 26 werden -- eine kleine Änderung
+  mit vielen Folgestellen, weil der Typ überall mitgeht.
+- Die Portaladressen stehen an 38 Stellen, aber gebündelt in
+  `portal.ts`, `grundbuch.ts` und `oereb.ts`, mit Tests. Das ist die
+  richtige Naht: sie wurde im September schon einmal gezogen, als der
+  Thurgau dazukam. `oereb.ts` ist die Ausnahme und muss nachziehen.
+
+### Reihenfolge
+
+Die Karte kommt **nicht** am Schluss. Sie kommt in zwei Stufen:
+
+1. **Mit Priorität 1**: Geometrie für ZH und TG, Vektorkacheln, der
+   Kartendienst steht. Auf zwei Kantonen, aber auf der Technik, die
+   auch 26 trägt.
+2. **Danach fortlaufend**: Kanton für Kanton dazu, sobald Lizenz und
+   Bezug geklärt sind. Jeder Kanton ist dann ein Einlesevorgang, kein
+   Umbau.
+
+Der Fehler, den man hier machen kann, ist, die Karte für zwei Kantone
+auf dem JSON-Weg zu bauen, weil es dort gerade noch geht -- und sie
+beim zehnten Kanton wegzuwerfen.
+
+### Ungeprüft
+
+- **Wie viele Grundstücke die Schweiz hat.** Ich habe keine belastbare
+  Zahl gefunden; ZH + TG sind gemessen 396'271. Die Gesamtzahl gehört
+  bei swisstopo oder über geodienste.ch erfragt, bevor irgendetwas
+  dimensioniert wird.
+- **Die Lizenzlage je Kanton.** Hier gibt es einen Widerspruch:
+  Zürich meldete 2017, die kantonalen Geodaten seien ab 2018
+  "kostenlos und ohne Einschränkung" nutzbar -- im Katalog war eine
+  AV-Ressource dagegen als bewilligungspflichtig für kommerzielle
+  Nutzung ausgewiesen. Welches für die Liegenschaftsgeometrie gilt,
+  ist vor dem Bezug zu klären, und zwar je Kanton.
+
+---
+
 ## 5. Entwicklungsplan
 
 Die Reihenfolge folgt Abschnitt 9, mit einem vorgezogenen Schritt 0.

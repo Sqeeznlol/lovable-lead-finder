@@ -19,6 +19,28 @@
 
 create extension if not exists postgis with schema extensions;
 
+-- Ein Name, ein Schlüssel.
+--
+-- "Müller" und "Mueller" müssen denselben Schlüssel ergeben, sonst
+-- steht derselbe Eigentümer zweimal da -- und beim Einpflegen der
+-- vorhandenen Daten zog genau das doppeltes Eigentum nach sich.
+-- Deshalb steht die Regel *einmal* hier und wird überall von hier
+-- geholt, statt an zwei Stellen abgeschrieben zu werden.
+create or replace function public.akteur_norm(p_name text)
+returns text
+language sql
+immutable
+set search_path to 'public'
+as $$
+  select regexp_replace(
+           replace(replace(replace(replace(replace(replace(replace(
+             lower(coalesce(p_name, '')),
+             'ä','ae'),'ö','oe'),'ü','ue'),'ß','ss'),
+             'é','e'),'è','e'),'à','a'),
+           '[^a-z0-9]', '', 'g');
+$$;
+
+
 -- ------------------------------------------------- Parzellengeometrie
 -- LV95 (EPSG:2056) ist das amtliche Schweizer Bezugssystem; die
 -- Amtliche Vermessung liefert darin. Umrechnen würde bei jeder
@@ -44,12 +66,18 @@ comment on column public.properties.geometrie is
 -- einer Textsuche über vier Spalten.
 create table if not exists public.akteur (
   id          uuid primary key default gen_random_uuid(),
-  art         text not null check (art in ('person', 'firma', 'institution')),
+  -- 'gemeinschaft' steht für Erbengemeinschaften. Im Bestand stehen
+  -- Einträge wie "Keller Robert Erben" -- das ist keine Person, die
+  -- man anruft, sondern eine unbekannte Zahl von Erben. Sie als
+  -- Person zu führen hiesse, einen Toten ins Telefonverzeichnis zu
+  -- schreiben.
+  art         text not null
+              check (art in ('person', 'firma', 'institution', 'gemeinschaft')),
   name        text not null,
-  -- Für den Abgleich: Name ohne Rechtsform, Umlaute und Interpunktion.
-  name_norm   text generated always as (
-                lower(regexp_replace(name, '[^[:alnum:]]', '', 'g'))
-              ) stored,
+  -- Für den Abgleich: Umlaute aufgelöst, alles andere weg. "Müller"
+  -- und "Mueller" müssen denselben Schlüssel ergeben, sonst steht
+  -- derselbe Eigentümer zweimal da.
+  name_norm   text generated always as (public.akteur_norm(name)) stored,
   adresse     text,
   plz         text,
   ort         text,

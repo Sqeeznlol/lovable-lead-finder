@@ -1,0 +1,102 @@
+# =====================================================================
+# Modell prüfen
+# =====================================================================
+# Die Migrationen des Plattform-Fundaments laufen hier gegen ein
+# echtes PostgreSQL mit PostGIS -- dieselbe Erweiterung, die auch bei
+# Supabase läuft.
+#
+# Warum als Ablauf und nicht als Vitest: das Modell ist SQL. Eine
+# Prüfung in TypeScript würde nachbilden, was die Datenbank tut, und
+# damit genau das Raten wiederholen, das dieses Projekt vermeiden
+# will. Hier läuft die Migration selbst.
+#
+# Geprüft wird dreierlei:
+#   1. die Übernahme der vorhandenen Eigentümer ins neue Modell
+#   2. dass anonyme Zugriffe auf Personendaten verschlossen bleiben
+#   3. dass die Nachbarschaft über PostGIS wirklich rechnet
+#
+# Die Testdaten tragen erfundene Namen. Die Muster stammen aus dem
+# Bestand, die Menschen nicht -- Personendaten gehören nicht ins
+# Repository.
+# =====================================================================
+name: Modell prüfen
+
+on:
+  push:
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/tests/**'
+      - '.github/workflows/modell-pruefen.yml'
+  workflow_dispatch:
+
+jobs:
+  pruefen:
+    runs-on: ubuntu-latest
+
+    services:
+      db:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_PASSWORD: probe
+          POSTGRES_DB: probe
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      PGPASSWORD: probe
+      PSQL: psql -h 127.0.0.1 -U postgres -d probe -v ON_ERROR_STOP=1
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Werkzeuge
+        run: sudo apt-get install -y -qq postgresql-client
+
+      - name: Was Supabase mitbringt, nachbilden
+        run: |
+          set -euo pipefail
+          # Die Rollen und das Schema, in dem Supabase Erweiterungen
+          # führt. Ohne sie laufen die Migrationen ins Leere.
+          $PSQL -c "create role anon;"
+          $PSQL -c "create role authenticated;"
+          $PSQL -c "create schema if not exists extensions;"
+          # Nur die Spalten, welche die Migrationen anfassen. Die
+          # echte Tabelle hat 118 -- die übrigen spielen hier keine
+          # Rolle und würden den Test nur mit Rauschen füllen.
+          $PSQL -c "create table public.properties (
+                      id uuid primary key default gen_random_uuid(),
+                      address text not null,
+                      egrid text,
+                      owner_name text,
+                      owner_name_2 text,
+                      owners_json jsonb,
+                      eigentuemer_adresse text,
+                      eigentuemer_plz_ort text,
+                      eigentuemer_fetched_at timestamptz);"
+
+      - name: Migrationen einspielen
+        run: |
+          set -euo pipefail
+          for f in supabase/migrations/20261031180000_plattform_fundament.sql \
+                   supabase/migrations/20261031190000_eigentuemer_uebernehmen.sql; do
+            echo "--- $f"
+            $PSQL -f "$f" > /dev/null
+          done
+          echo "Beide Migrationen eingespielt."
+
+      - name: Noch einmal -- Migrationen müssen wiederholbar sein
+        run: |
+          set -euo pipefail
+          $PSQL -f supabase/migrations/20261031180000_plattform_fundament.sql > /dev/null
+          echo "Zweiter Lauf des Fundaments ohne Fehler."
+
+      - name: Prüfen
+        run: |
+          set -euo pipefail
+          $PSQL -f supabase/tests/modell.sql
+          echo "### Modell geprüft" >> "$GITHUB_STEP_SUMMARY"
+          echo "Übernahme, Zugang und Nachbarschaft bestätigt." >> "$GITHUB_STEP_SUMMARY"
