@@ -446,8 +446,22 @@ jobs:
           fi
 
           echo "### Umrisse als Text"
-          ogr2ogr -f CSV /tmp/geometrie.csv /tmp/parzellen.gpkg grundstueck \
-            -select egris_egrid \
+          # Die Fläche steht nicht bei "grundstueck", sondern bei
+          # "liegenschaft" -- so trennt das INTERLIS-Modell Angaben und
+          # Geometrie. Verknüpft wird über T_Id, genau wie beim
+          # Verschneiden. Der erste Versuch las nur "grundstueck" und
+          # bekam eine Datei mit einer einzigen Spalte.
+          #
+          # CONVERT_TO_LINEAR ist nicht optional: die amtlichen Grenzen
+          # enthalten Kreisbögen, und ein CURVEPOLYGON nimmt eine
+          # Spalte vom Typ MultiPolygon nicht an.
+          ogr2ogr -f CSV /tmp/geometrie.csv /tmp/parzellen.gpkg \
+            -nlt CONVERT_TO_LINEAR \
+            -dialect sqlite -sql "
+              SELECT g.egris_egrid AS egrid, l.geometrie
+                FROM liegenschaft l
+                JOIN grundstueck g ON g.T_Id = l.liegenschaft_von
+               WHERE g.egris_egrid IS NOT NULL" \
             -lco GEOMETRY=AS_WKT -lco GEOMETRY_NAME=wkt
 
           zeilen=$(( $(wc -l < /tmp/geometrie.csv) - 1 ))
@@ -458,9 +472,19 @@ jobs:
             exit 1
           fi
 
+          # Die Reihenfolge der Spalten entscheidet beim Einlesen --
+          # \copy ordnet nach Stellung, nicht nach Namen. Stimmt sie
+          # nicht, landet der Umriss im EGRID-Feld, und das fiele erst
+          # auf, wenn die Karte leer bleibt.
+          kopf=$(head -1 /tmp/geometrie.csv)
+          if [ "$kopf" != "wkt,egrid" ]; then
+            echo "Unerwartete Kopfzeile: $kopf -- erwartet wkt,egrid" >&2
+            exit 1
+          fi
+
           # Nie eine ganze Zeile ins Protokoll: ein Umriss ist Hunderte
           # Zeichen lang und sagt dort nichts.
-          echo "Kopfzeile: $(head -1 /tmp/geometrie.csv)"
+          echo "Kopfzeile: $kopf"
           echo "Erste Zeile gekürzt: $(sed -n '2p' /tmp/geometrie.csv | cut -c1-80)"
           ls -lh /tmp/geometrie.csv
 
