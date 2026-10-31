@@ -96,6 +96,41 @@ function Kopieren({ wert, text }: { wert: string; text?: string }) {
   );
 }
 
+/** Spaltennamen als Schweizer Beschriftung: mit ä, ö, ü, ohne ß. */
+const BESCHRIFTUNG: Record<string, string> = {
+  address: 'Adresse', area: 'Fläche (m²)', plot_number: 'Parzellennummer', parzelle: 'Parzelle',
+  egrid: 'EGRID', gwr_egid: 'EGID', zone: 'Zone', kanton: 'Kanton', gemeinde: 'Gemeinde', bezirk: 'Bezirk',
+  bezirksort: 'Bezirksort', bfs_nr: 'BFS-Nr.', plz: 'PLZ', plz_ort: 'PLZ, Ort', ortschaftsname: 'Ortschaft',
+  strassenname: 'Strasse', hausnummer: 'Hausnummer', objektadresse: 'Objektadresse',
+  owner_name: 'Eigentümer', owner_name_2: 'Eigentümer 2', owner_address: 'Adresse Eigentümer',
+  owner_address_2: 'Adresse Eigentümer 2', owner_phone: 'Telefon', owner_phone_2: 'Telefon 2',
+  owners_json: 'Alle Eigentümer', eigentuemer_name: 'Eigentümer (Auskunft)', eigentuemer_adresse: 'Adresse Eigentümer (Auskunft)',
+  eigentuemer_plz_ort: 'PLZ, Ort Eigentümer', eigentuemer_fetched_at: 'Eigentümer abgefragt am',
+  ausnuetzung: 'Ausnützung', baujahr: 'Baujahr', renovationsjahr: 'Renovationsjahr', geschosse: 'Geschosse',
+  vollgeschosse: 'Vollgeschosse', vollgeschosse_zulaessig: 'Vollgeschosse zulässig', anrechenbare_geschosse: 'Anrechenbare Geschosse',
+  gebaeudeflaeche: 'Gebäudefläche (m²)', gebaeudeart: 'Gebäudeart', gebaeude_anzahl: 'Anzahl Gebäude', geb_status: 'Gebäudestatus',
+  wohnflaeche: 'Wohnfläche (m²)', nutzflaeche: 'Nutzfläche (m²)', wohnungen: 'Wohnungen',
+  gf_bestand: 'Geschossfläche heute', gf_zulaessig: 'Geschossfläche zulässig', reserve_gf: 'Reserve Geschossfläche',
+  reserve_quote: 'Reserve in %', bebaubar_m2: 'Bebaubar (m²)', hnf_bestand: 'HNF heute', hnf_neu: 'HNF neu',
+  hnf_delta: 'HNF Zuwachs', hnf_faktor: 'HNF-Faktor', hnf_schaetzung: 'HNF-Schätzung',
+  erloes_chf: 'Erlös (CHF)', investition_chf: 'Investition (CHF)', marge_chf: 'Marge (CHF)', marge_quote: 'Marge in %',
+  potenzial_score: 'Potenzial', deal_score: 'Deal-Bewertung', score_tier: 'Stufe', score_reasons: 'Gründe',
+  score_killers: 'Ausschlussgründe', ai_score: 'KI-Bewertung', ai_summary: 'KI-Zusammenfassung',
+  ai_recommendation: 'KI-Empfehlung', ai_priority: 'KI-Priorität', ausgeschlossen: 'Ausgeschlossen',
+  ausschluss_grund: 'Ausschlussgrund', denkmalschutz: 'Denkmalschutz', denkmalschutz_titel: 'Denkmalschutz, Titel',
+  isos: 'ISOS', isos_titel: 'ISOS, Titel', az_quelle: 'Quelle Ausnützung', kategorie: 'Kategorie', status: 'Status',
+  acquisition_status: 'Akquise-Status', notes: 'Notizen', created_at: 'Erfasst am', updated_at: 'Geändert am',
+  gis_url: 'GIS-Link', google_maps_url: 'Google Maps', streetview_url: 'Street View', housing_stat_url: 'Gebäuderegister-Link',
+  pipedrive_deal_id: 'Pipedrive-Deal', contact_attempts: 'Kontaktversuche', last_contact_at: 'Letzter Kontakt',
+  follow_up_at: 'Nachfassen am', data_quality: 'Datenqualität', source_file: 'Quelldatei', imported_at: 'Importiert am',
+};
+function beschriften(k: string) {
+  if (BESCHRIFTUNG[k]) return BESCHRIFTUNG[k];
+  // Unbekannte Spalten: Umlaute zurück, ausser in Wörtern wie "Quelle" oder "neue".
+  const t = k.replace(/_/g, ' ').replace(/(?<![qQ]|ne|tu)ue/g, 'ü').replace(/ae/g, 'ä').replace(/oe/g, 'ö');
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
 /** Alle gefüllten Spalten der Parzelle; leere und Umrisse bleiben weg. */
 function AlleFelder({ z }: { z: Record<string, unknown> }) {
   const zeilen = Object.entries(z).filter(([k, v]) =>
@@ -107,7 +142,7 @@ function AlleFelder({ z }: { z: Record<string, unknown> }) {
       <dl className="f">
         {zeilen.map(([k, v]) => (
           <div key={k} style={{ display: 'contents' }}>
-            <dt>{k.replace(/_/g, ' ')}</dt>
+            <dt>{beschriften(k)}</dt>
             <dd>{typeof v === 'object' ? JSON.stringify(v) : String(v)}</dd>
           </div>
         ))}
