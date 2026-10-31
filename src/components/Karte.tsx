@@ -98,7 +98,7 @@ type Auswahl =
 
 interface Treffer { label: string; origin: string; lat: number; lon: number }
 
-export function Karte() {
+export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
   const { current: kanton } = useCanton();
   const box = useRef<HTMLDivElement | null>(null);
   const karte = useRef<L.Map | null>(null);
@@ -278,6 +278,7 @@ export function Karte() {
     <div className="gisk">
       <style>{STIL}</style>
       <header>
+        {onSchliessen && <button type="button" className="btn ghost" onClick={onSchliessen}>← Aurora</button>}
         <div className="logo"><b>GIS Parzellenkarte</b><span>Swisstopo Kataster · Amtliche Vermessung</span></div>
         <div className="tools">
           <input type="search" value={suche} onChange={e => setSuche(e.target.value)}
@@ -448,7 +449,7 @@ const STIL = `
 .gisk{--paper:#FAFAF8;--surface:#FFFFFF;--surface-2:#F3F4F2;--ink:#14181A;--ink-2:#56605F;--line:#DCE1DF;
   --accent:#27605A;--accent-soft:#EBF2F0;--warn:#8A6512;--ok:#2C6640;--no:#8C3030;
   --display:"Schibsted Grotesk","Helvetica Neue",Arial,sans-serif;--mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
-  display:grid;grid-template-rows:auto minmax(0,1fr);height:calc(100vh - 140px);min-height:560px;
+  display:grid;grid-template-rows:auto minmax(0,1fr);position:fixed;inset:0;z-index:50;height:100dvh;
   background:var(--paper);color:var(--ink);font:15px/1.55 var(--display);-webkit-font-smoothing:antialiased;
   border:1px solid var(--line);border-radius:6px;overflow:hidden}
 .gisk *{box-sizing:border-box}
@@ -463,7 +464,7 @@ const STIL = `
 .gisk .btn.ghost{background:none;color:var(--ink);border-color:var(--line)}
 .gisk .btn.ghost:hover{border-color:var(--accent);color:var(--accent)}
 .gisk .wrap{display:grid;grid-template-columns:minmax(0,1fr) 352px;min-height:0}
-@media (max-width:900px){.gisk{height:auto}.gisk .wrap{grid-template-columns:minmax(0,1fr);grid-template-rows:62vh auto}}
+@media (max-width:900px){.gisk{overflow:auto}.gisk .wrap{grid-template-columns:minmax(0,1fr);grid-template-rows:62vh auto}}
 .gisk .map{height:100%;width:100%;background:var(--surface-2)}
 .gisk aside{border-left:1px solid var(--line);background:var(--surface);overflow-y:auto;min-width:0}
 @media (max-width:900px){.gisk aside{border-left:0;border-top:1px solid var(--line)}}

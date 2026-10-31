@@ -180,7 +180,7 @@ export default function Index() {
             {active === 'dashboard' && <Dashboard />}
             {active === 'master' && <MasterList />}
             {active === 'nummern' && <Nummern />}
-            {active === 'karte' && <Karte />}
+            {active === 'karte' && <Karte onSchliessen={() => setActive('uebersicht')} />}
             {active === 'nachbarschaft' && <Nachbarschaft />}
             {active === 'pipedrive' && <PipedriveBereit />}
             {active === 'masterimport' && <MasterImport />}
