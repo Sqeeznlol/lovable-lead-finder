@@ -30,6 +30,7 @@ on:
           - kette        # Wo die abgefragten Objekte gerade stehen
           - eigentuemer  # Jede eingetragene Auskunft, zum Nachpruefen
           - instanzen    # Zeigen Seite und Datenbank auf dasselbe Projekt?
+          - regeln       # Wer darf was -- die Zugriffsregeln der Tabellen
       egrid:
         description: 'Nur für "objekt": die EGRID, z.B. CH707709971116'
         required: false
@@ -208,6 +209,36 @@ jobs:
               from properties
               where coalesce(owner_name,'') <> ''
               order by eigentuemer_fetched_at desc nulls last;"
+
+          elif [ "${{ inputs.frage }}" = "regeln" ]; then
+            # Am 31. Oktober stellte sich heraus: zugang_beschraenken
+            # war eingespielt, und trotzdem las der oeffentliche
+            # Schluessel alle 259'057 Objekte. Die alten anon-Regeln
+            # von 20260414152532 hatte nie jemand entfernt -- die
+            # Anmeldung davor war eine Tuer ohne Wand.
+            #
+            # Wer das wissen will, muss die Datenbank fragen, nicht die
+            # Migrationen lesen. Hier steht, was wirklich gilt.
+            frage "Was anon darf" "
+              select c.relname                       as tabelle,
+                     p.polcmd                        as befehl,
+                     p.polname                       as regel
+              from pg_policy p
+              join pg_class c on c.oid = p.polrelid
+              join pg_namespace n on n.oid = c.relnamespace
+              where n.nspname = 'public'
+                and 'anon' = any (
+                      select r.rolname from pg_roles r
+                      where r.oid = any (p.polroles))
+              order by 1, 2;"
+
+            frage "Tabellen ohne eingeschalteten Zeilenschutz" "
+              select c.relname as tabelle
+              from pg_class c
+              join pg_namespace n on n.oid = c.relnamespace
+              where n.nspname = 'public' and c.relkind = 'r'
+                and not c.relrowsecurity
+              order by 1;"
 
           elif [ "${{ inputs.frage }}" = "zonen-tg" ]; then
             # Eine Parzelle kann zur Hälfte Wohnzone und zur Hälfte Wald

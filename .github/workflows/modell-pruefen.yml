@@ -87,7 +87,8 @@ jobs:
         run: |
           set -euo pipefail
           for f in supabase/migrations/20261031180000_plattform_fundament.sql \
-                   supabase/migrations/20261031190000_eigentuemer_uebernehmen.sql; do
+                   supabase/migrations/20261031190000_eigentuemer_uebernehmen.sql \
+                   supabase/migrations/20261031200000_nachbarschaft_rechnen.sql; do
             echo "--- $f"
             $PSQL -f "$f" > /dev/null
           done

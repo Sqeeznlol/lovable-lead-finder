@@ -130,18 +130,38 @@ begin
                                         2690100 1250000))', 2056))
   where address = 'Haldenweg 3';
 
+  -- Eine dritte Parzelle, die *nicht* angrenzt: sonst wuerde der
+  -- Test auch dann gruen, wenn die Funktion schlicht alles paart.
+  update public.properties set geometrie =
+    ST_Multi(ST_GeomFromText('POLYGON((2695000 1255000, 2695100 1255000,
+                                        2695100 1255100, 2695000 1255100,
+                                        2695000 1255000))', 2056))
+  where address = 'Seeweg 4';
+
   -- Genau das ist die Frage, an der Arrondierung und
   -- Baugesuch-Meldung haengen: grenzt a an b?
-  insert into public.nachbarschaft (parzelle_id, nachbar_id, grenzlaenge_m, distanz_m)
-  select a.id, b.id, ST_Length(ST_Intersection(a.geometrie, b.geometrie)), 0
-  from public.properties a, public.properties b
-  where a.id <> b.id and a.geometrie is not null and b.geometrie is not null
-    and ST_Touches(a.geometrie, b.geometrie);
+  perform public.nachbarschaft_rechnen();
 
   select count(*) into n from public.nachbarschaft;
-  if n <> 2 then raise exception 'Nachbarschaft: % Zeilen statt 2', n; end if;
+  if n <> 2 then raise exception 'Nachbarschaft: % Zeilen statt 2 (beide Richtungen)', n; end if;
   if (select grenzlaenge_m from public.nachbarschaft limit 1) <> 100
     then raise exception 'Gemeinsame Grenze falsch berechnet'; end if;
 
-  raise notice 'Geometrie: Nachbarschaft erkannt, Grenze 100 m.';
+  -- Die entfernte Parzelle darf keinen Nachbarn haben.
+  select count(*) into n from public.nachbarschaft nb
+  join public.properties p on p.id = nb.parzelle_id
+  where p.address = 'Seeweg 4';
+  if n <> 0 then raise exception 'Entfernte Parzelle hat % Nachbarn', n; end if;
+
+  -- Wiederholbar: ein zweiter Lauf darf nicht verdoppeln.
+  perform public.nachbarschaft_rechnen();
+  select count(*) into n from public.nachbarschaft;
+  if n <> 2 then raise exception 'Nach dem zweiten Lauf % Zeilen statt 2', n; end if;
+
+  -- Und die Sicht, die die Oberflaeche benutzen wird.
+  select count(*) into n from public.nachbarn
+  where nachbar_adresse = 'Haldenweg 3';
+  if n <> 1 then raise exception 'Sicht nachbarn: % Treffer statt 1', n; end if;
+
+  raise notice 'Geometrie: Nachbarschaft gerechnet, Grenze 100 m, Ferne ohne Nachbarn.';
 end $$;

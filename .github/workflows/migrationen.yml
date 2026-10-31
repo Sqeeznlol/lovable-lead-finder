@@ -33,6 +33,10 @@ on:
         description: 'Nur für "grundlage": Dateien bis zu diesem Namen'
         required: false
         default: ''
+      nur:
+        description: 'Nur Migrationen, deren Name diesen Text enthält (leer = alle offenen)'
+        required: false
+        default: ''
 
 jobs:
   migrieren:
@@ -98,6 +102,16 @@ jobs:
 
             if [ "${{ inputs.schritt }}" != "einspielen" ]; then
               echo "| $name | offen |" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            # "Alle offenen einspielen" ist ein grober Hebel: es liegen
+            # Migrationen herum, die Daten verändern und mit der
+            # gerade anstehenden Arbeit nichts zu tun haben. Mit "nur"
+            # lässt sich eine einzelne herausgreifen, statt alles
+            # mitzunehmen, was sich angesammelt hat.
+            if [ -n "${{ inputs.nur }}" ] && case "$name" in *"${{ inputs.nur }}"*) false;; *) true;; esac; then
+              echo "| $name | offen (nicht gewählt) |" >> "$GITHUB_STEP_SUMMARY"
               continue
             fi
 
