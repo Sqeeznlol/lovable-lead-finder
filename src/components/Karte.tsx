@@ -116,6 +116,12 @@ function AlleFelder({ z }: { z: Record<string, unknown> }) {
   );
 }
 
+const STUFEN: [number, string, string][] = [
+  [1_000_000, '#15803D', 'über 1 Mio.'], [500_000, '#65A30D', '0,5–1 Mio.'],
+  [100_000, '#CA8A04', '0,1–0,5 Mio.'], [1, '#EA580C', 'bis 0,1 Mio.'], [-Infinity, '#1E3A8A', 'ohne Marge'],
+];
+function margeFarbe(m: number) { return (STUFEN.find(([ab]) => m >= ab) ?? STUFEN[4])[1]; }
+
 type Auswahl =
   | { art: 'leer' }
   | { art: 'eigen'; id: string; e: ParzelleEigenschaften; lat: number; lon: number;
@@ -195,18 +201,25 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
     eigenEbene.current = null;
     if (!data || !genugNah || !bestandAn) return;
     eigenEbene.current = L.geoJSON(data, {
+      // Farbe nach Marge in Stufen, wie bei Regrid/LandGlide: man sieht
+      // die guten Parzellen, bevor man klickt. Legende unten links.
       style: f => {
         const e = (f?.properties ?? {}) as ParzelleEigenschaften;
-        if (e.ausgeschlossen) return { color: '#56605F', weight: 1, fillOpacity: 0.04 };
-        const stark = (Number(e.marge) || 0) > 500_000;
-        return {
-          color: stark ? '#2C6640' : '#27605A',
-          weight: stark ? 2.5 : 1.5,
-          fillColor: stark ? '#2C6640' : '#27605A',
-          fillOpacity: stark ? 0.28 : 0.12,
-        };
+        if (e.ausgeschlossen) return { color: '#64748B', weight: 1, fillOpacity: 0.04 };
+        const c = margeFarbe(Number(e.marge) || 0);
+        return { color: c, weight: 2, fillColor: c, fillOpacity: 0.32 };
       },
       onEachFeature: (f, schicht) => {
+        const e = (f.properties ?? {}) as ParzelleEigenschaften;
+        // Beim Überfahren schon das Wichtigste, ohne zu klicken.
+        schicht.bindTooltip(
+          `<b>${e.parzelle ? 'Parzelle ' + e.parzelle : 'Parzelle'}</b>`
+          + (e.adresse ? `<br>${String(e.adresse)}` : '')
+          + (e.zone ? `<br>${String(e.zone)}` : '')
+          + (Number(e.marge) > 0 ? `<br>Marge ${gr(Number(e.marge))} CHF` : ''),
+          { sticky: true, direction: 'top', className: 'gisk-tip' });
+        schicht.on('mouseover', () => (schicht as L.Path).setStyle({ weight: 4, fillOpacity: 0.5 }));
+        schicht.on('mouseout', () => eigenEbene.current?.resetStyle(schicht as L.Path));
         schicht.on('click', (ev: L.LeafletMouseEvent) => {
           L.DomEvent.stopPropagation(ev);
           eigeneZeigen(String(f.id), f.properties as ParzelleEigenschaften,
@@ -351,6 +364,12 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
       <div className="wrap">
         <div style={{ position: 'relative', minHeight: 0 }}>
           <div ref={box} className="map" />
+          {bestandAn && genugNah && (
+            <div className="legende">
+              <b>Marge</b>
+              {STUFEN.map(([, c, t]) => <span key={t}><i style={{ background: c }} />{t}</span>)}
+            </div>
+          )}
           <div className="readout">
             LV95 {gr(lvMitte.E)} / {gr(lvMitte.N)}  ·  WGS84 {mitte.lat.toFixed(5)}, {mitte.lng.toFixed(5)}  ·  Zoom {zoom}
             {!genugNah && bestandAn ? '  ·  näher heran für den Bestand' : ''}
@@ -545,6 +564,9 @@ const STIL = `
 .gisk .leaflet-container{font:inherit}
 .gisk .nachbarn{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
 
+.gisk .legende{position:absolute;z-index:500;left:14px;bottom:56px;background:#fff;border-radius:10px;box-shadow:0 4px 14px rgba(15,23,42,.12);padding:8px 12px;font-size:12px;display:flex;flex-direction:column;gap:3px}
+.gisk .legende i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:7px;vertical-align:-2px}
+.gisk-tip{font:13px/1.4 Inter,Arial,sans-serif;border-radius:8px;border:0;box-shadow:0 4px 14px rgba(15,23,42,.18);padding:7px 10px}
 /* Karte zuerst, wie bei Immobilienplattformen (popety.io u. a.): die
    Karte füllt alles, Suche und Angaben schweben als Karten darüber. */
 .gisk{--paper:#F6F7F9;--surface:#FFFFFF;--surface-2:#F1F3F6;--ink:#0F172A;--ink-2:#64748B;--line:#E2E8F0;
