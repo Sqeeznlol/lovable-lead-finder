@@ -36,10 +36,14 @@
 -- =====================================================================
 
 /** Wie viele Zeilen `anon` auf einmal löschen darf. */
+-- Ausdrücklich *ohne* `security definer`: damit wäre `current_user`
+-- innerhalb des Auslösers der Eigentümer der Funktion und niemals
+-- `anon` -- die Prüfung unten liefe immer ins Leere. Der erste
+-- Probelauf hat genau das gezeigt: die Sicherung stand da und tat
+-- nichts.
 create or replace function public.keine_massenloeschung()
 returns trigger
 language plpgsql
-security definer
 set search_path to 'public'
 as $$
 declare
@@ -79,3 +83,7 @@ create trigger phone_numbers_keine_massenloeschung
   referencing old table as geloescht
   for each statement
   execute function public.keine_massenloeschung();
+
+-- Der Auslöser läuft in der Rolle des Aufrufers; sie braucht deshalb
+-- das Recht, die Funktion auszuführen.
+grant execute on function public.keine_massenloeschung() to anon, authenticated;
