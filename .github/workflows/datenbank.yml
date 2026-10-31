@@ -40,6 +40,7 @@ on:
           - thema            # Katalogeintrag eines Themas (Adressen)
           - download         # Lässt sich der Datensatz herunterladen?
           - tempo             # Laufzeit der Abfragen der Masterliste
+          - nachbarn          # Geht die Abfrage des Browsers? (ohne Inhalte)
       grenze:
         description: 'Obergrenze für Durchläufe beim Nachrechnen'
         required: false
@@ -132,6 +133,67 @@ jobs:
                 | python3 -m json.tool >> "$GITHUB_STEP_SUMMARY"
               echo '```' >> "$GITHUB_STEP_SUMMARY"
               cat "$GITHUB_STEP_SUMMARY"
+              ;;
+
+            nachbarn)
+              # Derselbe Weg wie in src/hooks/use-nachbarn.ts, mit
+              # demselben oeffentlichen Schluessel, den der Browser
+              # benutzt. Zwei Dinge lassen sich nur so pruefen und
+              # nicht aus dem Quelltext ableiten:
+              #
+              #   1. Heisst der Fremdschluessel wirklich
+              #      nachbarschaft_nachbar_id_fkey? Der Name folgt
+              #      einer Gewohnheit von PostgreSQL, nicht einer
+              #      Zusage -- stimmt er nicht, bleibt die Liste im
+              #      Objektfenster leer, ohne dass es jemand merkt.
+              #
+              #   2. Darf anon die Tabelle ueberhaupt lesen? Eine
+              #      Zeilenregel ohne GRANT nuetzt nichts, und ob
+              #      Supabase das Recht an neue Tabellen vergibt,
+              #      steht nirgends im Repository.
+              #
+              # Abgefragt werden nur Kennungen und Masse. Adressen und
+              # Eigentuemer sind Personendaten und gehoeren nicht in
+              # ein Ablaufprotokoll -- fuer diese Frage braucht es sie
+              # auch nicht.
+              pfad="nachbarschaft?select=grenzlaenge_m,nachbar:properties!nachbarschaft_nachbar_id_fkey(id,area)&limit=3"
+              status=$(curl -sS -o /tmp/nachbarn.json -w '%{http_code}' \
+                "$URL/rest/v1/$pfad" \
+                -H "apikey: $KEY" -H "Authorization: Bearer $KEY")
+
+              echo "### Die Abfrage des Browsers" >> "$GITHUB_STEP_SUMMARY"
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
+              echo "HTTP $status" >> "$GITHUB_STEP_SUMMARY"
+              if [ "${status:0:1}" = "2" ]; then
+                # Nur die Form, nie die Werte.
+                jq -r '"Zeilen: \(length)"' /tmp/nachbarn.json \
+                  >> "$GITHUB_STEP_SUMMARY"
+                jq -r 'if length > 0 then "Felder: \(.[0] | keys | join(", "))" else "keine Zeilen" end' \
+                  /tmp/nachbarn.json >> "$GITHUB_STEP_SUMMARY"
+                jq -r 'if length > 0 and (.[0].nachbar | type) == "object" then "Verknuepfung traegt: ja, Felder \(.[0].nachbar | keys | join(", "))" else "Verknuepfung traegt: nein" end' \
+                  /tmp/nachbarn.json >> "$GITHUB_STEP_SUMMARY"
+              else
+                # Ein PostgREST-Fehler nennt die Ursache und enthaelt
+                # keine Personendaten.
+                head -c 400 /tmp/nachbarn.json >> "$GITHUB_STEP_SUMMARY"
+                echo >> "$GITHUB_STEP_SUMMARY"
+              fi
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+              echo "### Wie viele Paare insgesamt" >> "$GITHUB_STEP_SUMMARY"
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
+              curl -sS -o /dev/null -D - \
+                "$URL/rest/v1/nachbarschaft?select=parzelle_id" \
+                -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+                -H "Prefer: count=planned" -H "Range: 0-0" \
+                | grep -i 'content-range' >> "$GITHUB_STEP_SUMMARY" || true
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+              cat "$GITHUB_STEP_SUMMARY"
+              case "$status" in
+                2*) echo "Die Abfrage des Browsers geht." ;;
+                *)  echo "Die Abfrage des Browsers scheitert." >&2; exit 1 ;;
+              esac
               ;;
 
             diagnose)
