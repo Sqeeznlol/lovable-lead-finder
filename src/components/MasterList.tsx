@@ -8,6 +8,7 @@ import { useCanton } from '@/hooks/use-canton';
 import { MasterFiltersBar } from './MasterFilters';
 import { GemeindeSidebar } from './GemeindeSidebar';
 import { PropertyDetailDialog } from './PropertyDetailDialog';
+import { Gesamtliste } from './Gesamtliste';
 import { beurteile, EMPFEHLUNG_LABEL, type Empfehlung } from '@/lib/akquise';
 import { LAGE_LABEL } from '@/lib/gemeinden-zh';
 import { FENSTER } from '@/lib/fenster';
@@ -102,6 +103,9 @@ export function MasterList() {
                   (filters.ausgeschlossen === 'alle' ? ' · inklusive ausgeschlossener' : '')}
             </p>
           </div>
+          {/* Der ganze Bestand als eine Datei -- beide Kantone, ohne
+              Filter. Steht hier, weil hier die Liste ist. */}
+          <Gesamtliste />
         </div>
 
         {filterOffen && <MasterFiltersBar filters={filters} onChange={setFilters} />}
