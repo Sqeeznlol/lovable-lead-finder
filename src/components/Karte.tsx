@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useParzellenImAusschnitt, type Ausschnitt, type ParzelleEigenschaften } from '@/hooks/use-karte';
-import { useCanton } from '@/hooks/use-canton';
 import { Nachbarn } from '@/components/Nachbarn';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -42,13 +41,9 @@ const GRUNDKARTEN: Record<Grund, () => L.TileLayer[]> = {
 /** Erst ab hier werden eigene Umrisse geholt -- darunter sind sie Pixel. */
 const AB_ZOOM = 15;
 
-const MITTEN: Record<string, [number, number]> = {
-  TG: [47.6950, 8.7490],   // Diessenhofen -- dort liegen Umrisse
-  ZH: [47.3769, 8.5417],
-  ZG: [47.1715, 8.5150],
-  AG: [47.3925, 8.0444],
-  LU: [47.0502, 8.3093],
-};
+// Die Karte zeigt den ganzen Bestand, nicht einen Kanton: sie startet
+// deshalb über der ganzen Schweiz und hängt nicht an der Kantonswahl.
+const SCHWEIZ: [number, number] = [46.82, 8.23];
 
 /** WGS84 nach LV95, Näherungsformeln swisstopo (aus der Vorlage). */
 function toLV95(lat: number, lon: number) {
@@ -99,7 +94,6 @@ type Auswahl =
 interface Treffer { label: string; origin: string; lat: number; lon: number }
 
 export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
-  const { current: kanton } = useCanton();
   const box = useRef<HTMLDivElement | null>(null);
   const karte = useRef<L.Map | null>(null);
   const grundLagen = useRef<L.TileLayer[]>([]);
@@ -132,7 +126,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
   useEffect(() => {
     if (!box.current || karte.current) return;
     const m = L.map(box.current, {
-      center: MITTEN[kanton] ?? MITTEN.TG, zoom: 17, maxZoom: 21,
+      center: SCHWEIZ, zoom: 8, maxZoom: 21,
       zoomControl: true, preferCanvas: true,
     });
     L.control.scale({ imperial: false, position: 'bottomright' }).addTo(m);
@@ -149,7 +143,6 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
     merken();
     karte.current = m;
     return () => { m.remove(); karte.current = null; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -161,9 +154,6 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
     eigenEbene.current?.bringToFront();
   }, [grund]);
 
-  useEffect(() => {
-    karte.current?.setView(MITTEN[kanton] ?? MITTEN.TG, 17);
-  }, [kanton]);
 
   // ---------------------------------------------- eigene Umrisse
   useEffect(() => {
