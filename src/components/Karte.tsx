@@ -29,11 +29,23 @@ function lay(id: string, ext: string, max = 19) {
     attribution: '&copy; swisstopo und Kantone', crossOrigin: true,
   });
 }
+// Der Kataster kommt als WMS, nicht als WMTS-Kachel: die Kacheln des
+// Katasters sind in Web-Mercator umgerechnet und versetzen sich an den
+// Kachelrändern um einige Pixel -- Linien und Nummern brechen dort.
+// Ein WMS-Bild wird für genau den Ausschnitt gerechnet und passt.
+// Unter Zoom 14 malt der Kataster ganze Gemeinden grün; dort zeigt die
+// Landeskarte mehr, deshalb setzt er erst darüber ein.
+function wms(id: string, minZoom = 14) {
+  return L.tileLayer.wms('https://wms.geo.admin.ch/', {
+    layers: id, format: 'image/png', transparent: true, tileSize: 512,
+    minZoom, maxZoom: 21, attribution: '&copy; swisstopo und Kantone',
+  });
+}
 type Grund = 'kataster' | 'luftbild' | 'karte' | 'grau';
 const GRUNDKARTEN: Record<Grund, () => L.TileLayer[]> = {
-  kataster: () => [lay('ch.kantone.cadastralwebmap-farbe', 'png', 19)],
+  kataster: () => [lay('ch.swisstopo.pixelkarte-farbe', 'jpeg', 19), wms('ch.kantone.cadastralwebmap-farbe')],
   luftbild: () => [lay('ch.swisstopo.swissimage', 'jpeg', 20),
-                   lay('ch.swisstopo-vd.amtliche-vermessung', 'png', 19)],
+                   wms('ch.swisstopo-vd.amtliche-vermessung')],
   karte:    () => [lay('ch.swisstopo.pixelkarte-farbe', 'jpeg', 19)],
   grau:     () => [lay('ch.swisstopo.pixelkarte-grau', 'jpeg', 19)],
 };
@@ -84,10 +96,30 @@ function Kopieren({ wert, text }: { wert: string; text?: string }) {
   );
 }
 
+/** Alle gefüllten Spalten der Parzelle; leere und Umrisse bleiben weg. */
+function AlleFelder({ z }: { z: Record<string, unknown> }) {
+  const zeilen = Object.entries(z).filter(([k, v]) =>
+    v !== null && v !== '' && !/geom|umriss|^id$/i.test(k)
+    && !(Array.isArray(v) && v.length === 0));
+  return (
+    <details className="alle" open>
+      <summary>Alle Angaben ({zeilen.length})</summary>
+      <dl className="f">
+        {zeilen.map(([k, v]) => (
+          <div key={k} style={{ display: 'contents' }}>
+            <dt>{k.replace(/_/g, ' ')}</dt>
+            <dd>{typeof v === 'object' ? JSON.stringify(v) : String(v)}</dd>
+          </div>
+        ))}
+      </dl>
+    </details>
+  );
+}
+
 type Auswahl =
   | { art: 'leer' }
   | { art: 'eigen'; id: string; e: ParzelleEigenschaften; lat: number; lon: number;
-      eigentuemer?: string | null; geholt: boolean }
+      eigentuemer?: string | null; geholt: boolean; zeile?: Record<string, unknown> | null }
   | { art: 'bund'; lat: number; lon: number; laeuft: boolean; fehler?: boolean;
       treffer: { titel: string; adresse: string; info: string; egid?: string }[] };
 
@@ -188,15 +220,44 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
     setAuswahl({ art: 'eigen', id, e, lat, lon, geholt: false });
     // Der Eigentümer steht in properties und wird erst hier geholt;
     // die Kartenfunktion selbst trägt keine Personendaten.
+    // Alle Spalten: wer anklickt, will sehen, was wir wissen -- nicht
+    // eine Auswahl davon.
     const { data: p } = await supabase.from('properties')
-      .select('owner_name').eq('id', id).maybeSingle();
+      .select('*').eq('id', id).maybeSingle();
+    const z = p as Record<string, unknown> | null;
     setAuswahl(a => (a.art === 'eigen' && a.id === id
-      ? { ...a, eigentuemer: p?.owner_name ?? null, geholt: true } : a));
+      ? { ...a, eigentuemer: (z?.owner_name as string) ?? null, zeile: z, geholt: true } : a));
   }
 
   async function bundAbfragen(lat: number, lon: number) {
     const lv = toLV95(lat, lon);
     setAuswahl({ art: 'bund', lat, lon, laeuft: true, treffer: [] });
+    // Erst fragen, welche Parzelle hier liegt, und sie per EGRID im
+    // eigenen Bestand suchen -- auch dort, wo noch kein Umriss geladen ist.
+    try {
+      const k = 'https://api3.geo.admin.ch/rest/services/all/MapServer/identify?geometryType=esriGeometryPoint'
+        + `&geometry=${lv.E},${lv.N}&sr=2056&tolerance=0&returnGeometry=false`
+        + '&layers=all:ch.kantone.cadastralwebmap-farbe'
+        + `&mapExtent=${lv.E - 300},${lv.N - 300},${lv.E + 300},${lv.N + 300}&imageDisplay=600,600,96&lang=de`;
+      const kj = await (await fetch(k)).json();
+      // Den Attributnamen kenne ich nicht sicher; die EGRID erkennt man
+      // an ihrer Form, also wird nach der Form gesucht.
+      const egrid = (kj?.results ?? []).flatMap((x: { attributes?: Record<string, unknown> }) =>
+        Object.values(x.attributes ?? {})).map(String).find((v: string) => /^CH[0-9A-Z]{12}$/.test(v));
+      if (egrid) {
+        const { data: p } = await supabase.from('properties').select('*').eq('egrid', egrid).maybeSingle();
+        const z = p as Record<string, unknown> | null;
+        if (z) {
+          setAuswahl({
+            art: 'eigen', id: String(z.id), lat, lon, geholt: true, zeile: z,
+            eigentuemer: (z.owner_name as string) ?? null,
+            e: { parzelle: z.plot_number, adresse: z.address, gemeinde: z.gemeinde ?? z.municipality,
+                 zone: z.zone, flaeche: z.area, marge: z.marge } as unknown as ParzelleEigenschaften,
+          });
+          return;
+        }
+      }
+    } catch { /* weiter mit dem Bundesregister */ }
     const ebenen = 'ch.bfs.gebaeude_wohnungs_register,ch.swisstopo.amtliches-strassenverzeichnis';
     const url = 'https://api3.geo.admin.ch/rest/services/all/MapServer/identify?geometryType=esriGeometryPoint'
       + `&geometry=${lv.E},${lv.N}&sr=2056&tolerance=12&layers=all:${ebenen}`
@@ -332,6 +393,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
                       : auswahl.eigentuemer ?? <span className="hint">noch nicht abgefragt</span>}</dd>
                     <dt>LV95</dt><dd className="hint">{gr(lv.E)} / {gr(lv.N)}</dd>
                   </dl>
+                  {auswahl.zeile && <AlleFelder z={auswahl.zeile} />}
                   <div className="btnrow">
                     <a className="btn ghost" href={geoadminLink(auswahl.lat, auswahl.lon, 12)}
                        target="_blank" rel="noopener">Im Bundes-GIS prüfen</a>
@@ -455,6 +517,8 @@ const STIL = `
 .gisk .btn.ghost:hover{border-color:var(--accent);color:var(--accent)}
 .gisk .wrap{display:grid;grid-template-columns:minmax(0,1fr) 352px;min-height:0}
 @media (max-width:900px){.gisk{overflow:auto}.gisk .wrap{grid-template-columns:minmax(0,1fr);grid-template-rows:62vh auto}}
+.gisk .alle{margin-top:14px}.gisk .alle summary{cursor:pointer;font:600 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.gisk .alle dd{word-break:break-word}
 .gisk .map{height:100%;width:100%;background:var(--surface-2)}
 .gisk aside{border-left:1px solid var(--line);background:var(--surface);overflow-y:auto;min-width:0}
 @media (max-width:900px){.gisk aside{border-left:0;border-top:1px solid var(--line)}}
