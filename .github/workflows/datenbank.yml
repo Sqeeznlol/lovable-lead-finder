@@ -170,7 +170,13 @@ jobs:
                   >> "$GITHUB_STEP_SUMMARY"
                 jq -r 'if length > 0 then "Felder: \(.[0] | keys | join(", "))" else "keine Zeilen" end' \
                   /tmp/nachbarn.json >> "$GITHUB_STEP_SUMMARY"
-                jq -r 'if length > 0 and (.[0].nachbar | type) == "object" then "Verknuepfung traegt: ja, Felder \(.[0].nachbar | keys | join(", "))" else "Verknuepfung traegt: nein" end' \
+                # HTTP 200 ist hier schon die Antwort auf Frage 1:
+                # einen falschen Fremdschluessel-Hinweis weist
+                # PostgREST mit 400 ab ("Could not find a
+                # relationship"). Kommt 200, stimmt der Name.
+                echo "Beziehung aufgeloest: ja (sonst waere es 400)" \
+                  >> "$GITHUB_STEP_SUMMARY"
+                jq -r 'if length > 0 and (.[0].nachbar | type) == "object" then "Nachbar mitgeliefert: ja, Felder \(.[0].nachbar | keys | join(", "))" else "Nachbar mitgeliefert: noch keine Paare in der Tabelle" end' \
                   /tmp/nachbarn.json >> "$GITHUB_STEP_SUMMARY"
               else
                 # Ein PostgREST-Fehler nennt die Ursache und enthaelt
@@ -180,12 +186,16 @@ jobs:
               fi
               echo '```' >> "$GITHUB_STEP_SUMMARY"
 
+              # Genau zaehlen, nicht schaetzen. "count=planned" gab
+              # fuer die leere Tabelle 610 zurueck -- eine Zahl aus
+              # der Statistik des Planers, kein Bestand. Wer so etwas
+              # im Protokoll liest, glaubt, es seien Paare da.
               echo "### Wie viele Paare insgesamt" >> "$GITHUB_STEP_SUMMARY"
               echo '```' >> "$GITHUB_STEP_SUMMARY"
               curl -sS -o /dev/null -D - \
                 "$URL/rest/v1/nachbarschaft?select=parzelle_id" \
                 -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
-                -H "Prefer: count=planned" -H "Range: 0-0" \
+                -H "Prefer: count=exact" -H "Range: 0-0" \
                 | grep -i 'content-range' >> "$GITHUB_STEP_SUMMARY" || true
               echo '```' >> "$GITHUB_STEP_SUMMARY"
 
