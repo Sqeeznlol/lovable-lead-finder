@@ -12,10 +12,17 @@ import { supabase } from '@/integrations/supabase/client';
  * Festgehalten wird, was die Anwendung ohnehin tut, nicht jede
  * Mausbewegung. Und es wird nie gewartet: ein Protokoll, das die
  * Arbeit aufhält, wird abgeschaltet.
+ *
+ * Seit die Anmeldung weg ist, schreibt das hier nichts mehr: die Regel
+ * `aktivitaet_schreiben` lässt nur Angemeldete eintragen, und zwar nur
+ * unter ihrer eigenen Kennung (`user_id = auth.uid()`). Ohne Sitzung
+ * bricht die Funktion unten gleich ab. Die Einträge von früher bleiben
+ * lesbar, neue entstehen erst wieder, wenn entweder die Anmeldung
+ * zurückkommt oder diese Regel anonyme Einträge zulässt. "angemeldet"
+ * und "abgemeldet" sind als Aktionen entfallen -- es gibt sie nicht
+ * mehr.
  */
 export type Aktion =
-  | 'anmeldung'
-  | 'abmeldung'
   | 'abfrage'
   | 'eigentuemer'
   | 'archiviert'
@@ -28,6 +35,8 @@ export async function protokolliere(
   kanton?: string | null,
 ): Promise<void> {
   try {
+    // Ohne Sitzung gibt es keine Kennung, und ohne Kennung weist die
+    // Regel den Eintrag ab -- siehe oben.
     const { data } = await supabase.auth.getUser();
     const u = data?.user;
     if (!u) return;

@@ -4,8 +4,6 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider } from "@/hooks/use-auth";
-import { Torwaechter } from "@/components/Torwaechter";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { CantonProvider } from "@/hooks/use-canton";
 import { useEigentuemerLookupListener } from "@/hooks/use-eigentuemer-lookup";
@@ -34,14 +32,14 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
     <CantonProvider>
-    <AuthProvider>
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        {/* Die Liste enthält Adressen, Eigentümernamen und Nummern von
-            Menschen, die nie um ihre Aufnahme gebeten haben. Sie gehört
-            hinter eine Anmeldung. */}
-        <Torwaechter>
+        {/* Ohne Anmeldung: wer die Adresse kennt, ist drin. Was die
+            Liste hergibt, entscheiden damit allein die Regeln der
+            Datenbank -- in ihr stehen Adressen, Eigentuemernamen und
+            Nummern von Menschen, die nie um ihre Aufnahme gebeten
+            haben. */}
         <BrowserRouter>
           <GlobalListeners />
           <Suspense fallback={<div className="min-h-screen bg-background" />}>
@@ -53,9 +51,7 @@ const App = () => (
             </Routes>
           </Suspense>
         </BrowserRouter>
-        </Torwaechter>
       </TooltipProvider>
-    </AuthProvider>
     </CantonProvider>
     </ThemeProvider>
   </QueryClientProvider>

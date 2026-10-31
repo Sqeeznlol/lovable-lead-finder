@@ -25,12 +25,19 @@ Wer es lieber von Hand macht: der SQL-Block steht in
 **2. Offene Migrationen.** Drei liegen bereit und sind noch nicht
 angewendet:
 
-- `20260905230000_zugang_beschraenken.sql` -- die dringendste. Bisher
-  darf jeder mit dem öffentlichen Schlüssel alle 259'057 Datensätze
-  lesen, ändern und löschen, und dieser Schlüssel steckt im JavaScript
-  der Webseite. Die Anmeldemaske davor nützt nichts, solange die Regel
-  gilt. In der Tabelle stehen Namen, Adressen und Telefonnummern von
-  Menschen, die nie um ihre Aufnahme gebeten haben.
+- `20260905230000_zugang_beschraenken.sql` -- Vorsicht, die Lage hat
+  sich geändert. Bisher darf jeder mit dem öffentlichen Schlüssel alle
+  259'057 Datensätze lesen, ändern und löschen, und dieser Schlüssel
+  steckt im JavaScript der Webseite. In der Tabelle stehen Namen,
+  Adressen und Telefonnummern von Menschen, die nie um ihre Aufnahme
+  gebeten haben.
+
+  Diese Migration beschränkt den Zugriff auf Angemeldete. Seit die
+  Anmeldung aus der Anwendung entfernt ist, gibt es niemanden, der
+  angemeldet wäre: wer sie einspielt, sperrt damit die eigene Seite
+  aus -- leere Listen, jedes Speichern abgewiesen. Entweder bleibt die
+  Seite offen und die Migration liegen, oder die Anmeldung kommt
+  zurück. Eines von beiden, nicht keines.
 - `20260905130000_indizes_masterliste.sql` -- Indizes, siehe oben
 - `20260905200000_zonen_kuerzel.sql` -- schliesst Winterthurs Kürzel
   (Oe, Wa, Gw, F, G, I1, I2), das Bahnareal und die 3'092 Zeilen mit
@@ -41,11 +48,16 @@ dem öffentlichen Schlüssel auf die Objekte zugreifen, selbst eine
 Anmeldung -- Abgleich nach Pipedrive und Nachfüllen. Das ist in der
 Migration vermerkt und beim Einspielen gleich mitzurichten.
 
-**3. Konto anlegen.** In Supabase unter Authentication → Users:
-scamo@wohntraums.life mit einem neuen Passwort, Auto Confirm gesetzt.
-Bei der Anmeldung genügt "Scamo", die Maske ergänzt die Domain. Das im
-Gespräch genannte Passwort gilt als kompromittiert und darf nicht
-verwendet werden.
+**3. Konto anlegen -- entfällt.** Die Anwendung hat keine Anmeldung
+mehr. Weder der Torwächter vor der ganzen Seite noch die zweite Maske
+auf `/swipe` noch der Passwort-Riegel vor dem Admin-Bereich sind noch
+da; `src/lib/__tests__/keine-anmeldung.test.ts` hält das fest. Ein
+Konto in Supabase braucht die Seite damit nicht.
+
+Was damit auch wegfällt: das Protokoll (`aktivitaet`) schreibt nichts
+mehr, denn seine Regel lässt nur Angemeldete eintragen. Die alten
+Einträge bleiben lesbar. Und die Entscheide in der Vorauswahl tragen
+keinen Namen mehr -- `decided_by` und `user_id` bleiben leer.
 
 Solange sie fehlen, wirken die Zonenausschlüsse nur in der Übersicht
 (die im Browser rechnet), nicht in der Masterliste (die die Spalte

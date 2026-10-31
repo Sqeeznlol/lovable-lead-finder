@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { ThumbsUp, ThumbsDown, Clock, MapPin, Calendar, Home, Ruler, Layers, LogOut, RefreshCw } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, Clock, MapPin, Calendar, Home, Ruler, Layers, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -8,7 +8,6 @@ import { useListFilter } from '@/hooks/use-lists';
 import { useVorauswahlStats } from '@/hooks/use-vorauswahl-stats';
 import { useToast } from '@/hooks/use-toast';
 import { calculateDealScore, scoreColor, scoreBg } from '@/lib/deal-score';
-import { useAuth } from '@/hooks/use-auth';
 import { supabase } from '@/integrations/supabase/client';
 
 export function MobileSwipe() {
@@ -17,7 +16,6 @@ export function MobileSwipe() {
   const { data: stats, refetch: refetchStats } = useVorauswahlStats();
   const updateProp = useUpdateProperty();
   const { toast } = useToast();
-  const { user, signOut } = useAuth();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [processing, setProcessing] = useState(false);
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
@@ -69,13 +67,13 @@ export function MobileSwipe() {
         id: current.id,
         status: newStatus,
         review_status: newReview,
-        decided_by: user?.id,
+        decided_by: null,
         decided_at: new Date().toISOString(),
       });
 
       await supabase.from('property_decisions').insert({
         property_id: current.id,
-        user_id: user?.id,
+        user_id: null,
         user_decision: decision,
       });
 
@@ -91,7 +89,7 @@ export function MobileSwipe() {
     } finally {
       setProcessing(false);
     }
-  }, [current, processing, updateProp, user, moveToNext, toast]);
+  }, [current, processing, updateProp, moveToNext, toast]);
 
   // Touch handlers
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -161,9 +159,6 @@ export function MobileSwipe() {
             <span>✅{sessionStats.interessant}</span>
             <span>❌{sessionStats.nein}</span>
           </div>
-          <Button size="sm" variant="ghost" onClick={signOut} className="h-7 w-7 p-0">
-            <LogOut className="h-3.5 w-3.5" />
-          </Button>
         </div>
       </header>
 

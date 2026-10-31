@@ -14,7 +14,6 @@ import { useUnqueriedProperties, useUpdateProperty, useZones, useGemeinden } fro
 import { useVorauswahlStats } from '@/hooks/use-vorauswahl-stats';
 import { VorauswahlStatsBar } from '@/components/VorauswahlStats';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/use-auth';
 import { supabase } from '@/integrations/supabase/client';
 import { scoreColor, scoreBg } from '@/lib/deal-score';
 import { useListFilter, useLists } from '@/hooks/use-lists';
@@ -73,7 +72,6 @@ export function Vorauswahl() {
   const { data: stats, refetch: refetchStats } = useVorauswahlStats();
   const updateProp = useUpdateProperty();
   const { toast } = useToast();
-  const { user } = useAuth();
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [processing, setProcessing] = useState(false);
@@ -137,19 +135,20 @@ export function Vorauswahl() {
   }, [currentIndex, items.length, refetch, refetchStats]);
 
   const logDecision = useCallback(async (propertyId: string, decision: string, prop: typeof current) => {
-    if (!user || !prop) return;
+    if (!prop) return;
+    // Ohne Anmeldung gehoert der Entscheid niemandem namentlich.
     await supabase.from('property_decisions').insert({
       property_id: propertyId,
-      user_id: user.id,
+      user_id: null,
       user_decision: decision,
     });
-  }, [user]);
+  }, []);
 
   const handleInteressant = useCallback(async () => {
     if (!current || processing) return;
     setProcessing(true);
     try {
-      await updateProp.mutateAsync({ id: current.id, status: 'Vorausgewählt', review_status: 'approved', decided_by: user?.id, decided_at: new Date().toISOString() });
+      await updateProp.mutateAsync({ id: current.id, status: 'Vorausgewählt', review_status: 'approved', decided_by: null, decided_at: new Date().toISOString() });
       await logDecision(current.id, 'interessant', current);
       setSessionStats(s => ({ ...s, interessant: s.interessant + 1 }));
       toast({ title: '👍 Vorausgewählt' });
@@ -159,13 +158,13 @@ export function Vorauswahl() {
     } finally {
       setProcessing(false);
     }
-  }, [current, processing, updateProp, moveToNext, toast, logDecision, user]);
+  }, [current, processing, updateProp, moveToNext, toast, logDecision]);
 
   const handleNichtInteressant = useCallback(async () => {
     if (!current || processing) return;
     setProcessing(true);
     try {
-      await updateProp.mutateAsync({ id: current.id, status: 'Nicht interessant', review_status: 'rejected', decided_by: user?.id, decided_at: new Date().toISOString() });
+      await updateProp.mutateAsync({ id: current.id, status: 'Nicht interessant', review_status: 'rejected', decided_by: null, decided_at: new Date().toISOString() });
       await logDecision(current.id, 'nicht_interessant', current);
       setSessionStats(s => ({ ...s, ausgeblendet: s.ausgeblendet + 1 }));
       toast({ title: '👎 Nicht interessant' });
@@ -175,7 +174,7 @@ export function Vorauswahl() {
     } finally {
       setProcessing(false);
     }
-  }, [current, processing, updateProp, moveToNext, toast, logDecision, user]);
+  }, [current, processing, updateProp, moveToNext, toast, logDecision]);
 
   const handleSkip = useCallback(() => {
     setSessionStats(s => ({ ...s, skipped: s.skipped + 1 }));
@@ -208,7 +207,7 @@ export function Vorauswahl() {
     for (const id of selectedIds) {
       const prop = items.find(p => p.id === id);
       try {
-        await updateProp.mutateAsync({ id, status, review_status: reviewStatus, decided_by: user?.id, decided_at: new Date().toISOString() });
+        await updateProp.mutateAsync({ id, status, review_status: reviewStatus, decided_by: null, decided_at: new Date().toISOString() });
         if (prop) await logDecision(id, decision, prop);
         count++;
       } catch { /* skip */ }
@@ -218,7 +217,7 @@ export function Vorauswahl() {
     refetch();
     refetchStats();
     setProcessing(false);
-  }, [selectedIds, items, updateProp, user, logDecision, toast, refetch, refetchStats]);
+  }, [selectedIds, items, updateProp, logDecision, toast, refetch, refetchStats]);
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
@@ -412,7 +411,7 @@ export function Vorauswahl() {
                       <TableCell>
                         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={async () => {
-                            await updateProp.mutateAsync({ id: p.id, status: 'Vorausgewählt', review_status: 'approved', decided_by: user?.id, decided_at: new Date().toISOString() });
+                            await updateProp.mutateAsync({ id: p.id, status: 'Vorausgewählt', review_status: 'approved', decided_by: null, decided_at: new Date().toISOString() });
                             await logDecision(p.id, 'interessant', { ...p, _score: s });
                             refetch(); refetchStats();
                             toast({ title: '👍 Vorausgewählt' });
@@ -420,7 +419,7 @@ export function Vorauswahl() {
                             <ThumbsUp className="h-3.5 w-3.5 text-emerald-500" />
                           </Button>
                           <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={async () => {
-                            await updateProp.mutateAsync({ id: p.id, status: 'Nicht interessant', review_status: 'rejected', decided_by: user?.id, decided_at: new Date().toISOString() });
+                            await updateProp.mutateAsync({ id: p.id, status: 'Nicht interessant', review_status: 'rejected', decided_by: null, decided_at: new Date().toISOString() });
                             await logDecision(p.id, 'nicht_interessant', { ...p, _score: s });
                             refetch(); refetchStats();
                             toast({ title: '👎 Nicht interessant' });

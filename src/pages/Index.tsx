@@ -17,7 +17,6 @@ const AdminSettings = lazy(() => import('@/components/AdminSettings').then(m => 
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CantonTabs } from '@/components/CantonTabs';
 import { KeyboardShortcutsOverlay } from '@/components/KeyboardShortcutsOverlay';
-import { AdminSchloss } from '@/components/AdminSchloss';
 import { Protokoll } from '@/components/Protokoll';
 import { Lesezeichen } from '@/components/Lesezeichen';
 import { ErweiterungHolen } from '@/components/ErweiterungHolen';
@@ -182,14 +181,12 @@ export default function Index() {
             {active === 'phones' && <PhoneManager />}
             {active === 'admin' && (
               <div className="space-y-6">
-                {/* Vor dem Passwort: das Lesezeichen ist kein
-                    Einstellungswert, sondern ein Werkzeug, das jeder
-                    einmal in seine Leiste zieht. Wer es holt, soll
-                    nicht erst den Admin-Zugang brauchen. */}
+                {/* Das Lesezeichen steht oben, weil es kein
+                    Einstellungswert ist, sondern ein Werkzeug, das
+                    jeder einmal in seine Leiste zieht. */}
                 <Lesezeichen />
                 <ErweiterungHolen />
 
-                <AdminSchloss>
                 <div className="space-y-6">
                 <AdminSettings />
                 <Protokoll />
@@ -229,7 +226,6 @@ export default function Index() {
                   </Button>
                 </div>
               </div>
-                </AdminSchloss>
               </div>
             )}
           </Suspense>

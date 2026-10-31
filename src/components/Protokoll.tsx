@@ -104,8 +104,9 @@ export function Protokoll() {
 
         {(tage.data || []).length === 0 ? (
           <p className="p-5 text-sm text-muted-foreground">
-            Noch nichts festgehalten. Die Einträge entstehen ab der nächsten
-            Anmeldung.
+            Noch nichts festgehalten. Ohne Anmeldung entstehen auch keine
+            neuen Einträge -- die Regel in der Datenbank lässt nur
+            Angemeldete eintragen.
           </p>
         ) : (
           <div className="overflow-x-auto">

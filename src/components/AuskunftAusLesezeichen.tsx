@@ -5,7 +5,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { leseAuskunft } from '@/lib/eigentuemer';
 import { weiterverarbeiten } from '@/hooks/use-eigentuemer-lookup';
 import { protokolliere } from '@/lib/protokoll';
-import { useAuth } from '@/hooks/use-auth';
 import { naechsteParzelle, naechsteAdresse } from '@/lib/naechste';
 import { naechsteReihe } from '@/lib/reihe';
 import { FENSTER, oeffne } from '@/lib/fenster';
@@ -15,8 +14,8 @@ import { FENSTER, oeffne } from '@/lib/fenster';
  *
  * Die Daten stehen hinter der Raute in der Adresse. Das ist Absicht:
  * alles hinter "#" schickt der Browser nicht an den Server, es bleibt
- * hier. Gespeichert wird mit der angemeldeten Sitzung -- das
- * Lesezeichen selbst trägt keinen Schlüssel.
+ * hier. Das Lesezeichen selbst trägt keinen Schlüssel; gespeichert
+ * wird mit dem öffentlichen Schlüssel der Anwendung.
  *
  * Zugeordnet wird über die EGRID. Sie steht im Auszug und ist
  * schweizweit eindeutig; über die Adresse wäre es geraten.
@@ -54,7 +53,6 @@ export function AuskunftAusLesezeichen() {
   // Der Tag, aus dem der Auszug kam. Ueber ihn geht es weiter -- ohne
   // ihn muesste ein neuer aufgehen.
   const portalTag = useRef<Window | null>(null);
-  const { user, loading } = useAuth();
   // Eine Meldung, die wieder verschwindet, taugt hier nicht: der Tag
   // geht auf, etwas geschieht -- oder eben nicht --, und man sieht
   // nichts mehr. Der Stand bleibt stehen, bis man ihn wegklickt.
@@ -70,13 +68,6 @@ export function AuskunftAusLesezeichen() {
       rohdaten: { text?: string; egrid?: string; parzelle?: string },
       merkmal: string,
     ) => {
-    // Erst anmelden lassen: ohne Sitzung liest die Datenbank nichts,
-    // und der Auszug waere verloren.
-    if (loading) return;
-    if (!user) {
-      setStand({ art: 'fehler', text: 'Nicht angemeldet — bitte anmelden, dann nochmals übernehmen.' });
-      return;
-    }
     // Der Riegel gilt fuer diesen einen Auszug, nicht fuer alle
     // folgenden: sonst ist nach dem ersten fuer immer zu. Er faengt
     // auch ab, dass Raute und Nachricht denselben Auszug zweimal
@@ -301,7 +292,7 @@ export function AuskunftAusLesezeichen() {
       window.removeEventListener('hashchange', ausRaute);
       window.removeEventListener('message', ausNachricht);
     };
-  }, [toast, qc, user, loading]);
+  }, [toast, qc]);
 
   if (!stand) return null;
 
