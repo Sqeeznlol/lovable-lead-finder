@@ -31,6 +31,10 @@ on:
         description: 'Nur für "verschneiden": Nummer des Laufs mit den fertigen Dateien'
         required: false
         default: ''
+      menge:
+        description: 'Nur für "geometrie-schreiben": höchstens so viele Parzellen (0 = alle)'
+        required: false
+        default: '0'
       schritt:
         description: 'Was ausgeführt werden soll'
         required: true
@@ -503,6 +507,7 @@ jobs:
         env:
           DB: ${{ secrets.SUPABASE_DB_URL }}
           KANTON: ${{ inputs.kanton }}
+          MENGE: ${{ inputs.menge }}
           # Nur der Suchpfad. Die Zeitgrenze steht hier bewusst nicht:
           # Supabase setzt statement_timeout auf der Rolle, und
           # Rolleneinstellungen schlagen Startoptionen.
@@ -511,63 +516,64 @@ jobs:
           set -euo pipefail
           [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
 
-          lauf() {  # lauf <sql>  -- eine Anweisung, eigene Transaktion
-            psql "$DB" -v ON_ERROR_STOP=1 -X -q -t -A \
-              -c "set statement_timeout = '10min';" -c "$1"
+          groesse() {
+            psql "$DB" -X -q -t -A -c \
+              "select pg_size_pretty(pg_database_size(current_database()));"
           }
 
-          # Eine Eingangstabelle statt einzelner Anweisungen: 137'000
-          # Umrisse ueber die Schnittstelle zu schicken dauert Stunden,
-          # copy braucht Minuten.
-          lauf "create table if not exists public.geo_eingang (egrid text, wkt text);" > /dev/null
-          lauf "truncate public.geo_eingang;" > /dev/null
-          psql "$DB" -v ON_ERROR_STOP=1 -X -q \
-            -c "\copy public.geo_eingang(wkt, egrid) from '/tmp/geometrie.csv' with (format csv, header true)"
-          lauf "create index if not exists idx_geo_eingang_egrid on public.geo_eingang (egrid);" > /dev/null
+          echo "### Vorher" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Datenbank: $(groesse)" | tee -a "$GITHUB_STEP_SUMMARY"
 
-          echo "### Eingelesen" | tee -a "$GITHUB_STEP_SUMMARY"
-          lauf "select count(*) || ' Zeilen, ' || count(distinct egrid) || ' EGRID'
-                  from public.geo_eingang;" | tee -a "$GITHUB_STEP_SUMMARY"
+          # ----------------------------------------------- in Stuecke
+          # Kein grosses Zwischenlager mehr. Der erste Versuch legte
+          # alle 137'269 Umrisse als Text in eine Tabelle -- 82 MB,
+          # die nach dem Absturz liegenblieben und die Datenbank auf
+          # nur-lesen brachten. Jetzt wandert jedes Stueck einzeln
+          # durch eine Sitzungstabelle, die mit der Sitzung vergeht.
+          rm -f /tmp/teil_*
+          tail -n +2 /tmp/geometrie.csv | split -l 2000 - /tmp/teil_
+          stuecke=$(ls /tmp/teil_* | wc -l)
+          echo "Stuecke zu je 2000: $stuecke" | tee -a "$GITHUB_STEP_SUMMARY"
 
-          # ------------------------------------------------ Zuordnen
-          # In Stapeln, nicht am Stueck. Der Versuch, alles in einer
-          # Anweisung einzutragen, hat die Datenbank zum Absturz
-          # gebracht -- jedes Polygon wird beim Eintragen zerlegt,
-          # dazu die Pflege des GIST-Index, und eine Transaktion gibt
-          # bis zum Schluss nichts frei.
-          #
-          # Nur echte Flaechen: was nach CONVERT_TO_LINEAR keine ist,
-          # wuerde eine Spalte vom Typ MultiPolygon ohnehin abweisen
-          # und den ganzen Stapel mitreissen.
-          echo "### Zuordnen, in Stapeln" | tee -a "$GITHUB_STEP_SUMMARY"
+          grenze=${MENGE:-0}
           gesamt=0
-          while :; do
-            n=$(lauf "
-              with kand as (
-                select g.egrid, g.wkt
-                  from public.geo_eingang g
-                  join public.properties p on p.egrid = g.egrid
-                 where p.geometrie is null
-                   and (g.wkt like 'POLYGON%' or g.wkt like 'MULTIPOLYGON%')
-                 limit 2000
-              ), gesetzt as (
-                update public.properties p
-                   set geometrie        = ST_Multi(ST_GeomFromText(k.wkt, 2056)),
-                       geometrie_quelle = 'geodienste.ch AV',
-                       geometrie_stand  = now()
-                  from kand k
-                 where k.egrid = p.egrid
-                returning 1
-              )
-              select count(*) from gesetzt;")
+          nummer=0
+          for f in /tmp/teil_*; do
+            nummer=$(( nummer + 1 ))
+            if [ "$grenze" -gt 0 ] && [ "$gesamt" -ge "$grenze" ]; then
+              echo "Grenze von $grenze erreicht -- Rest bleibt offen."
+              break
+            fi
+            n=$(psql "$DB" -v ON_ERROR_STOP=1 -X -q -t -A \
+              -c "set statement_timeout = '10min';" \
+              -c "create temp table eingang (wkt text, egrid text);" \
+              -c "\copy eingang(wkt, egrid) from '$f' with (format csv)" \
+              -c "
+                with kand as (
+                  select e.egrid, e.wkt
+                    from eingang e
+                    join public.properties p on p.egrid = e.egrid
+                   where p.geometrie is null
+                     and (e.wkt like 'POLYGON%' or e.wkt like 'MULTIPOLYGON%')
+                ), gesetzt as (
+                  update public.properties p
+                     set geometrie        = ST_Multi(ST_GeomFromText(k.wkt, 2056)),
+                         geometrie_quelle = 'geodienste.ch AV',
+                         geometrie_stand  = now()
+                    from kand k
+                   where k.egrid = p.egrid
+                  returning 1
+                )
+                select count(*) from gesetzt;")
             gesamt=$(( gesamt + n ))
-            [ "$n" -gt 0 ] || break
-            echo "  $gesamt zugeordnet"
+            if [ $(( nummer % 10 )) -eq 0 ]; then
+              echo "  Stueck $nummer/$stuecke -- $gesamt zugeordnet, Datenbank $(groesse)"
+            fi
           done
           echo "Zugeordnet: $gesamt" | tee -a "$GITHUB_STEP_SUMMARY"
-
-          echo "### Wie viele Parzellen einen Umriss haben" \
+          echo "Datenbank nach den Umrissen: $(groesse)" \
             | tee -a "$GITHUB_STEP_SUMMARY"
+
           psql "$DB" -X -c \
             "select kanton,
                     count(*) filter (where geometrie is not null) as mit_umriss,
@@ -576,27 +582,34 @@ jobs:
             | tee -a "$GITHUB_STEP_SUMMARY"
 
           # ------------------------------------------- Nachbarschaft
-          # Ebenfalls in Stapeln, aus demselben Grund. Die Funktion
-          # merkt sich in properties.nachbarn_stand, was sie schon
-          # hatte, und meldet 0, wenn nichts mehr offen ist.
+          # Ebenfalls in Stapeln. Die Funktion merkt sich in
+          # properties.nachbarn_stand, was sie schon hatte, und meldet
+          # 0, wenn nichts mehr offen ist.
           echo "### Nachbarschaft rechnen, in Stapeln" \
             | tee -a "$GITHUB_STEP_SUMMARY"
           parzellen=0
           paare=0
+          runde=0
           while :; do
-            zeile=$(lauf "select bearbeitet || '|' || paare
-                            from public.nachbarschaft_rechnen('$KANTON', 2000);")
+            zeile=$(psql "$DB" -v ON_ERROR_STOP=1 -X -q -t -A \
+              -c "set statement_timeout = '10min';" \
+              -c "select bearbeitet || '|' || paare
+                    from public.nachbarschaft_rechnen('$KANTON', 2000);")
             b=${zeile%%|*}
             pz=${zeile##*|}
             [ "$b" -gt 0 ] || break
             parzellen=$(( parzellen + b ))
             paare=$(( paare + pz ))
-            echo "  $parzellen Parzellen, $paare Paare"
+            runde=$(( runde + 1 ))
+            if [ $(( runde % 10 )) -eq 0 ]; then
+              echo "  $parzellen Parzellen, $paare Paare, Datenbank $(groesse)"
+            fi
           done
           echo "Parzellen gerechnet: $parzellen" | tee -a "$GITHUB_STEP_SUMMARY"
           echo "Nachbarschaftspaare: $paare"     | tee -a "$GITHUB_STEP_SUMMARY"
 
-          lauf "drop table if exists public.geo_eingang;" > /dev/null
+          echo "### Nachher" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Datenbank: $(groesse)" | tee -a "$GITHUB_STEP_SUMMARY"
 
       # ---------------------------------------------------------------
       # Warum das Modell nicht greift
