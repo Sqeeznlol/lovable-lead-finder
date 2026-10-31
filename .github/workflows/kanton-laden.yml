@@ -35,6 +35,10 @@ on:
         description: 'Nur für "geometrie-schreiben": höchstens so viele Parzellen (0 = alle)'
         required: false
         default: '0'
+      grenze_mb:
+        description: 'Abbrechen, wenn die Datenbank so gross ist (MB)'
+        required: false
+        default: '1080'
       schritt:
         description: 'Was ausgeführt werden soll'
         required: true
@@ -508,6 +512,7 @@ jobs:
           DB: ${{ secrets.SUPABASE_DB_URL }}
           KANTON: ${{ inputs.kanton }}
           MENGE: ${{ inputs.menge }}
+          GRENZE_MB: ${{ inputs.grenze_mb }}
           # Nur der Suchpfad. Die Zeitgrenze steht hier bewusst nicht:
           # Supabase setzt statement_timeout auf der Rolle, und
           # Rolleneinstellungen schlagen Startoptionen.
@@ -519,6 +524,29 @@ jobs:
           groesse() {
             psql "$DB" -X -q -t -A -c \
               "select pg_size_pretty(pg_database_size(current_database()));"
+          }
+
+          megabyte() {
+            psql "$DB" -X -q -t -A -c \
+              "select (pg_database_size(current_database())/1024/1024)::int;"
+          }
+
+          # Am 31. Oktober stand die Datenbank bei 1107 MB auf
+          # nur-lesen -- und dann speichert auch die Webseite nichts
+          # mehr. Hier wird vorher abgebrochen. Was liegenbleibt,
+          # holt der naechste Lauf: beide Schleifen nehmen nur, was
+          # noch offen ist.
+          GRENZE_MB=${GRENZE_MB:-1080}
+          zu_voll() {
+            mb=$(megabyte)
+            if [ "$mb" -ge "$GRENZE_MB" ]; then
+              echo "ABBRUCH: Datenbank bei ${mb} MB, Grenze ${GRENZE_MB} MB." \
+                | tee -a "$GITHUB_STEP_SUMMARY"
+              echo "Der Rest bleibt offen und laeuft beim naechsten Mal weiter." \
+                | tee -a "$GITHUB_STEP_SUMMARY"
+              return 0
+            fi
+            return 1
           }
 
           echo "### Vorher" | tee -a "$GITHUB_STEP_SUMMARY"
@@ -544,6 +572,7 @@ jobs:
               echo "Grenze von $grenze erreicht -- Rest bleibt offen."
               break
             fi
+            if zu_voll; then break; fi
             n=$(psql "$DB" -v ON_ERROR_STOP=1 -X -q -t -A \
               -c "set statement_timeout = '10min';" \
               -c "create temp table eingang (wkt text, egrid text);" \
@@ -598,6 +627,7 @@ jobs:
             b=${zeile%%|*}
             pz=${zeile##*|}
             [ "$b" -gt 0 ] || break
+            if zu_voll; then break; fi
             parzellen=$(( parzellen + b ))
             paare=$(( paare + pz ))
             runde=$(( runde + 1 ))
