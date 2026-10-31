@@ -544,4 +544,26 @@ const STIL = `
 .gisk .readout{position:absolute;left:10px;bottom:10px;z-index:500;background:rgba(255,255,255,.92);border:1px solid var(--line);border-radius:3px;padding:5px 9px;font-family:var(--mono);font-size:.68rem;color:var(--ink-2);white-space:pre}
 .gisk .leaflet-container{font:inherit}
 .gisk .nachbarn{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+
+/* Karte zuerst, wie bei Immobilienplattformen (popety.io u. a.): die
+   Karte füllt alles, Suche und Angaben schweben als Karten darüber. */
+.gisk{--paper:#F6F7F9;--surface:#FFFFFF;--surface-2:#F1F3F6;--ink:#0F172A;--ink-2:#64748B;--line:#E2E8F0;
+  --accent:#1E3A8A;--accent-soft:#EEF2FF;--warn:#B45309;--ok:#15803D;--no:#B91C1C;
+  --display:"Inter","Schibsted Grotesk","Helvetica Neue",Arial,sans-serif;--mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  display:block;border:0;border-radius:0;font-size:14px}
+.gisk .wrap{display:block;position:absolute;inset:0}
+.gisk .wrap>div:first-child{position:absolute!important;inset:0}
+.gisk header{position:absolute;z-index:600;top:14px;left:14px;right:404px;border:0;border-radius:14px;
+  background:rgba(255,255,255,.96);box-shadow:0 8px 30px rgba(15,23,42,.14);padding:10px 14px}
+.gisk aside{position:absolute;z-index:600;top:14px;right:14px;bottom:14px;width:376px;border:0;border-radius:14px;
+  box-shadow:0 8px 30px rgba(15,23,42,.14)}
+.gisk .pa{padding:16px 18px}
+.gisk .pa h3{font-size:1.05rem;font-weight:650;letter-spacing:-.01em}
+.gisk input[type=search],.gisk select{border-radius:10px;padding:9px 12px}
+.gisk input[type=search]{min-width:280px;background:var(--surface-2);border-color:transparent}
+.gisk .btn{border-radius:10px;padding:8px 14px}
+.gisk .leaflet-top.leaflet-left{top:140px}.gisk .leaflet-bottom.leaflet-right{right:404px}
+.gisk .readout{left:14px;bottom:14px;border-radius:10px;border:0;box-shadow:0 4px 14px rgba(15,23,42,.12)}
+.gisk .chip{border-radius:999px}
+@media (max-width:900px){.gisk header{right:14px}.gisk aside{top:auto;left:14px;width:auto;height:45vh}}
 `;
