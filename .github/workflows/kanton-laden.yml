@@ -505,7 +505,12 @@ jobs:
           # nicht Sekunden. Als Verbindungsoption gesetzt, damit sie
           # für jede Anweisung gilt -- ein "set" je Aufruf verfällt
           # mit dessen Transaktion.
-          PGOPTIONS: "-c statement_timeout=2700000 -c search_path=public,extensions"
+          # Nur der Suchpfad. Die Zeitgrenze steht hier bewusst
+          # nicht: Supabase setzt statement_timeout auf der Rolle,
+          # und Rolleneinstellungen schlagen Startoptionen. Der erste
+          # Lauf brach deshalb nach genau zwei Minuten ab. Sie wird
+          # unten in der Sitzung selbst gesetzt.
+          PGOPTIONS: "-c search_path=public,extensions"
         run: |
           set -euo pipefail
           [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
@@ -527,8 +532,11 @@ jobs:
           echo "### Zuordnen"
           # Eine Parzelle kann mehrfach in der Datei stehen. Genommen
           # wird der längste Umriss -- ein abgeschnittener wäre kürzer.
-          psql "$DB" -v ON_ERROR_STOP=1 -X -q -c \
-            "update public.properties p
+          # Mehrere -c laufen in derselben Sitzung; das "set" gilt
+          # deshalb auch fuer die Anweisung danach.
+          psql "$DB" -v ON_ERROR_STOP=1 -X -q \
+            -c "set statement_timeout = '60min';" \
+            -c "update public.properties p
                 set geometrie        = ST_Multi(ST_GeomFromText(g.wkt, 2056)),
                     geometrie_quelle = 'geodienste.ch AV',
                     geometrie_stand  = now()
@@ -551,8 +559,9 @@ jobs:
           # Erst jetzt möglich -- und je Kanton, nicht alles auf
           # einmal: dieses Projekt ist bei dieser Tabelle schon
           # dreimal in die Zeitgrenze gelaufen.
-          psql "$DB" -v ON_ERROR_STOP=1 -X -c \
-            "select * from public.nachbarschaft_rechnen('$KANTON');" \
+          psql "$DB" -v ON_ERROR_STOP=1 -X \
+            -c "set statement_timeout = '60min';" \
+            -c "select * from public.nachbarschaft_rechnen('$KANTON');" \
             | tee -a "$GITHUB_STEP_SUMMARY"
 
           psql "$DB" -X -q -c "drop table if exists public.geo_eingang;"
