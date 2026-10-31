@@ -17,7 +17,15 @@
 -- der Adresse der Webseite lesen kann.
 -- =====================================================================
 
+-- PostGIS liegt bei Supabase im Schema `extensions`, in einem
+-- gewöhnlichen PostgreSQL meist in `public`. Diese Migration legt
+-- sich auf keines von beiden fest: sie stellt nur sicher, dass die
+-- Erweiterung da ist, und erweitert den Suchpfad. Der erste Lauf des
+-- Ablaufs "Modell prüfen" scheiterte an genau dieser Annahme -- ein
+-- fest vorangestelltes Schema gibt es nur dort, wo Supabase steht.
+create schema if not exists extensions;
 create extension if not exists postgis with schema extensions;
+set search_path to public, extensions;
 
 -- Ein Name, ein Schlüssel.
 --
@@ -46,7 +54,7 @@ $$;
 -- Amtliche Vermessung liefert darin. Umrechnen würde bei jeder
 -- Nachbarschaftsabfrage Genauigkeit kosten.
 alter table public.properties
-  add column if not exists geometrie extensions.geometry(MultiPolygon, 2056),
+  add column if not exists geometrie geometry(MultiPolygon, 2056),
   add column if not exists geometrie_quelle text,
   add column if not exists geometrie_stand  timestamptz;
 
@@ -194,7 +202,7 @@ create table if not exists public.baugesuch (
   kosten_chf    numeric,
   zustand       text not null default 'eingereicht'
                 check (zustand in ('eingereicht', 'bewilligt', 'abgelehnt', 'zurueckgezogen')),
-  geometrie     extensions.geometry(Point, 2056),
+  geometrie     geometry(Point, 2056),
   -- Zuordnung mit Herkunft und Sicherheit: ein Gesuch, das der
   -- falschen Parzelle zugeordnet wird, erzeugt eine Meldung über ein
   -- fremdes Grundstück. Genau dieser Fehler ist hier schon einmal

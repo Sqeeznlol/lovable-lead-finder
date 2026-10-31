@@ -64,6 +64,11 @@ jobs:
           $PSQL -c "create role anon;"
           $PSQL -c "create role authenticated;"
           $PSQL -c "create schema if not exists extensions;"
+          # Supabase hat `extensions` im Suchpfad. Hier
+          # nachgezogen, damit die ST_-Funktionen im Test
+          # gefunden werden, egal in welchem Schema PostGIS
+          # des Abbilds liegt.
+          $PSQL -c "alter database probe set search_path to public, extensions;"
           # Nur die Spalten, welche die Migrationen anfassen. Die
           # echte Tabelle hat 118 -- die übrigen spielen hier keine
           # Rolle und würden den Test nur mit Rauschen füllen.
