@@ -489,7 +489,9 @@ jobs:
           ls -lh /tmp/geometrie.csv
 
       - name: Umrisse bereitstellen
-        if: ${{ inputs.schritt == 'geometrie' }}
+        if: ${{ always()
+                && (inputs.schritt == 'geometrie'
+                    || inputs.schritt == 'geometrie-schreiben') }}
         uses: actions/upload-artifact@v4
         with:
           name: geometrie-${{ inputs.kanton }}
@@ -501,52 +503,70 @@ jobs:
         env:
           DB: ${{ secrets.SUPABASE_DB_URL }}
           KANTON: ${{ inputs.kanton }}
-          # Die Nachbarschaft über 137'000 Polygone braucht Minuten,
-          # nicht Sekunden. Als Verbindungsoption gesetzt, damit sie
-          # für jede Anweisung gilt -- ein "set" je Aufruf verfällt
-          # mit dessen Transaktion.
-          # Nur der Suchpfad. Die Zeitgrenze steht hier bewusst
-          # nicht: Supabase setzt statement_timeout auf der Rolle,
-          # und Rolleneinstellungen schlagen Startoptionen. Der erste
-          # Lauf brach deshalb nach genau zwei Minuten ab. Sie wird
-          # unten in der Sitzung selbst gesetzt.
+          # Nur der Suchpfad. Die Zeitgrenze steht hier bewusst nicht:
+          # Supabase setzt statement_timeout auf der Rolle, und
+          # Rolleneinstellungen schlagen Startoptionen.
           PGOPTIONS: "-c search_path=public,extensions"
         run: |
           set -euo pipefail
           [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
 
-          # Eine Eingangstabelle statt einzelner Anweisungen: 137'000
-          # Umrisse über die Schnittstelle zu schicken dauert Stunden,
-          # copy braucht Minuten.
-          psql "$DB" -v ON_ERROR_STOP=1 -X -q \
-            -c "create table if not exists public.geo_eingang (egrid text, wkt text);" \
-            -c "truncate public.geo_eingang;"
+          lauf() {  # lauf <sql>  -- eine Anweisung, eigene Transaktion
+            psql "$DB" -v ON_ERROR_STOP=1 -X -q -t -A \
+              -c "set statement_timeout = '10min';" -c "$1"
+          }
 
+          # Eine Eingangstabelle statt einzelner Anweisungen: 137'000
+          # Umrisse ueber die Schnittstelle zu schicken dauert Stunden,
+          # copy braucht Minuten.
+          lauf "create table if not exists public.geo_eingang (egrid text, wkt text);" > /dev/null
+          lauf "truncate public.geo_eingang;" > /dev/null
           psql "$DB" -v ON_ERROR_STOP=1 -X -q \
             -c "\copy public.geo_eingang(wkt, egrid) from '/tmp/geometrie.csv' with (format csv, header true)"
+          lauf "create index if not exists idx_geo_eingang_egrid on public.geo_eingang (egrid);" > /dev/null
 
-          echo "### Eingelesen"
-          psql "$DB" -X -q -c \
-            "select count(*) as zeilen, count(distinct egrid) as egrids from public.geo_eingang;"
+          echo "### Eingelesen" | tee -a "$GITHUB_STEP_SUMMARY"
+          lauf "select count(*) || ' Zeilen, ' || count(distinct egrid) || ' EGRID'
+                  from public.geo_eingang;" | tee -a "$GITHUB_STEP_SUMMARY"
 
-          echo "### Zuordnen"
-          # Eine Parzelle kann mehrfach in der Datei stehen. Genommen
-          # wird der längste Umriss -- ein abgeschnittener wäre kürzer.
-          # Mehrere -c laufen in derselben Sitzung; das "set" gilt
-          # deshalb auch fuer die Anweisung danach.
-          psql "$DB" -v ON_ERROR_STOP=1 -X -q \
-            -c "set statement_timeout = '60min';" \
-            -c "update public.properties p
-                set geometrie        = ST_Multi(ST_GeomFromText(g.wkt, 2056)),
-                    geometrie_quelle = 'geodienste.ch AV',
-                    geometrie_stand  = now()
-              from (select distinct on (egrid) egrid, wkt
-                      from public.geo_eingang
-                     where coalesce(wkt, '') <> ''
-                     order by egrid, length(wkt) desc) g
-             where g.egrid = p.egrid;"
+          # ------------------------------------------------ Zuordnen
+          # In Stapeln, nicht am Stueck. Der Versuch, alles in einer
+          # Anweisung einzutragen, hat die Datenbank zum Absturz
+          # gebracht -- jedes Polygon wird beim Eintragen zerlegt,
+          # dazu die Pflege des GIST-Index, und eine Transaktion gibt
+          # bis zum Schluss nichts frei.
+          #
+          # Nur echte Flaechen: was nach CONVERT_TO_LINEAR keine ist,
+          # wuerde eine Spalte vom Typ MultiPolygon ohnehin abweisen
+          # und den ganzen Stapel mitreissen.
+          echo "### Zuordnen, in Stapeln" | tee -a "$GITHUB_STEP_SUMMARY"
+          gesamt=0
+          while :; do
+            n=$(lauf "
+              with kand as (
+                select g.egrid, g.wkt
+                  from public.geo_eingang g
+                  join public.properties p on p.egrid = g.egrid
+                 where p.geometrie is null
+                   and (g.wkt like 'POLYGON%' or g.wkt like 'MULTIPOLYGON%')
+                 limit 2000
+              ), gesetzt as (
+                update public.properties p
+                   set geometrie        = ST_Multi(ST_GeomFromText(k.wkt, 2056)),
+                       geometrie_quelle = 'geodienste.ch AV',
+                       geometrie_stand  = now()
+                  from kand k
+                 where k.egrid = p.egrid
+                returning 1
+              )
+              select count(*) from gesetzt;")
+            gesamt=$(( gesamt + n ))
+            [ "$n" -gt 0 ] || break
+            echo "  $gesamt zugeordnet"
+          done
+          echo "Zugeordnet: $gesamt" | tee -a "$GITHUB_STEP_SUMMARY"
 
-          echo "### Wie viele Parzellen jetzt einen Umriss haben" \
+          echo "### Wie viele Parzellen einen Umriss haben" \
             | tee -a "$GITHUB_STEP_SUMMARY"
           psql "$DB" -X -c \
             "select kanton,
@@ -555,16 +575,28 @@ jobs:
                from public.properties group by 1 order by 1;" \
             | tee -a "$GITHUB_STEP_SUMMARY"
 
-          echo "### Nachbarschaft rechnen" | tee -a "$GITHUB_STEP_SUMMARY"
-          # Erst jetzt möglich -- und je Kanton, nicht alles auf
-          # einmal: dieses Projekt ist bei dieser Tabelle schon
-          # dreimal in die Zeitgrenze gelaufen.
-          psql "$DB" -v ON_ERROR_STOP=1 -X \
-            -c "set statement_timeout = '60min';" \
-            -c "select * from public.nachbarschaft_rechnen('$KANTON');" \
+          # ------------------------------------------- Nachbarschaft
+          # Ebenfalls in Stapeln, aus demselben Grund. Die Funktion
+          # merkt sich in properties.nachbarn_stand, was sie schon
+          # hatte, und meldet 0, wenn nichts mehr offen ist.
+          echo "### Nachbarschaft rechnen, in Stapeln" \
             | tee -a "$GITHUB_STEP_SUMMARY"
+          parzellen=0
+          paare=0
+          while :; do
+            zeile=$(lauf "select bearbeitet || '|' || paare
+                            from public.nachbarschaft_rechnen('$KANTON', 2000);")
+            b=${zeile%%|*}
+            pz=${zeile##*|}
+            [ "$b" -gt 0 ] || break
+            parzellen=$(( parzellen + b ))
+            paare=$(( paare + pz ))
+            echo "  $parzellen Parzellen, $paare Paare"
+          done
+          echo "Parzellen gerechnet: $parzellen" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Nachbarschaftspaare: $paare"     | tee -a "$GITHUB_STEP_SUMMARY"
 
-          psql "$DB" -X -q -c "drop table if exists public.geo_eingang;"
+          lauf "drop table if exists public.geo_eingang;" > /dev/null
 
       # ---------------------------------------------------------------
       # Warum das Modell nicht greift

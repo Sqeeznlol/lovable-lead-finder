@@ -153,10 +153,23 @@ begin
   where p.address = 'Seeweg 4';
   if n <> 0 then raise exception 'Entfernte Parzelle hat % Nachbarn', n; end if;
 
-  -- Wiederholbar: ein zweiter Lauf darf nicht verdoppeln.
-  perform public.nachbarschaft_rechnen();
+  -- Der Merker: ein zweiter Lauf darf nichts mehr zu tun finden.
+  -- Ohne ihn liefe die Schleife im Ablauf endlos, weil eine Parzelle
+  -- ohne Nachbarn nicht von einer ungerechneten zu unterscheiden
+  -- waere.
+  select bearbeitet into n from public.nachbarschaft_rechnen();
+  if n <> 0 then raise exception 'Zweiter Lauf bearbeitet noch % Parzellen', n; end if;
   select count(*) into n from public.nachbarschaft;
   if n <> 2 then raise exception 'Nach dem zweiten Lauf % Zeilen statt 2', n; end if;
+
+  -- Und nach dem Zuruecksetzen muss wieder alles offen sein.
+  perform public.nachbarschaft_zuruecksetzen();
+  select count(*) into n from public.nachbarschaft;
+  if n <> 0 then raise exception 'Nach dem Zuruecksetzen stehen % Paare da', n; end if;
+  select bearbeitet into n from public.nachbarschaft_rechnen();
+  if n <> 3 then raise exception 'Nach dem Zuruecksetzen % statt 3 Parzellen offen', n; end if;
+  select count(*) into n from public.nachbarschaft;
+  if n <> 2 then raise exception 'Neu gerechnet % Paare statt 2', n; end if;
 
   -- Und die Sicht, die die Oberflaeche benutzen wird.
   select count(*) into n from public.nachbarn
