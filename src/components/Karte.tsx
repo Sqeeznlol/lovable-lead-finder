@@ -137,13 +137,13 @@ function AlleFelder({ z }: { z: Record<string, unknown> }) {
     v !== null && v !== '' && !/geom|umriss|^id$/i.test(k)
     && !(Array.isArray(v) && v.length === 0));
   return (
-    <details className="alle" open>
+    <details className="alle">
       <summary>Alle Angaben ({zeilen.length})</summary>
       <dl className="f">
         {zeilen.map(([k, v]) => (
           <div key={k} style={{ display: 'contents' }}>
             <dt>{beschriften(k)}</dt>
-            <dd>{typeof v === 'object' ? JSON.stringify(v) : String(v)}</dd>
+            <dd>{wertZeigen(v)}</dd>
           </div>
         ))}
       </dl>
@@ -157,6 +157,34 @@ const STUFEN: [number, string, string][] = [
 ];
 function margeFarbe(m: number) { return (STUFEN.find(([ab]) => m >= ab) ?? STUFEN[4])[1]; }
 
+/** Zonenart aus dem kantonalen Zonennamen -- die Kantone schreiben
+ *  "W2", "Wohnzone W3" oder "Kernzone 2"; gefiltert wird nach Art. */
+type Zonenart = 'W' | 'WG' | 'K' | 'Z' | 'IG' | 'U';
+const ZONENARTEN: [Zonenart, string][] = [
+  ['W', 'Wohnen'], ['WG', 'Wohnen/Gewerbe'], ['K', 'Kern'], ['Z', 'Zentrum'], ['IG', 'Industrie/Gewerbe'], ['U', 'Übrige'],
+];
+function zonenart(z: string | null | undefined): Zonenart {
+  const t = String(z ?? '');
+  if (/wohn.*gewerb|misch|\bWG\s?\d/i.test(t)) return 'WG';
+  if (/wohn|\bW\s?\d/i.test(t)) return 'W';
+  if (/kern|\bK\s?\d/i.test(t)) return 'K';
+  if (/zentrum|\bZ\s?\d/i.test(t)) return 'Z';
+  if (/industr|gewerb|arbeit|\bI\s?\d|\bG\s?\d/i.test(t)) return 'IG';
+  return 'U';
+}
+
+/** Werte lesbar: Datum als Tag.Monat.Jahr, Ja/Nein, Zahlen mit Hochkomma, Links als Link. */
+function wertZeigen(v: unknown) {
+  if (typeof v === 'boolean') return v ? 'Ja' : 'Nein';
+  if (typeof v === 'number') return gr(v);
+  const t = typeof v === 'object' ? JSON.stringify(v) : String(v);
+  if (/^https?:\/\//.test(t)) return <a href={t} target="_blank" rel="noopener">öffnen ↗</a>;
+  const d = /^(\d{4})-(\d{2})-(\d{2})T/.exec(t);
+  if (d) return `${d[3]}.${d[2]}.${d[1]}`;
+  if (/^-?\d+(\.\d+)?$/.test(t)) return gr(Number(t));
+  return t;
+}
+
 type Auswahl =
   | { art: 'leer' }
   | { art: 'eigen'; id: string; e: ParzelleEigenschaften; lat: number; lon: number;
@@ -164,7 +192,7 @@ type Auswahl =
   | { art: 'bund'; lat: number; lon: number; laeuft: boolean; fehler?: boolean;
       treffer: { titel: string; adresse: string; info: string; egid?: string }[] };
 
-interface Treffer { label: string; origin: string; lat: number; lon: number }
+interface Treffer { label: string; origin: string; lat: number; lon: number; eigen?: { id: string; e: ParzelleEigenschaften } }
 
 export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
   const box = useRef<HTMLDivElement | null>(null);
@@ -185,6 +213,22 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
 
   const [grund, setGrund] = useState<Grund>('kataster');
   const [bestandAn, setBestandAn] = useState(true);
+  const [zonenAn, setZonenAn] = useState(false);
+  const [zonenFilter, setZonenFilter] = useState<Set<Zonenart>>(new Set());
+  const zonenEbene = useRef<L.TileLayer | null>(null);
+  // Bauzonen Schweiz (ARE, harmonisiert aus den Nutzungsplänen der
+  // Kantone -- dieselbe Grundlage wie der ÖREB-Kataster).
+  useEffect(() => {
+    const m = karte.current;
+    if (!m) return;
+    zonenEbene.current?.remove(); zonenEbene.current = null;
+    if (zonenAn) {
+      zonenEbene.current = L.tileLayer.wms('https://wms.geo.admin.ch/', {
+        layers: 'ch.are.bauzonen', format: 'image/png', transparent: true, tileSize: 512,
+        opacity: 0.55, minZoom: 11, maxZoom: 21, attribution: '&copy; ARE und Kantone',
+      }).addTo(m);
+    }
+  }, [zonenAn]);
   const [ausschnitt, setAusschnitt] = useState<Ausschnitt | null>(null);
   const [zoom, setZoom] = useState(0);
   const [mitte, setMitte] = useState<{ lat: number; lng: number }>({ lat: 0, lng: 0 });
@@ -247,6 +291,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
     eigenEbene.current = null;
     if (!data || !genugNah || !bestandAn) return;
     eigenEbene.current = L.geoJSON(data, {
+      filter: f => zonenFilter.size === 0 || zonenFilter.has(zonenart((f.properties as ParzelleEigenschaften)?.zone)),
       // Farbe nach Marge in Stufen, wie bei Regrid/LandGlide: man sieht
       // die guten Parzellen, bevor man klickt. Legende unten links.
       style: f => {
@@ -274,7 +319,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
         });
       },
     }).addTo(m);
-  }, [data, genugNah, bestandAn]);
+  }, [data, genugNah, bestandAn, zonenFilter]);
 
   async function eigeneZeigen(id: string, e: ParzelleEigenschaften, lat: number, lon: number) {
     setAuswahl({ art: 'eigen', id, e, lat, lon, geholt: false });
@@ -327,7 +372,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
         }
       }
     } catch { /* weiter mit dem Bundesregister */ }
-    const ebenen = 'ch.bfs.gebaeude_wohnungs_register,ch.swisstopo.amtliches-strassenverzeichnis';
+    const ebenen = 'ch.are.bauzonen,ch.bfs.gebaeude_wohnungs_register,ch.swisstopo.amtliches-strassenverzeichnis';
     const url = 'https://api3.geo.admin.ch/rest/services/all/MapServer/identify?geometryType=esriGeometryPoint'
       + `&geometry=${lv.E},${lv.N}&sr=2056&tolerance=12&layers=all:${ebenen}`
       + `&mapExtent=${lv.E - 300},${lv.N - 300},${lv.E + 300},${lv.N + 300}&imageDisplay=600,600,96&lang=de`;
@@ -357,12 +402,30 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
     if (s.length < 3) { setTreffer(null); setSucheStatus('ruhe'); return; }
     const t = setTimeout(async () => {
       setSucheStatus('laeuft');
+      // Zuerst im eigenen Bestand: Adresse, Parzellennummer oder EGRID.
+      // Die Bundessuche kennt unsere Parzellen nicht.
+      const muster = `%${s.replace(/[%_,()]/g, ' ')}%`;
+      const eigen = supabase.from('properties')
+        .select('id, address, plot_number, gemeinde, zone, area, marge_chf, ausgeschlossen, egrid')
+        .or(`address.ilike.${muster},plot_number.ilike.${muster},egrid.ilike.${muster}`)
+        .limit(6);
       try {
-        const j = await (await fetch(
-          'https://api3.geo.admin.ch/rest/services/ech/SearchServer?type=locations&limit=8&sr=2056&lang=de&searchText='
-          + encodeURIComponent(s))).json();
+        const [j, eig] = await Promise.all([
+          fetch('https://api3.geo.admin.ch/rest/services/ech/SearchServer?type=locations&limit=6&sr=2056&lang=de&searchText='
+            + encodeURIComponent(s)).then(x => x.json()).catch(() => null),
+          eigen,
+        ]);
+        const eigeneTreffer: Treffer[] = ((eig.data ?? []) as Record<string, unknown>[]).map(z => ({
+          label: String(z.address ?? `Parzelle ${z.plot_number ?? ''}`),
+          origin: ['Bestand', z.gemeinde, z.plot_number ? `Parz. ${z.plot_number}` : null].filter(Boolean).join(' · '),
+          lat: NaN, lon: NaN,
+          eigen: { id: String(z.id), e: {
+            adresse: (z.address as string) ?? null, parzelle: (z.plot_number as string) ?? null,
+            gemeinde: (z.gemeinde as string) ?? null, flaeche: (z.area as number) ?? null, zone: (z.zone as string) ?? null,
+            marge: (z.marge_chf as number) ?? null, ausgeschlossen: (z.ausgeschlossen as boolean) ?? null } },
+        }));
         const rs = (j?.results ?? []) as { attrs?: Record<string, unknown> }[];
-        setTreffer(rs.map(r => {
+        setTreffer([...eigeneTreffer, ...rs.map(r => {
           const a = r.attrs ?? {};
           let lat = Number(a.lat), lon = Number(a.lon);
           // Mit sr=2056 kommt LV95 zurück -- zurückrechnen.
@@ -371,7 +434,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
             label: String(a.label ?? '').replace(/<[^>]+>/g, ''),
             origin: String(a.origin ?? ''), lat, lon,
           };
-        }));
+        })]);
         setSucheStatus('ruhe');
       } catch { setSucheStatus('fehler'); }
     }, 350);
@@ -383,9 +446,10 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
     if (!data) return [];
     return [...data.features]
       .filter(f => !f.properties?.ausgeschlossen)
+      .filter(f => zonenFilter.size === 0 || zonenFilter.has(zonenart(f.properties?.zone)))
       .sort((a, b) => (Number(b.properties?.marge) || 0) - (Number(a.properties?.marge) || 0))
       .slice(0, 15);
-  }, [data]);
+  }, [data, zonenFilter]);
 
   function mitteVon(f: GeoJSON.Feature): [number, number] {
     const b = L.geoJSON(f).getBounds().getCenter();
@@ -394,254 +458,309 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
 
   const lvMitte = toLV95(mitte.lat, mitte.lng);
 
+  // Eigene Treffer haben keine Koordinaten in der Tabelle: die Adresse
+  // wird über die Bundessuche verortet, dann die Parzelle geöffnet.
+  async function trefferOeffnen(t: Treffer) {
+    setTreffer(null); setSuche('');
+    if (!t.eigen) { karte.current?.setView([t.lat, t.lon], 18); return; }
+    let lat = NaN, lon = NaN;
+    try {
+      const q = [t.eigen.e.adresse, t.eigen.e.gemeinde].filter(Boolean).join(' ');
+      const j = await (await fetch('https://api3.geo.admin.ch/rest/services/ech/SearchServer?type=locations&limit=1&lang=de&searchText='
+        + encodeURIComponent(q))).json();
+      const a = j?.results?.[0]?.attrs;
+      if (a) { lat = Number(a.lat); lon = Number(a.lon); }
+    } catch { /* ohne Ort: Angaben trotzdem zeigen */ }
+    if (Number.isFinite(lat)) karte.current?.setView([lat, lon], 19);
+    eigeneZeigen(t.eigen.id, t.eigen.e, Number.isFinite(lat) ? lat : mitte.lat, Number.isFinite(lon) ? lon : mitte.lng);
+  }
+
+  const umschalten = (z: Zonenart) => setZonenFilter(alt => {
+    const neu = new Set(alt);
+    if (neu.has(z)) neu.delete(z); else neu.add(z);
+    return neu;
+  });
+
   return (
     <div className="gisk">
       <style>{STIL}</style>
-      <header>
-        {onSchliessen && <button type="button" className="btn ghost" onClick={onSchliessen}>← Aurora</button>}
-        <div className="logo"><b>GIS Parzellenkarte</b><span>Swisstopo Kataster · Amtliche Vermessung</span></div>
-        <div className="tools">
+
+      <div ref={box} className="map" />
+
+      {/* Obere Leiste: eine Zeile, schwebend über der Karte. */}
+      <header className="leiste">
+        {onSchliessen && (
+          <button type="button" className="rund" onClick={onSchliessen} title="Zurück zu Aurora">←</button>
+        )}
+        <div className="suche">
+          <span className="lupe">⌕</span>
           <input type="search" value={suche} onChange={e => setSuche(e.target.value)}
-                 placeholder="Adresse, Ort oder Parzelle suchen" autoComplete="off" />
-          <select value={grund} onChange={e => setGrund(e.target.value as Grund)}>
-            <option value="kataster">Kataster, Parzellen farbig</option>
-            <option value="luftbild">Luftbild mit Parzellengrenzen</option>
-            <option value="karte">Landeskarte farbig</option>
-            <option value="grau">Landeskarte grau</option>
-          </select>
-          <button type="button" className="btn ghost" onClick={() => setBestandAn(v => !v)}>
-            {bestandAn ? 'Bestand ein' : 'Bestand aus'}
-          </button>
-          <a className="btn ghost" target="_blank" rel="noopener"
-             href={geoadminLink(mitte.lat, mitte.lng, Math.max(0, zoom - 7))}>In map.geo.admin.ch</a>
-        </div>
-      </header>
-
-      <div className="wrap">
-        <div style={{ position: 'relative', minHeight: 0 }}>
-          <div ref={box} className="map" />
-          {bestandAn && genugNah && (
-            <div className="legende">
-              <b>Marge</b>
-              {STUFEN.map(([, c, t]) => <span key={t}><i style={{ background: c }} />{t}</span>)}
-            </div>
-          )}
-          <div className="readout">
-            LV95 {gr(lvMitte.E)} / {gr(lvMitte.N)}  ·  WGS84 {mitte.lat.toFixed(5)}, {mitte.lng.toFixed(5)}  ·  Zoom {zoom}
-            {!genugNah && bestandAn ? '  ·  näher heran für den Bestand' : ''}
-            {genugNah && bestandAn && data ? `  ·  ${data.features.length} eigene Parzellen` : ''}
-          </div>
-        </div>
-
-        <aside>
-          <div className="pa">
-            <p className="eyebrow">Auswahl</p>
-            {auswahl.art === 'leer' && (
-              <>
-                <h3>Auf eine Parzelle klicken</h3>
-                <p className="hint">Hineinzoomen bis die Parzellennummern erscheinen, dann auf eine Fläche
-                  klicken. Eigene Parzellen sind eingefärbt; ein Klick daneben fragt Gebäude- und
-                  Adressregister des Bundes ab.</p>
-              </>
-            )}
-
-            {auswahl.art === 'eigen' && (() => {
-              const e = auswahl.e;
-              const lv = toLV95(auswahl.lat, auswahl.lon);
-              return (
-                <>
-                  <h3>
-                    {e.parzelle ? `Parzelle ${e.parzelle}` : 'Parzelle'}{' '}
-                    <span className={`chip ${e.ausgeschlossen ? 'mut' : 'acc'}`}>
-                      {e.ausgeschlossen ? 'ausgeschlossen' : 'Bestand'}
-                    </span>
-                  </h3>
-                  <dl className="f">
-                    {e.adresse && <><dt>Adresse</dt><dd><Kopieren wert={e.adresse} /></dd></>}
-                    {e.gemeinde && <><dt>Gemeinde</dt><dd>{e.gemeinde}</dd></>}
-                    <dt>Zone</dt><dd>{e.zone || '–'}{e.flaeche ? ` · ${gr(e.flaeche)} m²` : ''}</dd>
-                    {e.marge != null && Number(e.marge) > 0 && (
-                      <><dt>Marge</dt><dd><span className="chip warn">{gr(e.marge)} CHF</span></dd></>
-                    )}
-                    <dt>Eigentümer</dt>
-                    <dd>{!auswahl.geholt ? <span className="hint">wird geholt …</span>
-                      : auswahl.eigentuemer ?? <span className="hint">noch nicht abgefragt</span>}</dd>
-                    <dt>LV95</dt><dd className="hint">{gr(lv.E)} / {gr(lv.N)}</dd>
-                  </dl>
-                  {auswahl.zeile && <AlleFelder z={auswahl.zeile} />}
-                  <div className="btnrow">
-                    <a className="btn ghost" href={geoadminLink(auswahl.lat, auswahl.lon, 12)}
-                       target="_blank" rel="noopener">Im Bundes-GIS prüfen</a>
-                  </div>
-                  <div className="nachbarn"><Nachbarn parzelleId={auswahl.id} /></div>
-                </>
-              );
-            })()}
-
-            {auswahl.art === 'bund' && (() => {
-              const lv = toLV95(auswahl.lat, auswahl.lon);
-              return (
-                <>
-                  <h3>{auswahl.laeuft ? 'Abfrage läuft'
-                    : auswahl.fehler ? 'Abfrage nicht möglich' : 'Abfrage an dieser Stelle'}</h3>
-                  {auswahl.laeuft && <p className="hint">Gebäude- und Adressregister wird abgefragt.</p>}
-                  {!auswahl.laeuft && (
-                    <dl className="f">
-                      <dt>Punkt</dt><dd className="hint">LV95 {gr(lv.E)} / {gr(lv.N)}</dd>
-                      {auswahl.fehler && <><dt>Hinweis</dt><dd>Der Bundesdienst antwortet nicht. Die Karte bleibt nutzbar.</dd></>}
-                      {!auswahl.fehler && auswahl.treffer.length === 0 && (
-                        <><dt>Treffer</dt><dd>Kein Eintrag an dieser Stelle. Eigene Parzellen sind eingefärbt
-                          und lassen sich direkt anklicken.</dd></>
-                      )}
-                      {auswahl.treffer.map((t, i) => (
-                        <div key={i} style={{ display: 'contents' }}>
-                          <dt>{t.titel}</dt>
-                          <dd>
-                            {t.adresse && <Kopieren wert={t.adresse} />}
-                            {t.info && <div className="hint">{t.info}</div>}
-                            {t.egid && <div className="hint">EGID {t.egid}</div>}
-                          </dd>
-                        </div>
-                      ))}
-                    </dl>
-                  )}
-                  <div className="btnrow">
-                    <a className="btn ghost" href={geoadminLink(auswahl.lat, auswahl.lon, 12)}
-                       target="_blank" rel="noopener">Im Bundes-GIS öffnen</a>
-                    <Kopieren wert={`${gr(lv.E)} / ${gr(lv.N)}`} text="Koordinaten kopieren" />
-                  </div>
-                </>
-              );
-            })()}
-          </div>
-
-          <div className="pa">
-            <p className="eyebrow">Suchergebnisse</p>
-            <div className="rows">
-              {sucheStatus === 'laeuft' && <p className="hint">Suche läuft.</p>}
-              {sucheStatus === 'fehler' && <p className="hint">Suchdienst nicht erreichbar.</p>}
-              {sucheStatus === 'ruhe' && treffer === null && <p className="hint">Noch keine Suche.</p>}
-              {sucheStatus === 'ruhe' && treffer?.length === 0 && <p className="hint">Kein Treffer.</p>}
+                 placeholder="Adresse, Ort oder Parzelle" autoComplete="off" />
+          {(treffer !== null || sucheStatus !== 'ruhe') && suche.trim().length >= 3 && (
+            <div className="liste">
+              {sucheStatus === 'laeuft' && <p className="leer">Suche läuft …</p>}
+              {sucheStatus === 'fehler' && <p className="leer">Suchdienst nicht erreichbar.</p>}
+              {sucheStatus === 'ruhe' && treffer?.length === 0 && <p className="leer">Kein Treffer.</p>}
               {sucheStatus === 'ruhe' && treffer?.map((t, i) => (
-                <div key={i} className="row" onClick={() => karte.current?.setView([t.lat, t.lon], 19)}>
-                  <b>{t.label}</b><div>{t.origin}</div>
-                </div>
+                <button type="button" key={i} className={`treffer${t.eigen ? ' eigen' : ''}`} onClick={() => trefferOeffnen(t)}>
+                  <b>{t.label}</b><small>{t.eigen ? t.origin : 'Ort · swisstopo'}</small>
+                </button>
               ))}
             </div>
-          </div>
+          )}
+        </div>
+        <div className="segment">
+          {([['karte', 'Karte'], ['kataster', 'Kataster'], ['luftbild', 'Luftbild']] as [Grund, string][]).map(([g, t]) => (
+            <button type="button" key={g} className={grund === g ? 'an' : ''} onClick={() => setGrund(g)}>{t}</button>
+          ))}
+        </div>
+        <button type="button" className={`schalter${zonenAn ? ' an' : ''}`} onClick={() => setZonenAn(v => !v)}>
+          Bauzonen
+        </button>
+        <button type="button" className={`schalter${bestandAn ? ' an' : ''}`} onClick={() => setBestandAn(v => !v)}>
+          Bestand
+        </button>
+      </header>
 
-          <div className="pa">
-            <p className="eyebrow">Bestand im Bild</p>
-            <div className="rows">
-              {!bestandAn && <p className="hint">Bestand ausgeblendet.</p>}
-              {bestandAn && !genugNah && <p className="hint">Näher heranzoomen, dann erscheinen die eigenen Parzellen.</p>}
-              {bestandAn && genugNah && bestand.length === 0 && (
-                <p className="hint">Keine eigenen Parzellen mit Umriss in diesem Ausschnitt.</p>
-              )}
+      {/* Zonenfilter wie bei Immobilienportalen: Chips, mehrere wählbar. */}
+      <div className="filter">
+        <span className="titel">Zone</span>
+        <button type="button" className={zonenFilter.size === 0 ? 'an' : ''} onClick={() => setZonenFilter(new Set())}>Alle</button>
+        {ZONENARTEN.map(([z, t]) => (
+          <button type="button" key={z} className={zonenFilter.has(z) ? 'an' : ''} onClick={() => umschalten(z)}>{t}</button>
+        ))}
+      </div>
+
+      <div className="unten">
+        {bestandAn && genugNah && (
+          <div className="legende">
+            {STUFEN.map(([, c, t]) => <span key={t}><i style={{ background: c }} />{t}</span>)}
+          </div>
+        )}
+        {zonenAn && (
+          <div className="legende bild">
+            <img src="https://api3.geo.admin.ch/static/images/legends/ch.are.bauzonen_de.png" alt="Legende Bauzonen"
+                 onError={e => { (e.currentTarget.parentElement as HTMLElement).style.display = 'none'; }} />
+          </div>
+        )}
+        <div className="readout">
+          {!genugNah && bestandAn ? 'Näher heranzoomen für den Bestand · ' : ''}
+          {genugNah && bestandAn && data ? `${data.features.length} eigene Parzellen im Bild · ` : ''}
+          LV95 {gr(lvMitte.E)} / {gr(lvMitte.N)}
+        </div>
+      </div>
+
+      <aside className="tafel">
+        {auswahl.art === 'leer' && (
+          <>
+            <div className="kopf">
+              <p className="ueber">Bestand im Bild</p>
+              <h2>{bestandAn && genugNah ? `${bestand.length} Parzellen nach Marge` : 'Parzelle wählen'}</h2>
+              <p className="sanft">Auf eine Parzelle klicken, um alle Angaben zu sehen.</p>
+            </div>
+            {bestandAn && !genugNah && <p className="sanft block">Näher heranzoomen, dann erscheinen die eigenen Parzellen.</p>}
+            {bestandAn && genugNah && bestand.length === 0 && (
+              <p className="sanft block">Keine eigenen Parzellen in diesem Ausschnitt.</p>
+            )}
+            <div className="karten">
               {bestand.map(f => {
                 const e = f.properties as ParzelleEigenschaften;
                 return (
-                  <div key={String(f.id)} className="row" onClick={() => {
+                  <button type="button" key={String(f.id)} className="eintrag" onClick={() => {
                     const [lat, lon] = mitteVon(f);
                     karte.current?.setView([lat, lon], 19);
+                    markieren(f);
                     eigeneZeigen(String(f.id), e, lat, lon);
                   }}>
-                    <b>{e.parzelle ? `Parz. ${e.parzelle}` : 'Parzelle'} · {e.gemeinde ?? ''}</b>
-                    <div>{e.adresse ?? ''}{e.flaeche ? ` · ${gr(e.flaeche)} m²` : ''}
-                      {e.marge && Number(e.marge) > 0 ? ` · Marge ${gr(e.marge)} CHF` : ''}</div>
-                  </div>
+                    <i style={{ background: margeFarbe(Number(e.marge) || 0) }} />
+                    <span className="text">
+                      <b>{e.adresse ?? (e.parzelle ? `Parzelle ${e.parzelle}` : 'Parzelle')}</b>
+                      <small>{[e.gemeinde, e.zone, e.flaeche ? `${gr(e.flaeche)} m²` : null].filter(Boolean).join(' · ')}</small>
+                    </span>
+                    {Number(e.marge) > 0 && <span className="betrag">{gr(Math.round(Number(e.marge) / 1000))}k</span>}
+                  </button>
                 );
               })}
             </div>
-          </div>
+          </>
+        )}
 
-          <div className="pa">
-            <p className="eyebrow">Datenquellen</p>
-            <dl className="f">
-              <dt>Kataster</dt><dd>ch.kantone.cadastralwebmap-farbe, Kantone und swisstopo</dd>
-              <dt>Grenzen</dt><dd>ch.swisstopo-vd.amtliche-vermessung</dd>
-              <dt>Luftbild</dt><dd>ch.swisstopo.swissimage</dd>
-              <dt>Abfrage</dt><dd>api3.geo.admin.ch, Gebäude- und Wohnungsregister</dd>
-              <dt>Bestand</dt><dd>Eigene Datenbank: Umrisse aus der Amtlichen Vermessung (geodienste.ch), Zone, Marge, Eigentümer</dd>
-            </dl>
-          </div>
-        </aside>
-      </div>
+        {auswahl.art === 'eigen' && (() => {
+          const e = auswahl.e;
+          const z = auswahl.zeile ?? {};
+          const lv = toLV95(auswahl.lat, auswahl.lon);
+          const maps = typeof z.google_maps_url === 'string' ? z.google_maps_url : null;
+          return (
+            <>
+              <div className="kopf">
+                <button type="button" className="zurueck" onClick={() => { setAuswahl({ art: 'leer' }); markieren(null); }}>← Liste</button>
+                <p className="ueber">Parzelle {e.parzelle ?? '–'}{e.gemeinde ? ` · ${e.gemeinde}` : ''}</p>
+                <h2>{e.adresse ?? 'Ohne Adresse'}</h2>
+                <div className="marken">
+                  <span className={`marke ${e.ausgeschlossen ? 'grau' : 'blau'}`}>{e.ausgeschlossen ? 'Ausgeschlossen' : 'Im Bestand'}</span>
+                  {e.zone && <span className="marke">{ZONENARTEN.find(([k]) => k === zonenart(e.zone))?.[1]}</span>}
+                </div>
+              </div>
+
+              <div className="zahlen">
+                <div><small>Fläche</small><b>{e.flaeche ? `${gr(e.flaeche)} m²` : '–'}</b></div>
+                <div><small>Marge</small><b style={{ color: Number(e.marge) > 0 ? margeFarbe(Number(e.marge)) : undefined }}>
+                  {Number(e.marge) > 0 ? `${gr(e.marge)} CHF` : '–'}</b></div>
+                <div className="breit"><small>Zone</small><b>{e.zone || '–'}</b></div>
+                <div className="breit"><small>Eigentümer</small>
+                  <b>{!auswahl.geholt ? '…' : auswahl.eigentuemer ?? <span className="sanft">noch nicht abgefragt</span>}</b></div>
+              </div>
+
+              <div className="aktionen">
+                {e.adresse && <Kopieren wert={e.adresse} text="Adresse kopieren" />}
+                {maps && <a className="knopf" href={maps} target="_blank" rel="noopener">Google Maps</a>}
+                <a className="knopf" href={geoadminLink(auswahl.lat, auswahl.lon, 12)} target="_blank" rel="noopener">Bundes-GIS</a>
+                <Kopieren wert={`${gr(lv.E)} / ${gr(lv.N)}`} text="LV95" />
+              </div>
+
+              {auswahl.zeile && <div className="abschnitt"><AlleFelder z={auswahl.zeile} /></div>}
+              <div className="abschnitt"><Nachbarn parzelleId={auswahl.id} /></div>
+            </>
+          );
+        })()}
+
+        {auswahl.art === 'bund' && (() => {
+          const lv = toLV95(auswahl.lat, auswahl.lon);
+          return (
+            <>
+              <div className="kopf">
+                <button type="button" className="zurueck" onClick={() => { setAuswahl({ art: 'leer' }); markieren(null); }}>← Liste</button>
+                <p className="ueber">Nicht im Bestand</p>
+                <h2>{auswahl.laeuft ? 'Wird abgefragt …' : auswahl.fehler ? 'Abfrage nicht möglich' : 'Angaben vom Bund'}</h2>
+              </div>
+              {!auswahl.laeuft && auswahl.fehler && <p className="sanft block">Der Bundesdienst antwortet nicht.</p>}
+              {!auswahl.laeuft && !auswahl.fehler && auswahl.treffer.length === 0 && (
+                <p className="sanft block">Kein Eintrag an dieser Stelle.</p>
+              )}
+              <div className="karten">
+                {auswahl.treffer.map((t, i) => (
+                  <div key={i} className="eintrag still">
+                    <span className="text">
+                      <b>{t.adresse || t.titel}</b>
+                      <small>{[t.adresse ? t.titel : null, t.info, t.egid ? `EGID ${t.egid}` : null].filter(Boolean).join(' · ')}</small>
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="aktionen">
+                <a className="knopf" href={geoadminLink(auswahl.lat, auswahl.lon, 12)} target="_blank" rel="noopener">Bundes-GIS</a>
+                <Kopieren wert={`${gr(lv.E)} / ${gr(lv.N)}`} text="LV95" />
+              </div>
+            </>
+          );
+        })()}
+      </aside>
     </div>
   );
 }
 
 /** Die Gestaltung der Vorlage, auf diesen Bereich beschränkt. */
 const STIL = `
-.gisk{--paper:#FAFAF8;--surface:#FFFFFF;--surface-2:#F3F4F2;--ink:#14181A;--ink-2:#56605F;--line:#DCE1DF;
-  --accent:#27605A;--accent-soft:#EBF2F0;--warn:#8A6512;--ok:#2C6640;--no:#8C3030;
-  --display:"Schibsted Grotesk","Helvetica Neue",Arial,sans-serif;--mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
-  display:grid;grid-template-rows:auto minmax(0,1fr);position:fixed;inset:0;z-index:50;height:100dvh;
-  background:var(--paper);color:var(--ink);font:15px/1.55 var(--display);-webkit-font-smoothing:antialiased;
-  border:1px solid var(--line);border-radius:6px;overflow:hidden}
+/* Karte zuerst, wie bei Immobilienplattformen: die Karte füllt alles,
+   Leiste, Filter und Tafel schweben darüber. Eine Schrift, ruhige
+   Grautöne, ein Akzent. */
+.gisk{--bg:#F8FAFC;--weiss:#FFFFFF;--fl:#F1F5F9;--tinte:#0F172A;--grau:#64748B;--linie:#E2E8F0;--akzent:#2563EB;
+  --schatten:0 10px 30px -12px rgba(15,23,42,.25),0 2px 6px rgba(15,23,42,.06);
+  position:fixed;inset:0;z-index:50;height:100dvh;background:var(--bg);color:var(--tinte);
+  font:14px/1.5 "Inter","Schibsted Grotesk",-apple-system,"Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
 .gisk *{box-sizing:border-box}
-.gisk header{border-bottom:1px solid var(--line);background:var(--paper);display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;padding:10px 16px}
-.gisk .logo b{font-weight:700;letter-spacing:-0.035em;font-size:1.05rem}
-.gisk .logo span{font-family:var(--mono);font-size:.64rem;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-2);margin-left:8px}
-.gisk .tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.gisk input,.gisk select,.gisk button{font:inherit}
-.gisk input[type=search]{font-size:.88rem;padding:7px 9px;border:1px solid var(--line);border-radius:3px;background:var(--surface);color:var(--ink);min-width:230px}
-.gisk select{font-size:.86rem;padding:7px 9px;border:1px solid var(--line);border-radius:3px;background:var(--surface);color:var(--ink)}
-.gisk .btn{background:var(--accent);color:var(--paper);border:1px solid var(--accent);border-radius:3px;padding:7px 12px;font-size:.86rem;font-weight:500;cursor:pointer;text-decoration:none}
-.gisk .btn.ghost{background:none;color:var(--ink);border-color:var(--line)}
-.gisk .btn.ghost:hover{border-color:var(--accent);color:var(--accent)}
-.gisk .wrap{display:grid;grid-template-columns:minmax(0,1fr) 352px;min-height:0}
-@media (max-width:900px){.gisk{overflow:auto}.gisk .wrap{grid-template-columns:minmax(0,1fr);grid-template-rows:62vh auto}}
-.gisk .alle{margin-top:14px}.gisk .alle summary{cursor:pointer;font:600 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
-.gisk .alle dd{word-break:break-word}
-.gisk .map{height:100%;width:100%;background:var(--surface-2)}
-.gisk aside{border-left:1px solid var(--line);background:var(--surface);overflow-y:auto;min-width:0}
-@media (max-width:900px){.gisk aside{border-left:0;border-top:1px solid var(--line)}}
-.gisk .pa{padding:14px 16px;border-bottom:1px solid var(--line)}
-.gisk .pa h3{margin:0 0 8px;font-size:.95rem;font-weight:600}
-.gisk .eyebrow{font-family:var(--mono);font-size:.63rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin:0 0 6px}
-.gisk dl.f{margin:0;display:grid;grid-template-columns:auto minmax(0,1fr);gap:7px 12px;font-size:.9rem}
-.gisk dl.f dt{font-family:var(--mono);font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);padding-top:3px}
-.gisk dl.f dd{margin:0;min-width:0;word-break:break-word}
-.gisk .copy{font-family:var(--mono);font-size:.78rem;background:var(--surface-2);border:1px solid var(--line);border-radius:3px;padding:4px 8px;color:var(--ink);cursor:pointer;text-align:left}
-.gisk .copy:hover{border-color:var(--accent);color:var(--accent)}
-.gisk .copy.done{border-color:var(--ok);color:var(--ok)}
-.gisk .chip{font-family:var(--mono);font-size:.62rem;letter-spacing:.09em;text-transform:uppercase;padding:3px 7px;border-radius:2px;border:1px solid currentColor;white-space:nowrap}
-.gisk .chip.acc{color:var(--accent)}.gisk .chip.mut{color:var(--ink-2)}.gisk .chip.warn{color:var(--warn)}
-.gisk .hint{font-family:var(--mono);font-size:.67rem;color:var(--ink-2);margin:0}
-.gisk .rows{display:flex;flex-direction:column}
-.gisk .row{padding:10px 16px;margin:0 -16px;border-bottom:1px solid var(--line);cursor:pointer}
-.gisk .row:hover{background:var(--surface-2)}
-.gisk .row b{font-weight:600;font-size:.92rem}
-.gisk .row div{font-family:var(--mono);font-size:.67rem;color:var(--ink-2)}
-.gisk .btnrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
-.gisk a{color:var(--accent)}
-.gisk .readout{position:absolute;left:10px;bottom:10px;z-index:500;background:rgba(255,255,255,.92);border:1px solid var(--line);border-radius:3px;padding:5px 9px;font-family:var(--mono);font-size:.68rem;color:var(--ink-2);white-space:pre}
+.gisk button,.gisk input{font:inherit;color:inherit}
+.gisk a{color:var(--akzent);text-decoration:none}
+.gisk .map{position:absolute;inset:0;background:var(--fl)}
 .gisk .leaflet-container{font:inherit}
-.gisk .nachbarn{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.gisk .leaflet-top.leaflet-left{top:124px;left:16px}
+.gisk .leaflet-bar{border:0!important;box-shadow:var(--schatten)!important;border-radius:12px!important;overflow:hidden}
+.gisk .leaflet-bar a{width:36px!important;height:36px!important;line-height:36px!important;color:var(--tinte)!important;border-color:var(--linie)!important}
+.gisk .leaflet-bottom.leaflet-right{right:416px}
+.gisk .leaflet-control-attribution{background:rgba(255,255,255,.8)!important;border-radius:6px 0 0 0;font-size:10px}
 
-.gisk .legende{position:absolute;z-index:500;left:14px;bottom:56px;background:#fff;border-radius:10px;box-shadow:0 4px 14px rgba(15,23,42,.12);padding:8px 12px;font-size:12px;display:flex;flex-direction:column;gap:3px}
-.gisk .legende i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:7px;vertical-align:-2px}
-.gisk-tip{font:13px/1.4 Inter,Arial,sans-serif;border-radius:8px;border:0;box-shadow:0 4px 14px rgba(15,23,42,.18);padding:7px 10px}
-/* Karte zuerst, wie bei Immobilienplattformen (popety.io u. a.): die
-   Karte füllt alles, Suche und Angaben schweben als Karten darüber. */
-.gisk{--paper:#F6F7F9;--surface:#FFFFFF;--surface-2:#F1F3F6;--ink:#0F172A;--ink-2:#64748B;--line:#E2E8F0;
-  --accent:#1E3A8A;--accent-soft:#EEF2FF;--warn:#B45309;--ok:#15803D;--no:#B91C1C;
-  --display:"Inter","Schibsted Grotesk","Helvetica Neue",Arial,sans-serif;--mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
-  display:block;border:0;border-radius:0;font-size:14px}
-.gisk .wrap{display:block;position:absolute;inset:0}
-.gisk .wrap>div:first-child{position:absolute!important;inset:0}
-.gisk header{position:absolute;z-index:600;top:14px;left:14px;right:404px;border:0;border-radius:14px;
-  background:rgba(255,255,255,.96);box-shadow:0 8px 30px rgba(15,23,42,.14);padding:10px 14px}
-.gisk aside{position:absolute;z-index:600;top:14px;right:14px;bottom:14px;width:376px;border:0;border-radius:14px;
-  box-shadow:0 8px 30px rgba(15,23,42,.14)}
-.gisk .pa{padding:16px 18px}
-.gisk .pa h3{font-size:1.05rem;font-weight:650;letter-spacing:-.01em}
-.gisk input[type=search],.gisk select{border-radius:10px;padding:9px 12px}
-.gisk input[type=search]{min-width:280px;background:var(--surface-2);border-color:transparent}
-.gisk .btn{border-radius:10px;padding:8px 14px}
-.gisk .leaflet-top.leaflet-left{top:140px}.gisk .leaflet-bottom.leaflet-right{right:404px}
-.gisk .readout{left:14px;bottom:14px;border-radius:10px;border:0;box-shadow:0 4px 14px rgba(15,23,42,.12)}
-.gisk .chip{border-radius:999px}
-@media (max-width:900px){.gisk header{right:14px}.gisk aside{top:auto;left:14px;width:auto;height:45vh}}
+.gisk .leiste{position:absolute;z-index:700;top:16px;left:16px;right:416px;display:flex;gap:8px;align-items:center;
+  background:var(--weiss);border-radius:16px;box-shadow:var(--schatten);padding:8px}
+.gisk .rund{width:40px;height:40px;border-radius:12px;border:0;background:var(--fl);cursor:pointer;font-size:18px}
+.gisk .rund:hover{background:var(--linie)}
+.gisk .suche{position:relative;flex:1;min-width:160px}
+.gisk .suche .lupe{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--grau);font-size:20px;line-height:1}
+.gisk .suche input{width:100%;height:40px;border:0;border-radius:12px;background:var(--fl);padding:0 12px 0 36px;outline:none}
+.gisk .suche input:focus{box-shadow:0 0 0 2px var(--akzent) inset;background:var(--weiss)}
+.gisk .suche .liste{position:absolute;top:48px;left:0;right:0;background:var(--weiss);border-radius:12px;box-shadow:var(--schatten);
+  max-height:320px;overflow:auto;padding:6px}
+.gisk .treffer{display:block;width:100%;text-align:left;border:0;background:none;padding:9px 10px;border-radius:8px;cursor:pointer}
+.gisk .treffer:hover{background:var(--fl)}
+.gisk .treffer b{display:block;font-weight:600}.gisk .treffer small{color:var(--grau);font-size:12px}
+.gisk .treffer.eigen b{color:var(--akzent)}
+.gisk .leer{margin:0;padding:9px 10px;color:var(--grau)}
+.gisk .segment{display:flex;background:var(--fl);border-radius:12px;padding:3px}
+.gisk .segment button{border:0;background:none;padding:7px 12px;border-radius:9px;cursor:pointer;color:var(--grau);font-weight:500}
+.gisk .segment button.an{background:var(--weiss);color:var(--tinte);box-shadow:0 1px 3px rgba(15,23,42,.12)}
+.gisk .schalter{height:40px;border:1px solid var(--linie);background:var(--weiss);border-radius:12px;padding:0 14px;cursor:pointer;font-weight:500;color:var(--grau)}
+.gisk .schalter.an{background:var(--tinte);border-color:var(--tinte);color:#fff}
+
+.gisk .filter{position:absolute;z-index:650;top:76px;left:16px;right:416px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.gisk .filter .titel{font-size:12px;font-weight:600;color:var(--grau);background:var(--weiss);padding:6px 10px;border-radius:999px;box-shadow:var(--schatten)}
+.gisk .filter button{border:0;background:var(--weiss);padding:6px 12px;border-radius:999px;cursor:pointer;font-size:13px;font-weight:500;box-shadow:var(--schatten)}
+.gisk .filter button.an{background:var(--akzent);color:#fff}
+
+.gisk .unten{position:absolute;z-index:650;left:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.gisk .legende{background:var(--weiss);border-radius:12px;box-shadow:var(--schatten);padding:8px 12px;display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--grau)}
+.gisk .legende i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.gisk .legende.bild img{max-height:220px;display:block}
+.gisk .readout{background:rgba(255,255,255,.92);border-radius:10px;box-shadow:var(--schatten);padding:6px 10px;font-size:12px;color:var(--grau);font-variant-numeric:tabular-nums}
+
+.gisk .tafel{position:absolute;z-index:700;top:16px;right:16px;bottom:16px;width:384px;background:var(--weiss);
+  border-radius:20px;box-shadow:var(--schatten);overflow-y:auto;padding:20px}
+.gisk .kopf{margin-bottom:16px}
+.gisk .zurueck{border:0;background:none;color:var(--grau);cursor:pointer;padding:0;margin-bottom:10px;font-size:13px}
+.gisk .zurueck:hover{color:var(--tinte)}
+.gisk .ueber{margin:0 0 4px;font-size:12px;font-weight:600;color:var(--grau);letter-spacing:.02em}
+.gisk h2{font-family:inherit!important;margin:0;font-size:22px;line-height:1.2;font-weight:700;letter-spacing:-.02em}
+.gisk .sanft{color:var(--grau);margin:6px 0 0;font-size:13px}
+.gisk .sanft.block{margin:0 0 12px}
+.gisk .marken{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.gisk .marke{font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--fl);color:var(--tinte)}
+.gisk .marke.blau{background:#DBEAFE;color:#1D4ED8}.gisk .marke.grau{color:var(--grau)}
+
+.gisk .zahlen{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.gisk .zahlen>div{background:var(--fl);border-radius:12px;padding:10px 12px;min-width:0}
+.gisk .zahlen .breit{grid-column:1 / -1}
+.gisk .zahlen small{display:block;font-size:11px;font-weight:600;color:var(--grau);margin-bottom:2px}
+.gisk .zahlen b{font-size:15px;font-weight:600;word-break:break-word}
+
+.gisk .aktionen{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.gisk .knopf,.gisk .copy{display:inline-flex;align-items:center;height:32px;padding:0 12px;border-radius:10px;border:1px solid var(--linie);
+  background:var(--weiss);color:var(--tinte);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit}
+.gisk .knopf:hover,.gisk .copy:hover{border-color:var(--tinte)}
+.gisk .copy.done{border-color:#16A34A;color:#16A34A}
+
+.gisk .abschnitt{border-top:1px solid var(--linie);padding-top:14px;margin-top:14px}
+.gisk .alle summary{cursor:pointer;font-weight:600;list-style:none;display:flex;justify-content:space-between}
+.gisk .alle summary::after{content:"＋";color:var(--grau)}
+.gisk .alle[open] summary::after{content:"－"}
+.gisk dl.f{margin:10px 0 0;display:grid;grid-template-columns:minmax(0,44%) minmax(0,1fr);gap:0;font-size:13px}
+.gisk dl.f dt,.gisk dl.f dd{padding:7px 0;border-bottom:1px solid var(--fl);margin:0;min-width:0;word-break:break-word}
+.gisk dl.f dt{color:var(--grau);padding-right:10px}
+
+.gisk .karten{display:flex;flex-direction:column;gap:6px}
+.gisk .eintrag{display:flex;gap:10px;align-items:center;width:100%;text-align:left;border:1px solid var(--linie);background:var(--weiss);
+  border-radius:12px;padding:10px 12px;cursor:pointer}
+.gisk .eintrag:hover{border-color:var(--tinte)}
+.gisk .eintrag.still{cursor:default}
+.gisk .eintrag>i{width:10px;height:36px;border-radius:4px;flex:none}
+.gisk .eintrag .text{flex:1;min-width:0}
+.gisk .eintrag b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gisk .eintrag small{display:block;color:var(--grau);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gisk .betrag{font-weight:700;font-variant-numeric:tabular-nums}
+.gisk-tip{font:13px/1.45 Inter,-apple-system,Arial,sans-serif;border-radius:10px;border:0;box-shadow:0 8px 24px rgba(15,23,42,.2);padding:8px 11px}
+
+@media (max-width:900px){
+  .gisk .leiste{right:16px;flex-wrap:wrap}.gisk .filter{right:16px;top:124px}
+  .gisk .leaflet-top.leaflet-left{top:170px}
+  .gisk .tafel{top:auto;left:16px;width:auto;height:46vh}
+  .gisk .leaflet-bottom.leaflet-right{right:0}
+  .gisk .unten{bottom:calc(46vh + 24px)}
+}
 `;
