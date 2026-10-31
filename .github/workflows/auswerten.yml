@@ -31,6 +31,7 @@ on:
           - eigentuemer  # Jede eingetragene Auskunft, zum Nachpruefen
           - instanzen    # Zeigen Seite und Datenbank auf dasselbe Projekt?
           - regeln       # Wer darf was -- die Zugriffsregeln der Tabellen
+          - plattform    # Was im neuen Modell steht (Zahlen, keine Namen)
       egrid:
         description: 'Nur für "objekt": die EGRID, z.B. CH707709971116'
         required: false
@@ -209,6 +210,34 @@ jobs:
               from properties
               where coalesce(owner_name,'') <> ''
               order by eigentuemer_fetched_at desc nulls last;"
+
+          elif [ "${{ inputs.frage }}" = "plattform" ]; then
+            # Nur Zahlen. Eigentuemernamen sind Personendaten und
+            # haben in einem Ablaufprotokoll nichts verloren -- wer
+            # sie sehen will, sieht sie in der Anwendung.
+            frage "Das neue Modell" "
+              select 'Akteure'                as was, count(*) from public.akteur
+              union all select 'davon Personen',           count(*) from public.akteur where art='person'
+              union all select 'davon Firmen',             count(*) from public.akteur where art='firma'
+              union all select 'davon Institutionen',      count(*) from public.akteur where art='institution'
+              union all select 'davon Erbengemeinschaften', count(*) from public.akteur where art='gemeinschaft'
+              union all select 'Eigentumsbeziehungen',     count(*) from public.eigentum
+              union all select 'Parzellen mit Geometrie',  count(*) from public.properties where geometrie is not null
+              union all select 'Nachbarschaftspaare',      count(*) from public.nachbarschaft;"
+
+            frage "Hat das Zusammenfuehren gewirkt?" "
+              with je as (
+                select akteur_id, count(*) as parzellen
+                from public.eigentum group by 1
+              )
+              select parzellen as parzellen_je_akteur,
+                     count(*)  as so_viele_akteure
+              from je group by 1 order by 1;"
+
+            frage "Was ein Mensch nachsehen muss" "
+              select grund, count(*) as faelle
+              from public.eigentuemer_zu_pruefen
+              group by 1 order by 2 desc;"
 
           elif [ "${{ inputs.frage }}" = "regeln" ]; then
             # Am 31. Oktober stellte sich heraus: zugang_beschraenken
