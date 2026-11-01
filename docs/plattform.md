@@ -470,6 +470,36 @@ an drei Antworten, die nur der Auftraggeber geben kann:
 3. Datenbank-Tarif: die Tabelle properties trägt 396'271 Zeilen;
    Abfragen ohne Index brauchten bis 7 s bei 8 s Grenze.
 
+## 6b. Die Zentrale -- Kundenvorhaben an einem Ort
+
+Ein Kunde meldet ein Vorhaben ("1000 Adressen, entwickeln, in den
+nächsten sechs Monaten" -- oder kaufen, oder verkaufen). Die Zentrale
+führt es durch sechs Schritte: Eingegangen (Adressen beim Bund
+zuordnen, fortsetzbar, vier zugleich), Research (Nachbarn beim Bund,
+mit Bestand und Netzwerk verbunden), Analyse geliefert (Potenzial-
+analyse als PDF), Freigegeben (wer beim Kunden zugestimmt hat, dass
+in seinem Namen angefragt wird), Akquise, Abgeschlossen. Dazu mögliche
+Käufer aus den Investorprofilen, passende Objekte für Käufer und ein
+Verlauf mit Notizen. Tabellen: `vorhaben`, `vorhaben_eintrag`
+(20261101260000_vorhaben.sql).
+
+"Netzwerk" heisst: der Eigentümer eines Nachbarn ist uns als Kontakt,
+Investor, Kunde oder aus einem Gespräch bekannt.
+
+Gemessen am 1. November (Auswerten/vorhaben-probe, zurückgerollt, als
+Konto ohne Admin-Rolle): Vorhaben mit 1025 Adressen, Analyse in
+448 ms; Netzwerk-Nachbar erkannt ("Investor"); das Vorhaben eines
+fremden Teams unsichtbar (0).
+
+Offen: Zonenplanänderungen sind an keine Quelle angebunden; der
+Bericht sagt das ausdrücklich.
+
+Tempo, gemessen (Auswerten/tempo): Abfragen der Hauptbereiche 0.1 bis
+16 ms in der Datenbank. Bündel seit dem 1. November ein Jahr im
+Browser (vorher bei jedem Besuch neu angefragt), React und Supabase in
+eigenen Dateien. /bewertung, /potenzial und /investor antworteten bis
+dahin mit 404; "Was ist live" prüft beides bei jedem Push.
+
 ## 7. Was als Nächstes zu entscheiden ist
 
 1. Kommt die Anmeldung zurück, und in welcher Form -- ganze Seite,
