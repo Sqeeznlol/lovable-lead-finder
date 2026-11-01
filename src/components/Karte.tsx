@@ -229,6 +229,13 @@ const STUFEN: [number, string, string][] = [
   [1_000_000, '#15803D', 'über 1 Mio.'], [500_000, '#65A30D', '0,5–1 Mio.'],
   [100_000, '#CA8A04', '0,1–0,5 Mio.'], [1, '#EA580C', 'bis 0,1 Mio.'], [-Infinity, '#1E3A8A', 'ohne Marge'],
 ];
+/** Google-Maps-Adressen nach https://developers.google.com/maps/documentation/urls -- ohne Schlüssel. */
+export function googleLink([lat, lon]: [number, number], strassenansicht: boolean): string {
+  const p = `${lat.toFixed(6)},${lon.toFixed(6)}`;
+  return strassenansicht
+    ? `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${p}`
+    : `https://www.google.com/maps/search/?api=1&query=${p}`;
+}
 function margeFarbe(m: number) { return (STUFEN.find(([ab]) => m >= ab) ?? STUFEN[4])[1]; }
 
 /** Zonenart aus dem kantonalen Zonennamen -- die Kantone schreiben
@@ -498,6 +505,13 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
    * auf dem iPhone unten zwei Drittel. Gemessen wird, was tatsächlich
    * liegt, statt Zahlen aus dem CSS abzuschreiben.
    */
+  /** Wo die gewählte Parzelle liegt: Mitte des roten Umrisses, sonst der Klickpunkt. */
+  function auswahlOrt(): [number, number] {
+    const b = (markiert.current as L.GeoJSON | null)?.getBounds?.();
+    if (b?.isValid()) { const c = b.getCenter(); return [c.lat, c.lng]; }
+    return 'lat' in auswahl ? [auswahl.lat, auswahl.lon] : [mitte.lat, mitte.lng];
+  }
+
   function hinfliegen(b: L.LatLngBounds, maxZoom = 19) {
     const m = karte.current;
     if (!m || !b.isValid()) return;
@@ -966,7 +980,6 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
           const e = auswahl.e;
           const z = auswahl.zeile ?? {};
           const lv = toLV95(auswahl.lat, auswahl.lon);
-          const maps = typeof z.google_maps_url === 'string' ? z.google_maps_url : null;
           return (
             <>
               <div className="kopf">
@@ -990,7 +1003,14 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
 
               <div className="aktionen">
                 {e.adresse && <Kopieren wert={e.adresse} text="Adresse kopieren" />}
-                {maps && <a className="knopf" href={maps} target={FENSTER.karte}>Google Maps</a>}
+                {/* Google Maps und Street View über die offiziellen Maps-URLs
+                    (ohne Schlüssel erlaubt). Als Grundkarte einbetten liesse
+                    Google nur mit bezahltem API-Schlüssel und eigenem SDK zu;
+                    swisstopo bleibt darum die Karte. Der Ort ist der Umriss,
+                    wenn er da ist -- sonst stünde nach "aus der Liste
+                    öffnen" die Kartenmitte da. */}
+                <button type="button" className="knopf" onClick={() => window.open(googleLink(auswahlOrt(), false), FENSTER.karte)}>Google Maps</button>
+                <button type="button" className="knopf" onClick={() => window.open(googleLink(auswahlOrt(), true), FENSTER.karte)}>Street View</button>
                 <a className="knopf" href={geoadminLink(auswahl.lat, auswahl.lon, 12)} target={FENSTER.karte}>Bundes-GIS</a>
                 <Kopieren wert={`${gr(lv.E)} / ${gr(lv.N)}`} text="LV95" />
               </div>
