@@ -209,6 +209,7 @@ jobs:
             # nicht erreichbar; hier wird die Anfrage mit echten Umrissen
             # nachgestellt. Siehe tools/nachbarn_pruefen.mjs.
             { echo "### Nachbarsuche beim Bund"; echo '```'; node tools/nachbarn_pruefen.mjs; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            ROH=1 node tools/nachbarn_pruefen.mjs | grep '^ROH_' || true
             cat "$GITHUB_STEP_SUMMARY"
             exit 0
 

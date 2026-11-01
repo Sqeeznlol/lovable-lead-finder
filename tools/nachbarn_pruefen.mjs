@@ -19,6 +19,7 @@ async function nachbarn(r, runden) {
     imageDisplay: '600,600,96', lang: 'de' });
   const url = `${API}?${q}`;
   const a = await fetch(url); const t = await a.text(); let n = '-';
+  if (process.env.ROH && !runden && r.flat().length === 23) console.log('ROH_POLY ' + t);
   try { n = JSON.parse(t).results.length; } catch { n = 'keine JSON-Antwort: ' + t.slice(0, 60).replace(/\s+/g, ' '); }
   return `Laenge ${url.length}, HTTP ${a.status}, Treffer ${n}`;
 }
@@ -26,6 +27,9 @@ for (const [name, E, N] of PUNKTE) {
   const u = `${API}?geometryType=esriGeometryPoint&geometry=${E},${N}&sr=2056&tolerance=0&returnGeometry=true&geometryFormat=geojson`
     + `&layers=all:ch.kantone.cadastralwebmap-farbe&mapExtent=${E - 300},${N - 300},${E + 300},${N + 300}&imageDisplay=600,600,96&lang=de`;
   const j = await (await fetch(u)).json(); const g = j?.results?.[0]?.geometry;
+  // Fuer die Nachstellung im Browser: die rohe Antwort des Bundes (nur
+  // amtliche Vermessung, keine Personendaten), eine Zeile je Punkt.
+  if (process.env.ROH && name === 'Stadelhofen') console.log('ROH_PUNKT ' + JSON.stringify(j));
   if (!g) { console.log(`${name}: keine Parzelle`); continue; }
   const r = ringe(g);
   console.log(`${name}: ${g.type}, ${r.flat().length} Eckpunkte`);
