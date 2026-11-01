@@ -45,6 +45,7 @@ on:
           - teams-probe  # Ob ein Konto ausserhalb eines Teams dessen Kunden wirklich nicht sieht (wird zurueckgerollt)
           - potenzial-bund # Was der Bund an einem Punkt zu Bauzone und Parzelle liefert (fuer den Potenzialcheck)
           - anfrage-probe # Ob der oeffentliche Schluessel Anfragen einfuegen, aber nicht lesen kann (wird zurueckgerollt)
+          - amtsblatt-jahr # Ob die Baugesuche des Jahres (Amtsblatt-Export) in Quelle und Datenbank stehen
           - luftbild     # Ob der Bund Luftbilder (SWISSIMAGE) als ein Bild je Ausschnitt liefert
           - tempo        # Wie schnell die Seite und die Abfragen der Hauptbereiche sind
           - vorhaben-probe # Ob die Potenzialanalyse eines Vorhabens mit 1000 Adressen stimmt und wie schnell sie ist (wird zurueckgerollt)
@@ -562,6 +563,20 @@ jobs:
           select 'aui legt Kunden ohne Team an' as fall, count(*) as angelegt
           from mandant m join akteur a on a.id = m.akteur_id where a.name = 'Probe Neu';
           rollback;
+          \echo '```'
+          SQL
+
+          elif [ "$FRAGE" = "amtsblatt-jahr" ]; then
+            { echo "### Baugesuche des Jahres"; echo '```'; python3 tools/amtsblatt_jahr.py 2>&1 || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            psql "$DB" -X -q >> "$GITHUB_STEP_SUMMARY" 2>&1 <<'SQL' || true
+          \echo '```'
+          create temp table ab (id text);
+          \copy ab from '/tmp/ab_ids.txt'
+          select count(*) as amtsblatt,
+                 count(*) filter (where exists (select 1 from baugesuch b where b.publikation_id = ab.id)) as in_datenbank,
+                 (select count(distinct publikation_id) from baugesuch where quelle <> 'probe') as publikationen_in_datenbank,
+                 (select min(publiziert_am) from baugesuch where quelle <> 'probe') as aelteste_in_datenbank
+          from ab;
           \echo '```'
           SQL
 
