@@ -82,6 +82,7 @@ jobs:
           D: ${{ secrets.PIPEDRIVETOKEN }}
           E: ${{ secrets.PIPEDRIVE }}
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          KONTO_AUI: ${{ secrets.KONTO_AUI }}
         run: |
           set -euo pipefail
           # Die erste nicht leere Schreibweise gewinnt.
@@ -111,6 +112,9 @@ jobs:
               | sed 's/VITE_SUPABASE_URL=/URL=/; s/VITE_SUPABASE_PUBLISHABLE_KEY=/KEY=/' \
               | tr -d '"')
           set +a
+          # Der öffentliche Schlüssel darf nichts mehr lesen: angemeldet
+          # als aui (tools/anmelden.sh); die Skripte nehmen TOKEN.
+          TOKEN=$(tools/anmelden.sh); echo "::add-mask::$TOKEN"; export TOKEN
 
           case "${{ inputs.aufgabe }}" in
             probelauf)

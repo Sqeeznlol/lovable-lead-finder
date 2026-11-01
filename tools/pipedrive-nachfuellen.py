@@ -71,7 +71,7 @@ def pd_put(pfad: str, token: str, daten: dict) -> dict:
 def sb_get(pfad: str, url: str, key: str) -> list:
     anfrage = urllib.request.Request(
         f'{url}/rest/v1/{pfad}',
-        headers={'apikey': key, 'Authorization': f'Bearer {key}'})
+        headers={'apikey': key, 'Authorization': f"Bearer {os.environ.get('TOKEN') or key}"})
     with urllib.request.urlopen(anfrage, timeout=120) as r:
         return json.load(r)
 

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { sicher } from '@/lib/html';
 import { Auswahl } from '@/components/Auswahl';
 import L from 'leaflet';
 import { Layers, SlidersHorizontal, X } from 'lucide-react';
@@ -471,9 +472,9 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
         const e = (f.properties ?? {}) as ParzelleEigenschaften;
         // Beim Überfahren schon das Wichtigste, ohne zu klicken.
         schicht.bindTooltip(
-          `<b>${e.parzelle ? 'Parzelle ' + e.parzelle : 'Parzelle'}</b>`
-          + (e.adresse ? `<br>${String(e.adresse)}` : '')
-          + (e.zone ? `<br>${String(e.zone)}` : '')
+          `<b>${e.parzelle ? 'Parzelle ' + sicher(e.parzelle) : 'Parzelle'}</b>`
+          + (e.adresse ? `<br>${sicher(e.adresse)}` : '')
+          + (e.zone ? `<br>${sicher(e.zone)}` : '')
           + (Number(e.marge) > 0 ? `<br>Marge ${gr(Number(e.marge))} CHF` : ''),
           { sticky: true, direction: 'top', className: 'gisk-tip' });
         schicht.on('mouseover', () => (schicht as L.Path).setStyle({ weight: 4, fillOpacity: 0.5 }));
@@ -673,9 +674,9 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
             const f = L.geoJSON(g as GeoJSON.GeoJsonObject, {
               style: { color: farbe, weight: 3, fillColor: farbe, fillOpacity: 0.25 },
             });
-            f.bindTooltip(`<b>${p.adresse ?? 'Parzelle ' + (p.parzelle ?? '')}</b><br>${pf.name}`
-              + (p.rolle ? `<br>${p.rolle}` : '')
-              + (pf.manager.length ? `<br>Manager: ${pf.manager.join(', ')}` : ''),
+            f.bindTooltip(`<b>${sicher(p.adresse ?? 'Parzelle ' + (p.parzelle ?? ''))}</b><br>${sicher(pf.name)}`
+              + (p.rolle ? `<br>${sicher(p.rolle)}` : '')
+              + (pf.manager.length ? `<br>Manager: ${sicher(pf.manager.join(', '))}` : ''),
               { sticky: true, direction: 'top', className: 'gisk-tip' });
             f.on('click', (ev: L.LeafletMouseEvent) => {
               L.DomEvent.stopPropagation(ev);

@@ -4,12 +4,11 @@ import 'leaflet/dist/leaflet.css';
 import { Layers, Maximize2, Minus, Plus } from 'lucide-react';
 import { fondsFarbe, type Fonds, type Kante, type Punkt } from '@/lib/fonds';
 import { lv95NachWgs84 } from '@/lib/koordinaten';
+import { sicher } from '@/lib/html';
 import { GRUNDKARTEN } from '@/lib/karte-ebenen';
 
 const leise = () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 const m2 = (x: number | null) => (x ? `${Math.round(x).toLocaleString('de-CH')} m²` : null);
-// Text in Leaflet-Tooltips ist HTML: Adressen aus Datensätzen nie roh einsetzen.
-const sicher = (s: string) => s.replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 
 /**
  * Das Portfolio auf der Karte (Julian, 1. November: "im Immobilien-

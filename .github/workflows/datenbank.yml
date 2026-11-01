@@ -62,21 +62,26 @@ jobs:
             | tr -d '"' >> "$GITHUB_ENV"
 
       - name: Aufgabe ausführen
+        env:
+          KONTO_AUI: ${{ secrets.KONTO_AUI }}
         run: |
           set -euo pipefail
+          # Der öffentliche Schlüssel darf nichts mehr lesen: angemeldet
+          # als aui, wie die Seite (tools/anmelden.sh).
+          TOKEN=$(tools/anmelden.sh); echo "::add-mask::$TOKEN"
           AUFGABE="${{ inputs.aufgabe }}"
           GRENZE="${{ inputs.grenze }}"
 
           ruf() {   # ruf <funktion> <json-argumente>
             curl -sS -X POST "$URL/rest/v1/rpc/$1" \
-              -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+              -H "apikey: $KEY" -H "Authorization: Bearer $TOKEN" \
               -H "Content-Type: application/json" \
               -d "$2"
           }
 
           hole() {  # hole <pfad-mit-abfrage>
             curl -sS "$URL/rest/v1/$1" \
-              -H "apikey: $KEY" -H "Authorization: Bearer $KEY"
+              -H "apikey: $KEY" -H "Authorization: Bearer $TOKEN"
           }
 
           zaehle() { # zaehle <filter>
@@ -86,7 +91,7 @@ jobs:
             # Datenbank: eine Naeherung, aber immer eine Antwort.
             for modus in exact planned; do
               n=$(curl -sS -o /dev/null -D - "$URL/rest/v1/properties?select=id&$1" \
-                -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+                -H "apikey: $KEY" -H "Authorization: Bearer $TOKEN" \
                 -H "Prefer: count=$modus" -H "Range: 0-0" \
                 | grep -i content-range | tr -d '\r' | sed 's|.*/||')
               case "$n" in
@@ -148,7 +153,7 @@ jobs:
               pfad="rpc/parzellen_karte"
               status=$(curl -sS -o /tmp/karte.json -w '%{http_code}' \
                 -X POST "$URL/rest/v1/$pfad" \
-                -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+                -H "apikey: $KEY" -H "Authorization: Bearer $TOKEN" \
                 -H "Content-Type: application/json" \
                 -d '{"p_west":8.74,"p_sued":47.68,"p_ost":8.76,"p_nord":47.70,"p_menge":500}')
 
@@ -207,7 +212,7 @@ jobs:
               pfad="nachbarschaft?select=grenzlaenge_m,nachbar:properties!nachbarschaft_nachbar_id_fkey(id,area)&limit=3"
               status=$(curl -sS -o /tmp/nachbarn.json -w '%{http_code}' \
                 "$URL/rest/v1/$pfad" \
-                -H "apikey: $KEY" -H "Authorization: Bearer $KEY")
+                -H "apikey: $KEY" -H "Authorization: Bearer $TOKEN")
 
               echo "### Die Abfrage des Browsers" >> "$GITHUB_STEP_SUMMARY"
               echo '```' >> "$GITHUB_STEP_SUMMARY"
@@ -242,7 +247,7 @@ jobs:
               echo '```' >> "$GITHUB_STEP_SUMMARY"
               curl -sS -o /dev/null -D - \
                 "$URL/rest/v1/nachbarschaft?select=parzelle_id" \
-                -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+                -H "apikey: $KEY" -H "Authorization: Bearer $TOKEN" \
                 -H "Prefer: count=exact" -H "Range: 0-0" \
                 | grep -i 'content-range' >> "$GITHUB_STEP_SUMMARY" || true
               echo '```' >> "$GITHUB_STEP_SUMMARY"
@@ -327,14 +332,14 @@ jobs:
                 von=$((seite * 1000))
                 bis=$((von + 999))
                 curl -sS "$URL/rest/v1/properties?select=zone,gemeinde&ausgeschlossen=eq.false&zone=not.is.null&order=id.asc" \
-                  -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+                  -H "apikey: $KEY" -H "Authorization: Bearer $TOKEN" \
                   -H "Range: ${von}-${bis}" >> /tmp/zonen.json
                 echo >> /tmp/zonen.json
               done
 
               # Winterthur gesondert, sonst geht es in der Menge unter.
               curl -sS "$URL/rest/v1/properties?select=zone,gemeinde&ausgeschlossen=eq.false&zone=not.is.null&gemeinde=ilike.*Winterthur*" \
-                -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+                -H "apikey: $KEY" -H "Authorization: Bearer $TOKEN" \
                 -H "Range: 0-999" >> /tmp/zonen.json
 
               python3 tools/zonen-auswerten.py < /tmp/zonen.json >> "$GITHUB_STEP_SUMMARY"
