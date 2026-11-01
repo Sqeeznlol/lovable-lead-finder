@@ -141,6 +141,21 @@ Luftbilder kommen vom Bund (SWISSIMAGE, geo.admin.ch), nicht aus der
 Vorlage. Keine erfundenen Personenfotos, keine Buchstaben-Kästchen als
 Ersatz.
 
+## Prüfen mit den Demo-Szenarien
+
+Dreissig Kundenfälle in `daten/demo-szenarien.json` (erfundene Firmen,
+alle Phasen, 0 bis 1000 Adressen, ein Härtefall mit überlangem Namen)
+sind die Messlatte für die Zentrale. `tools/szenarien-pruefen.cjs`
+öffnet jeden Fall als Liste und Detail auf Desktop und iPhone und
+meldet Querscrollen, abgeschnittenen Text, zu kleine Knöpfe und
+Seitenfehler. Vor jeder Arbeit an der Zentrale laufen lassen:
+
+    npx vite --port 8080 &
+    node tools/szenarien-pruefen.cjs szenarien-bilder
+
+Gefunden hat er beim ersten Lauf: ein langer Kundenname drückte die
+Liste auf dem iPhone auf 663 px Breite, und "1 Adressen".
+
 ## Was bleibt (Julians Regeln)
 
 - Kein Weichzeichner hinter Text: Text muss auch unter Windows scharf

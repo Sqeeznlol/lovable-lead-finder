@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Flag, Handshake, Loader2, MapPin, Network, Search, Sparkles, Users } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useAnalyse, useInvestoren, useKunden, useVerlauf, useVorhabenListe, useZuordnung } from '@/hooks/use-vorhaben';
 import {
@@ -10,8 +10,9 @@ import {
 import { arrondierungErkennen } from '@/lib/arrondierung';
 import { passendeObjekte, type Treffer } from '@/lib/investor';
 import { useQuery } from '@tanstack/react-query';
-import { Abschnitt, FELD, KNOPF, KNOPF_HAUPT, Kopf, Leer, LISTE, Marke, Reiter, Seite } from '@/components/rahmen';
-import { BILD } from '@/lib/luftbild';
+import { Abschnitt, FELD, KNOPF, KNOPF_HAUPT, Kopf, Leer, LISTE, Marke, Reiter, Seite, Strichbalken } from '@/components/rahmen';
+import { BILD, luftbildWgs } from '@/lib/luftbild';
+import { geocode } from '@/lib/swisstopo';
 import { FENSTER } from '@/lib/fenster';
 
 /**
@@ -30,6 +31,25 @@ const chf = (v: number | null | undefined) =>
 const flaeche = (m2: number | null | undefined) => (!m2 ? '–' : m2 >= 100_000 ? `${(m2 / 10_000).toLocaleString('de-CH', { maximumFractionDigits: 1 })} ha` : `${n(m2)} m²`);
 const zeit = (s: string) => new Date(s).toLocaleString('de-CH', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
 const artTitel = (a: Art) => ARTEN.find(x => x[0] === a)?.[1] ?? a;
+// "1 Adressen" stand im Fall mit einem Objekt (Darstellungstest).
+const adressenText = (k: number) => `${n(k)} ${k === 1 ? 'Adresse' : 'Adressen'}`;
+
+/**
+ * Das Luftbild über dem Vorhaben zeigt seinen Ort -- die Parzelle mit
+ * dem grössten Potenzial, sonst die erste Gemeinde --, nicht ein
+ * allgemeines Bild. Bis der Ort gefunden ist (oder wenn nicht), das
+ * Bild der Zentrale.
+ */
+function useOrtsbild(text: string | null) {
+  const [bild, setBild] = useState<string>(BILD.zentrale);
+  useEffect(() => {
+    if (!text) return;
+    const c = new AbortController();
+    geocode(text, c.signal).then(g => { if (g) setBild(luftbildWgs(g.lat, g.lon, 800, 1280)); }).catch(() => {});
+    return () => c.abort();
+  }, [text]);
+  return bild;
+}
 
 type Filter = 'aktiv' | Zustand;
 
@@ -79,19 +99,22 @@ export function Zentrale({ neu: neuVonOben = 0 }: { neu?: number } = {}) {
         </Leer>
       )}
 
-      <ul className="grid gap-3 sm:grid-cols-2">
+      {/* minmax(0, 1fr) statt der Grundeinstellung: sonst bestimmt der
+          längste Kundenname die Spaltenbreite, und auf dem iPhone ragt
+          jede Karte über den Rand (gefunden mit tools/szenarien-pruefen.cjs). */}
+      <ul className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-[repeat(2,minmax(0,1fr))]">
         {liste.map(v => (
-          <li key={v.id}>
+          <li key={v.id} className="min-w-0">
             <button type="button" onClick={() => setOffen(v.id)}
                     className="flex h-full w-full flex-col gap-4 rounded border bg-card p-5 text-left transition-colors hover:border-foreground/30">
               <span className="space-y-1">
                 <span className="flex items-center justify-between gap-3 text-sm font-semibold text-muted-foreground">
-                  <span className="truncate">{v.kunde}</span>
+                  <span className="min-w-0 truncate">{v.kunde}</span>
                   <span className="shrink-0">{artTitel(v.art)}</span>
                 </span>
                 <span className="block text-lg font-semibold leading-snug">{v.titel}</span>
                 <span className="block text-sm text-muted-foreground">
-                  {[v.adressen ? `${n(v.adressen)} Adressen` : null, fristText(v.zeitraum_bis)].filter(Boolean).join(' · ') || 'Ohne Adressen und Frist'}
+                  {[v.adressen ? adressenText(v.adressen) : null, fristText(v.zeitraum_bis)].filter(Boolean).join(' · ') || 'Ohne Adressen und Frist'}
                 </span>
               </span>
               <Fortschritt z={v.zustand} />
@@ -266,6 +289,10 @@ function Detail({ v, onZurueck }: { v: Vorhaben; onZurueck: () => void }) {
     await neuLaden();
   };
 
+  // Vor jedem frühen return: Hooks immer in derselben Reihenfolge.
+  const ortText = a?.top?.[0]?.address ? `${a.top[0].address} ${a.top[0].gemeinde ?? ''}` : (a?.gemeinden?.[0]?.gemeinde ?? v.lagen?.[0] ?? null);
+  const bild = useOrtsbild(ortText);
+
   if (bericht && a) return <Bericht v={v} a={a} onZurueck={() => setBericht(false)} />;
 
   const nr = schrittNr(v.zustand);
@@ -311,49 +338,86 @@ function Detail({ v, onZurueck }: { v: Vorhaben; onZurueck: () => void }) {
     }
   })();
 
+  // Kennzahlen wie auf jeder Seite (DESIGN.md, Seitenaufbau). Beim
+  // Kaufen gibt es keine Adressen des Kunden, nur ein Suchprofil.
+  const offen = zu?.offen ?? a?.offen ?? 0;
+  // Kalendertage wie in fristText -- sonst stand oben "noch 30 Tage"
+  // und in der Kennzahl "noch 29 Tage" (Darstellungstest).
+  const heute = new Date();
+  const tage = v.zeitraum_bis
+    ? Math.round((new Date(v.zeitraum_bis + 'T00:00:00').getTime() - new Date(heute.getFullYear(), heute.getMonth(), heute.getDate()).getTime()) / 864e5)
+    : null;
+  const frist = {
+    titel: 'Frist',
+    wert: v.zeitraum_bis ? new Date(v.zeitraum_bis + 'T00:00:00').toLocaleDateString('de-CH', { month: 'short', year: 'numeric' }) : 'offen',
+    marke: tage == null ? <Marke>keine</Marke>
+      : tage < 0 ? <Marke art="rosa">vorbei</Marke>
+      : tage < 45 ? <Marke art={tage < 30 ? 'rosa' : 'minze'}>noch {tage} {tage === 1 ? 'Tag' : 'Tage'}</Marke>
+      : <Marke art="minze">noch {Math.round(tage / 30.4)} Monate</Marke>,
+  };
+  const kennzahlen = v.art === 'kaufen'
+    ? [
+        { titel: 'Lagen', wert: n(v.lagen?.length ?? 0), marke: <Marke art="lila">{(v.lagen ?? []).slice(0, 2).join(', ') || 'offen'}</Marke> },
+        { titel: 'Objekttypen', wert: n(v.objekttypen?.length ?? 0), marke: <Marke>{(v.objekttypen ?? []).slice(0, 2).join(', ') || 'offen'}</Marke> },
+        { titel: 'Schritt', wert: `${Math.max(1, nr + 1)} / ${SCHRITTE.length}`, marke: <Marke art="violett">{titelVon(v.zustand)}</Marke> },
+        frist,
+      ]
+    : [
+        { titel: 'Adressen', wert: a ? `${n(a.zugeordnet)} / ${n(a.adressen)}` : n(v.adressen),
+          marke: offen ? <Marke art="rosa">{n(offen)} offen</Marke> : <Marke art="minze">zugeordnet</Marke> },
+        // Ohne Wert keine Marke, die etwas behauptet ("0 Parzellen",
+        // "gerechnet" neben einem Strich).
+        { titel: 'Reserve', wert: a ? flaeche(a.hnf_reserve) : '–',
+          marke: a?.mit_reserve ? <Marke art="lila">{n(a.mit_reserve)} {a.mit_reserve === 1 ? 'Parzelle' : 'Parzellen'}</Marke> : <Marke>noch offen</Marke> },
+        { titel: 'Marge', wert: a ? chf(a.marge_chf) : '–',
+          marke: a?.marge_chf ? <Marke art="violett">gerechnet</Marke> : <Marke>noch offen</Marke> },
+        frist,
+      ];
+
   return (
-    <div className="mx-auto max-w-5xl space-y-10">
-      <div className="space-y-4">
+    <div className="space-y-2">
+      <div className="relative z-10 mx-auto max-w-[1400px]">
         <button type="button" onClick={onZurueck} className="-ml-2 inline-flex h-11 items-center gap-1 px-2 text-sm font-medium text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" /> Zentrale
         </button>
-        <Kopf ueber={`${v.kunde} · ${artTitel(v.art)}`} titel={v.titel}>
-          {[v.adressen ? `${n(v.adressen)} Adressen` : null, fristText(v.zeitraum_bis), v.zustaendig].filter(Boolean).join(' · ')}
-        </Kopf>
       </div>
+      <Seite bild={bild} ueber={`${v.kunde} · ${artTitel(v.art)}`} titel={v.titel}
+        unter={[v.adressen ? adressenText(v.adressen) : null, fristText(v.zeitraum_bis), v.zustaendig ? `zuständig ${v.zustaendig}` : null].filter(Boolean).join(' · ')}
+        kennzahlen={kennzahlen}
+        aktionen={a && v.art !== 'kaufen' ? <button type="button" className={KNOPF} onClick={() => setBericht(true)}>Als PDF für den Kunden</button> : undefined}
+        seite={<Verlauf v={v} eintraege={verlauf ?? []} />}>
 
-      {/* Die Schritte, und darunter genau das, was jetzt zu tun ist. */}
-      <section className="space-y-5 rounded border bg-card p-5 sm:p-6">
-        <ol className="grid grid-cols-6 gap-1.5">
-          {SCHRITTE.map((s, i) => (
-            <li key={s.z} className="space-y-2">
-              <span className={`block h-1 rounded-[1px] ${!pausiert && i <= nr ? 'bg-foreground' : 'bg-border'}`} />
-              <span className={`hidden text-xs sm:block ${i === nr ? 'font-semibold' : 'text-muted-foreground'}`}>{s.titel}</span>
-            </li>
-          ))}
-        </ol>
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="min-w-0 space-y-1">
-            <p className="font-semibold">{titelVon(v.zustand)}</p>
-            <p className="text-sm text-muted-foreground">{lauf ?? handlung.text}</p>
-          </div>
-          {/* Auf dem Handy untereinander und volle Breite, die Haupthandlung
-              oben -- wie ein Aktionsblatt. Ab Tablet in einer Reihe. */}
-          <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
-            {lauf && <Loader2 className="h-5 w-5 animate-spin self-center text-muted-foreground" />}
-            {!pausiert && v.zustand !== 'abgeschlossen' && (
-              <button type="button" onClick={() => schritt('pausiert')} className="inline-flex h-11 items-center justify-center px-3 text-sm text-muted-foreground hover:text-foreground">Pausieren</button>
-            )}
-            {handlung.knopf}
-          </div>
-        </div>
-      </section>
+        {/* Die Schritte, und darunter genau das, was jetzt zu tun ist. */}
+        <Abschnitt titel={titelVon(v.zustand)} unter={pausiert ? 'Das Vorhaben ruht' : `Schritt ${Math.max(1, nr + 1)} von ${SCHRITTE.length}`} symbol={Flag} kachel="schwarz">
+          <section className="space-y-5 rounded border bg-card p-5 sm:p-6">
+            <ol className="grid grid-cols-6 gap-1.5">
+              {SCHRITTE.map((s2, i) => (
+                <li key={s2.z} className="min-w-0 space-y-2">
+                  <span className={`block h-1 rounded-[1px] ${!pausiert && i <= nr ? 'bg-foreground' : 'bg-border'}`} />
+                  <span className={`hidden truncate text-xs sm:block ${i === nr ? 'font-semibold' : 'text-muted-foreground'}`}>{s2.titel}</span>
+                </li>
+              ))}
+            </ol>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <p className="min-w-0 text-sm text-muted-foreground">{lauf ?? handlung.text}</p>
+              {/* Auf dem Handy untereinander und volle Breite, die Haupthandlung
+                  oben -- wie ein Aktionsblatt. Ab Tablet in einer Reihe. */}
+              <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
+                {lauf && <Loader2 className="h-5 w-5 animate-spin self-center text-muted-foreground" />}
+                {!pausiert && v.zustand !== 'abgeschlossen' && (
+                  <button type="button" onClick={() => schritt('pausiert')} className="inline-flex h-11 items-center justify-center px-3 text-sm text-muted-foreground hover:text-foreground">Pausieren</button>
+                )}
+                {handlung.knopf}
+              </div>
+            </div>
+          </section>
+        </Abschnitt>
 
-      {isLoading && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Potenzialanalyse wird gerechnet …</p>}
-      {a && <Analyseteil v={v} a={a} onBericht={() => setBericht(true)} />}
+        {isLoading && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Potenzialanalyse wird gerechnet …</p>}
+        {a && <Analyseteil v={v} a={a} />}
 
-      {v.portfolio_id && <Adressen v={v} zu={zu} onNeu={neuLaden} />}
-      <Verlauf v={v} eintraege={verlauf ?? []} />
+        {v.portfolio_id && <Adressen v={v} zu={zu} onNeu={neuLaden} />}
+      </Seite>
     </div>
   );
 }
@@ -368,7 +432,7 @@ function Kachel({ titel, wert, zeile }: { titel: string; wert: string; zeile?: s
   );
 }
 
-function Analyseteil({ v, a, onBericht }: { v: Vorhaben; a: Analyse; onBericht: () => void }) {
+function Analyseteil({ v, a }: { v: Vorhaben; a: Analyse }) {
   const { data: investoren } = useInvestoren(v.art !== 'kaufen');
   const kaeufer = useMemo(() => kaeuferAbgleich(investoren ?? [], a.lage_art ?? []), [investoren, a.lage_art]);
   const { data: objekte } = useQuery({
@@ -380,23 +444,45 @@ function Analyseteil({ v, a, onBericht }: { v: Vorhaben; a: Analyse; onBericht: 
 
   return (
     <>
-      <Abschnitt titel="Potenzialanalyse" rechts={<button type="button" className={KNOPF} onClick={onBericht}>Als PDF für den Kunden</button>}>
+      {/* Adressen, Reserve und Marge stehen oben in den Kennzahlen; hier
+          das, was die Analyse über die Nachbarschaft weiss. */}
+      <Abschnitt titel="Nachbarn und Netzwerk" unter={`${n(a.gepruefte_positionen)} von ${n(a.zugeordnet)} Parzellen geprüft`} symbol={Users} kachel="akzent">
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Kachel titel="Adressen" wert={`${n(a.zugeordnet)} / ${n(a.adressen)}`} zeile="beim Bund zugeordnet" />
-          <Kachel titel="Fläche" wert={flaeche(a.flaeche_m2)} zeile="Grundstücke zusammen" />
-          <Kachel titel="Reserve" wert={flaeche(a.hnf_reserve)} zeile={`Hauptnutzfläche, ${n(a.mit_reserve)} Parzellen`} />
-          <Kachel titel="Marge" wert={chf(a.marge_chf)} zeile="gerechnet, lagegerecht" />
-        </div>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Kachel titel="Nachbarn" wert={n(a.nachbarn)} zeile={`im Bestand, ${n(a.gepruefte_positionen)} Parzellen geprüft`} />
-          <Kachel titel="Eigentümer bekannt" wert={n(a.nachbarn_mit_eigentuemer)} zeile="davon direkt anfragbar" />
+          <Kachel titel="Nachbarn" wert={n(a.nachbarn)} zeile="im Bestand" />
+          <Kachel titel="Eigentümer bekannt" wert={n(a.nachbarn_mit_eigentuemer)} zeile="direkt anfragbar" />
           <Kachel titel="Im Netzwerk" wert={n(a.netzwerk.length)} zeile="Nachbarn, die wir kennen" />
-          <Kachel titel="Ausserhalb" wert={n(a.nachbarn_ausserhalb)} zeile="Nachbarn noch nicht im Bestand" />
+          <Kachel titel="Ausserhalb" wert={n(a.nachbarn_ausserhalb)} zeile="noch nicht im Bestand" />
         </div>
       </Abschnitt>
 
+      {(a.gemeinden.length > 0 || a.zonen.length > 0) && (
+        <Abschnitt titel="Wo es liegt" unter="Parzellen je Gemeinde und Zone" symbol={MapPin} kachel="hell">
+          <div className="grid gap-3 lg:grid-cols-2">
+            {[{ t: 'Gemeinden', z: a.gemeinden.map(g => ({ k: g.gemeinde, n: g.n })), f: 'akzent' as const },
+              { t: 'Zonen', z: a.zonen.map(g => ({ k: g.zone, n: g.n })), f: 'heiss' as const }]
+              .filter(x => x.z.length).map(x => {
+                const max = Math.max(...x.z.map(y => y.n), 1);
+                return (
+                  <div key={x.t} className="space-y-3 rounded border bg-card p-5">
+                    <p className="text-sm font-semibold text-muted-foreground">{x.t}</p>
+                    <ul className="space-y-3">
+                      {x.z.map(y => (
+                        <li key={y.k} className="grid grid-cols-[minmax(0,8rem)_minmax(0,1fr)_3.5rem] items-center gap-3 text-sm">
+                          <span className="truncate">{y.k}</span>
+                          <Strichbalken anteil={y.n / max} farbe={x.f} />
+                          <span className="text-right tabular">{n(y.n)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })}
+          </div>
+        </Abschnitt>
+      )}
+
       {a.netzwerk.length > 0 && (
-        <Abschnitt titel="Nachbarn im Netzwerk" zahl={a.netzwerk.length}
+        <Abschnitt titel="Nachbarn im Netzwerk" zahl={a.netzwerk.length} symbol={Network} kachel="heiss"
                    hinweis="Der Eigentümer ist uns bekannt. Hier lässt sich sagen: der Nachbar ist bei uns im Netzwerk, gemeinsam liesse sich mehr entwickeln oder beides zukaufen.">
           <ul className={LISTE}>
             {a.netzwerk.map((x, i) => (
@@ -416,7 +502,7 @@ function Analyseteil({ v, a, onBericht }: { v: Vorhaben; a: Analyse; onBericht: 
       )}
 
       {v.art !== 'kaufen' && (
-        <Abschnitt titel="Mögliche Käufer" zahl={kaeufer.length || undefined}
+        <Abschnitt titel="Mögliche Käufer" zahl={kaeufer.length || undefined} symbol={Handshake} kachel="akzent"
                    hinweis="Investoren, deren Suchprofil Objekte dieses Vorhabens trifft, nach Gemeinde und Objektart. Den Preis führt der Bestand nicht.">
           {kaeufer.length === 0 ? (
             <Leer titel="Noch kein passendes Suchprofil.">Investorprofile entstehen aus Gesprächen und Anfragen unter Auswertung.</Leer>
@@ -437,7 +523,7 @@ function Analyseteil({ v, a, onBericht }: { v: Vorhaben; a: Analyse; onBericht: 
       )}
 
       {v.art === 'kaufen' && (
-        <Abschnitt titel="Passende Objekte" zahl={objekte?.objekte.length || undefined} hinweis={objekte?.hinweis ?? `Gesucht: ${[...(v.lagen ?? []), ...(v.objekttypen ?? [])].join(', ') || 'kein Suchprofil'}.`}>
+        <Abschnitt titel="Passende Objekte" zahl={objekte?.objekte.length || undefined} symbol={Search} kachel="akzent" hinweis={objekte?.hinweis ?? `Gesucht: ${[...(v.lagen ?? []), ...(v.objekttypen ?? [])].join(', ') || 'kein Suchprofil'}.`}>
           {(objekte?.objekte ?? []).length === 0 ? <Leer titel="Nichts gefunden." /> : (
             <ul className={LISTE}>
               {(objekte?.objekte ?? []).map((o: Treffer) => (
@@ -454,26 +540,32 @@ function Analyseteil({ v, a, onBericht }: { v: Vorhaben; a: Analyse; onBericht: 
         </Abschnitt>
       )}
 
-      {a.top.length > 0 && (
-        <Abschnitt titel="Grösstes Potenzial" zahl={a.top.length}>
-          <ul className={LISTE}>
-            {a.top.map((t, i) => (
-              <li key={i} className="flex items-center justify-between gap-4 px-5 py-4">
-                <span className="min-w-0">
-                  <span className="block font-semibold">{t.address ?? '–'}</span>
-                  <span className="block text-sm text-muted-foreground">
-                    {[t.gemeinde, t.zone, t.area ? `${n(t.area)} m²` : null, t.nachbarn ? `${t.nachbarn} Nachbarn` : null].filter(Boolean).join(' · ')}
+      {a.top.length > 0 && (() => {
+        const max = Math.max(...a.top.map(t => t.marge_chf ?? 0), 1);
+        return (
+          <Abschnitt titel="Grösstes Potenzial" zahl={a.top.length} unter="Nach gerechneter Marge" symbol={Sparkles} kachel="schwarz">
+            <ul className={LISTE}>
+              {a.top.map((t, i) => (
+                <li key={i} className="flex items-center justify-between gap-4 px-5 py-4">
+                  <span className="min-w-0 flex-1 space-y-2">
+                    <span className="block">
+                      <span className="block font-semibold">{t.address ?? '–'}</span>
+                      <span className="block text-sm text-muted-foreground">
+                        {[t.gemeinde, t.zone, t.area ? `${n(t.area)} m²` : null, t.nachbarn ? `${t.nachbarn} ${t.nachbarn === 1 ? 'Nachbar' : 'Nachbarn'}` : null].filter(Boolean).join(' · ')}
+                      </span>
+                    </span>
+                    <span className="block max-w-xs"><Strichbalken anteil={(t.marge_chf ?? 0) / max} farbe="akzent" /></span>
                   </span>
-                </span>
-                <span className="shrink-0 text-right">
-                  <span className="block font-semibold">{chf(t.marge_chf)}</span>
-                  {t.egrid && <a href={`https://map.geo.admin.ch/?swisssearch=${t.egrid}&lang=de`} target={FENSTER.karte} className="-my-2 inline-flex h-11 items-center text-sm text-accent">Karte</a>}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </Abschnitt>
-      )}
+                  <span className="shrink-0 text-right">
+                    <span className="block font-semibold text-violett">{chf(t.marge_chf)}</span>
+                    {t.egrid && <a href={`https://map.geo.admin.ch/?swisssearch=${t.egrid}&lang=de`} target={FENSTER.karte} className="-my-2 inline-flex h-11 items-center text-sm text-accent">Karte</a>}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Abschnitt>
+        );
+      })()}
     </>
   );
 }
