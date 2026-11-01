@@ -59,13 +59,24 @@ export const BAUZONEN: Ebene = {
 export interface Ausschnitt3857 { west: number; sued: number; ost: number; nord: number }
 
 /**
- * Grösstes Bild je Seite, das wir vom Dienst verlangen. Der Wert ist
- * nicht gemessen -- aus der Entwicklungsumgebung ist der Dienst nicht
- * erreichbar -- sondern die übliche Grenze von Kartendiensten. Liefert
- * der Dienst mehr, darf er steigen; liefert er weniger, bleibt die
- * Ebene leer, und dann ist das die erste Zahl, die man ändert.
+ * Grösstes Bild je Seite, das wir vom Dienst verlangen.
+ *
+ * Gemessen am 1. November (Ablauf "Auswerten", Frage "kartendienst"):
+ * Die Capabilities nennen 10000 je Seite. 4096x4096 kam als Bild mit
+ * 4.2 MB; 8192x8192 nur mit 261 KB -- das ist kein Bild mehr, sondern
+ * ein Fehler als PNG. Also 4096: scharf auf Retina bis 2048 Pixel
+ * Breite, und kein Bild über fünf Megabyte.
  */
-export const WMS_MAX = 2048;
+export const WMS_MAX = 4096;
+
+/**
+ * Die Ringe eines Polygons in der Form, die der Bundesdienst `identify`
+ * als Geometrie erwartet (ESRI-JSON). GeoJSON und ESRI nennen die Ringe
+ * gleich, nur die Hülle heisst anders; ein MultiPolygon wird flach.
+ */
+export function esriRinge(g: GeoJSON.Polygon | GeoJSON.MultiPolygon): number[][][] {
+  return g.type === 'Polygon' ? g.coordinates : g.coordinates.flat();
+}
 
 /**
  * Die Adresse für ein einzelnes WMS-Bild über den ganzen Ausschnitt.

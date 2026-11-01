@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Loader2, Map } from 'lucide-react';
 import { useNachbarn } from '@/hooks/use-nachbarn';
 
@@ -12,9 +13,12 @@ import { useNachbarn } from '@/hooks/use-nachbarn';
 export function Nachbarn({
   parzelleId,
   onOeffnen,
+  ohneUmriss,
 }: {
   parzelleId: string;
   onOeffnen?: (id: string) => void;
+  /** Was stattdessen steht, wenn kein Umriss eingelesen ist -- etwa die Nachbarn vom Bund. */
+  ohneUmriss?: ReactNode;
 }) {
   const { data, isLoading } = useNachbarn(parzelleId);
 
@@ -35,9 +39,11 @@ export function Nachbarn({
         <Map className="h-4 w-4 text-muted-foreground" />
         <h3 className="text-sm font-medium">
           Angrenzende Grundstücke
-          <span className="ml-2 text-xs font-normal text-muted-foreground">
-            {nachbarn.length}
-          </span>
+          {umrissDa && (
+            <span className="ml-2 text-xs font-normal text-muted-foreground">
+              {nachbarn.length}
+            </span>
+          )}
         </h3>
       </div>
 
@@ -45,13 +51,13 @@ export function Nachbarn({
           geladen, Umriss da aber ohne Nachbarn, oder Nachbarn.
           Frueher erschien in den ersten beiden Faellen gar nichts --
           dann sieht es aus, als gaebe es die Funktion nicht. */}
-      {!umrissDa && (
+      {!umrissDa && (ohneUmriss ?? (
         <p className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
           Für dieses Grundstück ist noch kein Umriss eingelesen. Die
           Nachbarn stehen erst da, wenn die amtliche Vermessung des
           Kantons geladen ist.
         </p>
-      )}
+      ))}
       {umrissDa && nachbarn.length === 0 && (
         <p className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
           Keine angrenzenden Grundstücke im Bestand — die Nachbarn

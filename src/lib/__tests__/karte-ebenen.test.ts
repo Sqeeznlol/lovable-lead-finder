@@ -4,7 +4,7 @@
  * das nicht wieder zu.
  */
 import { describe, expect, it } from 'vitest';
-import { BAUZONEN, GRENZEN, GRUNDKARTEN, WMS_MAX, wmsAdresse } from '@/lib/karte-ebenen';
+import { BAUZONEN, GRENZEN, GRUNDKARTEN, WMS_MAX, esriRinge, wmsAdresse } from '@/lib/karte-ebenen';
 
 describe('Kartenebenen', () => {
   it('jede Grundkarte ist genau eine deckende Kachelebene', () => {
@@ -47,8 +47,21 @@ describe('Ein WMS-Bild statt Kacheln', () => {
     expect(u.searchParams.get('FORMAT')).toBe('image/png');
   });
 
-  it('hat einen Deckel für die Bildgrösse', () => {
+  it('hat einen Deckel für die Bildgrösse, nicht über dem, was gemessen noch ein Bild war', () => {
     expect(WMS_MAX).toBeGreaterThanOrEqual(1024);
     expect(WMS_MAX).toBeLessThanOrEqual(4096);
+  });
+});
+
+describe('Ringe für identify', () => {
+  it('nimmt ein Polygon so, wie es ist', () => {
+    const g: GeoJSON.Polygon = { type: 'Polygon', coordinates: [[[1, 1], [2, 1], [2, 2], [1, 1]]] };
+    expect(esriRinge(g)).toEqual([[[1, 1], [2, 1], [2, 2], [1, 1]]]);
+  });
+  it('macht ein MultiPolygon flach', () => {
+    const g: GeoJSON.MultiPolygon = { type: 'MultiPolygon',
+      coordinates: [[[[1, 1], [2, 1], [2, 2], [1, 1]]], [[[5, 5], [6, 5], [6, 6], [5, 5]]]] };
+    expect(esriRinge(g)).toHaveLength(2);
+    expect(esriRinge(g)[1][0]).toEqual([5, 5]);
   });
 });

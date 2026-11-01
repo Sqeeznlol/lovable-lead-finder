@@ -3,6 +3,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useParzellenImAusschnitt, type Ausschnitt, type ParzelleEigenschaften } from '@/hooks/use-karte';
 import { Nachbarn } from '@/components/Nachbarn';
+import { NachbarnBund } from '@/components/NachbarnBund';
 import { supabase } from '@/integrations/supabase/client';
 import { FENSTER } from '@/lib/fenster';
 import { BAUZONEN, GRENZEN, GRUNDKARTEN, WMS_MAX, wmsAdresse, type Ebene, type Grund } from '@/lib/karte-ebenen';
@@ -250,12 +251,17 @@ function wertZeigen(v: unknown) {
   return t;
 }
 
+/** Ein Umriss vom Bund, in LV95 -- so, wie identify ihn liefert. */
+type Umriss = GeoJSON.Polygon | GeoJSON.MultiPolygon;
+
 type Auswahl =
   | { art: 'leer' }
   | { art: 'eigen'; id: string; e: ParzelleEigenschaften; lat: number; lon: number;
-      eigentuemer?: string | null; geholt: boolean; zeile?: Record<string, unknown> | null }
+      eigentuemer?: string | null; geholt: boolean; zeile?: Record<string, unknown> | null;
+      umriss?: Umriss | null; egrid?: string | null }
   | { art: 'bund'; lat: number; lon: number; laeuft: boolean; fehler?: boolean;
-      treffer: { titel: string; adresse: string; info: string; egid?: string }[] };
+      treffer: { titel: string; adresse: string; info: string; egid?: string }[];
+      umriss?: Umriss | null; egrid?: string | null };
 
 interface Treffer { label: string; origin: string; lat: number; lon: number; eigen?: { id: string; e: ParzelleEigenschaften } }
 
@@ -423,6 +429,10 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
   async function bundAbfragen(lat: number, lon: number) {
     const lv = toLV95(lat, lon);
     setAuswahl({ art: 'bund', lat, lon, laeuft: true, treffer: [] });
+    // Umriss und EGRID vom Bund bleiben erhalten: daran hängen die
+    // Nachbarn dort, wo der Kanton noch nicht eingelesen ist.
+    let umriss: Umriss | null = null;
+    let egridBund: string | null = null;
     // Erst fragen, welche Parzelle hier liegt, und sie per EGRID im
     // eigenen Bestand suchen -- auch dort, wo noch kein Umriss geladen ist.
     try {
@@ -435,24 +445,27 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
       const erster = kj?.results?.[0];
       markieren(null);
       if (erster?.geometry) {
+        umriss = erster.geometry as Umriss;
         const um = (c: unknown): unknown => Array.isArray(c) && typeof c[0] === 'number'
           ? (([la, lo]) => [lo, la])(fromLV95(c[0] as number, c[1] as number)) : (c as unknown[]).map(um);
         markieren({ type: 'Feature', properties: {},
           geometry: { ...erster.geometry, coordinates: um(erster.geometry.coordinates) } } as GeoJSON.Feature);
       }
-      // Den Attributnamen kenne ich nicht sicher; die EGRID erkennt man
-      // an ihrer Form, also wird nach der Form gesucht.
+      // Gemessen am 1. November: die EGRID steht in `egris_egrid`.
+      // Gesucht wird trotzdem nach der Form -- ändert der Dienst den
+      // Namen, fällt es so nicht still aus.
       const egrid = (kj?.results ?? []).flatMap((x: { attributes?: Record<string, unknown>; properties?: Record<string, unknown> }) =>
         Object.values({ ...x.attributes, ...x.properties })).map(String).find((v: string) => /^CH[0-9A-Z]{12}$/.test(v));
+      egridBund = egrid ?? null;
       if (egrid) {
         const { data: p } = await supabase.from('properties').select('*').eq('egrid', egrid).maybeSingle();
         const z = p as Record<string, unknown> | null;
         if (z) {
           setAuswahl({
             art: 'eigen', id: String(z.id), lat, lon, geholt: true, zeile: z,
+            umriss, egrid,
             eigentuemer: (z.owner_name as string) ?? null,
-            e: { parzelle: z.plot_number, adresse: z.address, gemeinde: z.gemeinde ?? z.municipality,
-                 zone: z.zone, flaeche: z.area, marge: z.marge } as unknown as ParzelleEigenschaften,
+            e: eigenschaftenAus(z),
           });
           return;
         }
@@ -466,7 +479,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
       const j = await (await fetch(url)).json();
       const res = (j?.results ?? []).slice(0, 4);
       setAuswahl({
-        art: 'bund', lat, lon, laeuft: false,
+        art: 'bund', lat, lon, laeuft: false, umriss, egrid: egridBund,
         treffer: res.map((r: { layerName?: string; layerBodId?: string; attributes?: Record<string, string> }) => {
           const a = r.attributes ?? {};
           const adresse = [a.strname_deinr || a.strname1 || '', a.plz_plz6 || a.dplz4 || '', a.ggdename || '']
@@ -478,8 +491,27 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
         }),
       });
     } catch {
-      setAuswahl({ art: 'bund', lat, lon, laeuft: false, fehler: true, treffer: [] });
+      setAuswahl({ art: 'bund', lat, lon, laeuft: false, fehler: true, treffer: [], umriss, egrid: egridBund });
     }
+  }
+
+  /** Die Kopfangaben einer Zeile des Bestands, wie die Kartenfunktion sie liefern würde. */
+  function eigenschaftenAus(z: Record<string, unknown>): ParzelleEigenschaften {
+    return { parzelle: z.plot_number, adresse: z.address, gemeinde: z.gemeinde ?? z.municipality,
+             zone: z.zone, flaeche: z.area, marge: z.marge_chf ?? z.marge,
+             ausgeschlossen: z.ausgeschlossen } as unknown as ParzelleEigenschaften;
+  }
+
+  // Eine Parzelle des Bestands per Kennung öffnen -- aus der Nachbarliste.
+  async function oeffnePerId(id: string) {
+    const { data: p } = await supabase.from('properties').select('*').eq('id', id).maybeSingle();
+    const z = p as Record<string, unknown> | null;
+    if (!z) return;
+    markieren(null);
+    setAuswahl({
+      art: 'eigen', id, lat: mitte.lat, lon: mitte.lng, geholt: true, zeile: z,
+      eigentuemer: (z.owner_name as string) ?? null, e: eigenschaftenAus(z),
+    });
   }
 
   // ------------------------------------------------------------ Suche
@@ -735,7 +767,12 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
               </div>
 
               {auswahl.zeile && <div className="abschnitt"><AlleFelder z={auswahl.zeile} /></div>}
-              <div className="abschnitt"><Nachbarn parzelleId={auswahl.id} /></div>
+              <div className="abschnitt">
+                <Nachbarn parzelleId={auswahl.id} onOeffnen={oeffnePerId}
+                  ohneUmriss={auswahl.umriss
+                    ? <NachbarnBund umriss={auswahl.umriss} egrid={auswahl.egrid} onOeffnen={oeffnePerId} />
+                    : undefined} />
+              </div>
             </>
           );
         })()}
@@ -767,6 +804,11 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
                 <a className="knopf" href={geoadminLink(auswahl.lat, auswahl.lon, 12)} target={FENSTER.karte}>Bundes-GIS</a>
                 <Kopieren wert={`${gr(lv.E)} / ${gr(lv.N)}`} text="LV95" />
               </div>
+              {auswahl.umriss && (
+                <div className="abschnitt">
+                  <NachbarnBund umriss={auswahl.umriss} egrid={auswahl.egrid} onOeffnen={oeffnePerId} />
+                </div>
+              )}
             </>
           );
         })()}
