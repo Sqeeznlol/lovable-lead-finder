@@ -598,6 +598,11 @@ jobs:
           select pg_temp.mess('Gelegenheiten', $q$select g.*, (select count(*) from gelegenheit_parzelle gp where gp.gelegenheit_id = g.id) from gelegenheit g limit 500$q$);
           select bereich, ms from zeiten;
           \echo '```'
+          \echo '### Plan der Uebersicht (zweimal: kalt, warm)'
+          \echo '```'
+          explain (analyze, buffers, costs off, timing on) select id, address, gemeinde, plz, parzelle, plot_number, egrid, owner_phone, bfs_nr, kanton, zone, ausnuetzung, area, gebaeudeflaeche, geschosse, baujahr, owner_name, eigentuemer_name, hnf_delta, marge_chf, preselection_status from properties where ausgeschlossen = false and kanton = 'ZH' and hnf_delta is not null order by hnf_delta desc nulls last limit 1000;
+          explain (analyze, buffers, costs off, timing on) select id, address, gemeinde, plz, parzelle, plot_number, egrid, owner_phone, bfs_nr, kanton, zone, ausnuetzung, area, gebaeudeflaeche, geschosse, baujahr, owner_name, eigentuemer_name, hnf_delta, marge_chf, preselection_status from properties where ausgeschlossen = false and kanton = 'ZH' and hnf_delta is not null order by hnf_delta desc nulls last limit 1000;
+          \echo '```'
           SQL
 
           elif [ "$FRAGE" = "vorhaben-probe" ]; then
