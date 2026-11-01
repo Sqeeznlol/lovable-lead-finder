@@ -5,6 +5,7 @@ import { useParzellenImAusschnitt, type Ausschnitt, type ParzelleEigenschaften }
 import { Nachbarn } from '@/components/Nachbarn';
 import { NachbarnBund } from '@/components/NachbarnBund';
 import { usePortfolios, umrissVomBund, type Portfolio } from '@/hooks/use-portfolio';
+import { eigentuemerParzellen, eigentuemerSuchen, type EigentuemerTreffer } from '@/hooks/use-eigentuemer-suche';
 import { supabase } from '@/integrations/supabase/client';
 import { FENSTER } from '@/lib/fenster';
 import { BAUZONEN, GRENZEN, GRUNDKARTEN, WMS_MAX, wmsAdresse, type Ebene, type Grund } from '@/lib/karte-ebenen';
@@ -271,7 +272,9 @@ type Auswahl =
       treffer: { titel: string; adresse: string; info: string; egid?: string }[];
       umriss?: Umriss | null; egrid?: string | null };
 
-interface Treffer { label: string; origin: string; lat: number; lon: number; eigen?: { id: string; e: ParzelleEigenschaften } }
+interface Treffer { label: string; origin: string; lat: number; lon: number; eigen?: { id: string; e: ParzelleEigenschaften };
+  /** Ein Eigentümer statt eines Orts: öffnet alle seine Parzellen auf der Karte. */
+  eigentuemer?: EigentuemerTreffer }
 
 export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
   const box = useRef<HTMLDivElement | null>(null);
@@ -296,6 +299,12 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
   const [portfolioAn, setPortfolioAn] = useState(false);
   const { data: portfolios, isLoading: portfoliosLaden, error: portfolioFehler } = usePortfolios(portfolioAn);
   const portfolioEbene = useRef<L.GeoJSON | null>(null);
+  // Alle Parzellen eines Eigentümers aus der Suche -- gezeigt wie ein
+  // Portfolio: nur sie, violett, mit Liste. Ist das eine an, ist das
+  // andere aus; zwei Gruppen übereinander wären nicht zu lesen.
+  const [gruppe, setGruppe] = useState<Portfolio | null>(null);
+  const [gruppeLaedt, setGruppeLaedt] = useState(false);
+  const gruppenModus = portfolioAn || !!gruppe || gruppeLaedt;
   // Die Ausdehnung je Portfolio, damit Aufklappen auf genau dieses zoomt.
   const portfolioRahmen = useRef<Record<string, L.LatLngBounds>>({});
   const [umrisseGeladen, setUmrisseGeladen] = useState<{ fertig: number; gesamt: number }>({ fertig: 0, gesamt: 0 });
@@ -328,7 +337,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
   // Im Portfolio-Modus zählt nur das Portfolio: der übrige Bestand wird
   // weder geholt noch gezeichnet, damit man sieht, wo die Parzellen
   // liegen, und nichts sonst.
-  const { data } = useParzellenImAusschnitt(ausschnitt, genugNah && !portfolioAn);
+  const { data } = useParzellenImAusschnitt(ausschnitt, genugNah && !gruppenModus);
 
   // Schriften der Vorlage, einmal geladen.
   useEffect(() => {
@@ -410,7 +419,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
     if (!m) return;
     eigenEbene.current?.remove();
     eigenEbene.current = null;
-    if (!data || !genugNah || portfolioAn) return;
+    if (!data || !genugNah || gruppenModus) return;
     eigenEbene.current = L.geoJSON(data, {
       filter: f => passtZone((f.properties as ParzelleEigenschaften)?.zone, zonenFilter, zonenGenau),
       // Farbe nach Marge in Stufen, wie bei Regrid/LandGlide: man sieht
@@ -444,7 +453,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
         });
       },
     }).addTo(m);
-  }, [data, genugNah, zonenFilter, zonenGenau, grund, portfolioAn]);
+  }, [data, genugNah, zonenFilter, zonenGenau, grund, gruppenModus]);
 
   /**
    * Den Umriss einer Bestandsparzelle beim Bund holen, wenn der Bestand
@@ -475,7 +484,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
    * auf dem iPhone unten zwei Drittel. Gemessen wird, was tatsächlich
    * liegt, statt Zahlen aus dem CSS abzuschreiben.
    */
-  function hinfliegen(b: L.LatLngBounds) {
+  function hinfliegen(b: L.LatLngBounds, maxZoom = 19) {
     const m = karte.current;
     if (!m || !b.isValid()) return;
     const c = m.getContainer().getBoundingClientRect();
@@ -487,7 +496,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
       if (t.width >= c.width - 40) unten = Math.max(unten, c.bottom - t.top + 16);
       else rechts = Math.max(rechts, c.right - t.left + 16);
     }
-    m.flyToBounds(b, { paddingTopLeft: [40, oben], paddingBottomRight: [rechts, unten], maxZoom: 19, duration: 0.8 });
+    m.flyToBounds(b, { paddingTopLeft: [40, oben], paddingBottomRight: [rechts, unten], maxZoom, duration: 0.8 });
   }
 
   async function eigeneZeigen(id: string, e: ParzelleEigenschaften, lat: number, lon: number) {
@@ -601,13 +610,14 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
   useEffect(() => {
     const m = karte.current;
     portfolioEbene.current?.remove(); portfolioEbene.current = null;
-    if (!m || !portfolioAn || !portfolios?.length) return;
+    const sichtbar = gruppe ? [gruppe] : portfolioAn ? portfolios ?? [] : [];
+    if (!m || !sichtbar.length) return;
     let abgebrochen = false;
     const ebene = L.geoJSON(undefined, {
       style: { color: '#7C3AED', weight: 3, fillColor: '#7C3AED', fillOpacity: 0.25 },
     }).addTo(m);
     portfolioEbene.current = ebene;
-    const alle = portfolios.flatMap(pf => pf.positionen.map(p => ({ pf, p }))).filter(x => x.p.egrid);
+    const alle = sichtbar.flatMap(pf => pf.positionen.map(p => ({ pf, p }))).filter(x => x.p.egrid);
     portfolioRahmen.current = {};
     setUmrisseGeladen({ fertig: 0, gesamt: alle.length });
     (async () => {
@@ -636,10 +646,12 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
         fertig += 1;
         setUmrisseGeladen({ fertig, gesamt: alle.length });
       }
-      if (!abgebrochen && ebene.getLayers().length) m.fitBounds(ebene.getBounds(), { padding: [60, 60], maxZoom: 17 });
+      // Unter Tafel und Knopfleiste darf keine Parzelle liegen -- gemessen:
+      // mit festem Rand lag eine von drei unter der Tafel.
+      if (!abgebrochen && ebene.getLayers().length) hinfliegen(ebene.getBounds(), 17);
     })();
     return () => { abgebrochen = true; };
-  }, [portfolioAn, portfolios]);
+  }, [portfolioAn, portfolios, gruppe]);
 
   // ------------------------------------------------------------ Suche
   useEffect(() => {
@@ -655,10 +667,11 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
         .or(`address.ilike.${muster},plot_number.ilike.${muster},egrid.ilike.${muster}`)
         .limit(6);
       try {
-        const [j, eig] = await Promise.all([
+        const [j, eig, eigner] = await Promise.all([
           fetch('https://api3.geo.admin.ch/rest/services/ech/SearchServer?type=locations&limit=6&sr=2056&lang=de&searchText='
             + encodeURIComponent(s)).then(x => x.json()).catch(() => null),
           eigen,
+          eigentuemerSuchen(s).catch(() => [] as EigentuemerTreffer[]),
         ]);
         const eigeneTreffer: Treffer[] = ((eig.data ?? []) as Record<string, unknown>[]).map(z => ({
           label: String(z.address ?? `Parzelle ${z.plot_number ?? ''}`),
@@ -670,7 +683,11 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
             marge: (z.marge_chf as number) ?? null, ausgeschlossen: (z.ausgeschlossen as boolean) ?? null } },
         }));
         const rs = (j?.results ?? []) as { attrs?: Record<string, unknown> }[];
-        setTreffer([...eigeneTreffer, ...rs.map(r => {
+        const eignerTreffer: Treffer[] = eigner.map(x => ({
+          label: x.name, lat: NaN, lon: NaN, eigentuemer: x,
+          origin: `Eigentümer${x.art ? ' · ' + ({ person: 'Person', firma: 'Firma', institution: 'Institution', gemeinschaft: 'Erbengemeinschaft' } as Record<string, string>)[x.art] : ''} · alle Parzellen`,
+        }));
+        setTreffer([...eignerTreffer, ...eigeneTreffer, ...rs.map(r => {
           const a = r.attrs ?? {};
           let lat = Number(a.lat), lon = Number(a.lon);
           // Mit sr=2056 kommt LV95 zurück -- zurückrechnen.
@@ -720,6 +737,13 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
   // wird über die Bundessuche verortet, dann die Parzelle geöffnet.
   async function trefferOeffnen(t: Treffer) {
     setTreffer(null); setSuche('');
+    if (t.eigentuemer) {
+      setPortfolioAn(false); setAuswahl({ art: 'leer' }); markieren(null);
+      setGruppe(null); setGruppeLaedt(true);
+      try { setGruppe(await eigentuemerParzellen(t.eigentuemer)); }
+      finally { setGruppeLaedt(false); }
+      return;
+    }
     if (!t.eigen) { karte.current?.setView([t.lat, t.lon], 18); return; }
     let lat = NaN, lon = NaN;
     try {
@@ -761,15 +785,15 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
         <div className="suche">
           <span className="lupe">⌕</span>
           <input type="search" value={suche} onChange={e => setSuche(e.target.value)}
-                 placeholder="Adresse, Ort oder Parzelle" autoComplete="off" />
+                 placeholder="Adresse, Parzelle oder Eigentümer" autoComplete="off" />
           {(treffer !== null || sucheStatus !== 'ruhe') && suche.trim().length >= 3 && (
             <div className="liste">
               {sucheStatus === 'laeuft' && <p className="leer">Suche läuft …</p>}
               {sucheStatus === 'fehler' && <p className="leer">Suchdienst nicht erreichbar.</p>}
               {sucheStatus === 'ruhe' && treffer?.length === 0 && <p className="leer">Kein Treffer.</p>}
               {sucheStatus === 'ruhe' && treffer?.map((t, i) => (
-                <button type="button" key={i} className={`treffer${t.eigen ? ' eigen' : ''}`} onClick={() => trefferOeffnen(t)}>
-                  <b>{t.label}</b><small>{t.eigen ? t.origin : 'Ort · swisstopo'}</small>
+                <button type="button" key={i} className={`treffer${t.eigen ? ' eigen' : ''}${t.eigentuemer ? ' eigner' : ''}`} onClick={() => trefferOeffnen(t)}>
+                  <b>{t.label}</b><small>{t.eigen || t.eigentuemer ? t.origin : 'Ort · swisstopo'}</small>
                 </button>
               ))}
             </div>
@@ -788,21 +812,21 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
             Bauzonen
           </button>
           <button type="button" className={`schalter${portfolioAn ? ' an lila' : ''}`}
-                  onClick={() => { setPortfolioAn(v => !v); setAuswahl({ art: 'leer' }); markieren(null); }}>
+                  onClick={() => { setPortfolioAn(v => !v); setGruppe(null); setAuswahl({ art: 'leer' }); markieren(null); }}>
             Portfolios
           </button>
         </div>
       </header>
 
       {/* Zonenfilter wie bei Immobilienportalen: Chips, mehrere wählbar. */}
-      {!portfolioAn && (<div className="filter">
+      {!gruppenModus && (<div className="filter">
         <span className="titel">Zone</span>
         <button type="button" className={zonenFilter.size === 0 ? 'an' : ''} onClick={() => { setZonenFilter(new Set()); setZonenGenau(new Set()); }}>Alle</button>
         {ZONENARTEN.map(([z, t]) => (
           <button type="button" key={z} className={zonenFilter.has(z) ? 'an' : ''} onClick={() => umschalten(z)}>{t}</button>
         ))}
       </div>)}
-      {!portfolioAn && zonenImBild.length > 0 && (
+      {!gruppenModus && zonenImBild.length > 0 && (
         <div className="filter genau">
           {zonenImBild.map(z => (
             <button type="button" key={z} className={zonenGenau.has(z) ? 'an' : ''} onClick={() => genauUmschalten(z)}>{z}</button>
@@ -811,7 +835,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
       )}
 
       <div className="unten">
-        {genugNah && !portfolioAn && (
+        {genugNah && !gruppenModus && (
           <div className="legende">
             {STUFEN.map(([, c, t]) => <span key={t}><i style={{ background: c }} />{t}</span>)}
           </div>
@@ -830,20 +854,28 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
           </div>
         )}
         <div className="readout">
-          {portfolioAn ? 'Nur Portfolios sichtbar · ' : !genugNah ? 'Näher heranzoomen für den Bestand · ' : ''}
-          {genugNah && data && !portfolioAn ? `${data.features?.length ?? 0} eigene Parzellen im Bild · ` : ''}
+          {gruppe ? `Nur ${gruppe.name} sichtbar · ` : portfolioAn ? 'Nur Portfolios sichtbar · ' : !genugNah ? 'Näher heranzoomen für den Bestand · ' : ''}
+          {genugNah && data && !gruppenModus ? `${data.features?.length ?? 0} eigene Parzellen im Bild · ` : ''}
           LV95 {gr(lvMitte.E)} / {gr(lvMitte.N)}
         </div>
       </div>
 
       <aside className="tafel">
-        {auswahl.art === 'leer' && portfolioAn && (
+        {auswahl.art === 'leer' && (gruppe || gruppeLaedt) && (
+          <PortfolioTafel portfolios={gruppe ? [gruppe] : undefined} laedt={gruppeLaedt} fehler={false}
+                          ueber="Eigentümer" startOffen={gruppe?.id}
+                          umrisse={umrisseGeladen} onOeffnen={id => oeffnePerId(id)}
+                          onSchliessen={() => { setGruppe(null); markieren(null); }}
+                          onZeigen={() => { const b = portfolioEbene.current?.getBounds();
+                            if (b?.isValid()) hinfliegen(b, 18); }} />
+        )}
+        {auswahl.art === 'leer' && !gruppe && !gruppeLaedt && portfolioAn && (
           <PortfolioTafel portfolios={portfolios} laedt={portfoliosLaden} fehler={!!portfolioFehler}
                           umrisse={umrisseGeladen} onOeffnen={id => oeffnePerId(id)}
                           onZeigen={id => { const b = portfolioRahmen.current[id];
-                            if (b) karte.current?.fitBounds(b, { padding: [60, 60], maxZoom: 18 }); }} />
+                            if (b) hinfliegen(b, 18); }} />
         )}
-        {auswahl.art === 'leer' && !portfolioAn && (
+        {auswahl.art === 'leer' && !gruppenModus && (
           <>
             <div className="kopf">
               <p className="ueber">Bestand im Bild</p>
@@ -962,16 +994,23 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
 }
 
 /** Die Portfolios in der Tafel: wem sie gehören, wer sie bewirtschaftet, welche Parzellen. */
-function PortfolioTafel({ portfolios, laedt, fehler, umrisse, onOeffnen, onZeigen }: {
+function PortfolioTafel({ portfolios, laedt, fehler, umrisse, onOeffnen, onZeigen,
+  ueber = 'Portfolios', startOffen, onSchliessen }: {
   portfolios?: Portfolio[]; laedt: boolean; fehler: boolean;
   umrisse: { fertig: number; gesamt: number }; onOeffnen: (id: string) => void;
   onZeigen: (portfolioId: string) => void;
+  /** Kleine Zeile über dem Titel; bei einer Eigentümersuche "Eigentümer". */
+  ueber?: string;
+  /** Eine Gruppe, die gleich offen steht -- bei einem Eigentümer gibt es nur die eine. */
+  startOffen?: string;
+  onSchliessen?: () => void;
 }) {
   // Zugeklappt, bis man eines wählt: mit zwanzig Parzellen je Portfolio
   // wird die Tafel sonst zur Liste, durch die man scrollt, statt zur
   // Übersicht. Offen ist immer höchstens eines.
-  const [offen, setOffen] = useState<string | null>(null);
-  if (laedt) return <div className="kopf"><p className="ueber">Portfolios</p><h2>Wird geladen …</h2></div>;
+  const [offen, setOffen] = useState<string | null>(startOffen ?? null);
+  useEffect(() => { if (startOffen) setOffen(startOffen); }, [startOffen]);
+  if (laedt) return <div className="kopf"><p className="ueber">{ueber}</p><h2>Wird geladen …</h2></div>;
   if (fehler) return (
     <div className="kopf"><p className="ueber">Portfolios</p><h2>Nicht lesbar</h2>
       <p className="sanft">Portfolios sieht nur, wer angemeldet ist.</p></div>);
@@ -981,8 +1020,11 @@ function PortfolioTafel({ portfolios, laedt, fehler, umrisse, onOeffnen, onZeige
   return (
     <>
       <div className="kopf">
-        <p className="ueber">Portfolios</p>
-        <h2>{portfolios.length} Portfolios</h2>
+        <p className="ueber">{ueber}</p>
+        <h2>{onSchliessen ? `${portfolios[0].positionen.length} Parzellen` : `${portfolios.length} Portfolios`}</h2>
+        {onSchliessen && (
+          <button type="button" className="knopf" onClick={onSchliessen}>Suche schliessen</button>
+        )}
         {umrisse.gesamt > 0 && umrisse.fertig < umrisse.gesamt && (
           <p className="sanft">Umrisse vom Bund: {umrisse.fertig} von {umrisse.gesamt} …</p>
         )}
@@ -1074,6 +1116,7 @@ const STIL = `
 .gisk .treffer:hover{background:var(--fl)}
 .gisk .treffer b{display:block;font-weight:600}.gisk .treffer small{color:var(--grau);font-size:12px}
 .gisk .treffer.eigen b{color:var(--akzent)}
+.gisk .treffer.eigner b{color:#7C3AED}
 .gisk .leer{margin:0;padding:9px 10px;color:var(--grau)}
 .gisk .werkzeuge{display:contents}
 .gisk .segment{display:flex;background:var(--fl);border-radius:12px;padding:3px}
