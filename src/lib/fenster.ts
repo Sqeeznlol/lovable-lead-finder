@@ -19,6 +19,8 @@ export const FENSTER = {
   karte: 'bauraum-karte',
   suche: 'bauraum-suche',
   pipedrive: 'bauraum-pipedrive',
+  // Seiten von Veranstaltern und anderen Fremden (Immo-Kalender).
+  extern: 'bauraum-extern',
 } as const;
 
 export type Fenstername = typeof FENSTER[keyof typeof FENSTER];

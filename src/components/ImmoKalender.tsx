@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { CalendarDays, CalendarPlus, ExternalLink, MapPin } from 'lucide-react';
 import { useUrlWert } from '@/hooks/use-url-wert';
 import { Leer, Marke, Reiter } from '@/components/rahmen';
+import { FENSTER } from '@/lib/fenster';
 import { ANLAESSE, ical, inTagen, land, ordnen, STAND, zeitraum, type Anlass, type AnlassArt } from '@/lib/immo-kalender';
 
 const heute = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -61,9 +62,9 @@ function Zeile({ a, tag }: { a: Anlass; tag: string }) {
         {a.bemerkung && <p className="text-sm text-muted-foreground/80">{a.bemerkung}</p>}
       </div>
       <div className="col-span-2 flex flex-wrap gap-2 sm:col-span-1 sm:flex-col sm:items-stretch">
-        <a className={KLEIN} href={a.url} target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4" /> Webseite</a>
+        <a className={KLEIN} href={a.url} target={FENSTER.extern}><ExternalLink className="h-4 w-4" /> Webseite</a>
         {a.von && <button type="button" className={KLEIN} onClick={() => eintragen(a)}><CalendarPlus className="h-4 w-4" /> In Kalender</button>}
-        {route && <a className={KLEIN} href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(route)}`} target="_blank" rel="noreferrer"><MapPin className="h-4 w-4" /> Route</a>}
+        {route && <a className={KLEIN} href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(route)}`} target={FENSTER.karte}><MapPin className="h-4 w-4" /> Route</a>}
       </div>
     </li>
   );
