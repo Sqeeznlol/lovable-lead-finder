@@ -6,6 +6,7 @@ import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { KATEGORIEN, kategorie, type Absicht, type Kategorie } from '@/lib/gespraech';
 import { passendeObjekte } from '@/lib/investor';
+import { useUrlWert } from '@/hooks/use-url-wert';
 
 /**
  * Auswertung: was aus den Gesprächen folgt, wer kaufen will, und ob
@@ -32,7 +33,10 @@ interface AnrufZeile {
 }
 
 function Reaktivierung() {
-  const [filter, setFilter] = useState<Kategorie | 'alle' | 'faellig'>('faellig');
+  // In der Adresse, damit "Zurück" im Browser den Filter zurücknimmt.
+  const [filterWert, setFilterWert] = useUrlWert('reiter', 'faellig');
+  const filter = filterWert as Kategorie | 'alle' | 'faellig';
+  const setFilter = (f: Kategorie | 'alle' | 'faellig') => setFilterWert(f);
   const { data, isLoading, error } = useQuery({
     queryKey: ['reaktivierung'],
     queryFn: async (): Promise<AnrufZeile[]> => {
@@ -110,7 +114,7 @@ interface Profil {
 }
 
 function Investoren() {
-  const [offen, setOffen] = useState<string | null>(null);
+  const [offen, setOffen] = useUrlWert('investor');
   const { data, isLoading, error } = useQuery({
     queryKey: ['investorprofile'],
     queryFn: async (): Promise<Profil[]> => {

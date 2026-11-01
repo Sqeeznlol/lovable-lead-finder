@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { usePortfolios } from '@/hooks/use-portfolio';
 import { arrondierungErkennen } from '@/lib/arrondierung';
 import { ANLAESSE, ZUSTAENDE, useGelegenheiten, type Gel, type Parz, type Zustand } from '@/hooks/use-gelegenheiten';
+import { useSchliessen, useUrlWert } from '@/hooks/use-url-wert';
 
 /**
  * Gelegenheiten: was erkannt wurde, wer daran arbeitet, was daraus
@@ -28,11 +29,18 @@ export function Gelegenheiten() {
   const qc = useQueryClient();
   const { data, isLoading, error } = useGelegenheiten();
   const { data: portfolios } = usePortfolios(true);
-  const [zustand, setZustand] = useState<Zustand | 'offen' | 'alle'>('offen');
-  const [mandant, setMandant] = useState('');
-  const [offen, setOffen] = useState<string | null>(null);
+  // Reiter, Kunde, aufgeklappte Gelegenheit und Bericht stehen in der
+  // Adresse -- "Zurück" im Browser führt jeweils einen Schritt zurück.
+  const [zustandWert, setZustandWert] = useUrlWert('reiter', 'offen');
+  const zustand = zustandWert as Zustand | 'offen' | 'alle';
+  const setZustand = (z: Zustand | 'offen' | 'alle') => setZustandWert(z);
+  const [mandantWert, setMandantWert] = useUrlWert('kunde');
+  const mandant = mandantWert ?? '';
+  const setMandant = (m: string) => setMandantWert(m || null);
+  const [offen, setOffen] = useUrlWert('gelegenheit');
   const [lauf, setLauf] = useState<Record<string, string>>({});
-  const [bericht, setBericht] = useState<string | null>(null);
+  const [bericht, setBericht] = useUrlWert('bericht');
+  const berichtZu = useSchliessen('bericht');
 
   const mandanten = useMemo(() => {
     const m = new Map<string, string>();
@@ -72,7 +80,7 @@ export function Gelegenheiten() {
     }
   };
 
-  if (bericht) return <Bericht mandantId={bericht} gelegenheiten={data ?? []} onZurueck={() => setBericht(null)} />;
+  if (bericht) return <Bericht mandantId={bericht} gelegenheiten={data ?? []} onZurueck={berichtZu} />;
 
   const zahl = (z: Zustand) => (data ?? []).filter(g => g.zustand === z && (!mandant || g.mandant?.id === mandant)).length;
 

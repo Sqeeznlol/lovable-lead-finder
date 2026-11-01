@@ -59,6 +59,9 @@ const App = () => (
                   <Suspense fallback={<div className="min-h-screen bg-background" />}>
                     <Routes>
                       <Route path="/" element={<Index />} />
+                      {/* Jeder Bereich hat seine Adresse (/zentrale, /baugesuche ...),
+                          damit "Zurück" im Browser funktioniert. */}
+                      <Route path="/:bereich" element={<Index />} />
                       <Route path="/swipe" element={<SwipePage />} />
                       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                       <Route path="*" element={<NotFound />} />

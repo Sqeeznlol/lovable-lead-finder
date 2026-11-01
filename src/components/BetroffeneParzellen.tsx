@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ChevronRight, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Marke } from '@/components/rahmen';
-import { PropertyDetailDialog } from '@/components/PropertyDetailDialog';
+import { useUrlWert } from '@/hooks/use-url-wert';
 import type { Gesuch } from '@/lib/baugesuch-belege';
 
 interface Parzelle {
@@ -25,7 +25,8 @@ const n = (x: number) => Math.round(x).toLocaleString('de-CH');
  * verschwiegen.
  */
 export function BetroffeneParzellen({ g }: { g: Gesuch }) {
-  const [offen, setOffen] = useState<string | null>(null);
+  // Die Objektansicht zeigt Index für alle Bereiche (?parzelle=...).
+  const [, setOffen] = useUrlWert('parzelle');
   // Nur echte EGRID (Buchstaben, Ziffern): sie stehen in der Filterzeile.
   const egrids = [...new Set([g.egrid, ...(g.nachbar_egrids ?? [])].filter((e): e is string => !!e && /^[A-Z0-9]+$/.test(e)))];
   const { data, isLoading } = useQuery({
@@ -83,7 +84,6 @@ export function BetroffeneParzellen({ g }: { g: Gesuch }) {
       {ohneEintrag > 0 && !isLoading && (
         <p className="text-xs text-muted-foreground">{ohneEintrag} {ohneEintrag === 1 ? 'Parzelle steht' : 'Parzellen stehen'} nicht im Bestand.</p>
       )}
-      <PropertyDetailDialog id={offen} onClose={() => setOffen(null)} />
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { useMasterProperties, useGemeindeStats, type MasterFilters } from '@/hoo
 import { useCanton } from '@/hooks/use-canton';
 import { MasterFiltersBar } from './MasterFilters';
 import { GemeindeSidebar } from './GemeindeSidebar';
-import { PropertyDetailDialog } from './PropertyDetailDialog';
+import { useUrlWert } from '@/hooks/use-url-wert';
 import { Gesamtliste } from './Gesamtliste';
 import { beurteile, EMPFEHLUNG_LABEL, type Empfehlung } from '@/lib/akquise';
 import { LAGE_LABEL } from '@/lib/gemeinden-zh';
@@ -59,7 +59,8 @@ export function MasterList() {
     sortDir: 'desc',
     ausgeschlossen: 'ausblenden',
   });
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Die Objektansicht zeigt Index für alle Bereiche (?parzelle=...).
+  const [, setSelectedId] = useUrlWert('parzelle');
   // Der Filterblock ist gross und wird selten gebraucht -- die beiden Regler
   // darunter decken den Alltag ab.
   const [filterOffen, setFilterOffen] = useState(false);
@@ -332,7 +333,6 @@ export function MasterList() {
         </Card>
       </div>
 
-      <PropertyDetailDialog id={selectedId} onClose={() => setSelectedId(null)} />
     </div>
   );
 }

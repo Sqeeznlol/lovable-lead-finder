@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Search, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
-import { PropertyDetailDialog } from '@/components/PropertyDetailDialog';
+import { useUrlWert } from '@/hooks/use-url-wert';
 
 interface Treffer {
   id: string;
@@ -34,7 +34,8 @@ export function Parzellensuche({ kanton }: { kanton?: string | null }) {
   const [wort, setWort] = useState('');
   const [treffer, setTreffer] = useState<Treffer[]>([]);
   const [sucht, setSucht] = useState(false);
-  const [offen, setOffen] = useState<string | null>(null);
+  // Die Objektansicht zeigt Index für alle Bereiche (?parzelle=...).
+  const [, setOffen] = useUrlWert('parzelle');
 
   useEffect(() => {
     const s = wort.trim();
@@ -108,7 +109,6 @@ export function Parzellensuche({ kanton }: { kanton?: string | null }) {
         </p>
       )}
 
-      <PropertyDetailDialog id={offen} onClose={() => setOffen(null)} />
     </div>
   );
 }

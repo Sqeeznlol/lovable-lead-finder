@@ -19,6 +19,7 @@ import { BetroffeneParzellen } from '@/components/BetroffeneParzellen';
 // Objektansicht sie nutzen kann, ohne diese ganze Seite mitzuladen.
 export { belege, type Gesuch } from '@/lib/baugesuch-belege';
 import { belege, type Gesuch } from '@/lib/baugesuch-belege';
+import { useUrlWert } from '@/hooks/use-url-wert';
 
 // Die erzeugten Typen kennen die Plattform-Tabellen noch nicht.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -80,11 +81,17 @@ export function filtern(gs: Gesuch[], mitGel: Set<string>, sicht: Sicht, tage: n
 }
 
 export function Baugesuche() {
-  const [tage, setTage] = useState(7);
+  // Zeitraum, Reiter und aufgeklapptes Gesuch stehen in der Adresse
+  // (?zeitraum=, ?sicht=, ?gesuch=) -- "Zurück" im Browser klappt zu.
+  const [tageWert, setTageWert] = useUrlWert('zeitraum', '7');
+  const tage = Number(tageWert) || 0;
+  const setTage = (t: number) => setTageWert(String(t));
   const { data, isLoading, error } = useBaugesuche(tage);
-  const [sicht, setSicht] = useState<Sicht>('alle');
+  const [sichtWert, setSichtWert] = useUrlWert('sicht', 'alle');
+  const sicht = sichtWert as Sicht;
+  const setSicht = (s: Sicht) => setSichtWert(s);
   const [wort, setWort] = useState('');
-  const [offen, setOffen] = useState<string | null>(null);
+  const [offen, setOffen] = useUrlWert('gesuch');
 
   // Der Zeitraum ist schon in der Abfrage; hier nur noch Sicht und Suchwort.
   const liste = useMemo(() => (data ? filtern(data.gesuche, data.mitGelegenheit, sicht, 0, wort) : []), [data, sicht, wort]);

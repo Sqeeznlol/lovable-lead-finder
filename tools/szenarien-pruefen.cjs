@@ -136,7 +136,9 @@ async function pruefen(p) {
       const d = await pruefen(p);
       if (d.breit || d.abgeschnitten.length || fehler.length) befunde.push({ fall: `${nr} ${f.titel}`, geraet, ...d, fehler: [...fehler] });
       if (i === 0) console.log(`${geraet}: zu kleine Knöpfe im ersten Fall:`, d.klein);
-      await p.getByRole('button', { name: /Zentrale/ }).first().click();
+      // Zurück wie im Browser -- jede Ansicht hat ihre Adresse
+      // (?vorhaben=...), "Zurück" muss in die Liste führen.
+      if (i % 2) await p.goBack(); else await p.getByRole('button', { name: /Zentrale/ }).first().click();
       // Zurück in der Liste steht noch der Reiter des letzten Falls.
       await p.waitForSelector('[role=tablist]', { timeout: 10000 });
     }

@@ -1,6 +1,9 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { Building2, LayoutDashboard, Upload, Phone, X, Zap, Search, FileSpreadsheet, Eye, Shield, Share, Plus, Database, Send, Map, Target, BarChart3, Gauge, HardHat, MoreHorizontal, Briefcase, LogOut } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { useNavigate, useParams } from 'react-router-dom';
+import { PropertyDetailDialog } from '@/components/PropertyDetailDialog';
+import { useSchliessen, useUrlWert } from '@/hooks/use-url-wert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 const Uebersicht = lazy(() => import('@/components/Uebersicht').then(m => ({ default: m.Uebersicht })));
@@ -44,7 +47,11 @@ import { useAuth } from '@/hooks/use-auth';
 import { usePlatform } from '@/hooks/use-platform';
 import { useMidnightReset } from '@/hooks/use-phones';
 
-type Tab = 'cockpit' | 'zentrale' | 'baugesuche' | 'pipedrive' | 'nummern' | 'karte' | 'nachbarschaft' | 'gelegenheiten' | 'auswertung' | 'uebersicht' | 'dashboard' | 'master' | 'vorauswahl' | 'akquise' | 'telsuche' | 'properties' | 'import' | 'masterimport' | 'phones' | 'export' | 'admin';
+// Jeder Bereich ist eine Adresse: /zentrale, /baugesuche ... ("/" ist
+// das Cockpit). So führt "Zurück" im Browser in den vorigen Bereich.
+const TABS = ['cockpit', 'zentrale', 'baugesuche', 'pipedrive', 'nummern', 'karte', 'nachbarschaft', 'gelegenheiten', 'auswertung', 'uebersicht', 'dashboard', 'master', 'vorauswahl', 'akquise', 'telsuche', 'properties', 'import', 'masterimport', 'phones', 'export', 'admin'] as const;
+type Tab = typeof TABS[number];
+const istTab = (x: string | undefined): x is Tab => !!x && (TABS as readonly string[]).includes(x);
 
 // Zehn Reiter waren neun zu viel. Was der neue Ablauf selbst erledigt,
 // braucht keinen eigenen Ort mehr:
@@ -127,10 +134,14 @@ function LeistenPunkt({ t, an, onClick }: { t: Eintrag; an: boolean; onClick: ()
 }
 
 export default function Index() {
-  const [active, setActive] = useState<Tab>('cockpit');
+  const { bereich } = useParams();
+  const navigate = useNavigate();
+  const active: Tab = istTab(bereich) ? bereich : 'cockpit';
+  // Die Objektansicht einer Parzelle -- eine für alle Bereiche, offen
+  // über ?parzelle=..., damit auch sie "Zurück" kennt.
+  const [parzelle] = useUrlWert('parzelle');
+  const parzelleZu = useSchliessen('parzelle');
   const [mehrAuf, setMehrAuf] = useState(false);
-  // Zählt Klicks auf "Neues Vorhaben" oben; die Zentrale öffnet dann das Formular.
-  const [neuesVorhaben, setNeuesVorhaben] = useState(0);
   const { current: kantonJetzt } = useCanton();
   const [wisch, setWisch] = useState<{ x: number; y: number } | null>(null);
   const { user, signOut } = useAuth();
@@ -151,7 +162,8 @@ export default function Index() {
     setShowInstallHint(false);
   };
 
-  const gehe = (t: Tab) => { setActive(t); setMehrAuf(false); window.scrollTo({ top: 0 }); };
+  const gehe = (t: Tab, suche = '') => { navigate((t === 'cockpit' ? '/' : `/${t}`) + suche); setMehrAuf(false); window.scrollTo({ top: 0 }); };
+  const neuesVorhaben = () => gehe('zentrale', '?neu=1');
   // Wischen auf dem iPhone: links/rechts wechselt zwischen den vier
   // Zielen der unteren Leiste. Nur waagrecht und deutlich -- sonst
   // stört es das Scrollen. Auf der Karte nicht: dort wischt man die Karte.
@@ -173,6 +185,7 @@ export default function Index() {
   return (
     <div className="flex min-h-safe-screen bg-background">
       <KeyboardShortcutsOverlay />
+      <PropertyDetailDialog id={parzelle} onClose={parzelleZu} />
 
       {/* Schmale Leiste nur mit Symbolen, wie in der Vorlage (DESIGN.md):
           der aktive Punkt als schwarzes Quadrat. Der Name steht beim
@@ -217,7 +230,7 @@ export default function Index() {
               <div className="ml-auto flex items-center gap-3">
                 {/* Der Kanton gilt nur für die Akquise. */}
                 {akquise && <div className="flex items-center gap-2 overflow-x-auto no-scrollbar"><CantonTabs /></div>}
-                <button type="button" onClick={() => { setNeuesVorhaben(n => n + 1); gehe('zentrale'); }}
+                <button type="button" onClick={neuesVorhaben}
                         className="hidden h-11 items-center gap-2 rounded-[3px] bg-accent px-4 text-[15px] font-medium text-accent-foreground transition-transform active:scale-[0.97] lg:inline-flex">
                   <Plus className="h-4 w-4" /> Neues Vorhaben
                 </button>
@@ -240,14 +253,14 @@ export default function Index() {
               <Skeleton className="h-64 w-full" />
             </div>
           }>
-            {active === 'cockpit' && <Cockpit onGehe={z => gehe(z)} onNeu={() => { setNeuesVorhaben(k => k + 1); gehe('zentrale'); }} />}
-            {active === 'zentrale' && <Zentrale neu={neuesVorhaben} />}
+            {active === 'cockpit' && <Cockpit onGehe={z => gehe(z)} onNeu={neuesVorhaben} />}
+            {active === 'zentrale' && <Zentrale />}
             {active === 'baugesuche' && <Baugesuche />}
             {active === 'uebersicht' && <Uebersicht />}
             {active === 'dashboard' && <Dashboard />}
             {active === 'master' && <MasterList />}
             {active === 'nummern' && <Nummern />}
-            {active === 'karte' && <Karte onSchliessen={() => setActive('cockpit')} />}
+            {active === 'karte' && <Karte onSchliessen={() => gehe('cockpit')} />}
             {active === 'nachbarschaft' && <Nachbarschaft />}
             {active === 'gelegenheiten' && <Gelegenheiten />}
             {active === 'auswertung' && <Auswertung />}
@@ -289,7 +302,7 @@ export default function Index() {
                         variant="outline"
                         size="sm"
                         className="gap-2"
-                        onClick={() => setActive(t.id)}
+                        onClick={() => gehe(t.id)}
                       >
                         <t.icon className="h-4 w-4" /> {t.label}
                       </Button>
@@ -306,7 +319,7 @@ export default function Index() {
                   <Button
                     variant="outline"
                     className="mt-3 gap-2"
-                    onClick={() => setActive('masterimport')}
+                    onClick={() => gehe('masterimport')}
                   >
                     <Upload className="h-4 w-4" /> Import öffnen
                   </Button>

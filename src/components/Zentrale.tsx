@@ -14,6 +14,7 @@ import { Abschnitt, FELD, KNOPF, KNOPF_HAUPT, Kopf, Leer, LISTE, Marke, Reiter, 
 import { BILD, luftbildWgs } from '@/lib/luftbild';
 import { geocode } from '@/lib/swisstopo';
 import { FENSTER } from '@/lib/fenster';
+import { useSchliessen, useUrlSetzen, useUrlWert } from '@/hooks/use-url-wert';
 
 /**
  * Die Zentrale: jedes Vorhaben eines Kunden an einem Ort.
@@ -53,19 +54,24 @@ function useOrtsbild(text: string | null) {
 
 type Filter = 'aktiv' | Zustand;
 
-export function Zentrale({ neu: neuVonOben = 0 }: { neu?: number } = {}) {
+export function Zentrale() {
   const { data, isLoading, error } = useVorhabenListe();
-  const [offen, setOffen] = useState<string | null>(null);
-  // "Neues Vorhaben" oben in der Kopfzeile öffnet das Formular, auch
-  // wenn die Zentrale schon offen ist (der Zähler ändert sich).
-  const [neu, setNeu] = useState(neuVonOben > 0);
-  useEffect(() => { if (neuVonOben > 0) { setNeu(true); setOffen(null); } }, [neuVonOben]);
-  const [filter, setFilter] = useState<Filter>('aktiv');
+  // Alles in der Adresse (?vorhaben=, ?neu=1, ?reiter=), damit "Zurück"
+  // im Browser vom Vorhaben in die Liste führt und ein Link genau diese
+  // Ansicht öffnet. "Neues Vorhaben" oben setzt ?neu=1.
+  const [offen, setOffen] = useUrlWert('vorhaben');
+  const [neu, setNeu] = useUrlWert('neu');
+  const [filterWert, setFilterWert] = useUrlWert('reiter', 'aktiv');
+  const filter = filterWert as Filter;
+  const setFilter = (f: Filter) => setFilterWert(f);
+  const setzen = useUrlSetzen();
+  const vorhabenZu = useSchliessen('vorhaben');
+  const neuZu = useSchliessen('neu');
 
   const alle = data ?? [];
   const gewaehlt = alle.find(v => v.id === offen) ?? null;
-  if (gewaehlt) return <Detail v={gewaehlt} onZurueck={() => setOffen(null)} />;
-  if (neu) return <Erfassen onFertig={id => { setNeu(false); setOffen(id); }} onAbbrechen={() => setNeu(false)} />;
+  if (gewaehlt) return <Detail v={gewaehlt} onZurueck={vorhabenZu} />;
+  if (neu) return <Erfassen onFertig={id => setzen({ neu: null, vorhaben: id })} onAbbrechen={neuZu} />;
 
   const aktiv = (v: Vorhaben) => v.zustand !== 'abgeschlossen' && v.zustand !== 'pausiert';
   const liste = alle.filter(v => (filter === 'aktiv' ? aktiv(v) : v.zustand === filter));
@@ -87,7 +93,7 @@ export function Zentrale({ neu: neuVonOben = 0 }: { neu?: number } = {}) {
         { titel: 'In Akquise', wert: zahl('akquise').toLocaleString('de-CH'), onClick: () => setFilter('akquise') },
         { titel: 'Frist bald', wert: bald.toLocaleString('de-CH'), marke: bald ? <Marke art="rosa">unter 30 Tagen</Marke> : <Marke art="minze">keine</Marke> },
       ] : undefined}
-      aktionen={<button type="button" className={`${KNOPF_HAUPT} lg:hidden`} onClick={() => setNeu(true)}>Neues Vorhaben</button>}>
+      aktionen={<button type="button" className={`${KNOPF_HAUPT} lg:hidden`} onClick={() => setNeu('1')}>Neues Vorhaben</button>}>
       <Reiter<Filter> wahl={filter} setWahl={setFilter}
               optionen={filterListe.filter(([f]) => f === 'aktiv' || zahl(f) > 0 || f === filter).map(([f, t]) => ({ wert: f, titel: t, zahl: zahl(f) }))} />
 
@@ -253,7 +259,11 @@ function Detail({ v, onZurueck }: { v: Vorhaben; onZurueck: () => void }) {
   const { data: zu } = useZuordnung(v.portfolio_id);
   const { data: verlauf } = useVerlauf(v.id);
   const [lauf, setLauf] = useState<string | null>(null);
-  const [bericht, setBericht] = useState(false);
+  // Der Bericht ist eine eigene Ansicht (?bericht=1) -- "Zurück" schliesst ihn.
+  const [berichtWert, setBerichtWert] = useUrlWert('bericht');
+  const bericht = berichtWert === '1';
+  const setBericht = (an: boolean) => setBerichtWert(an ? '1' : null);
+  const berichtZu = useSchliessen('bericht');
   const [wer, setWer] = useState('');
 
   const neuLaden = () => Promise.all([
@@ -293,7 +303,7 @@ function Detail({ v, onZurueck }: { v: Vorhaben; onZurueck: () => void }) {
   const ortText = a?.top?.[0]?.address ? `${a.top[0].address} ${a.top[0].gemeinde ?? ''}` : (a?.gemeinden?.[0]?.gemeinde ?? v.lagen?.[0] ?? null);
   const bild = useOrtsbild(ortText);
 
-  if (bericht && a) return <Bericht v={v} a={a} onZurueck={() => setBericht(false)} />;
+  if (bericht && a) return <Bericht v={v} a={a} onZurueck={berichtZu} />;
 
   const nr = schrittNr(v.zustand);
   const pausiert = v.zustand === 'pausiert';
