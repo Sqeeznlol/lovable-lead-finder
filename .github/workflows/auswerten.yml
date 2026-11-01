@@ -472,6 +472,18 @@ jobs:
                      count(*)                                  as konten
               from public.user_roles r
               group by 1 order by 2 desc;"
+            # Was beim Anmelden festgehalten wird. Adressen nur als
+            # vorhanden/leer -- die Zusammenfassung ist oeffentlich.
+            frage "Festgehaltene Anmeldungen (die letzten 15)" "
+              select to_char(zeit at time zone 'Europe/Zurich', 'DD.MM. HH24:MI') as wann,
+                     regexp_replace(coalesce(email,''), '^(.).*(@.*)$', '\\1***\\2') as konto,
+                     case when ip is null then 'leer' else 'vorhanden' end as ip,
+                     coalesce(geraet, '(leer)') as geraet,
+                     length(user_agent) as ua_laenge
+              from public.anmeldung order by zeit desc limit 15;"
+            frage "Spalten der Tabelle anmeldung" "
+              select column_name, data_type from information_schema.columns
+              where table_schema='public' and table_name='anmeldung' order by ordinal_position;"
 
           elif [ "$FRAGE" = "arten" ]; then
             frage "Gebäudearten" "
