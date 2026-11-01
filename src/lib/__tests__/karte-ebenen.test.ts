@@ -65,3 +65,16 @@ describe('Ringe für identify', () => {
     expect(esriRinge(g)[1][0]).toEqual([5, 5]);
   });
 });
+
+describe('Kachelnähte', () => {
+  // Leaflet setzt auf jede Kachel mix-blend-mode:plus-lighter, die Farben
+  // werden addiert. Überlappen sich Kacheln um einen Pixel, damit bei
+  // Windows-Skalierung keine Spalten bleiben, wird jede Kante doppelt
+  // hell -- ein weisses Raster. Überlappung nur zusammen mit "normal".
+  it('wer Kacheln überlappen lässt, schaltet das Addieren ab', async () => {
+    const { readFileSync } = await import('node:fs');
+    const t = readFileSync('src/components/Karte.tsx', 'utf8');
+    const regel = /img\.leaflet-tile\{[^}]*\}/.exec(t)?.[0] ?? '';
+    if (/width:\s*25[7-9]px/.test(regel)) expect(regel).toMatch(/mix-blend-mode:\s*normal/);
+  });
+});
