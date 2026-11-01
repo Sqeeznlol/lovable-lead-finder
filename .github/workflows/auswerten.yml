@@ -45,6 +45,7 @@ on:
           - teams-probe  # Ob ein Konto ausserhalb eines Teams dessen Kunden wirklich nicht sieht (wird zurueckgerollt)
           - potenzial-bund # Was der Bund an einem Punkt zu Bauzone und Parzelle liefert (fuer den Potenzialcheck)
           - anfrage-probe # Ob der oeffentliche Schluessel Anfragen einfuegen, aber nicht lesen kann (wird zurueckgerollt)
+          - demo         # Ob die Demo-Szenarien der Zentrale vollständig in der Datenbank stehen
           - ohne-egrid   # Wie die Zürcher Zeilen ohne EGRID aussehen (Gemeindenamen, Nummernformat, Herkunft)
           - indizes      # Welche Indizes auf properties wie gross sind und ob sie je benutzt werden
           - parzellen-zh # Ob jede Zürcher Parzelle im Bestand ist und welche Felder leer sind
@@ -602,6 +603,17 @@ jobs:
           select count(*) as egrid_mehrfach from (select egrid from properties where kanton = 'ZH' and egrid is not null group by egrid having count(*) > 1) d;
           \echo '```'
           SQL
+
+          elif [ "$FRAGE" = "demo" ]; then
+            # Nur erfundene Firmen (Demo) -- Namen duerfen hier stehen.
+            frage "Demo-Szenarien je Phase" "
+              select zustand, count(*) as vorhaben, sum(adressen) as adressen
+              from vorhaben_liste where kunde like '%(Demo)' group by 1 order by 1;"
+            frage "Demo-Szenarien einzeln" "
+              select left(kunde, 40) as kunde, art, zustand, adressen,
+                     (select count(*) from portfolio_position pp where pp.portfolio_id = l.portfolio_id and pp.zuordnung = 'zugeordnet') as zugeordnet,
+                     (select count(*) from vorhaben_eintrag e where e.vorhaben_id = l.id) as verlauf
+              from vorhaben_liste l where kunde like '%(Demo)' order by adressen desc;"
 
           elif [ "$FRAGE" = "ohne-egrid" ]; then
             # 73'847 Zuercher Zeilen ohne EGRID; nur 156 trafen ueber
