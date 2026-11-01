@@ -1,9 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ExternalLink, UserSearch, Check, Archive, X, ClipboardPaste } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Abschnitt, FELD, KNOPF, KNOPF_HAUPT, LISTE } from '@/components/rahmen';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { gemeindeBfsNr } from '@/lib/swisstopo';
@@ -155,7 +152,7 @@ export function Eigentuemersuche({ objekte }: { objekte: Chance[] }) {
 
     void protokolliere('eigentuemer', name, c.kanton);
     toast({
-      title: oeffentlich ? '✓ Eingetragen und archiviert' : '✓ Eigentümer eingetragen',
+      title: oeffentlich ? 'Eingetragen und archiviert' : 'Eigentümer eingetragen',
       description: oeffentlich ? 'Öffentliche Hand — verkauft nicht' : name,
     });
     setEntwurf(e => ({ ...e, [c.id]: '' }));
@@ -194,199 +191,166 @@ export function Eigentuemersuche({ objekte }: { objekte: Chance[] }) {
       return;
     }
     void protokolliere('archiviert', c.address, c.kanton);
-    toast({ title: '✓ Verworfen', description: c.address });
+    toast({ title: 'Verworfen', description: c.address });
     qc.invalidateQueries({ queryKey: ['uebersicht'] });
     qc.invalidateQueries({ queryKey: ['master'] });
   };
 
+  const inReihe = Math.min(anzahl, uebrig, objekte.filter(o => o.egrid).length);
+
   return (
-    <Card>
-      <CardContent className="p-0">
-        <div className="flex items-center justify-between gap-3 border-b p-5">
-          <div className="flex items-center gap-2">
-            <UserSearch className="h-4 w-4 text-primary" />
-            <h2 className="font-serif">Heute nachschlagen</h2>
-          </div>
-          <div className="ml-auto flex items-center gap-3">
-            <span className="text-xs text-muted-foreground">
-              {uebrig} von {proTagHier} Abfragen übrig
-            </span>
-            {/* Auch ohne Erweiterung sichtbar: ein Knopf, der nicht
-                da ist, sieht aus wie ein Fehler. So steht wenigstens
-                da, woran es liegt. */}
-            {uebrig > 1 && (
-              <>
-              {/* Wie viele am Stueck. Wer zwanzig frei hat, will nicht
-                  zwingend zwanzig auf einmal -- zehn und dann sehen,
-                  ob es laeuft, ist der vernuenftigere Anfang. */}
-              <label className="flex items-center gap-1 text-xs text-muted-foreground">
-                Anzahl
-                <input
-                  type="number"
-                  min={1}
-                  max={uebrig}
-                  value={Math.min(anzahl, uebrig)}
-                  onChange={e => setAnzahl(Math.max(1, Math.min(uebrig, Number(e.target.value) || 1)))}
-                  disabled={!mitExtension}
-                  className="w-14 rounded-md border bg-background px-2 py-1 text-right text-xs disabled:opacity-50"
-                />
-              </label>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={!mitExtension}
-                title={mitExtension
-                  ? 'Öffnet das Portal, liest aus, trägt ein und geht weiter'
-                  : 'Dafür braucht es die Erweiterung — im Admin steht, wie sie hineinkommt'}
-                onClick={async () => {
-                  const naechste = objekte
-                    .filter(o => o.egrid)
-                    .slice(0, Math.min(anzahl, uebrig))
-                    .map(o => ({
-                      propertyId: o.id,
-                      egrid: o.egrid,
-                      bfsNr: o.bfsNr || bfsNachGemeinde[o.gemeinde ?? ''] || '',
-                      kanton: o.kanton,
-                      address: o.address,
-                      // Ohne Ort findet die Adresssuche das Falsche:
-                      // einen "Rueselweg 3" gibt es mehr als einmal.
-                      plzOrt: [o.plz, o.gemeinde].filter(Boolean).join(' '),
-                    }));
-                  // Die Koordinaten werden vorher geholt, das dauert
-                  // einen Moment -- ohne Warten zaehlte der Verbrauch
-                  // auch dann, wenn der Start scheitert.
-                  if (await reihe(naechste)) {
-                    for (let i = 0; i < naechste.length; i++) zaehlen();
-                    setVerbraucht(gezaehlt());
-                  }
-                }}
-              >
-                <UserSearch className="mr-1 h-3.5 w-3.5" />
-                Reihe abfragen ({Math.min(anzahl, uebrig, objekte.filter(o => o.egrid).length)})
-              </Button>
-              </>
-            )}
-          </div>
-        </div>
-
-        <p className="border-b px-5 py-3 text-xs leading-relaxed text-muted-foreground">
-          Das Grundbuchportal bestätigt jede Auskunft per SMS und gibt
-          {' '}{proTagHier} pro Tag frei. Hier stehen die Objekte, bei denen
-          sich das heute am meisten lohnt — grösste Marge, Eigentümer noch
-          offen.
-        </p>
-
-        <ul className="divide-y">
-          {objekte.map(c => {
-            const bfs = c.bfsNr || (c.gemeinde ? bfsNachGemeinde[c.gemeinde] : '');
-            const link = grundbuchUrl(c.egrid, bfs, c.kanton);
-            return (
-              <li key={c.id} className="space-y-2 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="font-medium leading-tight">{c.address}</p>
-                    <p className="text-sm text-muted-foreground">
-                      <span className="tabular-nums">
-                        {c.parzelle ? `Parzelle ${c.parzelle}` : 'Parzelle unbekannt'}
-                      </span>
-                      {' · '}
-                      {[c.plz, c.gemeinde].filter(Boolean).join(' ')}
-                    </p>
-                  </div>
-                  <p className="shrink-0 text-right font-semibold tabular-nums">
-                    {c.marge != null ? `${(c.marge / 1e6).toFixed(1)} Mio` : '—'}
-                  </p>
+    <Abschnitt
+      titel="Heute nachschlagen"
+      zahl={`${uebrig} von ${proTagHier} Abfragen übrig`}
+      hinweis={<>Das Grundbuchportal bestätigt jede Auskunft per SMS und gibt {proTagHier} pro Tag frei.
+        Hier stehen die Objekte, bei denen sich das heute am meisten lohnt: grösste Marge, Eigentümer noch offen.</>}
+      rechts={uebrig > 1 && (
+        <>
+          {/* Wie viele am Stück. Wer zwanzig frei hat, will nicht
+              zwingend zwanzig auf einmal -- zehn und dann sehen, ob es
+              läuft, ist der vernünftigere Anfang. Auch ohne Erweiterung
+              sichtbar: ein Knopf, der fehlt, sieht aus wie ein Fehler. */}
+          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+            Anzahl
+            <input
+              type="number" min={1} max={uebrig}
+              value={Math.min(anzahl, uebrig)}
+              onChange={e => setAnzahl(Math.max(1, Math.min(uebrig, Number(e.target.value) || 1)))}
+              disabled={!mitExtension}
+              className={`${FELD} w-20 text-right disabled:opacity-50`}
+            />
+          </label>
+          <button
+            type="button"
+            className={KNOPF}
+            disabled={!mitExtension}
+            title={mitExtension
+              ? 'Öffnet das Portal, liest aus, trägt ein und geht weiter'
+              : 'Dafür braucht es die Erweiterung, im Admin steht, wie sie hineinkommt'}
+            onClick={async () => {
+              const naechste = objekte
+                .filter(o => o.egrid)
+                .slice(0, Math.min(anzahl, uebrig))
+                .map(o => ({
+                  propertyId: o.id,
+                  egrid: o.egrid,
+                  bfsNr: o.bfsNr || bfsNachGemeinde[o.gemeinde ?? ''] || '',
+                  kanton: o.kanton,
+                  address: o.address,
+                  // Ohne Ort findet die Adresssuche das Falsche:
+                  // einen "Rueselweg 3" gibt es mehr als einmal.
+                  plzOrt: [o.plz, o.gemeinde].filter(Boolean).join(' '),
+                }));
+              // Die Koordinaten werden vorher geholt, das dauert einen
+              // Moment -- ohne Warten zählte der Verbrauch auch dann,
+              // wenn der Start scheitert.
+              if (await reihe(naechste)) {
+                for (let i = 0; i < naechste.length; i++) zaehlen();
+                setVerbraucht(gezaehlt());
+              }
+            }}
+          >
+            {inReihe} in Reihe abfragen
+          </button>
+        </>
+      )}
+    >
+      <ul className={LISTE}>
+        {objekte.map(c => {
+          const bfs = c.bfsNr || (c.gemeinde ? bfsNachGemeinde[c.gemeinde] : '');
+          const link = grundbuchUrl(c.egrid, bfs, c.kanton);
+          const text = entwurf[c.id] || '';
+          return (
+            <li key={c.id} className="space-y-3 px-5 py-4">
+              <div className="space-y-0.5">
+                <div className="flex items-start justify-between gap-4">
+                  <span className="min-w-0 font-semibold">{c.address}</span>
+                  <span className="shrink-0 font-semibold">{c.marge != null ? `${(c.marge / 1e6).toFixed(1)} Mio` : '–'}</span>
                 </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  {/* Mit Extension läuft die ganze Kette: Portal, Nummer,
-                      Deal, aus der Liste. Ohne sie bleibt der blosse Link
-                      -- dann wird der Name von Hand eingetragen. */}
-                  {mitExtension ? (
-                    <Button
-                      size="sm"
-                      onClick={async () => {
-                        // Die Koordinaten werden vorher geholt; ohne
-                        // Warten zaehlte der Verbrauch auch dann, wenn
-                        // der Start gar nicht zustande kommt.
-                        const los = await starten({
-                          propertyId: c.id,
-                          egrid: c.egrid,
-                          bfsNr: bfs,
-                          kanton: c.kanton,
-                          parzelle: c.parzelle,
-                          address: c.address,
-                          plzOrt: [c.plz, c.gemeinde].filter(Boolean).join(' '),
-                        });
-                        if (los) { zaehlen(); setVerbraucht(gezaehlt()); }
-                      }}
-                    >
-                      <UserSearch className="mr-1 h-3.5 w-3.5" /> Abfragen
-                    </Button>
-                  ) : link ? (
-                    <a
-                      href={link}
-                      target={FENSTER.portal}
-                      onClick={() => { zaehlen(); setVerbraucht(gezaehlt()); }}
-                    >
-                      <Button size="sm" variant="outline">
-                        <ExternalLink className="mr-1 h-3.5 w-3.5" /> Grundbuch öffnen
-                      </Button>
-                    </a>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">
-                      EGRID oder Gemeindenummer fehlt
-                    </span>
-                  )}
-
-                  {/* Solange die Extension nicht steht: Block aus dem
-                      Portal kopieren, hier einfügen, fertig. */}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setEinfuegen(c)}
-                  >
-                    <ClipboardPaste className="mr-1 h-3.5 w-3.5" /> Auskunft einfügen
-                  </Button>
-
-                  <Input
-                    value={entwurf[c.id] ?? ''}
-                    onChange={e => setEntwurf(v => ({ ...v, [c.id]: e.target.value }))}
-                    onKeyDown={e => { if (e.key === 'Enter') eintragen(c); }}
-                    placeholder="Eigentümer aus dem Auszug einfügen"
-                    className="h-9 min-w-[220px] flex-1"
-                  />
-                  <Button
-                    size="sm"
-                    onClick={() => eintragen(c)}
-                    disabled={!((entwurf[c.id] || '').trim()) || speichert === c.id}
-                  >
-                    {verkauftNie(entwurf[c.id] || '')
-                      ? <><Archive className="mr-1 h-3.5 w-3.5" /> Archivieren</>
-                      : <><Check className="mr-1 h-3.5 w-3.5" /> Eintragen</>}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-muted-foreground hover:text-destructive"
+                {/* "Nicht rentabel" rechts neben der Parzelle: eine
+                    Nebenhandlung, die nicht so laut sein soll wie die
+                    Abfrage, und auf dem Handy keine eigene Zeile braucht.
+                    Die Trefferfläche bleibt 44 px hoch. */}
+                <div className="flex items-center justify-between gap-4">
+                  <span className="min-w-0 text-sm text-muted-foreground">
+                    {c.parzelle ? `Parzelle ${c.parzelle}` : 'Parzelle unbekannt'}{' · '}{[c.plz, c.gemeinde].filter(Boolean).join(' ')}
+                  </span>
+                  <button
+                    type="button"
+                    className="-my-3 -mr-2 inline-flex h-11 shrink-0 items-center px-2 text-sm text-muted-foreground transition-colors hover:text-destructive disabled:opacity-50"
                     onClick={() => verwerfen(c)}
                     disabled={speichert === c.id}
-                    title="Bringt nichts — aus der Liste nehmen"
+                    title="Bringt nichts, aus der Liste nehmen"
                   >
-                    <X className="mr-1 h-3.5 w-3.5" /> Nicht rentabel
-                  </Button>
+                    Nicht rentabel
+                  </button>
                 </div>
-              </li>
-            );
-          })}
-        </ul>
-      </CardContent>
+              </div>
+
+              {/* Mit Erweiterung läuft die ganze Kette: Portal, Nummer,
+                  Deal, aus der Liste. Ohne sie bleibt der blosse Link --
+                  dann wird der Name von Hand eingetragen. */}
+              <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                {mitExtension ? (
+                  <button
+                    type="button"
+                    className={KNOPF_HAUPT}
+                    onClick={async () => {
+                      const los = await starten({
+                        propertyId: c.id,
+                        egrid: c.egrid,
+                        bfsNr: bfs,
+                        kanton: c.kanton,
+                        parzelle: c.parzelle,
+                        address: c.address,
+                        plzOrt: [c.plz, c.gemeinde].filter(Boolean).join(' '),
+                      });
+                      if (los) { zaehlen(); setVerbraucht(gezaehlt()); }
+                    }}
+                  >
+                    Abfragen
+                  </button>
+                ) : link ? (
+                  <a href={link} target={FENSTER.portal} className={KNOPF}
+                     onClick={() => { zaehlen(); setVerbraucht(gezaehlt()); }}>
+                    Grundbuch öffnen
+                  </a>
+                ) : (
+                  <span className="self-center text-sm text-muted-foreground">EGRID oder Gemeindenummer fehlt</span>
+                )}
+                {/* Solange die Erweiterung nicht steht: Block aus dem
+                    Portal kopieren, hier einfügen, fertig. */}
+                <button type="button" className={KNOPF} onClick={() => setEinfuegen(c)}>Auskunft einfügen</button>
+              </div>
+
+              <div className="flex gap-2">
+                <input
+                  value={text}
+                  onChange={e => setEntwurf(v => ({ ...v, [c.id]: e.target.value }))}
+                  onKeyDown={e => { if (e.key === 'Enter') eintragen(c); }}
+                  placeholder="Eigentümer einfügen"
+                  aria-label={`Eigentümer für ${c.address}`}
+                  className={`${FELD} flex-1`}
+                />
+                <button
+                  type="button"
+                  className={KNOPF_HAUPT}
+                  onClick={() => eintragen(c)}
+                  disabled={!text.trim() || speichert === c.id}
+                >
+                  {verkauftNie(text) ? 'Archivieren' : 'Eintragen'}
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
 
       <AuskunftEinfuegen
         propertyId={einfuegen?.id ?? null}
         adresse={einfuegen?.address}
         onClose={() => setEinfuegen(null)}
       />
-    </Card>
+    </Abschnitt>
   );
 }

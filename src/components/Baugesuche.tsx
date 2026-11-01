@@ -145,7 +145,7 @@ export function Baugesuche() {
                     {!g.egrid && <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs text-muted-foreground">nicht verortet</span>}
                   </span>
                 </span>
-                <span className="shrink-0 text-right text-sm tabular-nums text-muted-foreground">{datum(g.publiziert_am)}</span>
+                <span className="shrink-0 text-right text-sm text-muted-foreground">{datum(g.publiziert_am)}</span>
               </button>
               {auf && (
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-t px-4 py-4 text-sm sm:grid-cols-4 sm:px-5">

@@ -81,7 +81,7 @@ export function Cockpit({ onGehe }: { onGehe: (z: Ziel) => void }) {
               <span className="text-sm font-semibold text-muted-foreground">{k.titel}</span>
               <ArrowUpRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
             </span>
-            <span className={`mt-3 block text-4xl font-bold tabular-nums tracking-tight ${k.wichtig ? 'text-accent' : ''}`}>{k.wert}</span>
+            <span className={`mt-3 block text-3xl font-bold tracking-tight sm:text-4xl ${k.wichtig ? 'text-accent' : ''}`}>{k.wert}</span>
             <span className="mt-1 block text-sm text-muted-foreground">{k.zeile}</span>
           </button>
         ))}

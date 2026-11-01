@@ -27,8 +27,8 @@ describe('Pipedrive-Reiter', () => {
         <PipedriveBereit />
       </QueryClientProvider>,
     );
-    expect(screen.getByText(/Post — Brief statt Anruf/)).toBeTruthy();
-    expect(screen.getByText(/Bereits gepusht/)).toBeTruthy();
+    expect(screen.getByText(/Brief statt Anruf/)).toBeTruthy();
+    expect(screen.getByText(/Bereits übertragen/)).toBeTruthy();
     expect(screen.getByText(/Noch kein Brief fällig/)).toBeTruthy();
   });
 });

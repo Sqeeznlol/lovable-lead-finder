@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Phone, ExternalLink, Loader2, Check, ArrowRight, Mail } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Loader2 } from 'lucide-react';
+import { Abschnitt, FELD, KNOPF, KNOPF_HAUPT, Kopf, Leer, LISTE } from '@/components/rahmen';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useOffeneNummern } from '@/hooks/use-properties';
@@ -71,7 +69,7 @@ export function Nummern() {
       return;
     }
     qc.invalidateQueries({ queryKey: ['properties'] });
-    toast({ title: '✉️ Auf Post gesetzt', description: `${adresse} — steht unter Pipedrive · Post` });
+    toast({ title: 'Auf Post gesetzt', description: `${adresse} steht jetzt unter Pipedrive, Post` });
   };
 
   const eintragen = async (id: string, adresse: string) => {
@@ -112,185 +110,142 @@ export function Nummern() {
     qc.invalidateQueries({ queryKey: ['properties'] });
     qc.invalidateQueries({ queryKey: ['uebersicht'] });
     qc.invalidateQueries({ queryKey: ['master'] });
-    toast({ title: '📞 Nummer eingetragen', description: adresse });
+    toast({ title: 'Nummer eingetragen', description: adresse });
   };
 
   if (isLoading) {
     return (
-      <div className="grid min-h-[40vh] place-items-center text-muted-foreground">
-        <Loader2 className="h-5 w-5 animate-spin" />
-      </div>
+      <p className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" /> wird geladen …
+      </p>
     );
   }
 
   const offen = data || [];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="font-serif tracking-tight">Nummern</h1>
-        <p className="mt-1 text-muted-foreground">
-          Eigentümer steht fest, die Telefonnummer fehlt. Sobald sie hier
-          steht, entsteht der Deal in Pipedrive — Akquise, Phase „Neu".
-        </p>
-      </div>
+    <div className="mx-auto max-w-4xl space-y-10">
+      <Kopf ueber="Akquise" titel="Nummern">
+        Eigentümer steht fest, die Telefonnummer fehlt. Sobald sie hier steht,
+        entsteht der Deal in Pipedrive, Akquise, Phase «Neu».
+      </Kopf>
+
+      <Abschnitt titel="Nummer gesucht" zahl={offen.length || undefined}>
+        {offen.length === 0 ? (
+          <Leer titel="Nichts offen.">Alles, was einen Eigentümer hat, hat auch eine Nummer.</Leer>
+        ) : (
+          <ul className={LISTE}>
+            {offen.map(p => {
+              const name = p.owner_name || '';
+              const ort = p.plz_ort || [p.plz, p.gemeinde].filter(Boolean).join(' ');
+              const text = entwurf[p.id] ?? '';
+              const firma = /\b(AG|GmbH|SA|Sàrl|Genossenschaft|Stiftung)\b/.test(name);
+              return (
+                <li key={p.id} className="flex gap-5 px-5 py-5">
+                  <Objektansicht
+                    address={p.address}
+                    plzOrt={ort}
+                    parzelle={p.parzelle}
+                    bfsNr={p.bfs_nr}
+                    gemeinde={p.gemeinde}
+                    kanton={p.kanton}
+                    className="hidden h-28 w-40 shrink-0 overflow-hidden rounded-xl sm:block"
+                  />
+                  <div className="min-w-0 flex-1 space-y-3">
+                    <div className="space-y-0.5">
+                      <div className="flex items-start justify-between gap-4">
+                        <span className="min-w-0 font-semibold">{p.address}</span>
+                        {p.marge_chf ? <span className="shrink-0 font-semibold">{(p.marge_chf / 1e6).toFixed(1)} Mio</span> : null}
+                      </div>
+                      {/* "Per Post" als leise Nebenhandlung neben der
+                          Parzelle, wie "Nicht rentabel" in der Übersicht. */}
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="min-w-0 text-sm text-muted-foreground">
+                          {p.parzelle ? `Parzelle ${p.parzelle} · ` : ''}{ort}
+                        </span>
+                        <button type="button"
+                                className="-my-3 -mr-2 inline-flex h-11 shrink-0 items-center px-2 text-sm text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                                onClick={() => aufPost(p.id, p.address)} disabled={speichert === p.id}
+                                title="Keine Nummer zu finden, per Brief anschreiben">
+                          Per Post
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Der Eigentümer mit seiner Adresse: mit beidem
+                        zusammen findet man die Nummer, mit dem Namen
+                        allein selten. */}
+                    <p className="text-sm">
+                      <span className="font-medium">{name}</span>
+                      {p.owner_address && <span className="text-muted-foreground"> · {p.owner_address}</span>}
+                    </p>
+
+                    <div className="flex flex-wrap gap-2">
+                      <a className={KNOPF} target={FENSTER.suche}
+                         href={`https://tel.search.ch/?was=${encodeURIComponent(name)}${p.owner_address ? `&wo=${encodeURIComponent(p.owner_address)}` : ''}`}>
+                        tel.search.ch
+                      </a>
+                      <a className={KNOPF} target={FENSTER.suche}
+                         href={`https://www.google.com/search?q=${encodeURIComponent(`${name} ${p.owner_address ?? ''} Telefon`)}`}>
+                        Google
+                      </a>
+                      {/* Firmen stehen im Handelsregister, Private nicht. */}
+                      {firma && (
+                        <a className={KNOPF} target={FENSTER.suche}
+                           href={`https://www.zefix.ch/de/search/entity/list?name=${encodeURIComponent(name)}`}>
+                          Zefix
+                        </a>
+                      )}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <input
+                        type="tel"
+                        inputMode="tel"
+                        value={text}
+                        onChange={e => setEntwurf(v => ({ ...v, [p.id]: e.target.value }))}
+                        onKeyDown={e => { if (e.key === 'Enter') eintragen(p.id, p.address); }}
+                        placeholder="079 123 45 67"
+                        aria-label={`Telefonnummer für ${p.address}`}
+                        className={`${FELD} flex-1 sm:max-w-xs`}
+                      />
+                      <button type="button" className={KNOPF_HAUPT}
+                              onClick={() => eintragen(p.id, p.address)}
+                              disabled={!text.trim() || speichert === p.id}>
+                        {speichert === p.id ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Eintragen'}
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Abschnitt>
 
       {/* Wohin die Leads gegangen sind. Ohne das ist die Frage
           berechtigt: "jetzt ist er weg -- wo?" */}
       {uebergeben.length > 0 && (
-        <Card>
-          <CardContent className="p-0">
-            <div className="flex items-center gap-2 border-b p-5">
-              <ArrowRight className="h-4 w-4 text-muted-foreground" />
-              <h2 className="font-serif">Nach Pipedrive übergeben</h2>
-              <span className="ml-auto text-xs text-muted-foreground">
-                Akquise · Phase „Neu"
-              </span>
-            </div>
-            <ul className="divide-y">
-              {uebergeben.map((u, i) => (
-                <li key={`${u.adresse}-${i}`} className="flex items-baseline justify-between gap-3 px-5 py-2 text-sm">
-                  <span className="min-w-0">
-                    <span className="font-medium">{u.adresse}</span>
-                    {u.name && <span className="text-muted-foreground"> · {u.name}</span>}
-                  </span>
-                  {u.dealId ? (
-                    <a
-                      href={`https://bauraum.pipedrive.com/deal/${u.dealId}`}
-                      target={FENSTER.pipedrive}
-                      className="shrink-0 underline underline-offset-4"
-                    >
-                      Deal {u.dealId} öffnen
-                    </a>
-                  ) : (
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      kein Deal entstanden
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
-
-      {offen.length === 0 ? (
-        <Card>
-          <CardContent className="p-10 text-center text-muted-foreground">
-            Nichts offen. Alles, was einen Eigentümer hat, hat auch eine
-            Nummer.
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardContent className="p-0">
-            <div className="flex items-center gap-2 border-b p-5">
-              <Phone className="h-4 w-4 text-primary" />
-              <h2 className="font-serif">Nummer gesucht</h2>
-              <span className="ml-auto text-xs text-muted-foreground">
-                {offen.length}
-              </span>
-            </div>
-
-            <ul className="divide-y">
-              {offen.map(p => {
-                const name = p.owner_name || '';
-                const ort = p.plz_ort || [p.plz, p.gemeinde].filter(Boolean).join(' ');
-                return (
-                  <li key={p.id} className="flex flex-wrap items-start gap-4 p-4">
-                    <Objektansicht
-                      address={p.address}
-                      plzOrt={ort}
-                      parzelle={p.parzelle}
-                      bfsNr={p.bfs_nr}
-                      gemeinde={p.gemeinde}
-                      kanton={p.kanton}
-                      className="hidden h-24 w-36 shrink-0 sm:block"
-                    />
-
-                    <div className="min-w-0 flex-1 space-y-1">
-                      <p className="font-medium leading-tight">{p.address}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {p.parzelle ? `Parzelle ${p.parzelle} · ` : ''}{ort}
-                        {p.marge_chf ? ` · ${(p.marge_chf / 1e6).toFixed(1)} Mio` : ''}
-                      </p>
-
-                      {/* Der Eigentümer mit seiner Adresse: mit beidem
-                          zusammen findet man die Nummer, mit dem Namen
-                          allein selten. */}
-                      <p className="text-sm">
-                        <span className="font-medium">{name}</span>
-                        {p.owner_address && (
-                          <span className="text-muted-foreground"> · {p.owner_address}</span>
-                        )}
-                      </p>
-
-                      <div className="flex flex-wrap gap-2 pt-1">
-                        <a
-                          href={`https://tel.search.ch/?was=${encodeURIComponent(name)}${
-                            p.owner_address ? `&wo=${encodeURIComponent(p.owner_address)}` : ''}`}
-                          target={FENSTER.suche}
-                        >
-                          <Button size="sm" variant="outline">
-                            <ExternalLink className="mr-1 h-3.5 w-3.5" /> tel.search.ch
-                          </Button>
-                        </a>
-                        <a
-                          href={`https://www.google.com/search?q=${encodeURIComponent(
-                            `${name} ${p.owner_address ?? ''} Telefon`)}`}
-                          target={FENSTER.suche}
-                        >
-                          <Button size="sm" variant="outline">
-                            <ExternalLink className="mr-1 h-3.5 w-3.5" /> Google
-                          </Button>
-                        </a>
-                        {/* Firmen stehen im Handelsregister, Private nicht. */}
-                        {/\b(AG|GmbH|SA|Sàrl|Genossenschaft|Stiftung)\b/.test(name) && (
-                          <a
-                            href={`https://www.zefix.ch/de/search/entity/list?name=${encodeURIComponent(name)}`}
-                            target={FENSTER.suche}
-                          >
-                            <Button size="sm" variant="outline">
-                              <ExternalLink className="mr-1 h-3.5 w-3.5" /> Zefix
-                            </Button>
-                          </a>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex w-full items-center gap-2 sm:w-auto">
-                      <Input
-                        value={entwurf[p.id] ?? ''}
-                        onChange={e => setEntwurf(v => ({ ...v, [p.id]: e.target.value }))}
-                        onKeyDown={e => { if (e.key === 'Enter') eintragen(p.id, p.address); }}
-                        placeholder="079 123 45 67"
-                        className="h-9 w-full sm:w-44"
-                      />
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => aufPost(p.id, p.address)}
-                        disabled={speichert === p.id}
-                        title="Keine Nummer zu finden — per Brief anschreiben"
-                      >
-                        <Mail className="mr-1 h-3.5 w-3.5" /> Post
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={() => eintragen(p.id, p.address)}
-                        disabled={!((entwurf[p.id] || '').trim()) || speichert === p.id}
-                      >
-                        {speichert === p.id
-                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          : <><Check className="mr-1 h-3.5 w-3.5" /> Eintragen</>}
-                      </Button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </CardContent>
-        </Card>
+        <Abschnitt titel="Nach Pipedrive übergeben" hinweis="Akquise, Phase «Neu». Die letzten acht.">
+          <ul className={LISTE}>
+            {uebergeben.map((u, i) => (
+              <li key={`${u.adresse}-${i}`} className="flex items-center justify-between gap-4 px-5 py-3">
+                <span className="min-w-0">
+                  <span className="block truncate font-medium">{u.adresse}</span>
+                  {u.name && <span className="block truncate text-sm text-muted-foreground">{u.name}</span>}
+                </span>
+                {u.dealId ? (
+                  <a href={`https://bauraum.pipedrive.com/deal/${u.dealId}`} target={FENSTER.pipedrive}
+                     className="-my-3 inline-flex h-11 shrink-0 items-center text-sm font-semibold text-accent">
+                    Deal {u.dealId}
+                  </a>
+                ) : (
+                  <span className="shrink-0 text-sm text-muted-foreground">kein Deal entstanden</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </Abschnitt>
       )}
     </div>
   );
