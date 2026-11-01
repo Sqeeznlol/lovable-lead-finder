@@ -2,10 +2,8 @@ import { useEffect, useState } from 'react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { grundbuchUrl, verkauftNie, ARCHIV_STATUS } from '@/lib/grundbuch';
-import { Label } from '@/components/ui/label';
 import { Objektansicht } from '@/components/Objektansicht';
 import { Gespraeche } from '@/components/Gespraeche';
 import { Nachbarn } from '@/components/Nachbarn';
@@ -14,7 +12,9 @@ import { AuskunftEinfuegen } from '@/components/AuskunftEinfuegen';
 import { weiterverarbeiten } from '@/hooks/use-eigentuemer-lookup';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ExternalLink, MapPin, Phone, User, Save, Loader2, Bot, RefreshCw, Archive, ClipboardPaste } from 'lucide-react';
+import { ExternalLink, MapPin, Phone, Save, Loader2, Bot, RefreshCw, Archive, ClipboardPaste } from 'lucide-react';
+import { KNOPF, KNOPF_HAUPT, Marke } from '@/components/rahmen';
+import { zoneKurzform } from '@/lib/potential';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
@@ -136,256 +136,171 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
     onClose();
   };
 
+  const ort = data ? (data.plz_ort || [data.plz, data.gemeinde].filter(Boolean).join(' ')) : '';
+  const suche = data ? encodeURIComponent([data.address, ort].filter(Boolean).join(', ')) : '';
+  const d = data as (Property & { eigentuemer_name?: string | null; eigentuemer_adresse?: string | null; eigentuemer_plz_ort?: string | null }) | null;
+  const zahl = (v: number | null | undefined, e = '') => (v ? `${Math.round(v).toLocaleString('de-CH')}${e}` : '–');
+
+  // Aufbau wie die Detailseite der Vorlage (DESIGN.md): links das grosse
+  // Bild, Titel, Betrag in Violett und das Merkmal-Raster; rechts eine
+  // Tafel für Eigentümer und Stand mit dem schwarzen Knopf.
   return (
     <Dialog open={!!id} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto rounded border-0 bg-card p-0">
         {loading || !data ? (
-          <div className="p-12 flex justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>
+          <div className="flex justify-center p-12"><Loader2 className="h-6 w-6 animate-spin" /></div>
         ) : (
-          <>
-            <DialogHeader>
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <DialogTitle>{data.address}</DialogTitle>
-                  <DialogDescription>
-                    {data.gemeinde} {data.plz && `· ${data.plz}`} {data.egrid && `· EGRID ${data.egrid}`}
-                  </DialogDescription>
-                </div>
-                {/* Oben, nicht unten: es ist die häufigste Entscheidung.
-                    Die meisten Objekte sind nichts, und wer das nach
-                    drei Sekunden sieht, soll nicht erst scrollen. */}
-                {data.preselection_status === ARCHIV_STATUS ? (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="shrink-0"
-                    onClick={() => update({ preselection_status: 'Nicht geprüft' })}
-                  >
-                    Aus dem Archiv holen
-                  </Button>
-                ) : (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="shrink-0"
-                    onClick={archivieren}
-                    disabled={saving}
-                  >
-                    <Archive className="mr-1 h-4 w-4" /> Nicht interessant
-                  </Button>
+          <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_340px]">
+            <div className="min-w-0 space-y-6 p-5 sm:p-6">
+              <DialogHeader className="sr-only">
+                <DialogTitle>{data.address}</DialogTitle>
+                <DialogDescription>{ort}</DialogDescription>
+              </DialogHeader>
+
+              {/* Erst das Bild, über die ganze Breite: es zeigt in zwei
+                  Sekunden, was keine Zahl zeigt -- Platz, Hang, Nachbar. */}
+              <div className="relative">
+                <Objektansicht address={data.address} plzOrt={ort} parzelle={data.parzelle} bfsNr={data.bfs_nr}
+                               gemeinde={data.gemeinde} kanton={data.kanton} className="h-72 w-full sm:h-[380px]" />
+                {zoneKurzform(data.zone) && (
+                  <span className="pointer-events-none absolute bottom-3 left-3"><Marke art="gruen">{zoneKurzform(data.zone)}</Marke></span>
                 )}
               </div>
-            </DialogHeader>
 
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-                <Stat label="Fläche" value={data.area ? `${data.area.toLocaleString('de-CH')} m²` : '—'} />
-                <Stat label="Gebäude" value={data.gebaeudeflaeche ? `${data.gebaeudeflaeche.toLocaleString('de-CH')} m²` : '—'} />
-                <Stat label="HNF" value={data.hnf_schaetzung ? `${data.hnf_schaetzung.toLocaleString('de-CH')} m²` : '—'} />
-                <Stat label="Baujahr" value={data.baujahr || '—'} />
-                <Stat label="Geschosse" value={data.geschosse || '—'} />
-                <Stat label="Wohnungen" value={data.wohnungen || '—'} />
-                <Stat label="Zone" value={data.zone || '—'} />
-                <Stat label="Kategorie" value={data.kategorie || '—'} />
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0 space-y-1">
+                  <p className="flex items-center gap-1.5 text-sm text-muted-foreground"><MapPin className="h-4 w-4" /> {ort || '–'}</p>
+                  <h2 className="text-[28px] leading-tight">{data.address}</h2>
+                  <p className="text-2xl font-semibold text-violett">{data.marge_chf ? `CHF ${(data.marge_chf / 1e6).toFixed(1)} Mio` : 'Marge offen'}</p>
+                  <p className="text-sm text-muted-foreground">{[data.parzelle && `Parzelle ${data.parzelle}`, data.egrid && `EGRID ${data.egrid}`].filter(Boolean).join(' · ')}</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {[[data.area, ' m²', 'Fläche'], [data.geschosse, ' Gesch.', 'Geschosse'], [data.wohnungen, ' Whg.', 'Wohnungen']]
+                    .filter(([v]) => v).map(([v, e, t]) => (
+                      <span key={t as string} title={t as string} className="inline-flex h-10 items-center rounded-[3px] border px-3 text-sm">{zahl(v as number, e as string)}</span>
+                    ))}
+                </div>
               </div>
 
-              {/* Zuerst die Zahlen, dann das Bild -- und das über die
-                  ganze Breite: ein Luftbild in Briefmarkengrösse
-                  beantwortet keine Frage. Es zeigt in zwei Sekunden,
-                  was keine Zahl zeigt: steht da noch Platz, hängt das
-                  Grundstück am Hang, hat der Nachbar schon gebaut. */}
-              <Objektansicht
-                address={data.address}
-                plzOrt={data.plz_ort || [data.plz, data.gemeinde].filter(Boolean).join(' ')}
-                parzelle={data.parzelle}
-                bfsNr={data.bfs_nr}
-                gemeinde={data.gemeinde}
-                kanton={data.kanton}
-                className="h-72 w-full"
-              />
+              {/* Merkmal-Raster mit kleinen Grossbuchstaben wie in der Vorlage. */}
+              <dl className="grid grid-cols-2 gap-x-6 gap-y-4 border-t pt-5 sm:grid-cols-3">
+                {([
+                  ['Zone', data.zone], ['Kategorie', data.kategorie], ['Baujahr', data.baujahr],
+                  ['Grundstück', zahl(data.area, ' m²')], ['Gebäudefläche', zahl(data.gebaeudeflaeche, ' m²')], ['HNF geschätzt', zahl(data.hnf_schaetzung, ' m²')],
+                  ['Reserve HNF', data.hnf_delta && data.hnf_delta > 0 ? zahl(data.hnf_delta, ' m²') : '–'], ['Geschosse', data.geschosse], ['Wohnungen', data.wohnungen],
+                ] as [string, unknown][]).map(([t, v]) => (
+                  <div key={t} className="min-w-0">
+                    <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">{t}</dt>
+                    <dd className="mt-0.5 break-words font-medium">{v == null || v === '' ? '–' : String(v)}</dd>
+                  </div>
+                ))}
+              </dl>
 
               <div className="flex flex-wrap gap-2">
                 {/* Der gespeicherte Link fehlt bei den meisten Objekten;
                     aus Adresse und Ort lässt er sich immer bilden. */}
-                <a
-                  href={data.google_maps_url || `https://www.google.com/maps/search/?api=1&query=${
-                    encodeURIComponent([data.address, data.plz_ort || [data.plz, data.gemeinde].filter(Boolean).join(' ')].filter(Boolean).join(', '))}`}
-                  target={FENSTER.karte}
-                >
-                  <Button size="sm" variant="outline"><MapPin className="h-3.5 w-3.5 mr-1" /> Maps</Button>
-                </a>
-                <a
-                  href={`https://www.google.com/maps/search/?api=1&query=${
-                    encodeURIComponent([data.address, data.plz_ort || [data.plz, data.gemeinde].filter(Boolean).join(' ')].filter(Boolean).join(', '))}&basemap=satellite`}
-                  target={FENSTER.karte}
-                >
-                  <Button size="sm" variant="outline"><MapPin className="h-3.5 w-3.5 mr-1" /> Satellit</Button>
-                </a>
-                {data.gis_url && (
-                  <a href={data.gis_url} target={FENSTER.portal}>
-                    <Button size="sm" variant="outline"><ExternalLink className="h-3.5 w-3.5 mr-1" /> GIS</Button>
-                  </a>
-                )}
-                {data.housing_stat_url && (
-                  <a href={data.housing_stat_url} target={FENSTER.portal}>
-                    <Button size="sm" variant="outline"><ExternalLink className="h-3.5 w-3.5 mr-1" /> Kataster</Button>
-                  </a>
-                )}
+                <a className={KNOPF} href={data.google_maps_url || `https://www.google.com/maps/search/?api=1&query=${suche}`} target={FENSTER.karte}><MapPin className="h-4 w-4" /> Maps</a>
+                <a className={KNOPF} href={`https://www.google.com/maps/search/?api=1&query=${suche}&basemap=satellite`} target={FENSTER.karte}><MapPin className="h-4 w-4" /> Satellit</a>
+                {data.gis_url && <a className={KNOPF} href={data.gis_url} target={FENSTER.portal}><ExternalLink className="h-4 w-4" /> GIS</a>}
+                {data.housing_stat_url && <a className={KNOPF} href={data.housing_stat_url} target={FENSTER.portal}><ExternalLink className="h-4 w-4" /> Kataster</a>}
+                {/* Die Auskunft des Grundbuchamts nennt den eingetragenen
+                    Eigentümer. Führt der Link auf die Anmeldung, ist das
+                    die Identifikation des Portals, kein defekter Link. */}
                 {grundbuchUrl(data.egrid, data.bfs_nr, data.kanton) && (
-                  /* Die Auskunft des Grundbuchamts nennt den eingetragenen
-                     Eigentümer -- genau die Angabe, die in den Listen fehlt.
-                     Führt der Link auf die Anmeldung, ist das die
-                     Identifikation des Portals und kein defekter Link. */
-                  <a href={grundbuchUrl(data.egrid, data.bfs_nr, data.kanton)!} target={FENSTER.portal}>
-                    <Button size="sm" variant="outline"><ExternalLink className="h-3.5 w-3.5 mr-1" /> Grundbuch</Button>
-                  </a>
+                  <a className={KNOPF} href={grundbuchUrl(data.egrid, data.bfs_nr, data.kanton)!} target={FENSTER.portal}><ExternalLink className="h-4 w-4" /> Grundbuch</a>
                 )}
-                {data.owner_name && (
-                  <a href={`https://tel.search.ch/?was=${encodeURIComponent(data.owner_name)}`} target={FENSTER.suche}>
-                    <Button size="sm" variant="outline"><Phone className="h-3.5 w-3.5 mr-1" /> Tel.search</Button>
-                  </a>
-                )}
-              </div>
-
-              {/* Eigentümer (Portal-Lookup) */}
-              <div className="rounded-lg border p-3 space-y-2 bg-muted/30">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                    <Bot className="h-3.5 w-3.5" /> Eigentümer (ZH-Portal)
-                  </Label>
-                  <Button
-                    size="sm"
-                    variant={(data as Property & { eigentuemer_name?: string | null }).eigentuemer_name ? 'outline' : 'default'}
-                    className="h-7 text-xs gap-1"
-                    disabled={!data.egrid}
-                    onClick={() => startLookup({
-                      propertyId: data.id,
-                      egrid: data.egrid,
-                      bfsNr: data.bfs_nr,
-                      kanton: data.kanton,
-                      parzelle: data.parzelle,
-                      address: data.address,
-                      plzOrt: data.plz_ort || data.gemeinde,
-                    })}
-                  >
-                    {(data as Property & { eigentuemer_name?: string | null }).eigentuemer_name
-                      ? (<><RefreshCw className="h-3 w-3" /> Erneut abrufen</>)
-                      : (<><Bot className="h-3 w-3" /> Eigentümer abrufen</>)}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 gap-1 text-xs"
-                    onClick={() => setEinfuegen(true)}
-                  >
-                    <ClipboardPaste className="h-3 w-3" /> Auskunft einfügen
-                  </Button>
-                </div>
-                {(() => {
-                  const d = data as Property & { eigentuemer_name?: string | null; eigentuemer_adresse?: string | null; eigentuemer_plz_ort?: string | null };
-                  if (!d.eigentuemer_name && !d.eigentuemer_adresse) {
-                    return <p className="text-xs text-muted-foreground">Noch nicht abgerufen{!data.egrid && ' — keine EGRID vorhanden'}.</p>;
-                  }
-                  return (
-                    <div className="text-sm space-y-0.5">
-                      {d.eigentuemer_name && <p className="font-medium">{d.eigentuemer_name}</p>}
-                      {d.eigentuemer_adresse && <p className="text-muted-foreground">{d.eigentuemer_adresse}</p>}
-                      {d.eigentuemer_plz_ort && <p className="text-muted-foreground">{d.eigentuemer_plz_ort}</p>}
-                    </div>
-                  );
-                })()}
-                {!extensionAvailable && (
-                  <p className="text-xs text-muted-foreground">Chrome-Extension empfohlen für Auto-Speicherung.</p>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Vorwahl-Status</Label>
-                  <Select value={data.preselection_status || 'Nicht geprüft'}
-                          onValueChange={v => update({ preselection_status: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {preselectionStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Akquise-Status</Label>
-                  <Select value={data.status} onValueChange={v => update({ status: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {akquiseStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs"><User className="h-3 w-3 inline mr-1" /> Eigentümer</Label>
-                  <Input value={data.owner_name || ''} onChange={e => update({ owner_name: e.target.value || null })} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs"><Phone className="h-3 w-3 inline mr-1" /> Telefon</Label>
-                  <Input value={data.owner_phone || ''} onChange={e => update({ owner_phone: e.target.value || null })} />
-                </div>
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label className="text-xs">Eigentümer-Adresse</Label>
-                  <Input value={data.owner_address || ''} onChange={e => update({ owner_address: e.target.value || null })} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Follow-up</Label>
-                  <Input type="date"
-                         value={data.follow_up_at ? data.follow_up_at.slice(0, 10) : ''}
-                         onChange={e => update({ follow_up_at: e.target.value ? new Date(e.target.value).toISOString() : null })} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Zuständige Person</Label>
-                  <Input value={data.assigned_to || ''} onChange={e => update({ assigned_to: e.target.value || null })} />
-                </div>
+                {data.owner_name && <a className={KNOPF} href={`https://tel.search.ch/?was=${encodeURIComponent(data.owner_name)}`} target={FENSTER.suche}><Phone className="h-4 w-4" /> Tel.search</a>}
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs">Notizen</Label>
-                <Textarea rows={4} value={data.notes || ''}
-                          onChange={e => update({ notes: e.target.value || null })} />
+                <h3 className="text-lg">Notizen</h3>
+                <Textarea rows={4} value={data.notes || ''} onChange={e => update({ notes: e.target.value || null })} className="rounded-[3px]" />
               </div>
+
+              {/* Wer arrondieren will, fragt zuerst: wem gehört nebenan? */}
+              <Nachbarn parzelleId={data.id} />
+              {/* Jedes Gespräch als Daten: Absicht, Preis, Grund, Wiedervorlage. */}
+              <Gespraeche parzelleId={data.id} ownerName={data.owner_name ?? null} />
             </div>
 
-            {/* Wer arrondieren will, fragt zuerst: wem gehört
-                nebenan? Die Liste steht erst da, wenn die Umrisse des
-                Kantons eingelesen sind -- vorher erscheint sie gar
-                nicht, statt leer. */}
-            <Nachbarn parzelleId={data.id} />
-
-            {/* Jedes Gespräch als Daten: Absicht, Preis, Grund, Wiedervorlage. */}
-            <Gespraeche parzelleId={data.id} ownerName={data.owner_name ?? null} />
-
-            {/* Die öffentliche Hand verkauft ihren Grundbesitz praktisch nie.
-                Steht ein solcher Eigentümer im Grundbuch, ist die Arbeit an
-                diesem Objekt beendet -- es gehört ins Archiv und nicht mehr
-                auf die Anrufliste. */}
-            {verkauftNie(data.owner_name) && data.preselection_status !== ARCHIV_STATUS && (
-              <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
-                <p className="text-sm">
-                  <span className="font-medium">Öffentliche Hand als Eigentümerin.</span>{' '}
-                  Verkauft in aller Regel nicht — ins Archiv?
-                </p>
-                <Button size="sm" variant="outline" onClick={archivieren} disabled={saving}>
-                  Archivieren
-                </Button>
+            {/* Rechte Tafel: Eigentümer und Stand, wie "Listing Agent" in der Vorlage. */}
+            <aside className="space-y-5 border-t bg-secondary/40 p-5 sm:p-6 lg:border-l lg:border-t-0">
+              {/* Rechts Platz lassen: dort sitzt das Schliessen-Kreuz. */}
+              <div className="flex items-center justify-between gap-2 pr-8">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Eigentümer</p>
+                {/* Oben, nicht unten: die häufigste Entscheidung. */}
+                {data.preselection_status === ARCHIV_STATUS ? (
+                  <button type="button" className="text-sm text-muted-foreground hover:text-foreground" onClick={() => update({ preselection_status: 'Nicht geprüft' })}>Aus dem Archiv holen</button>
+                ) : (
+                  <button type="button" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-destructive" onClick={archivieren} disabled={saving}>
+                    <Archive className="h-4 w-4" /> Nicht interessant
+                  </button>
+                )}
               </div>
-            )}
 
-            <div className="flex justify-end gap-2">
-              <Button variant="ghost" onClick={onClose}>Abbrechen</Button>
-              <Button onClick={save} disabled={saving}>
-                {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
-                Speichern
-              </Button>
-            </div>
-          </>
+              <div className="space-y-2 rounded border bg-card p-4">
+                {d?.eigentuemer_name || d?.eigentuemer_adresse ? (
+                  <div className="space-y-0.5 text-sm">
+                    {d.eigentuemer_name && <p className="font-semibold">{d.eigentuemer_name}</p>}
+                    {d.eigentuemer_adresse && <p className="text-muted-foreground">{d.eigentuemer_adresse}</p>}
+                    {d.eigentuemer_plz_ort && <p className="text-muted-foreground">{d.eigentuemer_plz_ort}</p>}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Aus dem Grundbuch noch nicht abgerufen{!data.egrid && ', keine EGRID vorhanden'}.</p>
+                )}
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button type="button" className={`${KNOPF} px-2 text-sm`} disabled={!data.egrid}
+                          onClick={() => startLookup({ propertyId: data.id, egrid: data.egrid, bfsNr: data.bfs_nr, kanton: data.kanton, parzelle: data.parzelle, address: data.address, plzOrt: data.plz_ort || data.gemeinde })}>
+                    {d?.eigentuemer_name ? <><RefreshCw className="h-4 w-4" /> Erneut</> : <><Bot className="h-4 w-4" /> Abrufen</>}
+                  </button>
+                  <button type="button" className={`${KNOPF} px-2 text-sm`} onClick={() => setEinfuegen(true)}><ClipboardPaste className="h-4 w-4" /> Einfügen</button>
+                </div>
+                {!extensionAvailable && <p className="text-xs text-muted-foreground">Mit der Chrome-Erweiterung wird automatisch gespeichert.</p>}
+              </div>
+
+              <Feld titel="Name"><Input value={data.owner_name || ''} onChange={e => update({ owner_name: e.target.value || null })} /></Feld>
+              <Feld titel="Telefon"><Input value={data.owner_phone || ''} onChange={e => update({ owner_phone: e.target.value || null })} /></Feld>
+              <Feld titel="Adresse"><Input value={data.owner_address || ''} onChange={e => update({ owner_address: e.target.value || null })} /></Feld>
+
+              <div className="grid grid-cols-1 gap-4 border-t pt-5">
+                <Feld titel="Vorwahl">
+                  <Select value={data.preselection_status || 'Nicht geprüft'} onValueChange={v => update({ preselection_status: v })}>
+                    <SelectTrigger className="rounded-[3px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>{preselectionStatuses.map(x => <SelectItem key={x} value={x}>{x}</SelectItem>)}</SelectContent>
+                  </Select>
+                </Feld>
+                <Feld titel="Akquise">
+                  <Select value={data.status} onValueChange={v => update({ status: v })}>
+                    <SelectTrigger className="rounded-[3px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>{akquiseStatuses.map(x => <SelectItem key={x} value={x}>{x}</SelectItem>)}</SelectContent>
+                  </Select>
+                </Feld>
+                <div className="grid grid-cols-2 gap-3">
+                  <Feld titel="Follow-up">
+                    <Input type="date" value={data.follow_up_at ? data.follow_up_at.slice(0, 10) : ''}
+                           onChange={e => update({ follow_up_at: e.target.value ? new Date(e.target.value).toISOString() : null })} />
+                  </Feld>
+                  <Feld titel="Zuständig"><Input value={data.assigned_to || ''} onChange={e => update({ assigned_to: e.target.value || null })} /></Feld>
+                </div>
+              </div>
+
+              {/* Die öffentliche Hand verkauft ihren Grundbesitz praktisch
+                  nie -- dann gehört das Objekt ins Archiv. */}
+              {verkauftNie(data.owner_name) && data.preselection_status !== ARCHIV_STATUS && (
+                <div className="space-y-2 rounded border border-warning/40 bg-warning/10 p-3 text-sm">
+                  <p><span className="font-medium">Öffentliche Hand als Eigentümerin.</span> Verkauft in aller Regel nicht.</p>
+                  <button type="button" className={`${KNOPF} w-full`} onClick={archivieren} disabled={saving}>Archivieren</button>
+                </div>
+              )}
+
+              <div className="sticky bottom-0 -mx-5 space-y-2 border-t bg-card px-5 pb-1 pt-4 sm:-mx-6 sm:px-6">
+                <button type="button" className={`${KNOPF_HAUPT} w-full`} onClick={save} disabled={saving}>
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Speichern
+                </button>
+                <button type="button" className="h-11 w-full text-sm text-muted-foreground hover:text-foreground" onClick={onClose}>Abbrechen</button>
+              </div>
+            </aside>
+          </div>
         )}
         <AuskunftEinfuegen
           propertyId={einfuegen ? (data?.id ?? null) : null}
@@ -397,11 +312,11 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
   );
 }
 
-function Stat({ label, value }: { label: string; value: React.ReactNode }) {
+function Feld({ titel, children }: { titel: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border p-2.5">
-      <p className="text-xs uppercase text-muted-foreground tracking-wider">{label}</p>
-      <p className="font-medium mt-0.5">{value}</p>
-    </div>
+    <label className="block space-y-1.5">
+      <span className="text-[11px] uppercase tracking-wide text-muted-foreground">{titel}</span>
+      {children}
+    </label>
   );
 }
