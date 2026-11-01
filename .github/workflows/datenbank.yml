@@ -135,7 +135,7 @@ jobs:
 
             stichprobe)
               echo '```' >> "$GITHUB_STEP_SUMMARY"
-              hole "properties?select=address,gemeinde,zone,area,bebaubar_m2,baujahr,owner_name,hnf_delta,marge_chf,score_tier,ausgeschlossen&ausgeschlossen=eq.false&hnf_delta=not.is.null&order=hnf_delta.desc&limit=10" \
+              hole "properties?select=address,gemeinde,zone,area,bebaubar_m2,baujahr,hnf_delta,marge_chf,score_tier,ausgeschlossen&ausgeschlossen=eq.false&hnf_delta=not.is.null&order=hnf_delta.desc&limit=10" \
                 | python3 -m json.tool >> "$GITHUB_STEP_SUMMARY"
               echo '```' >> "$GITHUB_STEP_SUMMARY"
               cat "$GITHUB_STEP_SUMMARY"
@@ -289,7 +289,7 @@ jobs:
               echo "" >> "$GITHUB_STEP_SUMMARY"
               echo "### Beispielzeile" >> "$GITHUB_STEP_SUMMARY"
               echo '```' >> "$GITHUB_STEP_SUMMARY"
-              hole "properties?select=*&limit=1" | python3 -m json.tool >> "$GITHUB_STEP_SUMMARY"
+              hole "properties?select=*&limit=1" | python3 -c "import json,sys;d=json.load(sys.stdin);print(json.dumps([sorted(r.keys()) for r in d],indent=1))" >> "$GITHUB_STEP_SUMMARY"
               echo '```' >> "$GITHUB_STEP_SUMMARY"
               cat "$GITHUB_STEP_SUMMARY"
               ;;

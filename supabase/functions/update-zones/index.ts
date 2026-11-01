@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { abgewiesen, angemeldet, istAdmin } from '../_shared/zugang.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,6 +8,10 @@ const corsHeaders = {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  // Nur für Admins: die Funktion schreibt mit dem service_role.
+  { const k = await angemeldet(req);
+    if (!k) return abgewiesen(corsHeaders);
+    if (!(await istAdmin(k))) return abgewiesen(corsHeaders, 403); }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;

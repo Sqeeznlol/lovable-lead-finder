@@ -109,9 +109,10 @@ jobs:
           for pfad in supabase/functions/*/; do
             name=$(basename "$pfad")
             [ -f "$pfad/index.ts" ] || continue
-            # Die Funktionen werden vom Browser aufgerufen, teils ohne
-            # Anmeldung -- die Prüfung des JWT übernimmt die Funktion
-            # selbst, wie bisher.
+            # Das Gateway liesse auch den öffentlichen Schlüssel durch
+            # (er ist ein gültiges JWT). Jede Funktion fragt darum selbst
+            # GoTrue, ob ein angemeldeter Mensch dahinter steht
+            # (supabase/functions/_shared/zugang.ts).
             if supabase functions deploy "$name" \
                  --project-ref "$projekt" --no-verify-jwt; then
               echo "- $name ✓" >> "$GITHUB_STEP_SUMMARY"

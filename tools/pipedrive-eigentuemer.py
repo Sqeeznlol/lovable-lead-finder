@@ -26,6 +26,13 @@ import sys
 import urllib.parse
 import urllib.request
 
+
+def _maske(t) -> str:
+    """Namen im öffentlichen Ablaufprotokoll nur angedeutet (Sicherheitsprüfung 1. November)."""
+    t = str(t or '')
+    return (t[:1] + '***') if t else ''
+
+
 PIPEDRIVE = 'https://api.pipedrive.com/v1'
 
 # Woran ein Eintrag mehrere Eigentümer erkennen lässt: das Trennzeichen
@@ -199,9 +206,9 @@ def main() -> None:
     print(f'## {len(arbeit)} Kontakte stehen für mehrere Menschen')
     print()
     for person, geteilt in arbeit[:10]:
-        print(f'- `{(person.get("name") or "")[:70]}…`')
+        print(f'- `{_maske(person.get("name"))}`')
         for e in geteilt:
-            print(f'  - **{e["name"]}** — {e["adresse"]}')
+            print(f'  - **{_maske(e["name"])}** — {"Adresse vorhanden" if e.get("adresse") else "ohne Adresse"}')
     if len(arbeit) > 10:
         print(f'- … und {len(arbeit) - 10} weitere')
     print()

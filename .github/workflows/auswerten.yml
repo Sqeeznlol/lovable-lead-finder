@@ -118,9 +118,11 @@ jobs:
                      -- kommt aus der Abfrage, das andere aus der
                      -- Handeingabe. Wer nur eines liest, sieht "leer",
                      -- wo etwas steht.
-                     coalesce(eigentuemer_name,'(leer)') as aus_abfrage,
-                     coalesce(owner_name,'(leer)')       as eingetragen,
-                     coalesce(owner_phone,'(leer)')      as telefon,
+                     -- Nur ob etwas da ist, nicht was: das Protokoll
+                     -- eines öffentlichen Repositorys ist öffentlich.
+                     case when coalesce(eigentuemer_name,'') = '' then '(leer)' else 'vorhanden' end as aus_abfrage,
+                     case when coalesce(owner_name,'') = '' then '(leer)' else 'vorhanden' end       as eingetragen,
+                     case when coalesce(owner_phone,'') = '' then '(leer)' else 'vorhanden' end      as telefon,
                      is_queried, status,
                      coalesce(pipedrive_deal_id,'(leer)') as deal
               from properties where egrid = '$kennung';"
@@ -173,8 +175,8 @@ jobs:
             frage "Die zuletzt bearbeiteten Objekte" "
               select left(address, 28) as adresse,
                      coalesce(kanton,'')                as kt,
-                     left(coalesce(owner_name,'(leer)'), 24) as eigentuemer,
-                     coalesce(owner_phone,'(leer)')     as telefon,
+                     case when coalesce(owner_name,'') = '' then '(leer)' else left(owner_name, 1) || '***' end as eigentuemer,
+                     case when coalesce(owner_phone,'') = '' then '(leer)' else 'vorhanden' end as telefon,
                      is_queried,
                      coalesce(ausgeschlossen::text,'')  as ausg,
                      coalesce(preselection_status,'')   as vorauswahl,
@@ -317,9 +319,12 @@ jobs:
               select left(address, 26)                        as objekt,
                      coalesce(parzelle,'')                    as parz,
                      coalesce(egrid,'')                       as egrid,
-                     left(coalesce(owner_name,''), 24)        as eigentuemer,
-                     left(coalesce(eigentuemer_adresse,''), 26) as eig_adresse,
-                     coalesce(eigentuemer_plz_ort,'')         as eig_ort,
+                     -- Maskiert: das Protokoll ist öffentlich. Zum
+                     -- Nachprüfen reicht, ob Parzelle und Auskunft
+                     -- zusammenpassen; die Namen stehen in der App.
+                     left(coalesce(owner_name,''), 1) || '***'  as eigentuemer,
+                     case when coalesce(eigentuemer_adresse,'') = '' then '' else 'vorhanden' end as eig_adresse,
+                     left(coalesce(eigentuemer_plz_ort,''), 4) as eig_plz,
                      to_char(eigentuemer_fetched_at, 'DD.MM HH24:MI') as wann
               from properties
               where coalesce(owner_name,'') <> ''

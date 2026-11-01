@@ -12,6 +12,13 @@ import sys
 import urllib.parse
 import urllib.request
 
+
+def _maske(t) -> str:
+    """Namen im öffentlichen Ablaufprotokoll nur angedeutet (Sicherheitsprüfung 1. November)."""
+    t = str(t or '')
+    return (t[:1] + '***') if t else ''
+
+
 PIPEDRIVE = 'https://api.pipedrive.com/v1'
 
 
@@ -36,7 +43,9 @@ def zeige(titel: str, eintrag: dict, felder: list) -> None:
             continue
         name = namen.get(schluessel)
         if name:
-            print(f'- **{name}**: `{wert}`')
+            # Felder mit Personenbezug nur andeuten: das Protokoll ist öffentlich.
+            heikel = any(w in name.lower() for w in ('name', 'eigent', 'telefon', 'phone', 'mail', 'adress', 'kontakt', 'person'))
+            print(f'- **{name}**: `{_maske(wert) if heikel else wert}`')
     print()
 
 
@@ -70,9 +79,9 @@ def main() -> None:
         p = (get(f'/persons/{kennung}', token) or {}).get('data') or {}
         print(f'## Kontakt {kennung}')
         print()
-        print(f'- Name: `{p.get("name")}`')
-        print(f'- Vorname: `{p.get("first_name")}`')
-        print(f'- Nachname: `{p.get("last_name")}`')
+        print(f'- Name: `{_maske(p.get("name"))}`')
+        print(f'- Vorname: `{_maske(p.get("first_name"))}`')
+        print(f'- Nachname: `{_maske(p.get("last_name"))}`')
         for nummer_ in (p.get('phone') or []):
             print(f'- Telefon: `{nummer_.get("value")}` ({nummer_.get("label")})')
         print()
@@ -81,7 +90,7 @@ def main() -> None:
 
     org = deal.get('org_id')
     if isinstance(org, dict) and org.get('name'):
-        print(f'## Organisation\n\n- Name: `{org.get("name")}`\n')
+        print(f'## Organisation\n\n- Name: `{_maske(org.get("name"))}`\n')
 
 
 if __name__ == '__main__':

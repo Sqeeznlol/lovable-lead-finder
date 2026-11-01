@@ -1,4 +1,5 @@
 import { z } from 'https://esm.sh/zod@3.25.76';
+import { abgewiesen, angemeldet } from '../_shared/zugang.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -422,6 +423,8 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
+  // Nur für Angemeldete (supabase/functions/_shared/zugang.ts).
+  if (!(await angemeldet(req))) return abgewiesen(corsHeaders);
 
   try {
     const PIPEDRIVE_API_TOKEN = Deno.env.get('PIPEDRIVE_API_TOKEN');
