@@ -322,7 +322,10 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
   const [sucheStatus, setSucheStatus] = useState<'ruhe' | 'laeuft' | 'fehler'>('ruhe');
 
   const genugNah = zoom >= AB_ZOOM;
-  const { data } = useParzellenImAusschnitt(ausschnitt, genugNah);
+  // Im Portfolio-Modus zählt nur das Portfolio: der übrige Bestand wird
+  // weder geholt noch gezeichnet, damit man sieht, wo die Parzellen
+  // liegen, und nichts sonst.
+  const { data } = useParzellenImAusschnitt(ausschnitt, genugNah && !portfolioAn);
 
   // Schriften der Vorlage, einmal geladen.
   useEffect(() => {
@@ -404,7 +407,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
     if (!m) return;
     eigenEbene.current?.remove();
     eigenEbene.current = null;
-    if (!data || !genugNah) return;
+    if (!data || !genugNah || portfolioAn) return;
     eigenEbene.current = L.geoJSON(data, {
       filter: f => passtZone((f.properties as ParzelleEigenschaften)?.zone, zonenFilter, zonenGenau),
       // Farbe nach Marge in Stufen, wie bei Regrid/LandGlide: man sieht
@@ -438,7 +441,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
         });
       },
     }).addTo(m);
-  }, [data, genugNah, zonenFilter, zonenGenau, grund]);
+  }, [data, genugNah, zonenFilter, zonenGenau, grund, portfolioAn]);
 
   async function eigeneZeigen(id: string, e: ParzelleEigenschaften, lat: number, lon: number) {
     setAuswahl({ art: 'eigen', id, e, lat, lon, geholt: false });
@@ -738,14 +741,14 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
       </header>
 
       {/* Zonenfilter wie bei Immobilienportalen: Chips, mehrere wählbar. */}
-      <div className="filter">
+      {!portfolioAn && (<div className="filter">
         <span className="titel">Zone</span>
         <button type="button" className={zonenFilter.size === 0 ? 'an' : ''} onClick={() => { setZonenFilter(new Set()); setZonenGenau(new Set()); }}>Alle</button>
         {ZONENARTEN.map(([z, t]) => (
           <button type="button" key={z} className={zonenFilter.has(z) ? 'an' : ''} onClick={() => umschalten(z)}>{t}</button>
         ))}
-      </div>
-      {zonenImBild.length > 0 && (
+      </div>)}
+      {!portfolioAn && zonenImBild.length > 0 && (
         <div className="filter genau">
           {zonenImBild.map(z => (
             <button type="button" key={z} className={zonenGenau.has(z) ? 'an' : ''} onClick={() => genauUmschalten(z)}>{z}</button>
@@ -754,7 +757,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
       )}
 
       <div className="unten">
-        {genugNah && (
+        {genugNah && !portfolioAn && (
           <div className="legende">
             {STUFEN.map(([, c, t]) => <span key={t}><i style={{ background: c }} />{t}</span>)}
           </div>
@@ -766,8 +769,8 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
           </div>
         )}
         <div className="readout">
-          {!genugNah ? 'Näher heranzoomen für den Bestand · ' : ''}
-          {genugNah && data ? `${data.features?.length ?? 0} eigene Parzellen im Bild · ` : ''}
+          {portfolioAn ? 'Nur Portfolios sichtbar · ' : !genugNah ? 'Näher heranzoomen für den Bestand · ' : ''}
+          {genugNah && data && !portfolioAn ? `${data.features?.length ?? 0} eigene Parzellen im Bild · ` : ''}
           LV95 {gr(lvMitte.E)} / {gr(lvMitte.N)}
         </div>
       </div>
