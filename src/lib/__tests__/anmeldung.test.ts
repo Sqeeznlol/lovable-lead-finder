@@ -23,7 +23,12 @@ describe('Anmeldung', () => {
     // Ausserhalb des Torwächters stehen genau diese drei, und nur die Anfrage-Seite.
     const aussen = app.replace(/<Torwaechter>[\s\S]*<\/Torwaechter>/, '');
     const offen = [...aussen.matchAll(/<Route path="([^"]+)" element=\{<(\w+)/g)].map(m => `${m[1]} ${m[2]}`);
-    expect(offen).toEqual(['/bewertung Anfrage', '/potenzial Anfrage', '/investor Anfrage']);
+    // /fonds (Wohntraums) hat eine eigene Anmeldung statt des Torwächters --
+    // erlaubt nur, solange die Seite ohne Konto nichts als die Maske zeigt.
+    expect(offen).toEqual(['/bewertung Anfrage', '/potenzial Anfrage', '/investor Anfrage', '/fonds FondsSeite']);
+    const fonds = readFileSync('src/pages/Fonds.tsx', 'utf8');
+    expect(fonds).toMatch(/if \(!user\) return <Anmeldung konto="fonds"/);
+    expect(fonds.indexOf('if (!user)')).toBeLessThan(fonds.indexOf('<FondsOberflaeche'));
   });
 
   it('die öffentliche Seite liest nichts aus der Datenbank, sie fügt nur ein', () => {
