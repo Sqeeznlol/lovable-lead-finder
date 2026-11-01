@@ -42,6 +42,7 @@ on:
           - arrondierung # Wie viele Nachbarn der Test-Portfolios der Bund liefert und wie viele im Bestand sind
           - baugesuche   # Wo der Zuercher Baugesuch-Datensatz liegt, und wie er aufgebaut ist
           - baugesuch-probe # Ob ein Gesuch beim Nachbarn einer Portfolio-Parzelle eine Gelegenheit erzeugt (wird zurueckgerollt)
+          - teams-probe  # Ob ein Konto ausserhalb eines Teams dessen Kunden wirklich nicht sieht (wird zurueckgerollt)
       egrid:
         description: 'Nur für "objekt": die EGRID, z.B. CH707709971116'
         required: false
@@ -516,6 +517,44 @@ jobs:
           where b.quelle = 'probe' group by 1, 2 order by 1;
           \echo 'Zweiter Abgleich -- darf nichts doppelt anlegen:'
           select * from baugesuche_abgleichen(30);
+          rollback;
+          \echo '```'
+          SQL
+
+          elif [ "$FRAGE" = "teams-probe" ]; then
+            # Als Konto "aui" (keine Admin-Rolle), so wie die Seite fragt:
+            # Rolle authenticated, die Kennung im JWT. Ein Kunde in einem
+            # fremden Team muss unsichtbar sein, nach dem Beitritt sichtbar.
+            # Alles in einer Transaktion, die zurueckgerollt wird.
+            psql "$DB" -v ON_ERROR_STOP=1 -X -q >> "$GITHUB_STEP_SUMMARY" <<'SQL'
+          \echo '### Probe: Teams und Rechte'
+          \echo '```'
+          begin;
+          create temp table probe_ids as
+            select (select id from auth.users where email like 'aui@%') as aui;
+          insert into team (name) values ('Probe-Team');
+          insert into akteur (name, art) values ('Probe Kunde', 'firma');
+          insert into mandant (akteur_id, team_id)
+            select a.id, t.id from akteur a, team t where a.name = 'Probe Kunde' and t.name = 'Probe-Team';
+          insert into portfolio (mandant_id, name)
+            select m.id, 'Probe-Portfolio' from mandant m join team t on t.id = m.team_id where t.name = 'Probe-Team';
+          grant select on probe_ids to authenticated;
+          select set_config('request.jwt.claims', json_build_object('sub', (select aui from probe_ids), 'role', 'authenticated')::text, true);
+          set local role authenticated;
+          select 'aui, nicht im Team' as fall,
+                 (select count(*) from portfolio where name = 'Probe-Portfolio') as fremdes_portfolio_sichtbar,
+                 (select count(*) from portfolio where name <> 'Probe-Portfolio') as portfolios_ohne_team_sichtbar;
+          reset role;
+          insert into team_mitglied (team_id, user_id)
+            select t.id, (select aui from probe_ids) from team t where t.name = 'Probe-Team';
+          set local role authenticated;
+          select 'aui, im Team' as fall,
+                 (select count(*) from portfolio where name = 'Probe-Portfolio') as fremdes_portfolio_sichtbar;
+          -- Anlegen ohne Team muss fuer aui gehen (Portfolio-Import).
+          with a as (insert into akteur (name, art) values ('Probe Neu', 'firma') returning id)
+          insert into mandant (akteur_id) select id from a;
+          select 'aui legt Kunden ohne Team an' as fall, count(*) as angelegt
+          from mandant m join akteur a on a.id = m.akteur_id where a.name = 'Probe Neu';
           rollback;
           \echo '```'
           SQL
