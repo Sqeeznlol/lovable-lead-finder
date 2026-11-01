@@ -45,6 +45,7 @@ on:
           - teams-probe  # Ob ein Konto ausserhalb eines Teams dessen Kunden wirklich nicht sieht (wird zurueckgerollt)
           - potenzial-bund # Was der Bund an einem Punkt zu Bauzone und Parzelle liefert (fuer den Potenzialcheck)
           - anfrage-probe # Ob der oeffentliche Schluessel Anfragen einfuegen, aber nicht lesen kann (wird zurueckgerollt)
+          - luftbild     # Ob der Bund Luftbilder (SWISSIMAGE) als ein Bild je Ausschnitt liefert
           - tempo        # Wie schnell die Seite und die Abfragen der Hauptbereiche sind
           - vorhaben-probe # Ob die Potenzialanalyse eines Vorhabens mit 1000 Adressen stimmt und wie schnell sie ist (wird zurueckgerollt)
           - amtsblatt    # Welche Adresse im Amtsblattportal ein Baugesuch zeigt
@@ -563,6 +564,25 @@ jobs:
           rollback;
           \echo '```'
           SQL
+
+          elif [ "$FRAGE" = "luftbild" ]; then
+            # Das Cockpit zeigt Luftbilder wie die Vorlage. Geprueft wird
+            # der WMS-Dienst des Bundes mit einem Ausschnitt in LV95 und
+            # einem in WGS84 (Breite/Laenge, Reihenfolge nach WMS 1.3.0),
+            # dazu die Kachel, die das Objektfenster schon benutzt.
+            {
+              echo "### Luftbild vom Bund"; echo '```'
+              w='https://wms.geo.admin.ch/?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=ch.swisstopo.swissimage&STYLES=&FORMAT=image/jpeg'
+              for u in \
+                "$w&CRS=EPSG:2056&BBOX=2682300,1247700,2683100,1248150&WIDTH=1600&HEIGHT=900" \
+                "$w&CRS=EPSG:4326&BBOX=47.3770,8.5300,47.3790,8.5340&WIDTH=640&HEIGHT=360" \
+                "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/18/137489/91762.jpeg"; do
+                curl -s -o /tmp/l.bin -D /tmp/l.kopf -w "HTTP %{http_code}, %{size_download} Bytes, %{time_total}s" "$u"
+                echo " | $(grep -i '^content-type' /tmp/l.kopf | tr -d '\r') | $(grep -i '^access-control-allow-origin' /tmp/l.kopf | tr -d '\r')"
+                file /tmp/l.bin | cut -c1-120
+              done
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
 
           elif [ "$FRAGE" = "tempo" ]; then
             # Gemessen statt vermutet: wie lange die Seite braucht, ob sie
