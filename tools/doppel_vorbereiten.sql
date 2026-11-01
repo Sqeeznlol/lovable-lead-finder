@@ -60,6 +60,13 @@ select c.column_name::text as name,
                            'stage_changed_at', 'notes', 'address', 'ortschaftsname') then 'meta'
     -- gwr_egid: mehrere Häuser auf einer Parzelle haben verschiedene
     -- Gebäudenummern -- das ist kein Widerspruch.
+    -- Zone, Ausschluss, Vorauswahl: gegenübergestellt am 1. November
+    -- (Doppel/felder). Bei allen Doppeln steht als Zone "zarchivat"
+    -- (keine Zone), und ausgeschlossen sind sie nur wegen "Zonenangabe
+    -- fehlt" -- K hat die echte Zone. Ein "Ausschliessen" bei K ist ein
+    -- Entscheid, der Doppel steht nur auf "Nicht geprüft". K gilt.
+    when c.column_name in ('zone', 'ausgeschlossen', 'ausschluss_grund', 'preselection_status', 'preselection_note',
+                           'preselection_decided_at', 'bezirksort') then 'amtlich'
     when c.column_name in ('parzelle', 'plot_number', 'bfs_nr', 'area', 'kanton', 'gemeinde', 'bezirk',
                            'gis_url', 'google_maps_url', 'streetview_url', 'housing_stat_url') then 'amtlich'
     -- Gebäudefelder: auf einer Parzelle mit vielen Häusern (bis 195
