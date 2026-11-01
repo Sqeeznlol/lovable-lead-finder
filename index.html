@@ -25,6 +25,16 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Bauraum" />
     <meta name="twitter:description" content="Off-Market Immobilien-Akquise CRM für die Schweiz." />
+    <!-- Hell oder dunkel vor dem ersten Bild setzen, sonst blitzt die
+         Seite im dunklen Modus beim Laden weiss auf. Derselbe Schlüssel
+         wie src/hooks/use-theme.tsx. -->
+    <script>
+      try {
+        var m = localStorage.getItem('bauraum-theme');
+        if (m === 'system') m = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        if (m === 'dark' || m === 'bluelight') document.documentElement.classList.add(m);
+      } catch (e) {}
+    </script>
 </head>
 
   <body>

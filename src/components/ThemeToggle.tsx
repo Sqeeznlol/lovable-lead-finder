@@ -1,41 +1,20 @@
-import { Sun, Moon, Eye, Monitor } from 'lucide-react';
-import { useTheme, type ThemeMode } from '@/hooks/use-theme';
-import { cn } from '@/lib/utils';
+import { Moon, Sun } from 'lucide-react';
+import { useTheme } from '@/hooks/use-theme';
 
-const options: { id: ThemeMode; icon: React.ComponentType<{ className?: string }>; label: string }[] = [
-  { id: 'light', icon: Sun, label: 'Tag' },
-  { id: 'dark', icon: Moon, label: 'Nacht' },
-  { id: 'bluelight', icon: Eye, label: 'Bluelight' },
-  { id: 'system', icon: Monitor, label: 'System' },
-];
-
-export function ThemeToggle({ compact = false }: { compact?: boolean }) {
-  const { mode, setMode } = useTheme();
+/**
+ * Hell oder dunkel, ein Tipp oben rechts (Julian, 1. November). Ein
+ * Knopf statt einer Auswahl aus vier: wer umschaltet, will das andere.
+ * Das Zeichen zeigt, wohin es geht -- der Mond im Hellen, die Sonne im
+ * Dunkeln --, wie bei macOS und iOS.
+ */
+export function ThemeToggle() {
+  const { resolved, setMode } = useTheme();
+  const dunkel = resolved === 'dark';
+  const titel = dunkel ? 'Hell darstellen' : 'Dunkel darstellen';
   return (
-    <div className={cn(
-      'inline-flex items-center gap-1 rounded-full bg-muted/60 p-1 ring-1 ring-foreground/5 backdrop-blur',
-      compact && 'scale-90'
-    )}>
-      {options.map(o => {
-        const Icon = o.icon;
-        const active = mode === o.id;
-        return (
-          <button
-            key={o.id}
-            onClick={() => setMode(o.id)}
-            title={o.label}
-            aria-label={o.label}
-            className={cn(
-              'h-8 w-8 grid place-items-center rounded-full transition-all',
-              active
-                ? 'bg-card text-foreground shadow-ceramic ring-1 ring-foreground/5'
-                : 'text-muted-foreground hover:text-foreground'
-            )}
-          >
-            <Icon className="h-4 w-4" />
-          </button>
-        );
-      })}
-    </div>
+    <button type="button" onClick={() => setMode(dunkel ? 'light' : 'dark')} title={titel} aria-label={titel}
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-[3px] border bg-card text-foreground transition-colors hover:bg-secondary">
+      {dunkel ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+    </button>
   );
 }
