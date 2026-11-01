@@ -1,4 +1,7 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;500;600&family=Newsreader:opsz,wght@6..72,400;500;600;700&display=swap');
+/* Eine Schriftfamilie für alles (Julians Regel): Schibsted Grotesk,
+   dieselbe wie auf der Karte. Vorher DM Sans für Text und Newsreader
+   für Titel -- zwei Familien, und auf der Karte eine dritte. */
+@import url('https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,55 +9,60 @@
 
 @layer base {
   :root {
-    /* Tactile Matte Ceramic — warm editorial palette */
-    --background: 36 14% 92%;          /* matte beige #EFECE7 */
-    --foreground: 30 9% 16%;           /* ink base #2D2A26 */
+    /* Hell, ruhig, viel Weiss. Eine Akzentfarbe (Blau) für das, was
+       man anklicken kann; kein Orange (Julians Regel). Dieselben Werte
+       wie die Karte (.gisk), damit alles aus einem Guss ist. */
+    --background: 210 40% 98%;         /* #F8FAFC */
+    --foreground: 222 47% 11%;         /* #0F172A */
 
-    --card: 60 20% 98%;                /* matte surface #FAFCF9 */
-    --card-foreground: 30 9% 16%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
 
-    --popover: 60 20% 98%;
-    --popover-foreground: 30 9% 16%;
+    --primary: 222 47% 11%;
+    --primary-foreground: 0 0% 100%;
 
-    --primary: 30 9% 16%;              /* ink base — primary action */
-    --primary-foreground: 36 14% 96%;
+    --secondary: 210 40% 96%;          /* #F1F5F9 */
+    --secondary-foreground: 222 47% 11%;
 
-    --secondary: 36 12% 88%;
-    --secondary-foreground: 30 9% 16%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;   /* #64748B */
 
-    --muted: 36 12% 90%;
-    --muted-foreground: 30 6% 49%;     /* ink muted #857F78 */
+    --accent: 221 83% 53%;             /* #2563EB */
+    --accent-foreground: 0 0% 100%;
 
-    --accent: 24 35% 64%;              /* warm terracotta accent */
-    --accent-foreground: 60 20% 98%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
 
-    --destructive: 0 65% 50%;
-    --destructive-foreground: 60 20% 98%;
+    --border: 214 32% 91%;             /* #E2E8F0 */
+    --input: 214 32% 91%;
+    --ring: 221 83% 53%;
 
-    --border: 30 9% 16% / 0.08;        /* ink-base/8 */
-    --input: 30 9% 16% / 0.12;
-    --ring: 30 9% 16%;
+    --radius: 0.875rem;
 
-    --radius: 1.25rem;                  /* much rounder — ceramic feel */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-primary: 222 47% 11%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 40% 96%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 214 32% 91%;
+    --sidebar-ring: 221 83% 53%;
 
-    --sidebar-background: 36 14% 94%;
-    --sidebar-foreground: 30 9% 16%;
-    --sidebar-primary: 30 9% 16%;
-    --sidebar-primary-foreground: 60 20% 98%;
-    --sidebar-accent: 36 12% 90%;
-    --sidebar-accent-foreground: 30 9% 16%;
-    --sidebar-border: 30 9% 16% / 0.08;
-    --sidebar-ring: 30 9% 16%;
+    /* Warnung in Gelb statt Orange. */
+    --warning: 45 93% 40%;
+    --warning-foreground: 0 0% 100%;
+    --success: 142 72% 29%;
+    --success-foreground: 0 0% 100%;
 
-    --warning: 35 80% 50%;
-    --warning-foreground: 60 20% 98%;
-    --success: 145 50% 35%;
-    --success-foreground: 60 20% 98%;
-
-    /* Ceramic shadows — soft tactile depth */
-    --shadow-ceramic: 0 10px 40px -10px hsl(30 9% 16% / 0.06), 0 2px 10px -2px hsl(30 9% 16% / 0.04);
-    --shadow-ceramic-hover: 0 20px 40px -10px hsl(30 9% 16% / 0.10), 0 4px 12px -2px hsl(30 9% 16% / 0.05);
-    --shadow-inner-glow: inset 0 2px 4px 0 hsl(0 0% 100% / 0.7), inset 0 -1px 2px 0 hsl(0 0% 0% / 0.02);
+    /* Schatten nur als Hauch: Flächen trennen sich durch Weiss und Linie. */
+    --shadow-ceramic: 0 1px 2px hsl(222 47% 11% / 0.04), 0 1px 1px hsl(222 47% 11% / 0.03);
+    --shadow-ceramic-hover: 0 8px 24px -8px hsl(222 47% 11% / 0.12), 0 2px 6px hsl(222 47% 11% / 0.05);
+    /* Nicht "none": der Wert wird mit dem Rahmen (ring) zu einem
+       box-shadow verbunden, und "none" darin macht den ganzen Wert
+       ungültig -- das Passwortfeld war dann ohne Rahmen unsichtbar. */
+    --shadow-inner-glow: 0 0 #0000;
   }
 
   .dark {
@@ -172,11 +180,9 @@ input, textarea, select {
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'DM Sans', sans-serif;
-    /* ss01/cv11: geschlossenes a und gerades l -- ruhiger im Fliesstext.
-       Basis auf 15.5px: 14px war auf grossen Bildschirmen zu klein für
+    font-family: 'Schibsted Grotesk', ui-sans-serif, system-ui, sans-serif;
+    /* Basis auf 15.5px: 14px war auf grossen Bildschirmen zu klein für
        Listen, die man den ganzen Tag liest. */
-    font-feature-settings: 'ss01', 'cv11';
     font-size: 15.5px;
     line-height: 1.55;
     -webkit-font-smoothing: antialiased;
@@ -188,7 +194,7 @@ input, textarea, select {
      Spalte und Beträge lassen sich nicht vergleichen. */
   table, .tabular, [class*="tabular-nums"] {
     font-variant-numeric: tabular-nums;
-    font-feature-settings: 'tnum', 'ss01';
+    font-feature-settings: 'tnum';
   }
 
   th {
@@ -196,8 +202,11 @@ input, textarea, select {
     font-weight: 500;
   }
 
+  /* Titel in derselben Familie, nur kräftiger und enger -- Hierarchie
+     über Gewicht und Grösse, nicht über eine zweite Schrift. */
   h1, h2, h3, .font-serif {
-    font-family: 'Newsreader', serif;
+    font-family: 'Schibsted Grotesk', ui-sans-serif, system-ui, sans-serif;
+    font-weight: 700;
     letter-spacing: -0.02em;
     line-height: 1.15;
   }
@@ -209,7 +218,7 @@ input, textarea, select {
   h3 { @apply text-lg; }
 
   code, .font-mono {
-    font-family: 'DM Sans', monospace;
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
   }
 
   ::selection {

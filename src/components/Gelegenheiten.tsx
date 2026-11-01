@@ -136,8 +136,8 @@ export function Gelegenheiten() {
         <ul className="space-y-2">
           {liste.map(g => {
             const auf = offen === g.id;
-            const ausl = g.gelegenheit_parzelle.filter(x => x.rolle === 'ausloeser').map(x => x.parzelle).filter(Boolean) as Parz[];
-            const nachb = g.gelegenheit_parzelle.filter(x => x.rolle === 'nachbar').map(x => x.parzelle).filter(Boolean) as Parz[];
+            const ausl = (g.gelegenheit_parzelle ?? []).filter(x => x.rolle === 'ausloeser').map(x => x.parzelle).filter(Boolean) as Parz[];
+            const nachb = (g.gelegenheit_parzelle ?? []).filter(x => x.rolle === 'nachbar').map(x => x.parzelle).filter(Boolean) as Parz[];
             return (
               <li key={g.id} className="rounded-xl border">
                 <button type="button" onClick={() => setOffen(auf ? null : g.id)} aria-expanded={auf}

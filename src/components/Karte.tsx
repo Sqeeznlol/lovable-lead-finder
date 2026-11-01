@@ -227,7 +227,7 @@ function AlleFelder({ z }: { z: Record<string, unknown> }) {
 
 const STUFEN: [number, string, string][] = [
   [1_000_000, '#15803D', 'über 1 Mio.'], [500_000, '#65A30D', '0,5–1 Mio.'],
-  [100_000, '#CA8A04', '0,1–0,5 Mio.'], [1, '#EA580C', 'bis 0,1 Mio.'], [-Infinity, '#1E3A8A', 'ohne Marge'],
+  [100_000, '#CA8A04', '0,1–0,5 Mio.'], [1, '#94A3B8', 'bis 0,1 Mio.'], [-Infinity, '#1E3A8A', 'ohne Marge'],
 ];
 /** Google-Maps-Adressen nach https://developers.google.com/maps/documentation/urls -- ohne Schlüssel. */
 export function googleLink([lat, lon]: [number, number], strassenansicht: boolean): string {
@@ -632,15 +632,16 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
   }
 
   // ---------------------------------------------- Portfolio
-  // Violett, weil die Margen-Farben grün bis orange sind und Rot die
+  // Violett, weil die Margen-Farben grün bis gelb sind und Rot die
   // angeklickte Parzelle ist: ein Portfolio soll man auf einen Blick
   // vom Bestand unterscheiden.
   useEffect(() => {
     const m = karte.current;
     portfolioEbene.current?.remove(); portfolioEbene.current = null;
     const sichtbar = gruppe ? [gruppe] : gelAn ? gelGruppen ?? [] : portfolioAn ? portfolios ?? [] : [];
-    // Orange für Gelegenheiten: man soll sie nicht mit einem Portfolio verwechseln.
-    const farbe = gelAn ? '#EA580C' : '#7C3AED';
+    // Petrol für Gelegenheiten: man soll sie nicht mit einem Portfolio
+    // verwechseln. Kein Orange (Julians Regel).
+    const farbe = gelAn ? '#0E7490' : '#7C3AED';
     if (!m || !sichtbar.length) return;
     let abgebrochen = false;
     const ebene = L.geoJSON(undefined, {
@@ -1139,7 +1140,7 @@ function PortfolioTafel({ portfolios, laedt, fehler, umrisse, onOeffnen, onZeige
                     {pf.positionen.map(p => (
                       <button type="button" key={p.id} className="eintrag" disabled={!p.parzelleId}
                               onClick={() => p.parzelleId && onOeffnen(p.parzelleId)}>
-                        <i className={gel ? 'orange' : 'lila'} />
+                        <i className={gel ? 'petrol' : 'lila'} />
                         <span className="text">
                           <b>{p.adresse ?? `Parzelle ${p.parzelle ?? '?'}`}</b>
                           <small>{[p.rolle, p.parzelle ? `Parz. ${p.parzelle}` : null, p.zone,
@@ -1216,13 +1217,13 @@ const STIL = `
 .gisk .schalter.an{background:var(--tinte);border-color:var(--tinte);color:#fff}
 .gisk .schalter.an.lila{background:#7C3AED;border-color:#7C3AED}
 .gisk .eintrag>i.lila{background:#7C3AED}
-.gisk .eintrag>i.orange{background:#EA580C}
+.gisk .eintrag>i.petrol{background:#0E7490}
 .gisk .segment.ansicht{margin:0 0 14px}
 .gisk .segment.ansicht button{flex:1;height:36px}
 .gisk .mappen{display:flex;flex-direction:column;gap:8px}
 .gisk .mappe{border:1px solid var(--linie);border-radius:14px;overflow:hidden;background:var(--weiss)}
 .gisk .mappe.auf{border-color:#7C3AED}
-.gisk .mappe.gel.auf{border-color:#EA580C}
+.gisk .mappe.gel.auf{border-color:#0E7490}
 .gisk .mappe-kopf{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:12px 14px;border:0;background:none;text-align:left;cursor:pointer}
 .gisk .mappe-kopf:hover{background:var(--fl)}
 .gisk .mappe-kopf .text{flex:1;min-width:0}
@@ -1256,8 +1257,8 @@ const STIL = `
 .gisk .zurueck{border:0;background:none;color:var(--grau);cursor:pointer;padding:0;margin-bottom:10px;font-size:13px}
 .gisk .zurueck:hover{color:var(--tinte)}
 .gisk .ueber{margin:0 0 4px;font-size:12px;font-weight:600;color:var(--grau);letter-spacing:.02em}
-/* Die Anwendung setzt h1-h3 in Newsreader (index.css); auf der Karte gilt
-   ihre eigene Schrift -- für h3 fehlte das, die Bausteine darin standen in Serifen. */
+/* Die Karte setzt ihre Schrift selbst; für h3 fehlte das früher, die
+   Bausteine darin standen in der Serifenschrift der Anwendung. */
 .gisk h3{font-family:inherit!important}
 .gisk h2{font-family:inherit!important;margin:0;font-size:22px;line-height:1.2;font-weight:700;letter-spacing:-.02em}
 .gisk .sanft{color:var(--grau);margin:6px 0 0;font-size:13px}

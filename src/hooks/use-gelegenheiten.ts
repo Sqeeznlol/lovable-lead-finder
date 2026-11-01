@@ -61,7 +61,7 @@ export function alsKartengruppen(gel: Gel[]): import('@/hooks/use-portfolio').Po
       name: g.titel,
       eigner: g.mandant?.akteur?.name ?? null,
       manager: [ZUSTAENDE.find(z => z[0] === g.zustand)?.[1] ?? g.zustand],
-      positionen: g.gelegenheit_parzelle
+      positionen: (g.gelegenheit_parzelle ?? [])
         .filter(x => x.parzelle)
         .map(x => ({
           id: `${g.id}:${x.parzelle!.id}`, parzelleId: x.parzelle!.id,
