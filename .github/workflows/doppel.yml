@@ -1,0 +1,95 @@
+# =====================================================================
+# Doppelte Zürcher Parzellen zusammenführen
+# =====================================================================
+# 70'160 Zeilen ohne EGRID stehen ein zweites Mal im Bestand -- ihre
+# Gebäudenummer führt laut Gebäuderegister auf eine Parzelle, die mit
+# EGRID schon da ist (gemessen am 1. November). Julians Regel: nur
+# löschen, wenn es dieselben Daten sind; sonst gegenseitig ergänzen
+# und eine behalten. Wie genau: siehe tools/doppel_vorbereiten.sql.
+#
+# "probe" zählt nur: wie viele Paare, je Feld wie viel ergänzt würde
+# und wo sich die beiden widersprechen, welche Tabellen auf die Doppel
+# verweisen. "schreiben" arbeitet sie in Stücken ein und löscht sie.
+# =====================================================================
+
+name: Doppel zusammenführen
+
+on:
+  workflow_dispatch:
+    inputs:
+      schritt:
+        description: 'Was ausgeführt werden soll'
+        required: true
+        default: 'probe'
+        type: choice
+        options:
+          - probe       # Zählen, nichts schreiben
+          - schreiben   # Zusammenführen und Doppel löschen
+      grenze_mb:
+        description: 'Abbrechen, wenn die Datenbank so gross ist (MB)'
+        required: false
+        default: '1090'
+
+jobs:
+  doppel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Werkzeuge
+        run: sudo apt-get install -y -qq postgresql-client
+
+      - name: Gebäuderegister holen
+        run: |
+          set -euo pipefail
+          curl -sSL --retry 4 -o /tmp/gwr.zip "https://public.madd.bfs.admin.ch/zh.zip"
+          mkdir -p /tmp/gwr && unzip -o -q /tmp/gwr.zip -d /tmp/gwr
+          python3 tools/gwr_zh.py /tmp/gwr /tmp/gwr_egid.csv /tmp/gwr_parzelle.csv
+          rm -rf /tmp/gwr /tmp/gwr.zip
+
+      - name: Zusammenführen
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+          SCHRITT: ${{ inputs.schritt }}
+          GRENZE_MB: ${{ inputs.grenze_mb }}
+        run: |
+          set -euo pipefail
+          [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
+          {
+            echo "\\set grenze ${GRENZE_MB:-1090}"
+            cat tools/doppel_vorbereiten.sql
+            if [ "$SCHRITT" = "schreiben" ]; then
+              cat tools/doppel_zusammenfuehren.sql
+              echo "select count(distinct stueck) as n_stuecke from paar \\gset"
+              echo "select (pg_database_size(current_database())/1024/1024)::int as mb \\gset"
+              echo "\\echo '### Schreiben -- Datenbank vorher' :mb 'MB,' :n_stuecke 'Stücke'"
+              # VACUUM darf in keinem Block stehen; darum schreibt die
+              # Shell die Stücke aus, und psql prüft vor jedem die Grösse.
+              for i in $(seq 0 15); do
+                cat <<SQL
+          select (pg_database_size(current_database())/1024/1024)::int as mb \gset
+          select :mb >= :grenze as voll, $i >= :n_stuecke as fertig \gset
+          \if :voll
+            \echo 'ABBRUCH vor Stück $i: Datenbank bei' :mb 'MB. Der nächste Lauf macht weiter.'
+            \quit
+          \endif
+          \if :fertig
+          \else
+            select pg_temp.zusammenfuehren($i) as stueck_$i;
+            vacuum public.properties;
+          \endif
+          SQL
+              done
+              echo "select pg_size_pretty(pg_database_size(current_database())) as datenbank_nachher;"
+            fi
+            cat <<'SQL'
+          \echo '### Bestand ZH'
+          select count(*) as zeilen, count(distinct egrid) as mit_egrid,
+                 count(*) filter (where egrid is null) as ohne_egrid,
+                 count(*) filter (where bfs_nr is null) as ohne_bfs,
+                 count(*) filter (where area is null or area = 0) as ohne_flaeche
+          from public.properties where kanton = 'ZH';
+          SQL
+          } > /tmp/doppel.sql
+          psql "$DB" -X -q -f /tmp/doppel.sql 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
