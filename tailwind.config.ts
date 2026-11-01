@@ -88,12 +88,20 @@ export default {
         "accordion-up": { from: { height: "var(--radix-accordion-content-height)", opacity: "1" }, to: { height: "0", opacity: "0" } },
         "fade-in": { "0%": { opacity: "0", transform: "translateY(8px)" }, "100%": { opacity: "1", transform: "translateY(0)" } },
         "scale-in": { "0%": { transform: "scale(0.97)", opacity: "0" }, "100%": { transform: "scale(1)", opacity: "1" } },
+        // Bewegung nach DESIGN.md: Tafeln steigen gestaffelt auf, das
+        // Luftbild zoomt langsam auf, Striche füllen sich nacheinander.
+        "aufsteigen": { "0%": { opacity: "0", transform: "translateY(14px)" }, "100%": { opacity: "1", transform: "translateY(0)" } },
+        "luftbild": { "0%": { transform: "scale(1.08)", opacity: "0" }, "100%": { transform: "scale(1)", opacity: "1" } },
+        "strich": { "0%": { transform: "scaleY(0.15)", opacity: "0.2" }, "100%": { transform: "scaleY(1)", opacity: "1" } },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "fade-in": "fade-in 0.4s ease-out",
         "scale-in": "scale-in 0.3s ease-out",
+        "aufsteigen": "aufsteigen 0.55s cubic-bezier(.2,.7,.2,1) both",
+        "luftbild": "luftbild 1.4s cubic-bezier(.2,.7,.2,1) both",
+        "strich": "strich 0.35s ease-out both",
       },
     },
   },

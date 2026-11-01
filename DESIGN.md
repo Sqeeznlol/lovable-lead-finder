@@ -67,6 +67,56 @@ Desktop: schmale Leiste links nur mit Symbolen, der aktive Punkt als
 schwarzes Quadrat; oben Suche, rechts die Hauptaktion und das Konto.
 Handy: Kopf mit Zeichen und Titel, unten fünf Ziele.
 
+## Seitenaufbau -- die Regel für jede Seite
+
+Das Cockpit ist das Muster. Julian, 1. November: "So wie die Dashboard-
+Seite aussieht, sieht es wirklich gut aus. Das sollte der Aufbau der
+kompletten Webseite sein -- auch die animierten Sachen, auch die
+Grafiken." Jede Seite wird deshalb mit `<Seite>` aus `rahmen.tsx` gebaut
+und hat diese Reihenfolge:
+
+1. **Bühne**: ein Luftbild (SWISSIMAGE) liegt hinter dem ganzen oberen
+   Bereich, rechts voll, nach links und unten in die Seitenfarbe
+   auslaufend. Jede Seite hat ihren eigenen Ort (`src/lib/luftbild.ts`).
+2. **Überzeiler und ein Satz**: klein, wo man ist ("Kanton Zürich ·
+   täglich"); gross, was zählt -- als Aussage mit Zahl, nicht als
+   Seitenname ("63 neue Baugesuche diese Woche", nicht "Baugesuche").
+3. **Kennzahlenleiste**: vier Zahlen, die eine Handlung auslösen, je
+   mit Marke (+2 neu, 3 ungeprüft, 7 Tage); ein Tipp führt dorthin.
+4. **Tafeln**: Kachel (orange = heiss, blau = Hinweis/Empfehlung,
+   schwarz = Bestand), Titel, Untertitel, rechts "Alle zeigen" in Grau.
+   Darin Zeilen mit Titel, grauer Unterzeile und rechts einer Grafik
+   (Strichbalken für Anteile, Marke für Zustände, Zeit in Blau).
+5. **Rechte Spalte** (ab 1280 px) als eigene weisse Tafel: oben drei
+   Handlungen (zwei weiss, die wichtigste schwarz), darunter Karten mit
+   Luftbild, Ort, Titel, Merkmalen mit Trennstrichen und Betrag violett.
+
+**Grafik statt Zahlenkolonne**: Anteile als Strichbalken, Zustände als
+Marke, Zeit relativ ("vor 5 Min") in Blau, Orte mit Luftbild. Eine
+Zahl steht nie allein, wenn eine Grafik sie schneller lesbar macht.
+
+**Bewegung** (nur wenn das System nicht "weniger Bewegung" will):
+das Luftbild zoomt in 1.4 s auf; Kopf, Kennzahlen, Tafeln und rechte
+Spalte steigen gestaffelt auf (90 ms Abstand); Zahlen zählen beim
+ersten Erscheinen hoch (0.7 s); die Striche eines Balkens füllen sich
+nacheinander. Nichts blinkt, nichts läuft endlos.
+
+**Handy** (bis 640 px, geprüft auf 390 px):
+
+- Bühne niedriger (170 statt 300 px), Satz 40 statt 56 px, das Bild
+  über die ganze Breite und nach unten auslaufend.
+- Kennzahlen 2 × 2, Trennlinien bleiben.
+- Die drei Handlungen stehen direkt unter den Kennzahlen, gleich breit
+  in einer Reihe; die rechte Spalte rückt ans Ende.
+- Karten mit Bild werden zum Karussell: waagrecht wischen, einrastend,
+  die nächste Karte ragt sichtbar hinein.
+- Reiter wischbar statt umbrechend; Tafeln untereinander; jede Zeile
+  und jeder Knopf mindestens 44 px hoch.
+- Ein Raster mit einer Spalte immer mit `grid-cols-1` (sonst wächst es
+  mit dem Inhalt über den Rand -- am 1. November passiert).
+- Untere Leiste fest, deckend, ohne Weichzeichner; der Inhalt endet
+  darüber.
+
 ## Bilder
 
 Luftbilder kommen vom Bund (SWISSIMAGE, geo.admin.ch), nicht aus der

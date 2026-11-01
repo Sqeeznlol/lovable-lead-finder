@@ -37,6 +37,14 @@ taugt als Merkmal nicht -- er hängt auch an den Umgebungsvariablen.
 Das ganze Vorgehen steht in `docs/morgen.md` unter
 "Wie gepusht und ausgeliefert wird".
 
+## Gestaltung
+
+Wie die Seite aussieht, steht in `DESIGN.md` -- vor jeder Arbeit an der
+Oberfläche lesen. Das Cockpit ist das Muster für jede Seite (Julian:
+"so ist es perfekt"): Luftbild-Bühne, ein Satz mit Zahl,
+Kennzahlenleiste, Tafeln mit Grafik, rechte Spalte mit Karten, Bewegung,
+Handy-Fassung. Gebaut wird mit `<Seite>` aus `src/components/rahmen.tsx`.
+
 ## Sprache
 
 Code, Kommentare, Commits und Antworten auf Deutsch. Kommentare sagen,

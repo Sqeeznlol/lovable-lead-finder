@@ -1,4 +1,4 @@
-import type { ComponentType, ReactNode } from 'react';
+import { useEffect, useRef, useState, type ComponentType, type CSSProperties, type ReactNode } from 'react';
 
 /**
  * Die gemeinsamen Bausteine der Bereiche, gestaltet nach DESIGN.md
@@ -161,7 +161,9 @@ export function Strichbalken({ anteil, farbe = 'heiss', titel }: { anteil: numbe
       )}
       <span className="flex h-4 gap-[2px]" role="img" aria-label={`${Math.round(a * 100)} Prozent`}>
         {Array.from({ length: n }, (_, i) => (
-          <span key={i} className={`h-full flex-1 rounded-[1px] ${i < voll ? f : 'bg-foreground/10'}`} />
+          // Die Striche füllen sich nacheinander von links (DESIGN.md, Bewegung).
+          <span key={i} style={i < voll ? { animationDelay: `${120 + i * 22}ms` } : undefined}
+                className={`h-full flex-1 origin-bottom rounded-[1px] ${i < voll ? `${f} motion-safe:animate-strich` : 'bg-foreground/10'}`} />
         ))}
       </span>
     </span>
@@ -175,7 +177,7 @@ export function Strichbalken({ anteil, farbe = 'heiss', titel }: { anteil: numbe
  */
 export function Kennzahlen({ werte }: { werte: { titel: string; wert: string; marke?: ReactNode; onClick?: () => void }[] }) {
   return (
-    <div className="grid grid-cols-2 overflow-hidden rounded border bg-card lg:grid-cols-4">
+    <div className={`grid grid-cols-2 overflow-hidden rounded border bg-card lg:grid-cols-4 ${AUF}`} style={verz(1)}>
       {werte.map((w, i) => {
         // Trennlinien wie in der Vorlage: senkrecht zwischen Spalten,
         // auf dem Handy (2 Spalten) auch waagrecht zwischen den Reihen.
@@ -187,7 +189,7 @@ export function Kennzahlen({ werte }: { werte: { titel: string; wert: string; ma
               {w.onClick && <span aria-hidden className="text-xs">↗</span>}
             </span>
             <span className="mt-2 flex flex-wrap items-center gap-2">
-              <span className="text-[34px] font-normal leading-none tracking-tight">{w.wert}</span>
+              <span className="text-[30px] font-normal leading-none tracking-tight sm:text-[34px]"><Hochzaehlen text={w.wert} /></span>
               {w.marke}
             </span>
           </>
@@ -196,6 +198,103 @@ export function Kennzahlen({ werte }: { werte: { titel: string; wert: string; ma
           ? <button key={w.titel} type="button" onClick={w.onClick} className={`block p-5 text-left transition-colors hover:bg-secondary/60 ${linie}`}>{inhalt}</button>
           : <div key={w.titel} className={`p-5 ${linie}`}>{inhalt}</div>;
       })}
+    </div>
+  );
+}
+
+// ------------------------------------------------------------- Bewegung
+
+/** Gestaffeltes Aufsteigen: Klasse und Verzögerung je Stufe (0, 1, 2 ...). */
+export const AUF = 'motion-safe:animate-aufsteigen';
+export const verz = (stufe: number): CSSProperties => ({ animationDelay: `${stufe * 90}ms` });
+
+/**
+ * Eine Zahl, die beim ersten Erscheinen von 0 hochzählt (0.7 s). Text,
+ * der keine reine Zahl ist ("2.8 Mrd", "–"), bleibt wie er ist. Wer im
+ * System "weniger Bewegung" eingestellt hat, sieht sofort den Endwert.
+ */
+export function Hochzaehlen({ text }: { text: string }) {
+  const ziel = /^[\d']+$/.test(text) ? Number(text.replace(/'/g, '')) : null;
+  const [jetzt, setJetzt] = useState(ziel ?? 0);
+  const fertig = useRef(false);
+  useEffect(() => {
+    if (ziel == null) return;
+    // Spätere Änderungen (neu geladen) ohne Zählen übernehmen.
+    if (fertig.current) { setJetzt(ziel); return; }
+    fertig.current = true;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches || ziel < 2) { setJetzt(ziel); return; }
+    const start = performance.now();
+    let f = 0;
+    const schritt = (t: number) => {
+      const a = Math.min(1, (t - start) / 700);
+      setJetzt(Math.round(ziel * (1 - Math.pow(1 - a, 3))));
+      if (a < 1) f = requestAnimationFrame(schritt);
+    };
+    setJetzt(0);
+    f = requestAnimationFrame(schritt);
+    return () => cancelAnimationFrame(f);
+  }, [ziel]);
+  if (ziel == null) return <>{text}</>;
+  return <>{(fertig.current ? jetzt : ziel).toLocaleString('de-CH')}</>;
+}
+
+// --------------------------------------------------------- Seitenaufbau
+
+/**
+ * Der Aufbau jeder Seite, wie das Cockpit (DESIGN.md, "Seitenaufbau"):
+ *
+ *   1. Luftbild hinter dem ganzen oberen Bereich, nach links und unten
+ *      in die Seitenfarbe auslaufend; davor kleiner Überzeiler und ein
+ *      grosser Satz.
+ *   2. Kennzahlenleiste (vier Spalten, auf dem Handy 2 × 2).
+ *   3. Hauptspalte mit Tafeln; rechts eine eigene Tafel mit Handlungen
+ *      und Karten (ab 1280 px), auf dem Handy die Handlungen direkt
+ *      unter den Kennzahlen und die Seitentafel am Schluss.
+ *
+ * Alles steigt gestaffelt auf; das Bild zoomt langsam auf.
+ */
+export function Seite({ bild, ueber, titel, unter, kennzahlen, aktionen, seite, children }: {
+  bild: string; ueber?: string; titel: string; unter?: ReactNode;
+  kennzahlen?: Parameters<typeof Kennzahlen>[0]['werte'];
+  aktionen?: ReactNode; seite?: ReactNode; children: ReactNode;
+}) {
+  return (
+    <div className="relative mx-auto max-w-[1400px] space-y-6">
+      <div aria-hidden className="pointer-events-none absolute -left-4 -right-4 -top-6 h-[300px] overflow-hidden sm:-left-10 sm:-right-10 sm:-top-4 sm:h-[480px]">
+        <img src={bild} alt="" className="absolute inset-0 h-full w-full object-cover motion-safe:animate-luftbild" />
+        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/85 to-background/0 sm:via-background/60" />
+        <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-background to-background/0" />
+        <span className="absolute bottom-2 right-4 text-[10px] text-muted-foreground">Luftbild © swisstopo</span>
+      </div>
+      <div className={`relative grid grid-cols-1 gap-6 ${seite ? 'xl:grid-cols-[minmax(0,1fr)_380px]' : ''}`}>
+        <div className="min-w-0 space-y-6">
+          <div className={`flex min-h-[170px] items-start pt-2 sm:min-h-[300px] sm:pt-8 ${AUF}`}>
+            <Kopf gross ueber={ueber} titel={titel}>{unter}</Kopf>
+          </div>
+          {kennzahlen && <Kennzahlen werte={kennzahlen} />}
+          {aktionen && <div className={`grid grid-cols-3 gap-2 xl:hidden ${AUF}`} style={verz(2)}>{aktionen}</div>}
+          <div className={`space-y-6 ${AUF}`} style={verz(2)}>{children}</div>
+        </div>
+        {seite && (
+          <aside className={`min-w-0 space-y-4 rounded border bg-card p-4 ${AUF}`} style={verz(3)}>
+            {aktionen && <div className="hidden grid-cols-3 gap-2 xl:grid">{aktionen}</div>}
+            {seite}
+          </aside>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Karten, die auf dem Handy waagrecht durchgewischt werden (einrastend,
+ * die nächste ragt hinein, damit man sieht, dass es weitergeht); ab
+ * Tablet untereinander.
+ */
+export function Karussell({ children }: { children: ReactNode }) {
+  return (
+    <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 no-scrollbar sm:mx-0 sm:flex-col sm:overflow-visible sm:px-0 [&>*]:w-[82%] [&>*]:shrink-0 [&>*]:snap-start sm:[&>*]:w-auto">
+      {children}
     </div>
   );
 }

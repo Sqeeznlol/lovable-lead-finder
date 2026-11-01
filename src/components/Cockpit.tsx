@@ -3,7 +3,7 @@ import { Activity, Archive, Briefcase, FileSearch, Flame, Loader2, MapPin, Spark
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { useCanton } from '@/hooks/use-canton';
-import { Abschnitt, Kennzahlen, KNOPF, KNOPF_HAUPT, KNOPF_LEISE, Kopf, Leer, LISTE, Marke, Strichbalken } from '@/components/rahmen';
+import { Abschnitt, Karussell, KNOPF, KNOPF_HAUPT, KNOPF_LEISE, Leer, LISTE, Marke, Seite, Strichbalken } from '@/components/rahmen';
 import { LuftbildKarte } from '@/components/LuftbildKarte';
 import { KOPFBILD } from '@/lib/luftbild';
 import { zoneKurzform } from '@/lib/potential';
@@ -116,124 +116,101 @@ export function Cockpit({ onGehe, onNeu }: { onGehe: (z: Ziel) => void; onNeu?: 
   const maxPrio = Math.max(1, ...(data?.heisse ?? []).map(h => Number(h.prioritaet) || 0));
   const FARBEN = ['heiss', 'akzent', 'gruen', 'heiss'] as const;
 
+  const aktionen = (
+    <>
+      <button type="button" className={`${KNOPF} px-2 text-sm`} onClick={() => onGehe('karte')}><MapPin className="h-4 w-4 shrink-0" /> Karte</button>
+      <button type="button" className={`${KNOPF} px-2 text-sm`} onClick={() => onGehe('baugesuche')}><FileSearch className="h-4 w-4 shrink-0" /> Baugesuche</button>
+      <button type="button" className={`${KNOPF_HAUPT} px-2 text-sm`} onClick={() => (onNeu ? onNeu() : onGehe('zentrale'))}><Briefcase className="h-4 w-4 shrink-0" /> Vorhaben</button>
+    </>
+  );
+
   return (
-    <div className="relative mx-auto max-w-[1400px] space-y-6">
-      {/* Das Luftbild liegt hinter dem ganzen oberen Bereich, über beide
-          Spalten, wie in der Vorlage: rechts voll, nach links und unten
-          in die Seitenfarbe auslaufend. Vorher sass es in der linken
-          Spalte und war an beiden Rändern hart abgeschnitten. */}
-      <div aria-hidden className="pointer-events-none absolute -left-4 -right-4 -top-6 h-[420px] overflow-hidden sm:-left-10 sm:-right-10 sm:-top-4 sm:h-[480px]">
-        <img src={KOPFBILD} alt="" className="absolute inset-0 h-full w-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/85 to-background/0 sm:via-background/60" />
-        <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-background to-background/0" />
-        <span className="absolute bottom-2 right-4 text-[10px] text-muted-foreground">Luftbild © swisstopo</span>
-      </div>
-      <div className="relative grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-        {/* Links: Kopf, Kennzahlen, Tafeln */}
-        <div className="min-w-0 space-y-6">
-          <div className="flex min-h-[220px] items-start pt-2 sm:min-h-[300px] sm:pt-8">
-            <Kopf gross ueber={`${gruss()}${name ? `, ${name}` : ''}`} titel={data ? satzDesTages(data) : ' '} />
-          </div>
-
-          {isLoading && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> wird gezählt …</p>}
-
-          {data && (
-            <Kennzahlen werte={[
-              { titel: 'Vorhaben', wert: n(data.vorhaben), marke: data.vorhabenNeu ? <Marke art="lila">+{data.vorhabenNeu} neu</Marke> : undefined, onClick: () => onGehe('zentrale') },
-              { titel: 'Gelegenheiten', wert: n(data.gelOffen), marke: data.gelNeu ? <Marke art="rosa">{data.gelNeu} ungeprüft</Marke> : undefined, onClick: () => onGehe('gelegenheiten') },
-              { titel: 'Baugesuche', wert: n(data.bgNeu), marke: <Marke art="minze">7 Tage</Marke>, onClick: () => onGehe('baugesuche') },
-              { titel: 'Wiedervorlagen', wert: n(data.faellig), marke: data.anfragen ? <Marke art="rosa">+{data.anfragen} Anfragen</Marke> : undefined, onClick: () => onGehe('auswertung') },
-            ]} />
-          )}
-
-          {data && (
-            <div className="grid gap-6 lg:grid-cols-2">
-              <Abschnitt titel="Heisse Gelegenheiten" unter="Höchste Priorität, noch offen" symbol={Flame} kachel="heiss"
-                         rechts={<button type="button" className={KNOPF_LEISE} onClick={() => onGehe('gelegenheiten')}>Alle zeigen</button>}>
-                {data.heisse.length === 0 ? <Leer titel="Keine offene Gelegenheit." /> : (
-                  <ul className={LISTE}>
-                    {data.heisse.map((h, i) => (
-                      <li key={h.id}>
-                        <button type="button" onClick={() => onGehe('gelegenheiten')} className="grid w-full grid-cols-[minmax(0,1fr)_minmax(120px,40%)] items-center gap-4 px-4 py-3.5 text-left hover:bg-secondary/50">
-                          <span className="min-w-0">
-                            <span className="block truncate font-medium">{h.titel}</span>
-                            <span className="block truncate text-sm text-muted-foreground">{[h.gemeinde, h.begruendung].filter(Boolean).join(' · ')}</span>
-                          </span>
-                          <Strichbalken titel="Priorität" anteil={(Number(h.prioritaet) || 0) / maxPrio} farbe={FARBEN[i]} />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </Abschnitt>
-
-              <Abschnitt titel="Letzte Aktivität" unter="Abfragen, Eigentümer, Vorhaben" symbol={Activity} kachel="akzent">
-                {data.ereignisse.length === 0 ? <Leer titel="Noch nichts geschehen." /> : (
-                  <ul className={LISTE}>
-                    {data.ereignisse.map(e => {
-                      const a = ARTEN[e.art] ?? ARTEN.vorhaben;
-                      return (
-                        <li key={e.id} className="flex items-center gap-3 px-4 py-3">
-                          <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-[3px] ${a.farbe}`}><a.symbol className="h-4 w-4" /></span>
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-[15px] font-medium">{e.titel}</span>
-                            <span className="block truncate text-sm text-muted-foreground">{e.unter}</span>
-                          </span>
-                          <span className="shrink-0 text-xs font-medium text-accent">{vorWann(e.zeit)}</span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </Abschnitt>
-            </div>
-          )}
-        </div>
-
-        {/* Rechts: Handlungen und Objekte mit Luftbild */}
-        {/* Die rechte Spalte als eigene Tafel wie in der Vorlage: so liegt
-            ihr Titel nie direkt auf dem Luftbild und bleibt lesbar. */}
-        <aside className="min-w-0 space-y-4 rounded border bg-card p-4">
-          <div className="grid grid-cols-3 gap-2">
-            <button type="button" className={`${KNOPF} px-2 text-sm`} onClick={() => onGehe('karte')}><MapPin className="h-4 w-4 shrink-0" /> Karte</button>
-            <button type="button" className={`${KNOPF} px-2 text-sm`} onClick={() => onGehe('baugesuche')}><FileSearch className="h-4 w-4 shrink-0" /> Baugesuche</button>
-            <button type="button" className={`${KNOPF_HAUPT} px-2 text-sm`} onClick={() => (onNeu ? onNeu() : onGehe('zentrale'))}><Briefcase className="h-4 w-4 shrink-0" /> Vorhaben</button>
-          </div>
-
-          <Abschnitt titel="Grösstes Potenzial" unter={`Kanton ${current}, Eigentümer noch offen`} symbol={Sparkles} kachel="akzent"
-                     rechts={<button type="button" className={KNOPF_LEISE} onClick={() => onGehe('uebersicht')}>Alle</button>}>
-            {data && data.objekte.length === 0 && <Leer titel="Keine Objekte gefunden." />}
-            <ul className="space-y-3">
-              {(data?.objekte ?? []).map(o => (
-                <li key={o.id}>
-                  <button type="button" onClick={() => onGehe('uebersicht')} className="block w-full overflow-hidden rounded border bg-card text-left transition-colors hover:border-foreground/30">
-                    <span className="relative block">
-                      <LuftbildKarte adresse={[o.address, o.gemeinde].filter(Boolean).join(', ')} className="aspect-[16/9] w-full" />
-                      {o.hnf_delta != null && o.hnf_delta > 0 && (
-                        <span className="absolute left-3 top-3"><Marke art="gruen">Reserve {n(Math.round(o.hnf_delta))} m²</Marke></span>
-                      )}
-                    </span>
-                    <span className="block space-y-2 p-4">
-                      <span className="flex items-center gap-1.5 text-xs text-muted-foreground"><MapPin className="h-3.5 w-3.5" /> {o.gemeinde ?? '–'}</span>
-                      <span className="flex items-baseline justify-between gap-3">
-                        <span className="truncate text-lg font-medium">{o.address}</span>
+    <Seite bild={KOPFBILD} ueber={`${gruss()}${name ? `, ${name}` : ''}`} titel={data ? satzDesTages(data) : ' '}
+      kennzahlen={data ? [
+        { titel: 'Vorhaben', wert: n(data.vorhaben), marke: data.vorhabenNeu ? <Marke art="lila">+{data.vorhabenNeu} neu</Marke> : undefined, onClick: () => onGehe('zentrale') },
+        { titel: 'Gelegenheiten', wert: n(data.gelOffen), marke: data.gelNeu ? <Marke art="rosa">{data.gelNeu} ungeprüft</Marke> : undefined, onClick: () => onGehe('gelegenheiten') },
+        { titel: 'Baugesuche', wert: n(data.bgNeu), marke: <Marke art="minze">7 Tage</Marke>, onClick: () => onGehe('baugesuche') },
+        { titel: 'Wiedervorlagen', wert: n(data.faellig), marke: data.anfragen ? <Marke art="rosa">+{data.anfragen} Anfragen</Marke> : undefined, onClick: () => onGehe('auswertung') },
+      ] : undefined}
+      aktionen={aktionen}
+      seite={
+        <Abschnitt titel="Grösstes Potenzial" unter={`Kanton ${current}, Eigentümer noch offen`} symbol={Sparkles} kachel="akzent"
+                   rechts={<button type="button" className={KNOPF_LEISE} onClick={() => onGehe('uebersicht')}>Alle</button>}>
+          {data && data.objekte.length === 0 && <Leer titel="Keine Objekte gefunden." />}
+          <Karussell>
+            {(data?.objekte ?? []).map(o => <ObjektKarte key={o.id} o={o} onClick={() => onGehe('uebersicht')} />)}
+          </Karussell>
+        </Abschnitt>
+      }>
+      {isLoading && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> wird gezählt …</p>}
+      {data && (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <Abschnitt titel="Heisse Gelegenheiten" unter="Höchste Priorität, noch offen" symbol={Flame} kachel="heiss"
+                     rechts={<button type="button" className={KNOPF_LEISE} onClick={() => onGehe('gelegenheiten')}>Alle zeigen</button>}>
+            {data.heisse.length === 0 ? <Leer titel="Keine offene Gelegenheit." /> : (
+              <ul className={LISTE}>
+                {data.heisse.map((h, i) => (
+                  <li key={h.id}>
+                    <button type="button" onClick={() => onGehe('gelegenheiten')} className="grid w-full grid-cols-[minmax(0,1fr)_minmax(110px,40%)] items-center gap-4 px-4 py-3.5 text-left hover:bg-secondary/50">
+                      <span className="min-w-0">
+                        <span className="block truncate font-medium">{h.titel}</span>
+                        <span className="block truncate text-sm text-muted-foreground">{[h.gemeinde, h.begruendung].filter(Boolean).join(' · ')}</span>
                       </span>
-                      <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-                        {[o.area ? `${n(Math.round(o.area))} m²` : null, zoneKurzform(o.zone), o.baujahr ? `Baujahr ${o.baujahr}` : null]
-                          .filter(Boolean).map((x, i) => <span key={i} className={`whitespace-nowrap ${i ? 'border-l pl-3' : ''}`}>{x}</span>)}
-                      </span>
-                      <span className="flex items-center justify-between border-t pt-3">
-                        <span className="text-xl font-semibold text-violett">{mio(o.marge_chf)}</span>
-                        <Marke art="violett">Marge</Marke>
-                      </span>
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
+                      <Strichbalken titel="Priorität" anteil={(Number(h.prioritaet) || 0) / maxPrio} farbe={FARBEN[i]} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </Abschnitt>
-        </aside>
-      </div>
-    </div>
+
+          <Abschnitt titel="Letzte Aktivität" unter="Abfragen, Eigentümer, Vorhaben" symbol={Activity} kachel="akzent">
+            {data.ereignisse.length === 0 ? <Leer titel="Noch nichts geschehen." /> : (
+              <ul className={LISTE}>
+                {data.ereignisse.map(e => {
+                  const a = ARTEN[e.art] ?? ARTEN.vorhaben;
+                  return (
+                    <li key={e.id} className="flex items-center gap-3 px-4 py-3">
+                      <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-[3px] ${a.farbe}`}><a.symbol className="h-4 w-4" /></span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[15px] font-medium">{e.titel}</span>
+                        <span className="block truncate text-sm text-muted-foreground">{e.unter}</span>
+                      </span>
+                      <span className="shrink-0 text-xs font-medium text-accent">{vorWann(e.zeit)}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Abschnitt>
+        </div>
+      )}
+    </Seite>
+  );
+}
+
+/** Objektkarte wie "AI Recommended" in der Vorlage: Luftbild, Ort, Adresse, Merkmale, Marge. */
+function ObjektKarte({ o, onClick }: { o: Objekt; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className="block overflow-hidden rounded border bg-card text-left transition-colors hover:border-foreground/30">
+      <span className="relative block">
+        <LuftbildKarte adresse={[o.address, o.gemeinde].filter(Boolean).join(', ')} className="aspect-[16/9] w-full" />
+        {o.hnf_delta != null && o.hnf_delta > 0 && (
+          <span className="absolute left-3 top-3"><Marke art="gruen">Reserve {n(Math.round(o.hnf_delta))} m²</Marke></span>
+        )}
+      </span>
+      <span className="block space-y-2 p-4">
+        <span className="flex items-center gap-1.5 text-xs text-muted-foreground"><MapPin className="h-3.5 w-3.5" /> {o.gemeinde ?? '–'}</span>
+        <span className="block truncate text-lg font-medium">{o.address}</span>
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+          {[o.area ? `${n(Math.round(o.area))} m²` : null, zoneKurzform(o.zone), o.baujahr ? `Baujahr ${o.baujahr}` : null]
+            .filter(Boolean).map((x, i) => <span key={i} className={`whitespace-nowrap ${i ? 'border-l pl-3' : ''}`}>{x}</span>)}
+        </span>
+        <span className="flex items-center justify-between border-t pt-3">
+          <span className="text-xl font-semibold text-violett">{mio(o.marge_chf)}</span>
+          <Marke art="violett">Marge</Marke>
+        </span>
+      </span>
+    </button>
   );
 }
