@@ -436,6 +436,15 @@ jobs:
               explain (analyze, costs off, timing on)
               select owner_name from properties
               where owner_name ilike '%xqzyw%' limit 60;"
+            frage "Dauer: Kennzahl Eigentuemer bekannt (wie die Seite)" "
+              explain (analyze, costs off, timing on)
+              select count(*) from properties where owner_name is not null;"
+            frage "Dauer: passende Objekte zu einem Suchprofil (wie die Seite)" "
+              explain (analyze, costs off, timing on)
+              select id, address, gemeinde, kategorie, area, marge_chf from properties
+              where ausgeschlossen = false and gemeinde in ('Zürich','Kloten')
+                and kategorie in ('Mehrfamilienhaus')
+              order by marge_chf desc nulls last limit 20;"
             frage "Treffer fuer Swisscanto, Helvetica, SFP (nur Anzahl)" "
               select w as wort, count(*) as objekte
               from (values ('swisscanto'),('helvetica'),('sfp')) v(w)
