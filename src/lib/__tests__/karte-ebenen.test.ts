@@ -82,3 +82,21 @@ describe('Kachelnähte', () => {
     if (/width:\s*25[7-9]px/.test(regel)) expect(regel).toMatch(/mix-blend-mode:\s*normal/);
   });
 });
+
+describe('Symbolnamen', () => {
+  // "import { Map } from 'lucide-react'" überdeckt das eingebaute Map.
+  // In NachbarnBund.tsx warf das "Map is not a constructor", und die
+  // Nachbarsuche meldete, der Bund antworte nicht. Wer Map als Symbol
+  // braucht und zugleich new Map schreibt, muss das Symbol umbenennen.
+  it('kein Symbol namens Map, wo new Map gebraucht wird', async () => {
+    const { readFileSync, readdirSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const alle = (o: string): string[] => readdirSync(o, { withFileTypes: true }).flatMap(e =>
+      e.isDirectory() ? (e.name === '__tests__' ? [] : alle(join(o, e.name))) : /\.tsx?$/.test(e.name) ? [join(o, e.name)] : []);
+    const schuldige = alle('src').filter(p => {
+      const t = readFileSync(p, 'utf8');
+      return /import\s*\{[^}]*\bMap\b(?!\s+as)[^}]*\}\s*from\s*'lucide-react'/.test(t) && /new Map\b/.test(t);
+    });
+    expect(schuldige).toEqual([]);
+  });
+});

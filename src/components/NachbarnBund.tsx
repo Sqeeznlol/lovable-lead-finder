@@ -1,5 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
-import { Loader2, Map } from 'lucide-react';
+// Das Symbol heisst hier MapIcon, nicht Map: unter dem Namen Map
+// überdeckt es JavaScripts eingebautes Map, und "new Map(...)" weiter
+// unten warf "Map is not a constructor" -- angezeigt als "Der
+// Bundesdienst antwortet nicht", obwohl der Bund geantwortet hatte.
+import { Loader2, Map as MapIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { esriRinge } from '@/lib/karte-ebenen';
 
@@ -33,7 +37,7 @@ export function NachbarnBund({ umriss, egrid, onOeffnen }: {
   egrid?: string | null;
   onOeffnen?: (id: string) => void;
 }) {
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: ['nachbarn-bund', egrid ?? JSON.stringify(umriss).slice(0, 300)],
     staleTime: 10 * 60 * 1000,
     queryFn: async (): Promise<Nachbar[]> => {
@@ -79,6 +83,9 @@ export function NachbarnBund({ umriss, egrid, onOeffnen }: {
     );
   }
   if (isError) {
+    // Die Ursache ins Protokoll des Browsers: "antwortet nicht" allein
+    // hat einmal einen Fehler im eigenen Code verdeckt.
+    console.error('Nachbarn beim Bund:', error);
     return (
       <p className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
         Der Bundesdienst antwortet nicht; die Nachbarn fehlen deshalb.
@@ -96,7 +103,7 @@ export function NachbarnBund({ umriss, egrid, onOeffnen }: {
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <Map className="h-3.5 w-3.5" />
+        <MapIcon className="h-3.5 w-3.5" />
         {data.length} angrenzende Parzellen laut Bund{imBestand ? `, ${imBestand} davon im Bestand` : ''}.
       </div>
       <div className="divide-y rounded-lg border">
