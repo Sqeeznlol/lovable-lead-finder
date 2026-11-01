@@ -429,6 +429,47 @@ danach.
 
 ---
 
+## 6a. Stand am 1. November -- umgesetzt und gemessen
+
+Gemessen heisst: gegen die echte Datenbank oder den Bund, über die
+Abläufe "Auswerten" und "Baugesuche"; im Browser nachgestellt auf
+Desktop und iPhone-Breite.
+
+| Tims Punkt | Umgesetzt | Gemessen |
+|---|---|---|
+| Karte, Eigentümer- und Portfoliosuche | Suche nach Eigentümer zeigt alle Parzellen; Filter Fläche, Potenzial, Objektart; Gelegenheiten als eigene Ansicht | Suche 5 ms (vorher 7,2 s ohne Index) |
+| Portfolio-Import | Liste oder CSV, Zuordnung über EGRID beim Bund | 41 von 42 mit Ort richtig; ohne Ort nie falsch, sondern Rückfrage |
+| Arrondierung | Nachbarn je Portfolio-Parzelle, Gelegenheit mit Priorität | 28 Parzellen, 119 Nachbarn, 54 im Bestand |
+| Baugesuche ZH | Täglicher Ablauf, Zuordnung, Gelegenheit beim Nachbarn oder im Portfolio | 122 Gesuche, 101 mit EGRID, 70 im Bestand; Probe erzeugt beide Fälle, keine Doppel |
+| Gespräche, Investoren, Reaktivierung | Strukturierte Erfassung, Suchprofil, Kategorien mit nächstem Schritt | Investorensuche 0,9 s |
+| Kennzahlen | Bereich "Auswertung" | 30 ms |
+| Teams und Rechte | Kunde einem Team; Datenbank lässt nur Mitglieder und Admin lesen | Als Konto aui: fremdes Team 0, nach Beitritt 1 |
+| Landingpages | /bewertung, /potenzial, /investor; nur Einfügen | Im Browser: genau eine Anfrage, nichts gelesen |
+| Kundenbericht | Je Kunde, druckbar | -- |
+
+**Was die Daten heute begrenzen** (gemessen, nicht geschätzt):
+
+- Eigentümer stehen bei 114 von 396'271 Objekten. Swisscanto,
+  Helvetica und SFP: 0 Treffer. Keiner der 54 Nachbarn im Bestand hat
+  einen Eigentümer. Ohne Eigentümerdaten bleibt die Arrondierung eine
+  Liste von Parzellen, nicht von Ansprechpartnern.
+- Baugesuche: nur eingereichte, nur Zürich. Bewilligt oder abgelehnt
+  liefert die Quelle nicht.
+- Investoren: der Bestand führt keinen Preis; das Budget lässt sich
+  nicht abgleichen.
+
+**Kosten.** Eine Zahl in Franken steht hier weiterhin nicht. Sie hängt
+an drei Antworten, die nur der Auftraggeber geben kann:
+
+1. Eigentümerdaten: Preis je Abfrage oder je Jahr für einen
+   lizenzierten Bezug -- und ob die Lizenz Speichern und Weitergabe an
+   Kunden erlaubt. Mengengerüst gemessen: je Portfolio-Parzelle rund
+   4 Nachbarn (119 auf 28).
+2. Lizenz der amtlichen Vermessung für die kommerzielle Nutzung der
+   Umrisse.
+3. Datenbank-Tarif: die Tabelle properties trägt 396'271 Zeilen;
+   Abfragen ohne Index brauchten bis 7 s bei 8 s Grenze.
+
 ## 7. Was als Nächstes zu entscheiden ist
 
 1. Kommt die Anmeldung zurück, und in welcher Form -- ganze Seite,
