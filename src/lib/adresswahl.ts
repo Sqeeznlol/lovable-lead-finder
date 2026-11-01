@@ -13,7 +13,10 @@ const norm = (s: string) => s.toLowerCase()
   .replace(/<[^>]+>/g, ' ')
   .replace(/str\.(?=\s|,|$)/g, 'strasse')
   .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
-  .replace(/[^a-z0-9]+/g, ' ').trim();
+  // "7.1" ist ein Nebeneingang und nicht die 7: der Punkt zwischen
+  // Ziffern bleibt, sonst passt "Gerlisberg 7" auch auf "7.1" -- so
+  // gemessen am 1. November, drei Fälle in Kloten.
+  .replace(/[^a-z0-9.]+/g, ' ').replace(/(?<!\d)\.|\.(?!\d)/g, ' ').replace(/\s+/g, ' ').trim();
 
 export type Wahl = { index: number } | { mehrdeutig: string[] } | { keine: true };
 

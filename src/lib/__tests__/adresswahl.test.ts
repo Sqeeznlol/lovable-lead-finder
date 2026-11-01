@@ -7,6 +7,16 @@ describe('Adresse aus den Vorschlägen des Bundes wählen', () => {
       ['Gerlisberg 7 <b>8302 Kloten</b>', 'Gerlisberg 7a 8302 Kloten', 'Gerlisbergstrasse 7 8302 Kloten']))
       .toEqual({ index: 0 });
   });
+  it('Nebeneingänge wie "7.1" sind nicht die 7 (echte Antworten aus Kloten)', () => {
+    expect(adresseWaehlen('Gerlisberg 7, Kloten',
+      ['Gerlisberg 7 8302 Kloten', 'Gerlisbergstrasse 7 8302 Kloten', 'Gerlisberg 7.1 8302 Kloten'])).toEqual({ index: 0 });
+    expect(adresseWaehlen('Am Balsberg 36, Kloten', ['Am Balsberg 36 8302 Kloten', 'Am Balsberg 36.1 8302 Kloten'])).toEqual({ index: 0 });
+    expect(adresseWaehlen('Haldenstrasse 30, Kloten', ['Haldenstrasse 30 8302 Kloten', 'Haldenstrasse 30.1 8302 Kloten'])).toEqual({ index: 0 });
+  });
+  it('ohne Ort und in mehreren Gemeinden: nachfragen (echte Antwort für "Seestrasse 301")', () => {
+    expect(adresseWaehlen('Seestrasse 301', ['Seestrasse 301 3658 Merligen', 'Seestrasse 301 8038 Zürich', 'Seestrasse 301a 3658 Merligen']))
+      .toEqual({ mehrdeutig: ['Seestrasse 301 3658 Merligen', 'Seestrasse 301 8038 Zürich', 'Seestrasse 301a 3658 Merligen'] });
+  });
   it('versteht "str." als "strasse"', () => {
     expect(adresseWaehlen('Haldenstr. 30, 8302 Kloten', ['Haldenstrasse 30 8302 Kloten', 'Haldenstrasse 30 8152 Glattbrugg']))
       .toEqual({ index: 0 });
