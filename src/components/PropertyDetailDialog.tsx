@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { grundbuchUrl, verkauftNie, ARCHIV_STATUS } from '@/lib/grundbuch';
 import { Label } from '@/components/ui/label';
 import { Objektansicht } from '@/components/Objektansicht';
+import { Gespraeche } from '@/components/Gespraeche';
 import { Nachbarn } from '@/components/Nachbarn';
 import { protokolliere } from '@/lib/protokoll';
 import { AuskunftEinfuegen } from '@/components/AuskunftEinfuegen';
@@ -357,6 +358,9 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
                 Kantons eingelesen sind -- vorher erscheint sie gar
                 nicht, statt leer. */}
             <Nachbarn parzelleId={data.id} />
+
+            {/* Jedes Gespräch als Daten: Absicht, Preis, Grund, Wiedervorlage. */}
+            <Gespraeche parzelleId={data.id} ownerName={data.owner_name ?? null} />
 
             {/* Die öffentliche Hand verkauft ihren Grundbesitz praktisch nie.
                 Steht ein solcher Eigentümer im Grundbuch, ist die Arbeit an

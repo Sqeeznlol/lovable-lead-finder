@@ -6,6 +6,7 @@ import { Nachbarn } from '@/components/Nachbarn';
 import { NachbarnBund } from '@/components/NachbarnBund';
 import { usePortfolios, umrissVomBund, type Portfolio } from '@/hooks/use-portfolio';
 import { PortfolioImport } from '@/components/PortfolioImport';
+import { Gespraeche } from '@/components/Gespraeche';
 import { eigentuemerParzellen, eigentuemerSuchen, type EigentuemerTreffer } from '@/hooks/use-eigentuemer-suche';
 import { supabase } from '@/integrations/supabase/client';
 import { FENSTER } from '@/lib/fenster';
@@ -975,6 +976,9 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
                     ? <NachbarnBund umriss={auswahl.umriss} egrid={auswahl.egrid} onOeffnen={oeffnePerId} />
                     : undefined} />
               </div>
+              <div className="abschnitt">
+                <Gespraeche parzelleId={auswahl.id} ownerName={auswahl.eigentuemer ?? null} />
+              </div>
             </>
           );
         })()}
@@ -1115,7 +1119,10 @@ const STIL = `
   position:fixed;inset:0;z-index:50;height:100dvh;background:var(--bg);color:var(--tinte);
   font:14px/1.5 "Inter","Schibsted Grotesk",-apple-system,"Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
 .gisk *{box-sizing:border-box}
-.gisk button,.gisk input{font:inherit;color:inherit}
+/* :where, damit die Grundregel nur Vorgabe ist: Bausteine mit eigenen
+   Klassen (Gespräche, Nachbarn) behalten ihre Farbe -- mit .gisk button
+   stand ein weisser Knopftext dunkel auf dunkel. */
+:where(.gisk) button,:where(.gisk) input{font:inherit;color:inherit}
 .gisk a{color:var(--akzent);text-decoration:none}
 .gisk .map{position:absolute;inset:0;background:var(--fl)}
 .gisk .leaflet-container{font:inherit}
@@ -1196,6 +1203,9 @@ const STIL = `
 .gisk .zurueck{border:0;background:none;color:var(--grau);cursor:pointer;padding:0;margin-bottom:10px;font-size:13px}
 .gisk .zurueck:hover{color:var(--tinte)}
 .gisk .ueber{margin:0 0 4px;font-size:12px;font-weight:600;color:var(--grau);letter-spacing:.02em}
+/* Die Anwendung setzt h1-h3 in Newsreader (index.css); auf der Karte gilt
+   ihre eigene Schrift -- für h3 fehlte das, die Bausteine darin standen in Serifen. */
+.gisk h3{font-family:inherit!important}
 .gisk h2{font-family:inherit!important;margin:0;font-size:22px;line-height:1.2;font-weight:700;letter-spacing:-.02em}
 .gisk .sanft{color:var(--grau);margin:6px 0 0;font-size:13px}
 .gisk .sanft.block{margin:0 0 12px}
