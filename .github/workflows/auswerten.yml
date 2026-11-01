@@ -37,6 +37,7 @@ on:
           - plattform    # Was im neuen Modell steht (Zahlen, keine Namen)
           - konten       # Welche Anmeldekonten bestehen, und seit wann
           - suche        # Wie schnell die Eigentuemersuche ist, und ob ein Index fehlt
+          - ortsdienst   # Welcher Dienst aus einer IP-Adresse den Ort liefert (Felder, CORS)
       egrid:
         description: 'Nur für "objekt": die EGRID, z.B. CH707709971116'
         required: false
@@ -437,6 +438,23 @@ jobs:
               from (values ('swisscanto'),('helvetica'),('sfp')) v(w)
               join properties p on p.owner_name ilike '%'||w||'%'
               group by 1 order by 1;"
+
+          elif [ "$FRAGE" = "ortsdienst" ]; then
+            # Die Anmeldung soll den Ort zur Adresse zeigen. Der Browser
+            # fragt dafuer einen Dienst; geprueft wird hier, ob er
+            # antwortet, ob er Browser-Anfragen erlaubt (CORS) und welche
+            # Felder er liefert. Die Adresse des Laufs selbst wird nicht
+            # ausgegeben, nur Feldnamen und der Ort (ein Rechenzentrum).
+            for url in https://get.geojs.io/v1/ip/geo.json https://ipapi.co/json/ https://ipwho.is/ https://freeipapi.com/api/json; do
+              {
+                echo "### $url"; echo '```'
+                curl -s -m 15 -D /tmp/k -o /tmp/b -H 'Origin: https://example.org' "$url" \
+                  -w 'HTTP %{http_code}\n' || echo "keine Antwort"
+                grep -i '^access-control-allow-origin' /tmp/k || echo "kein CORS-Kopf"
+                python3 -c "import json;d=json.load(open('/tmp/b'));print('Felder:',sorted(d.keys()));print('Ort:',{k:d.get(k) for k in ('city','region','country','country_name','regionName','cityName','countryName') if k in d})" 2>&1 | head -5
+                echo '```'
+              } >> "$GITHUB_STEP_SUMMARY"
+            done
 
           elif [ "$FRAGE" = "konten" ]; then
             # Wer kommt heute ueberhaupt herein? Die Anmeldung liegt in
