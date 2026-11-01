@@ -1,9 +1,14 @@
 // Zeigt die Seite des Amtsblattportals das Gesuch? Sie laedt ihren Inhalt
 // erst im Browser (Hash-Route) -- darum mit einem echten Browser.
 import { chromium } from 'playwright';
-const [id, nr] = process.argv.slice(2);
+// Mit `node -e` steht das erste Argument schon in argv[1]; darum von hinten.
+const [id, nr] = process.argv.slice(-2);
 const b = await chromium.launch();
-for (const url of [`https://www.amtsblattportal.ch/#!/search/publications/detail/${id}`, `https://amtsblatt.zh.ch/#!/search/publications/detail/${id}`]) {
+for (const url of [
+  `https://www.amtsblattportal.ch/#!/search/publications/detail/${id}`,
+  `https://amtsblatt.zh.ch/#!/search/publications/detail/${id}`,
+  `https://amtsblatt.zh.ch/#!/search/publications?text=${nr}`,
+]) {
   const p = await b.newPage();
   try {
     await p.goto(url, { waitUntil: 'networkidle', timeout: 45000 }); await p.waitForTimeout(4000);

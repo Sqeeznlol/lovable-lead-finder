@@ -25,6 +25,8 @@ print('Spalten mit Datum:', [(k, z[i]) for i, k in enumerate(kopf) if 'Date' in 
 for url in [
     f'https://www.amtsblattportal.ch/api/v1/publications/{pid}',
     f'https://www.amtsblattportal.ch/api/v1/publications/{pid}/xml',
+    f'https://www.amtsblattportal.ch/api/v1/publications/{pid}/pdf',
+    f'https://amtsblatt.zh.ch/api/v1/publications/{pid}/pdf',
     f'https://www.amtsblattportal.ch/api/v1/publications?publicationNumber={nr}',
     f'https://www.amtsblattportal.ch/#!/search/publications/detail/{pid}',
     f'https://amtsblattportal.ch/#!/search/publications/detail/{pid}',
@@ -39,6 +41,8 @@ for url in [
             print('  Schluessel:', list(j.keys())[:20] if isinstance(j, dict) else type(j).__name__)
         except Exception as e:
             print('  kein JSON:', e)
+    elif s == 200 and 'pdf' in t:
+        print('  PDF beginnt mit:', b[:8])
     elif s == 200 and 'xml' in t:
         print('  Anfang:', text[:300].replace('\n', ' '))
 
