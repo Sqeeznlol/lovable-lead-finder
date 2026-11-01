@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, Printer } from 'lucide-react';
+import { Loader2, Printer, Target } from 'lucide-react';
+import { Abschnitt, FELD, KNOPF, KNOPF_HAUPT, Leer, LISTE, Marke, Reiter, Seite, Strichbalken } from '@/components/rahmen';
+import { BILD } from '@/lib/luftbild';
 import { supabase } from '@/integrations/supabase/client';
 import { usePortfolios } from '@/hooks/use-portfolio';
 import { arrondierungErkennen } from '@/lib/arrondierung';
@@ -74,127 +76,111 @@ export function Gelegenheiten() {
 
   const zahl = (z: Zustand) => (data ?? []).filter(g => g.zustand === z && (!mandant || g.mandant?.id === mandant)).length;
 
+  const offenAlle = (data ?? []).filter(g => !['abgeschlossen', 'verworfen'].includes(g.zustand) && (!mandant || g.mandant?.id === mandant)).length;
+  const maxPrio = Math.max(1, ...liste.map(g => Number(g.prioritaet) || 0));
+  const ZFARBE: Record<string, 'rosa' | 'lila' | 'violett' | 'minze' | 'grau' | 'heiss'> = {
+    erkannt: 'heiss', geprueft: 'lila', gemeldet: 'violett', 'in bearbeitung': 'lila', abgeschlossen: 'minze', verworfen: 'grau',
+  };
+  const feld = `${FELD} w-full`;
+
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-6">
-      <div>
-        <h1 className="text-2xl">Gelegenheiten</h1>
-        <p className="text-sm text-muted-foreground">Was das System erkannt hat, wer daran arbeitet und was daraus wurde.</p>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {(['erkannt', 'gemeldet', 'in bearbeitung', 'abgeschlossen'] as Zustand[]).map(z => (
-          <div key={z} className="rounded-xl border p-4">
-            <p className="text-xs text-muted-foreground">{ZUSTAENDE.find(x => x[0] === z)![1]}</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums">{data ? zahl(z) : '–'}</p>
-          </div>
-        ))}
-      </div>
-
-      <section className="space-y-2 rounded-xl border p-4">
-        <h2 className="text-base font-medium" style={{ fontFamily: 'inherit' }}>Arrondierung je Portfolio</h2>
-        <p className="text-sm text-muted-foreground">Zu jeder Parzelle die Nachbarn beim Bund holen, mit dem Bestand verbinden und als Gelegenheit ablegen. Darf beliebig oft laufen; Doppeltes wird nicht angelegt.</p>
-        {!portfolios?.length && <p className="text-sm text-muted-foreground">Kein Portfolio erfasst.</p>}
-        <ul className="divide-y">
-          {portfolios?.map(pf => (
-            <li key={pf.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-              <span className="text-sm"><span className="font-medium">{pf.name}</span>
-                <span className="text-muted-foreground"> · {pf.positionen.filter(p => p.parzelleId).length} Parzellen</span></span>
-              <span className="flex items-center gap-3">
-                {lauf[pf.id] && <span className="text-xs text-muted-foreground">{lauf[pf.id]}</span>}
-                <button type="button" onClick={() => void pruefen(pf.id)} disabled={!!lauf[pf.id]?.endsWith('…')}
-                        className="h-10 rounded-lg border px-3 text-sm font-medium hover:bg-muted/50 disabled:opacity-50">
-                  Nachbarn prüfen
-                </button>
-              </span>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          {([['offen', 'Offen'], ...ZUSTAENDE, ['alle', 'Alle']] as [string, string][]).map(([w, t]) => (
-            <button key={w} type="button" onClick={() => setZustand(w as typeof zustand)}
-                    className={`h-9 rounded-full border px-3 text-sm ${zustand === w ? 'border-slate-900 bg-slate-900 text-white' : ''}`}>{t}</button>
-          ))}
-          <select value={mandant} onChange={e => setMandant(e.target.value)} className="h-9 rounded-full border bg-white px-3 text-sm">
-            <option value="">Alle Kunden</option>
-            {mandanten.map(([id, n]) => <option key={id} value={id}>{n}</option>)}
-          </select>
-          {mandant && (
-            <button type="button" onClick={() => setBericht(mandant)}
-                    className="flex h-9 items-center gap-1.5 rounded-full border px-3 text-sm font-medium">
-              <Printer className="h-4 w-4" /> Kundenbericht
-            </button>
+    <Seite bild={BILD.gelegenheiten} ueber="Gelegenheiten · erkannt, gemeldet, erreicht"
+      titel={data ? `${offenAlle} ${offenAlle === 1 ? 'Gelegenheit ist' : 'Gelegenheiten sind'} offen` : ' '}
+      unter="Was das System erkannt hat, wer daran arbeitet und was daraus wurde."
+      kennzahlen={data ? ([['erkannt', 'rosa', 'ungeprüft'], ['gemeldet', 'violett', 'beim Kunden'], ['in bearbeitung', 'lila', 'läuft'], ['abgeschlossen', 'minze', 'erreicht']] as [Zustand, 'rosa' | 'violett' | 'lila' | 'minze', string][])
+        .map(([z, art, wort]) => ({ titel: ZUSTAENDE.find(x => x[0] === z)![1], wert: String(zahl(z)), marke: <Marke art={art}>{wort}</Marke>, onClick: () => setZustand(z) })) : undefined}
+      aktionen={mandant ? <button type="button" onClick={() => setBericht(mandant)} className={KNOPF_HAUPT}><Printer className="h-4 w-4" /> Kundenbericht</button> : undefined}
+      seite={
+        <Abschnitt titel="Arrondierung" unter="Nachbarn je Portfolio beim Bund prüfen" symbol={Target} kachel="akzent"
+                   hinweis="Darf beliebig oft laufen; Doppeltes wird nicht angelegt.">
+          {!portfolios?.length ? <Leer titel="Kein Portfolio erfasst." /> : (
+            <ul className={LISTE}>
+              {portfolios.map(pf => (
+                <li key={pf.id} className="space-y-2 px-4 py-3">
+                  <span className="block min-w-0">
+                    <span className="block truncate font-medium">{pf.name}</span>
+                    <span className="block text-sm text-muted-foreground">{pf.positionen.filter(p => p.parzelleId).length} Parzellen{lauf[pf.id] ? ` · ${lauf[pf.id]}` : ''}</span>
+                  </span>
+                  <button type="button" onClick={() => void pruefen(pf.id)} disabled={!!lauf[pf.id]?.endsWith('…')} className={`${KNOPF} w-full`}>
+                    Nachbarn prüfen
+                  </button>
+                </li>
+              ))}
+            </ul>
           )}
-        </div>
+        </Abschnitt>
+      }>
+      <div className="flex flex-wrap items-center gap-2">
+        <Reiter<string> wahl={zustand} setWahl={w => setZustand(w as typeof zustand)}
+          optionen={([['offen', 'Offen'], ...ZUSTAENDE, ['alle', 'Alle']] as [string, string][])
+            .map(([w, t]) => ({ wert: w, titel: t, zahl: w === 'offen' ? offenAlle : w === 'alle' ? undefined : zahl(w as Zustand) }))} />
+        <select value={mandant} onChange={e => setMandant(e.target.value)} className={`${FELD} pr-8`}>
+          <option value="">Alle Kunden</option>
+          {mandanten.map(([id, n]) => <option key={id} value={id}>{n}</option>)}
+        </select>
+      </div>
 
-        {isLoading && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> wird geladen …</p>}
-        {error && <p className="text-sm text-destructive">Gelegenheiten nicht lesbar.</p>}
-        {data && liste.length === 0 && <p className="text-sm text-muted-foreground">Keine Gelegenheit in dieser Auswahl.</p>}
+      {isLoading && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> wird geladen …</p>}
+      {error && <p className="text-sm text-destructive">Gelegenheiten nicht lesbar.</p>}
+      {data && liste.length === 0 && <Leer titel="Keine Gelegenheit in dieser Auswahl." />}
 
-        <ul className="space-y-2">
+      {liste.length > 0 && (
+        <ul className={LISTE}>
           {liste.map(g => {
             const auf = offen === g.id;
             const ausl = (g.gelegenheit_parzelle ?? []).filter(x => x.rolle === 'ausloeser').map(x => x.parzelle).filter(Boolean) as Parz[];
             const nachb = (g.gelegenheit_parzelle ?? []).filter(x => x.rolle === 'nachbar').map(x => x.parzelle).filter(Boolean) as Parz[];
             return (
-              <li key={g.id} className="rounded-xl border">
+              <li key={g.id}>
                 <button type="button" onClick={() => setOffen(auf ? null : g.id)} aria-expanded={auf}
-                        className="flex w-full items-start justify-between gap-3 p-4 text-left">
+                        className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-3.5 text-left hover:bg-secondary/50 sm:grid-cols-[minmax(0,1fr)_minmax(120px,30%)_auto]">
                   <span className="min-w-0">
-                    <span className="block font-medium">{g.titel}</span>
-                    <span className="block text-sm text-muted-foreground">
+                    <span className="block truncate font-medium">{g.titel}</span>
+                    <span className="block truncate text-sm text-muted-foreground">
                       {[ANLAESSE[g.anlass] ?? g.anlass, g.mandant?.akteur?.name, g.begruendung].filter(Boolean).join(' · ')}
                     </span>
                   </span>
-                  <span className="shrink-0 text-right text-xs text-muted-foreground">
-                    <span className="block font-medium text-foreground">{ZUSTAENDE.find(x => x[0] === g.zustand)?.[1]}</span>
-                    {g.prioritaet != null && <span className="block tabular-nums">Priorität {g.prioritaet}</span>}
+                  <span className="hidden sm:block">
+                    {g.prioritaet != null && <Strichbalken titel="Priorität" anteil={(Number(g.prioritaet) || 0) / maxPrio} farbe={g.zustand === 'erkannt' ? 'heiss' : 'akzent'} />}
                   </span>
+                  <Marke art={ZFARBE[g.zustand] ?? 'grau'}>{ZUSTAENDE.find(x => x[0] === g.zustand)?.[1]}</Marke>
                 </button>
                 {auf && (
-                  <div className="space-y-3 border-t p-4">
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <label className="block space-y-1 text-xs font-medium text-muted-foreground">Zustand
-                        <select value={g.zustand} onChange={e => void aendern(g, { zustand: e.target.value as Zustand })}
-                                className="h-11 w-full rounded-lg border bg-white px-3 text-base text-slate-900">
+                  <div className="space-y-4 border-t bg-secondary/30 px-4 py-4">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="block space-y-1.5"><span className="text-[11px] uppercase tracking-wide text-muted-foreground">Zustand</span>
+                        <select value={g.zustand} onChange={e => void aendern(g, { zustand: e.target.value as Zustand })} className={feld}>
                           {ZUSTAENDE.map(([w, t]) => <option key={w} value={w}>{t}</option>)}
                         </select>
                       </label>
-                      <label className="block space-y-1 text-xs font-medium text-muted-foreground">Zuständig
+                      <label className="block space-y-1.5"><span className="text-[11px] uppercase tracking-wide text-muted-foreground">Zuständig</span>
                         <input defaultValue={g.zustaendig ?? ''} placeholder="Name"
-                               onBlur={e => e.target.value !== (g.zustaendig ?? '') && void aendern(g, { zustaendig: e.target.value || null })}
-                               className="h-11 w-full rounded-lg border bg-white px-3 text-base text-slate-900" />
+                               onBlur={e => e.target.value !== (g.zustaendig ?? '') && void aendern(g, { zustaendig: e.target.value || null })} className={feld} />
                       </label>
                     </div>
-                    <label className="block space-y-1 text-xs font-medium text-muted-foreground">Ergebnis
+                    <label className="block space-y-1.5"><span className="text-[11px] uppercase tracking-wide text-muted-foreground">Ergebnis</span>
                       <input defaultValue={g.ergebnis ?? ''} placeholder="z. B. Nachbar verkauft an Kunden, Vorvertrag"
-                             onBlur={e => e.target.value !== (g.ergebnis ?? '') && void aendern(g, { ergebnis: e.target.value || null })}
-                             className="h-11 w-full rounded-lg border bg-white px-3 text-base text-slate-900" />
+                             onBlur={e => e.target.value !== (g.ergebnis ?? '') && void aendern(g, { ergebnis: e.target.value || null })} className={feld} />
                     </label>
                     <p className="text-xs text-muted-foreground">Erkannt {datum(g.erkannt_am)} · gemeldet {datum(g.gemeldet_am)} · abgeschlossen {datum(g.abgeschlossen_am)}</p>
                     {ausl.length > 0 && (
-                      <div className="text-sm"><p className="text-xs font-medium text-muted-foreground">Parzelle des Kunden</p>
-                        {ausl.map(p => <p key={p.id}>{p.address ?? p.egrid}{p.gemeinde ? ` · ${p.gemeinde}` : ''}</p>)}</div>
+                      <div className="text-sm"><p className="text-[11px] uppercase tracking-wide text-muted-foreground">Parzelle des Kunden</p>
+                        {ausl.map(p => <p key={p.id} className="font-medium">{p.address ?? p.egrid}{p.gemeinde ? ` · ${p.gemeinde}` : ''}</p>)}</div>
                     )}
                     {nachb.length > 0 && (
-                      <div className="text-sm"><p className="text-xs font-medium text-muted-foreground">Nachbarn im Bestand</p>
-                        <ul className="divide-y rounded-lg border">
+                      <div className="space-y-1.5 text-sm"><p className="text-[11px] uppercase tracking-wide text-muted-foreground">Nachbarn im Bestand</p>
+                        <ul className={LISTE}>
                           {nachb.map(p => (
                             <li key={p.id} className="flex justify-between gap-3 px-3 py-2">
                               <span className="min-w-0 truncate">{p.address ?? p.egrid}</span>
-                              <span className="shrink-0 text-xs text-muted-foreground">
-                                {[p.owner_name ?? 'Eigentümer offen', m2(p.area)].filter(Boolean).join(' · ')}
-                              </span>
+                              <span className="shrink-0 text-xs text-muted-foreground">{[p.owner_name ?? 'Eigentümer offen', m2(p.area)].filter(Boolean).join(' · ')}</span>
                             </li>
                           ))}
-                        </ul></div>
+                        </ul>
+                      </div>
                     )}
                     {!!g.fremde_nachbarn?.length && (
-                      <p className="text-xs text-muted-foreground">
-                        Ausserhalb des Bestands: {g.fremde_nachbarn.map(n => n.nummer || n.egrid).join(', ')}
-                      </p>
+                      <p className="text-xs text-muted-foreground">Ausserhalb des Bestands: {g.fremde_nachbarn.map(n => n.nummer || n.egrid).join(', ')}</p>
                     )}
                   </div>
                 )}
@@ -202,8 +188,8 @@ export function Gelegenheiten() {
             );
           })}
         </ul>
-      </section>
-    </div>
+      )}
+    </Seite>
   );
 }
 

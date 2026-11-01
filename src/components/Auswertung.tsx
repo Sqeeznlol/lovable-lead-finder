@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Marke, Seite } from '@/components/rahmen';
+import { BILD } from '@/lib/luftbild';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { KATEGORIEN, kategorie, type Absicht, type Kategorie } from '@/lib/gespraech';
@@ -58,21 +60,21 @@ function Reaktivierung() {
 
   return (
     <section className="space-y-3">
-      <h2 className="text-lg font-medium" style={{ fontFamily: 'inherit' }}>Reaktivierung</h2>
+      <h2 className="text-xl">Reaktivierung</h2>
       <p className="text-sm text-muted-foreground">Je Objekt das letzte Gespräch. Wer nicht verkauft, ist nicht verloren -- jede Gruppe hat ihren nächsten Schritt.</p>
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={() => setFilter('faellig')}
-                className={`h-9 rounded-full border px-3 text-sm ${filter === 'faellig' ? 'border-slate-900 bg-slate-900 text-white' : ''}`}>
+                className={`h-9 rounded-[3px] border px-3 text-sm ${filter === 'faellig' ? 'border-[#1E2433] bg-[#1E2433] text-white' : ''}`}>
           Wiedervorlage fällig · {mitKat.filter(x => faellig(x.a)).length}
         </button>
         {(Object.keys(KATEGORIEN) as Kategorie[]).map(k => (
           <button key={k} type="button" onClick={() => setFilter(k)}
-                  className={`h-9 rounded-full border px-3 text-sm ${filter === k ? 'border-slate-900 bg-slate-900 text-white' : ''}`}>
+                  className={`h-9 rounded-[3px] border px-3 text-sm ${filter === k ? 'border-[#1E2433] bg-[#1E2433] text-white' : ''}`}>
             {KATEGORIEN[k].titel} · {zahl(k)}
           </button>
         ))}
         <button type="button" onClick={() => setFilter('alle')}
-                className={`h-9 rounded-full border px-3 text-sm ${filter === 'alle' ? 'border-slate-900 bg-slate-900 text-white' : ''}`}>Alle</button>
+                className={`h-9 rounded-[3px] border px-3 text-sm ${filter === 'alle' ? 'border-[#1E2433] bg-[#1E2433] text-white' : ''}`}>Alle</button>
       </div>
       {isLoading && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> wird geladen …</p>}
       {error && <p className="text-sm text-destructive">Gespräche nicht lesbar.</p>}
@@ -127,7 +129,7 @@ function Investoren() {
 
   return (
     <section className="space-y-3">
-      <h2 className="text-lg font-medium" style={{ fontFamily: 'inherit' }}>Investoren</h2>
+      <h2 className="text-xl">Investoren</h2>
       <p className="text-sm text-muted-foreground">Suchprofile aus den Gesprächen, mit den passenden Objekten aus dem Bestand.</p>
       {isLoading && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> wird geladen …</p>}
       {error && <p className="text-sm text-destructive">Suchprofile nicht lesbar.</p>}
@@ -177,8 +179,8 @@ async function zaehlen(tabelle: string, filter?: (q: any) => any, geschaetzt = f
   return r.error ? null : r.count ?? null;
 }
 
-function Kennzahlen() {
-  const { data, isLoading } = useQuery({
+function useKennzahlen() {
+  return useQuery({
     queryKey: ['kennzahlen'],
     queryFn: async () => {
       const [objekte, mitEigner, portfolios, positionen, zugeordnet, gel, gemeldet, abgeschlossen, anrufe, erreicht, profile] = await Promise.all([
@@ -197,7 +199,12 @@ function Kennzahlen() {
     },
     staleTime: 60 * 1000,
   });
-  const z = (n: number | null | undefined) => (n == null ? '–' : n.toLocaleString('de-CH'));
+}
+
+const z = (n: number | null | undefined) => (n == null ? '–' : n.toLocaleString('de-CH'));
+
+function Kennzahlen() {
+  const { data, isLoading } = useKennzahlen();
   const pct = (a: number | null | undefined, b: number | null | undefined) =>
     a != null && b ? `${((a / b) * 100).toLocaleString('de-CH', { maximumFractionDigits: a / b < 0.01 ? 2 : 0 })} %` : '–';
   const kacheln: [string, string, string][] = data ? [
@@ -209,7 +216,7 @@ function Kennzahlen() {
   ] : [];
   return (
     <section className="space-y-3">
-      <h2 className="text-lg font-medium" style={{ fontFamily: 'inherit' }}>Kennzahlen</h2>
+      <h2 className="text-xl">Weitere Zahlen</h2>
       {isLoading && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> wird gezählt …</p>}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {kacheln.map(([t, w, s]) => (
@@ -270,7 +277,7 @@ function Anfragen() {
   return (
     <section className="space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-lg font-medium" style={{ fontFamily: 'inherit' }}>Anfragen</h2>
+        <h2 className="text-xl">Anfragen</h2>
         <label className="flex items-center gap-2 text-sm text-muted-foreground">
           <input type="checkbox" checked={alle} onChange={e => setAlle(e.target.checked)} /> auch erledigte
         </label>
@@ -307,16 +314,22 @@ function Anfragen() {
 }
 
 export function Auswertung() {
+  const { data } = useKennzahlen();
+  const pct = (a: number | null | undefined, b: number | null | undefined) => (a != null && b ? Math.round((a / b) * 100) : null);
   return (
-    <div className="mx-auto max-w-5xl space-y-8 p-4 md:p-6">
-      <div>
-        <h1 className="text-2xl">Auswertung</h1>
-        <p className="text-sm text-muted-foreground">Reaktivierung, Investoren und Kennzahlen -- aus den erfassten Gesprächen und Gelegenheiten.</p>
-      </div>
-      <Kennzahlen />
+    <Seite bild={BILD.auswertung} ueber="Auswertung · Gespräche, Anfragen, Investoren"
+      titel={data && data.anrufe != null ? `${z(data.anrufe)} Gespräche, ${z(data.profile ?? 0)} Suchprofile` : 'Gespräche und Suchprofile'}
+      unter="Reaktivierung, Investoren und Kennzahlen, aus den erfassten Gesprächen und Gelegenheiten."
+      kennzahlen={data ? [
+        { titel: 'Gespräche', wert: z(data.anrufe), marke: <Marke art="lila">{pct(data.erreicht, data.anrufe) ?? 0} % erreicht</Marke> },
+        { titel: 'Suchprofile', wert: z(data.profile), marke: <Marke art="violett">Investoren</Marke> },
+        { titel: 'Gelegenheiten', wert: z(data.gel), marke: <Marke art="minze">{z(data.abgeschlossen)} erreicht</Marke> },
+        { titel: 'Überwacht', wert: z(data.zugeordnet), marke: <Marke>Parzellen</Marke> },
+      ] : undefined}>
       <Anfragen />
       <Reaktivierung />
       <Investoren />
-    </div>
+      <Kennzahlen />
+    </Seite>
   );
 }
