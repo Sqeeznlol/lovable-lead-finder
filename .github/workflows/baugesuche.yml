@@ -62,6 +62,12 @@ jobs:
           from public.baugesuch;
           \echo '### Abgleich'
           select * from public.baugesuche_abgleichen(:'TAGE'::int);
+          -- Gelegenheiten ohne Kunde (Migration 20261101290000). Schwelle
+          -- gemessen am 1. November (Auswerten/nachbar-baut): 200 m²
+          -- Reserve und nur Bauvorhaben ergaben übers Jahr 127 Parzellen,
+          -- ohne Filter 315 -- dort ist zu viel Wärmepumpe dabei.
+          \echo '### Nachbar baut (Gelegenheiten ohne Kunde)'
+          select * from public.gelegenheiten_nachbar_baut(:'TAGE'::int, 200, true, true);
           \echo '### Nachher'
           select count(*) as gesuche, count(egrid) as mit_egrid, count(parzelle_id) as im_bestand,
                  count(*) filter (where egrid is not null and parzelle_id is null) as egrid_ohne_parzelle,
@@ -78,7 +84,10 @@ jobs:
                  count(*) filter (where g.titel like 'Baugesuch im Portfolio%') as im_portfolio,
                  count(*) filter (where g.titel like 'Baugesuch beim Nachbarn%') as beim_nachbarn
           from public.gelegenheit g join public.mandant m on m.id = g.mandant_id join public.akteur a on a.id = m.akteur_id
-          where g.anlass = 'baugesuch' group by 1;
+          where g.anlass = 'baugesuch' group by 1
+          union all
+          select 'ohne Kunde (Nachbar baut)', count(*), 0, count(*) from public.gelegenheit
+          where anlass = 'baugesuch' and mandant_id is null;
           SQL
             exit 0
           fi
@@ -115,6 +124,8 @@ jobs:
                 quelle_url = excluded.quelle_url;
           \echo '### Abgleich'
           select * from public.baugesuche_abgleichen(greatest(:'TAGE'::int, 30));
+          \echo '### Nachbar baut (Gelegenheiten ohne Kunde)'
+          select * from public.gelegenheiten_nachbar_baut(greatest(:'TAGE'::int, 30), 200, true, true);
           \echo '### Bestand der Tabelle'
           select count(*) as gesuche, count(egrid) as mit_egrid, count(parzelle_id) as im_bestand,
                  count(publikation_nr) as mit_publikation,
