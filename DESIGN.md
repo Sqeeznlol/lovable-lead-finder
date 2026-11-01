@@ -117,6 +117,24 @@ nacheinander. Nichts blinkt, nichts läuft endlos.
 - Untere Leiste fest, deckend, ohne Weichzeichner; der Inhalt endet
   darüber.
 
+## Karte auf dem Handy
+
+Die Karte ist der Inhalt; alles andere tritt zurück (Julian, iPhone,
+1. November: "sieht noch richtig schlecht aus" -- vier Reihen Knöpfe
+liessen ein Viertel Karte übrig).
+
+- Oben **eine** schlanke Leiste: zurück, Suche, Filter, Ebenen (je 44 px).
+- **Filter** in einem Blatt von unten: Zone, Grösse, Potenzial, Objektart
+  als Chips; unten "Zurücksetzen" und schwarz "N Parzellen zeigen".
+- **Ebenen** in einem Blatt: Karte/Luftbild, Schalter für Grenzen,
+  Bauzonen, nur Portfolios.
+- Aktive Filter als **eine** Zeile dunkler Chips unter der Suche, je mit
+  Kreuz.
+- Die Tafel unten in drei Stufen (140 px, halb, fast ganz): Griff
+  antippen oder wischen; eine gewählte Parzelle öffnet sie halb, wer die
+  Karte zieht, klappt sie ein.
+- Am Desktop bleibt alles sichtbar (Platz ist da).
+
 ## Bilder
 
 Luftbilder kommen vom Bund (SWISSIMAGE, geo.admin.ch), nicht aus der

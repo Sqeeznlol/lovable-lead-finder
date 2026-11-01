@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
+import { Layers, SlidersHorizontal, X } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import { useParzellenImAusschnitt, type Ausschnitt, type ParzelleEigenschaften } from '@/hooks/use-karte';
 import { Nachbarn } from '@/components/Nachbarn';
@@ -332,6 +333,14 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
   const [zonenFilter, setZonenFilter] = useState<Set<Zonenart>>(new Set());
   const [filter, setFilter] = useState<KartenFilter>(OHNE_FILTER);
   const [legendeAuf, setLegendeAuf] = useState(false);
+  // Handy (DESIGN.md, Karte): Filter und Ebenen in eigenen Blättern statt
+  // vier Reihen Knöpfe über der Karte; die Tafel unten in drei Stufen.
+  const [blatt, setBlatt] = useState<null | 'filter' | 'ebenen'>(null);
+  const [stufe, setStufe] = useState<'klein' | 'mittel' | 'gross'>('klein');
+  const griffY = useRef<number | null>(null);
+  // Auf dem Handy ist die Suche schmal: ein kürzerer Platzhalter, sonst
+  // steht dort "Adresse, Parzelle oder Eigen".
+  const schmal = typeof window !== 'undefined' && window.matchMedia?.('(max-width: 900px)').matches;
   // Die genaue Zone -- W2, W3, Kernzone 2 -- so, wie der Kanton sie schreibt.
   const [zonenGenau, setZonenGenau] = useState<Set<string>>(new Set());
   const zonenEbene = useRef<L.Layer | null>(null);
@@ -405,6 +414,8 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
     };
     m.on('moveend', merken);
     m.on('move zoom', () => { setMitte(m.getCenter()); setZoom(m.getZoom()); });
+    // Wer die Karte bewegt, will die Karte sehen: die Tafel klappt ein.
+    m.on('dragstart', () => setStufe('klein'));
     // Klick daneben: die offenen Bundesdienste fragen, wie in der Vorlage.
     m.on('click', (ev: L.LeafletMouseEvent) => bundAbfragen(ev.latlng.lat, ev.latlng.lng));
     merken();
@@ -746,6 +757,16 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
       .slice(0, 15);
   }, [data, zonenFilter, zonenGenau, filter]);
 
+  // Wie viele Parzellen im Bild den Filtern entsprechen -- für den Knopf
+  // "N Parzellen zeigen" im Filterblatt (bestand ist auf 15 gekürzt).
+  const trefferZahl = useMemo(() => (data?.features ?? [])
+    .filter(f => !f.properties?.ausgeschlossen)
+    .filter(f => passtZone(f.properties?.zone, zonenFilter, zonenGenau))
+    .filter(f => passtFilter(f.properties ?? {}, filter)).length, [data, zonenFilter, zonenGenau, filter]);
+  const filterZahl = zonenFilter.size + zonenGenau.size + (filter.flaecheAb ? 1 : 0) + (filter.margeAb ? 1 : 0) + (filter.art ? 1 : 0);
+  // Eine gewählte Parzelle öffnet die Tafel halb, damit Karte und Angaben zu sehen sind.
+  useEffect(() => { if (auswahl.art !== 'leer') setStufe(st => (st === 'klein' ? 'mittel' : st)); }, [auswahl]);
+
   // Die genauen Zonen der gewählten Arten, wie sie im Bild vorkommen.
   // Nur dann: ohne gewählte Art wären es dreissig Chips, und das hilft
   // niemandem. Sortiert so, dass W2 vor W10 steht.
@@ -818,7 +839,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
         <div className="suche">
           <span className="lupe">⌕</span>
           <input type="search" value={suche} onChange={e => setSuche(e.target.value)}
-                 placeholder="Adresse, Parzelle oder Eigentümer" autoComplete="off" />
+                 placeholder={schmal ? 'Adresse oder Parzelle' : 'Adresse, Parzelle oder Eigentümer'} autoComplete="off" />
           {(treffer !== null || sucheStatus !== 'ruhe') && suche.trim().length >= 3 && (
             <div className="liste">
               {sucheStatus === 'laeuft' && <p className="leer">Suche läuft …</p>}
@@ -832,6 +853,15 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
             </div>
           )}
         </div>
+        {!gruppenModus && (
+          <button type="button" className={`rund nur-handy${filterZahl ? ' an' : ''}`} onClick={() => setBlatt('filter')}
+                  aria-label={filterZahl ? `Filter, ${filterZahl} aktiv` : 'Filter'}>
+            <SlidersHorizontal className="sym" />{filterZahl ? <span className="zahl">{filterZahl}</span> : null}
+          </button>
+        )}
+        <button type="button" className="rund nur-handy" onClick={() => setBlatt('ebenen')} aria-label="Kartenebenen">
+          <Layers className="sym" />
+        </button>
         <div className="werkzeuge">
           <div className="segment">
             {([['karte', 'Karte'], ['luftbild', 'Luftbild']] as [Grund, string][]).map(([g, t]) => (
@@ -888,6 +918,82 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
         )}
       </div>)}
 
+      {/* Handy: die aktiven Filter als eine Zeile, je mit Kreuz zum Entfernen. */}
+      {!gruppenModus && filterZahl > 0 && (
+        <div className="aktiv-zeile nur-handy-flex">
+          {[...zonenFilter].map(z => (
+            <button type="button" key={z} onClick={() => umschalten(z)}>{ZONENARTEN.find(x => x[0] === z)?.[1]} <X className="x" /></button>
+          ))}
+          {[...zonenGenau].map(z => <button type="button" key={z} onClick={() => genauUmschalten(z)}>{z} <X className="x" /></button>)}
+          {filter.flaecheAb > 0 && <button type="button" onClick={() => setFilter(f => ({ ...f, flaecheAb: 0 }))}>{FLAECHEN.find(x => x[0] === filter.flaecheAb)?.[1]} <X className="x" /></button>}
+          {filter.margeAb > 0 && <button type="button" onClick={() => setFilter(f => ({ ...f, margeAb: 0 }))}>{MARGEN.find(x => x[0] === filter.margeAb)?.[1]} <X className="x" /></button>}
+          {filter.art && <button type="button" onClick={() => setFilter(f => ({ ...f, art: '' }))}>{ARTEN.find(x => x[0] === filter.art)?.[1]} <X className="x" /></button>}
+        </div>
+      )}
+
+      {blatt && (
+        <div className="blatt-grund" onClick={() => setBlatt(null)}>
+          <div className="blatt" role="dialog" aria-label={blatt === 'filter' ? 'Filter' : 'Kartenebenen'} onClick={e => e.stopPropagation()}>
+            <div className="blatt-kopf">
+              <h3>{blatt === 'filter' ? 'Filter' : 'Kartenebenen'}</h3>
+              <button type="button" className="rund" onClick={() => setBlatt(null)} aria-label="Schliessen"><X className="sym" /></button>
+            </div>
+
+            {blatt === 'ebenen' ? (
+              <>
+                <div className="segment voll">
+                  {([['karte', 'Karte'], ['luftbild', 'Luftbild']] as [Grund, string][]).map(([g, t]) => (
+                    <button type="button" key={g} className={grund === g ? 'an' : ''} onClick={() => setGrund(g)}>{t}</button>
+                  ))}
+                </div>
+                {([
+                  ['Parzellengrenzen', 'Grenzen der Grundstücke aus dem Kataster', grenzenAn, () => setGrenzenAn(v => !v)],
+                  ['Bauzonen', 'Zonen des Bundes, mit Legende', zonenAn, () => setZonenAn(v => !v)],
+                  ['Nur Portfolios', 'Kundenportfolios und Gelegenheiten', portfolioAn, () => { setPortfolioAn(v => !v); setGruppe(null); setAuswahl({ art: 'leer' }); markieren(null); }],
+                ] as [string, string, boolean, () => void][]).map(([t, u, an, f]) => (
+                  <button type="button" key={t} className="schalt-zeile" role="switch" aria-checked={an} onClick={f}>
+                    <span><b>{t}</b><small>{u}</small></span>
+                    <i className={`schalt${an ? ' an' : ''}`} />
+                  </button>
+                ))}
+              </>
+            ) : (
+              <>
+                <p className="blatt-titel">Zone</p>
+                <div className="chips">
+                  <button type="button" className={zonenFilter.size === 0 ? 'an' : ''} onClick={() => { setZonenFilter(new Set()); setZonenGenau(new Set()); }}>Alle</button>
+                  {ZONENARTEN.map(([z, t]) => <button type="button" key={z} className={zonenFilter.has(z) ? 'an' : ''} onClick={() => umschalten(z)}>{t}</button>)}
+                </div>
+                {zonenImBild.length > 0 && (
+                  <div className="chips klein">
+                    {zonenImBild.map(z => <button type="button" key={z} className={zonenGenau.has(z) ? 'an' : ''} onClick={() => genauUmschalten(z)}>{z}</button>)}
+                  </div>
+                )}
+                <p className="blatt-titel">Grösse</p>
+                <div className="chips">
+                  {FLAECHEN.map(([w, t]) => <button type="button" key={w} className={filter.flaecheAb === w ? 'an' : ''} onClick={() => setFilter(f => ({ ...f, flaecheAb: w }))}>{w ? t : 'Alle'}</button>)}
+                </div>
+                <p className="blatt-titel">Potenzial</p>
+                <div className="chips">
+                  {MARGEN.map(([w, t]) => <button type="button" key={w} className={filter.margeAb === w ? 'an' : ''} onClick={() => setFilter(f => ({ ...f, margeAb: w }))}>{w ? t : 'Alle'}</button>)}
+                </div>
+                <p className="blatt-titel">Objektart</p>
+                <div className="chips">
+                  {ARTEN.map(([w, t]) => <button type="button" key={w || 'alle'} className={filter.art === w ? 'an' : ''} onClick={() => setFilter(f => ({ ...f, art: w }))}>{w ? t : 'Alle'}</button>)}
+                </div>
+                <div className="blatt-fuss">
+                  <button type="button" className="knopf" disabled={!filterZahl}
+                          onClick={() => { setFilter(OHNE_FILTER); setZonenFilter(new Set()); setZonenGenau(new Set()); }}>Zurücksetzen</button>
+                  <button type="button" className="knopf haupt" onClick={() => setBlatt(null)}>
+                    {genugNah ? `${trefferZahl.toLocaleString('de-CH')} ${trefferZahl === 1 ? 'Parzelle' : 'Parzellen'} zeigen` : 'Anwenden'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="unten">
         {genugNah && !gruppenModus && (
           <div className="legende">
@@ -914,7 +1020,21 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
         </div>
       </div>
 
-      <aside className="tafel">
+      <aside className={`tafel stufe-${stufe}`}>
+        {/* Griff (nur Handy): antippen oder wischen -- klein, halb, gross. */}
+        <button type="button" className="griff nur-handy" aria-label="Tafel grösser oder kleiner"
+                onClick={() => setStufe(st => (st === 'klein' ? 'mittel' : st === 'mittel' ? 'gross' : 'klein'))}
+                onTouchStart={e => { griffY.current = e.touches[0].clientY; }}
+                onTouchEnd={e => {
+                  const y0 = griffY.current; griffY.current = null;
+                  if (y0 == null) return;
+                  const dy = e.changedTouches[0].clientY - y0;
+                  if (Math.abs(dy) < 30) return;
+                  e.preventDefault();
+                  setStufe(st => dy < 0 ? (st === 'klein' ? 'mittel' : 'gross') : (st === 'gross' ? 'mittel' : 'klein'));
+                }}>
+          <i />
+        </button>
         {auswahl.art === 'leer' && (gruppe || gruppeLaedt) && (
           <PortfolioTafel portfolios={gruppe ? [gruppe] : undefined} laedt={gruppeLaedt} fehler={false}
                           ueber="Eigentümer" startOffen={gruppe?.id}
@@ -1341,5 +1461,63 @@ const STIL = `
   .gisk .unten{left:12px;bottom:calc(34vh + 12px)}
   .gisk.offen .unten{bottom:calc(64vh + 12px)}
   .gisk h2{font-size:18px}
+}
+
+/* ---------------------------------------------------------------
+   Handy (DESIGN.md, Karte): die Karte zuerst. Oben eine schlanke
+   Leiste (zurück, Suche, Filter, Ebenen); Filter und Ebenen in Blättern
+   von unten; aktive Filter als eine Zeile; die Tafel unten in drei
+   Stufen, eingeklappt, sobald man die Karte bewegt.
+   --------------------------------------------------------------- */
+.gisk .nur-handy,.gisk .nur-handy-flex{display:none}
+.gisk .sym{width:20px;height:20px}
+.gisk .rund .zahl{font-size:13px;font-weight:600;margin-left:4px}
+.gisk .blatt-grund{position:fixed;inset:0;z-index:900;background:rgba(17,17,17,.38);display:flex;align-items:flex-end;justify-content:center}
+.gisk .blatt{background:var(--weiss);width:100%;max-width:560px;max-height:84vh;overflow-y:auto;border-radius:6px 6px 0 0;
+  padding:14px 16px calc(14px + env(safe-area-inset-bottom));animation:gisk-hoch .26s cubic-bezier(.2,.7,.2,1)}
+@keyframes gisk-hoch{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+.gisk .blatt-kopf{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.gisk .blatt-kopf h3{margin:0;font-size:22px;font-weight:500;letter-spacing:-.01em}
+.gisk .blatt-titel{margin:18px 0 8px;font-size:11px;font-weight:500;color:var(--grau);text-transform:uppercase;letter-spacing:.05em}
+.gisk .chips{display:flex;flex-wrap:wrap;gap:8px}
+.gisk .chips button{height:42px;padding:0 14px;border:1px solid var(--linie);border-radius:3px;background:var(--weiss);font-size:15px;cursor:pointer}
+.gisk .chips button.an{background:var(--dunkel);border-color:var(--dunkel);color:#fff}
+.gisk .chips.klein{margin-top:8px}.gisk .chips.klein button{height:36px;font-size:13px;padding:0 10px}
+.gisk .blatt-fuss{position:sticky;bottom:calc(-14px - env(safe-area-inset-bottom));display:grid;grid-template-columns:1fr 1.6fr;gap:8px;
+  margin:20px -16px 0;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:var(--weiss);border-top:1px solid var(--linie)}
+.gisk .blatt-fuss .knopf{height:48px;justify-content:center;font-size:15px}
+.gisk .segment.voll{display:flex;margin:6px 0 10px}.gisk .segment.voll button{flex:1;height:42px;font-size:15px}
+.gisk .schalt-zeile{display:flex;width:100%;align-items:center;justify-content:space-between;gap:16px;min-height:62px;padding:8px 0;
+  border:0;border-bottom:1px solid var(--linie);background:none;text-align:left;cursor:pointer}
+.gisk .schalt-zeile b{display:block;font-weight:500;font-size:16px}.gisk .schalt-zeile small{display:block;color:var(--grau);font-size:13px}
+.gisk .schalt{flex:none;position:relative;width:50px;height:30px;border-radius:4px;background:var(--linie);transition:background .2s}
+.gisk .schalt::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:3px;background:#fff;
+  box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .2s}
+.gisk .schalt.an{background:var(--dunkel)}.gisk .schalt.an::after{transform:translateX(20px)}
+
+@media (max-width:900px){
+  .gisk .nur-handy{display:inline-grid;place-items:center}
+  .gisk .nur-handy-flex{display:flex}
+  .gisk .werkzeuge,.gisk .filterblock{display:none!important}
+  .gisk .leiste{top:calc(8px + env(safe-area-inset-top));left:8px;right:8px;flex-wrap:nowrap;gap:6px;padding:6px}
+  .gisk .rund{width:44px;height:44px;flex:none;display:inline-grid;place-items:center;grid-auto-flow:column;color:var(--tinte)}
+  .gisk .rund.an{background:var(--dunkel);color:#fff;width:auto;padding:0 12px}
+  .gisk .suche{flex:1 1 auto;min-width:0}
+  .gisk .suche input{height:44px;font-size:16px}
+  .gisk .aktiv-zeile{position:absolute;z-index:690;top:calc(70px + env(safe-area-inset-top));left:8px;right:8px;gap:6px;overflow-x:auto;scrollbar-width:none}
+  .gisk .aktiv-zeile::-webkit-scrollbar{display:none}
+  .gisk .aktiv-zeile button{flex:none;display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 10px;border:0;border-radius:3px;
+    background:var(--dunkel);color:#fff;font-size:13px;box-shadow:var(--schatten);cursor:pointer}
+  .gisk .aktiv-zeile .x{width:14px;height:14px;opacity:.8}
+  .gisk .tafel{height:auto;padding:0 16px 16px;border-radius:6px 6px 0 0;transition:height .28s cubic-bezier(.2,.7,.2,1)}
+  .gisk .tafel::before{display:none}
+  .gisk .tafel.stufe-klein{height:140px;overflow:hidden}
+  .gisk .tafel.stufe-mittel{height:48vh}
+  .gisk .tafel.stufe-gross{height:86vh}
+  .gisk .griff{display:flex;position:sticky;top:0;z-index:2;width:calc(100% + 32px);margin:0 -16px 2px;height:40px;align-items:center;justify-content:center;
+    border:0;background:var(--weiss);cursor:pointer}
+  .gisk .griff i{display:block;width:40px;height:4px;border-radius:2px;background:var(--linie)}
+  .gisk .unten{bottom:144px;left:8px}
+  .gisk.offen .unten{display:none}
 }
 `;
