@@ -87,7 +87,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     const phoneNumber = (msg.phoneNumber || '').replace(/\s+/g, '');
     // Die Anwendung schickt die fertige Adresse mit -- sie traegt die
     // Koordinaten, ohne die die Karte nicht auf die Parzelle springt.
-    const fertigeAdresse = msg.url || '';
+    // Nur Adressen der beiden Portale: die Seite schickt die Adresse, und
+    // eine fremde Seite hätte sonst beliebige Tabs öffnen lassen
+    // (Sicherheitsprüfung, 1. November).
+    const PORTALE = ['portal.objektwesen.zh.ch', 'map.geo.tg.ch'];
+    let fertigeAdresse = '';
+    try {
+      const u = new URL(msg.url || '');
+      if (u.protocol === 'https:' && PORTALE.includes(u.hostname)) fertigeAdresse = u.href;
+    } catch { /* keine oder ungültige Adresse: aus Kanton und EGRID bilden */ }
 
     // Store the job details
     chrome.storage.local.set({
@@ -136,12 +144,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
       chrome.tabs.query({}, (tabs) => {
         for (const tab of tabs) {
-          if (tab.url && (
-            tab.url.includes('wohntraums.life') ||
-            tab.url.includes('lovable.app') ||
-            tab.url.includes('lovableproject.com') ||
-            tab.url.includes('localhost')
-          )) {
+          // Eigentümerdaten nur an die eigene Seite -- vorher an jede Seite
+          // auf lovable.app, also auch an fremde Projekte.
+          let host = '';
+          try { host = new URL(tab.url || '').hostname; } catch { /* kein Tab mit Adresse */ }
+          if (host === 'wohntraums.life' || host === 'www.wohntraums.life' || host === 'localhost') {
             chrome.tabs.sendMessage(tab.id, {
               type: 'OWNER_RESULT',
               propertyId: kennung,
