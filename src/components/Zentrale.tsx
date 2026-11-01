@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
@@ -10,7 +10,7 @@ import {
 import { arrondierungErkennen } from '@/lib/arrondierung';
 import { passendeObjekte, type Treffer } from '@/lib/investor';
 import { useQuery } from '@tanstack/react-query';
-import { Abschnitt, FELD, KNOPF, KNOPF_HAUPT, Kopf, Leer, LISTE } from '@/components/rahmen';
+import { Abschnitt, FELD, KNOPF, KNOPF_HAUPT, Kopf, Leer, LISTE, Reiter } from '@/components/rahmen';
 import { FENSTER } from '@/lib/fenster';
 
 /**
@@ -32,10 +32,13 @@ const artTitel = (a: Art) => ARTEN.find(x => x[0] === a)?.[1] ?? a;
 
 type Filter = 'aktiv' | Zustand;
 
-export function Zentrale() {
+export function Zentrale({ neu: neuVonOben = 0 }: { neu?: number } = {}) {
   const { data, isLoading, error } = useVorhabenListe();
   const [offen, setOffen] = useState<string | null>(null);
-  const [neu, setNeu] = useState(false);
+  // "Neues Vorhaben" oben in der Kopfzeile öffnet das Formular, auch
+  // wenn die Zentrale schon offen ist (der Zähler ändert sich).
+  const [neu, setNeu] = useState(neuVonOben > 0);
+  useEffect(() => { if (neuVonOben > 0) { setNeu(true); setOffen(null); } }, [neuVonOben]);
   const [filter, setFilter] = useState<Filter>('aktiv');
 
   const alle = data ?? [];
@@ -54,19 +57,11 @@ export function Zentrale() {
         <Kopf ueber="Kundenprojekte" titel="Zentrale">
           Was Kunden entwickeln, kaufen oder verkaufen wollen: Research, Potenzialanalyse und Akquise in ihrem Namen, alles off-market.
         </Kopf>
-        <button type="button" className={KNOPF_HAUPT} onClick={() => setNeu(true)}>Neues Vorhaben</button>
+        <button type="button" className={`${KNOPF_HAUPT} lg:hidden`} onClick={() => setNeu(true)}>Neues Vorhaben</button>
       </div>
 
-      {/* Waagrecht wischbar statt umbrechend: auf dem Handy bleibt die
-          Reihe eine Zeile, wie eine Segmentauswahl. */}
-      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
-        {filterListe.filter(([f]) => f === 'aktiv' || zahl(f) > 0 || f === filter).map(([f, t]) => (
-          <button key={f} type="button" onClick={() => setFilter(f)}
-                  className={`h-10 shrink-0 rounded-full border px-4 text-sm font-medium transition-colors ${filter === f ? 'border-foreground bg-foreground text-background' : 'bg-card hover:bg-secondary'}`}>
-            {t} <span className="ml-1 opacity-60">{zahl(f)}</span>
-          </button>
-        ))}
-      </div>
+      <Reiter<Filter> wahl={filter} setWahl={setFilter}
+              optionen={filterListe.filter(([f]) => f === 'aktiv' || zahl(f) > 0 || f === filter).map(([f, t]) => ({ wert: f, titel: t, zahl: zahl(f) }))} />
 
       {isLoading && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> wird geladen …</p>}
       {error && <p className="text-sm text-destructive">Vorhaben nicht lesbar.</p>}
@@ -80,7 +75,7 @@ export function Zentrale() {
         {liste.map(v => (
           <li key={v.id}>
             <button type="button" onClick={() => setOffen(v.id)}
-                    className="flex h-full w-full flex-col gap-4 rounded-2xl border bg-card p-5 text-left transition-shadow hover:shadow-ceramic-hover">
+                    className="flex h-full w-full flex-col gap-4 rounded border bg-card p-5 text-left transition-colors hover:border-foreground/30">
               <span className="space-y-1">
                 <span className="flex items-center justify-between gap-3 text-sm font-semibold text-muted-foreground">
                   <span className="truncate">{v.kunde}</span>
@@ -107,7 +102,7 @@ function Fortschritt({ z }: { z: Zustand }) {
     <span className="mt-auto block space-y-2">
       <span className="flex gap-1" aria-hidden>
         {SCHRITTE.map((s, i) => (
-          <span key={s.z} className={`h-1 flex-1 rounded-full ${z === 'pausiert' ? 'bg-border' : i <= nr ? 'bg-foreground' : 'bg-border'}`} />
+          <span key={s.z} className={`h-1 flex-1 rounded-[1px] ${z === 'pausiert' ? 'bg-border' : i <= nr ? 'bg-foreground' : 'bg-border'}`} />
         ))}
       </span>
       <span className="block text-sm font-medium">
@@ -148,7 +143,7 @@ function Erfassen({ onFertig, onAbbrechen }: { onFertig: (id: string) => void; o
       {hinweis && <span className="block text-sm text-muted-foreground">{hinweis}</span>}
     </label>
   );
-  const wahl = (an: boolean) => `h-11 flex-1 rounded-full border px-4 text-sm font-medium transition-colors ${an ? 'border-foreground bg-foreground text-background' : 'bg-card hover:bg-secondary'}`;
+  const wahl = (an: boolean) => `h-11 flex-1 rounded-[3px] border px-4 text-sm font-medium transition-colors ${an ? 'border-[#1E2433] bg-[#1E2433] text-white' : 'bg-card hover:bg-secondary'}`;
 
   return (
     <div className="mx-auto max-w-2xl space-y-8">
@@ -157,7 +152,7 @@ function Erfassen({ onFertig, onAbbrechen }: { onFertig: (id: string) => void; o
       </button>
       <Kopf titel="Neues Vorhaben">Was der Kunde vorhat. Adressen lassen sich auch später ergänzen.</Kopf>
 
-      <div className="space-y-6 rounded-2xl border bg-card p-5 sm:p-6">
+      <div className="space-y-6 rounded border bg-card p-5 sm:p-6">
         <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
           {feld('Kunde', <input list="kunden" value={f.kunde} onChange={e => setze({ kunde: e.target.value })} className={`${FELD} w-full`} placeholder="z.B. Pensionskasse A" />)}
           {feld('Art', (
@@ -195,7 +190,7 @@ function Erfassen({ onFertig, onAbbrechen }: { onFertig: (id: string) => void; o
 
         {feld('Adressen', (
           <textarea value={f.adressen} onChange={e => setze({ adressen: e.target.value })} rows={6}
-                    className="w-full rounded-2xl border bg-card px-4 py-3 text-sm" placeholder={'Bahnhofstrasse 1, 8001 Zürich\nCH123456789012\n…'} />
+                    className="w-full rounded border bg-card px-4 py-3 text-sm" placeholder={'Bahnhofstrasse 1, 8001 Zürich\nCH123456789012\n…'} />
         ), `Eine Adresse oder EGRID je Zeile, auch aus Excel kopiert.${zeilen ? ` ${n(zeilen)} Zeilen.` : ''}`)}
         <label className="inline-flex h-11 cursor-pointer items-center text-sm font-medium text-accent">
           Datei wählen (CSV, TXT)
@@ -203,7 +198,7 @@ function Erfassen({ onFertig, onAbbrechen }: { onFertig: (id: string) => void; o
         </label>
 
         {feld('Notiz', <textarea value={f.beschreibung} onChange={e => setze({ beschreibung: e.target.value })} rows={3}
-                                  className="w-full rounded-2xl border bg-card px-4 py-3 text-sm" placeholder="Was der Kunde sagt, wer Ansprechperson ist …" />)}
+                                  className="w-full rounded border bg-card px-4 py-3 text-sm" placeholder="Was der Kunde sagt, wer Ansprechperson ist …" />)}
 
         {fehler && <p className="text-sm text-destructive">{fehler}</p>}
         <div className="flex justify-end gap-2">
@@ -320,11 +315,11 @@ function Detail({ v, onZurueck }: { v: Vorhaben; onZurueck: () => void }) {
       </div>
 
       {/* Die Schritte, und darunter genau das, was jetzt zu tun ist. */}
-      <section className="space-y-5 rounded-2xl border bg-card p-5 sm:p-6">
+      <section className="space-y-5 rounded border bg-card p-5 sm:p-6">
         <ol className="grid grid-cols-6 gap-1.5">
           {SCHRITTE.map((s, i) => (
             <li key={s.z} className="space-y-2">
-              <span className={`block h-1 rounded-full ${!pausiert && i <= nr ? 'bg-foreground' : 'bg-border'}`} />
+              <span className={`block h-1 rounded-[1px] ${!pausiert && i <= nr ? 'bg-foreground' : 'bg-border'}`} />
               <span className={`hidden text-xs sm:block ${i === nr ? 'font-semibold' : 'text-muted-foreground'}`}>{s.titel}</span>
             </li>
           ))}
@@ -357,7 +352,7 @@ function Detail({ v, onZurueck }: { v: Vorhaben; onZurueck: () => void }) {
 
 function Kachel({ titel, wert, zeile }: { titel: string; wert: string; zeile?: string }) {
   return (
-    <div className="rounded-2xl border bg-card p-5">
+    <div className="rounded border bg-card p-5">
       <p className="text-sm font-semibold text-muted-foreground">{titel}</p>
       <p className="mt-2 whitespace-nowrap text-2xl font-bold tracking-tight sm:text-3xl">{wert}</p>
       {zeile && <p className="mt-1 text-sm text-muted-foreground">{zeile}</p>}
@@ -496,8 +491,8 @@ function Adressen({ v, zu, onNeu }: { v: Vorhaben; zu?: { offen: number; zugeord
         </div>
       )}
       {auf && (
-        <div className="space-y-3 rounded-2xl border bg-card p-5">
-          <textarea value={text} onChange={e => setText(e.target.value)} rows={5} className="w-full rounded-2xl border bg-card px-4 py-3 text-sm" placeholder="Eine Adresse oder EGRID je Zeile" />
+        <div className="space-y-3 rounded border bg-card p-5">
+          <textarea value={text} onChange={e => setText(e.target.value)} rows={5} className="w-full rounded border bg-card px-4 py-3 text-sm" placeholder="Eine Adresse oder EGRID je Zeile" />
           <div className="flex justify-end"><button type="button" className={KNOPF_HAUPT} disabled={!text.trim()} onClick={hinzu}>Hinzufügen</button></div>
         </div>
       )}
@@ -522,7 +517,7 @@ function Verlauf({ v, eintraege }: { v: Vorhaben; eintraege: { id: string; am: s
                placeholder="Notiz: Gespräch, Rückmeldung, Abmachung …" className={`${FELD} flex-1`} />
         <button type="button" className={KNOPF_HAUPT} onClick={notiz} disabled={!text.trim()}>Festhalten</button>
       </div>
-      {v.beschreibung && <p className="rounded-2xl border bg-card px-5 py-4 text-sm">{v.beschreibung}</p>}
+      {v.beschreibung && <p className="rounded border bg-card px-5 py-4 text-sm">{v.beschreibung}</p>}
       {eintraege.length > 0 && (
         <ul className={LISTE}>
           {eintraege.map(e => (
@@ -560,7 +555,7 @@ function Bericht({ v, a, onZurueck }: { v: Vorhaben; a: Analyse; onZurueck: () =
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[['Adressen', `${n(a.zugeordnet)} / ${n(a.adressen)}`], ['Fläche', flaeche(a.flaeche_m2)], ['Reserve HNF', flaeche(a.hnf_reserve)], ['Marge', chf(a.marge_chf)],
           ['Nachbarn', n(a.nachbarn)], ['Eigentümer bekannt', n(a.nachbarn_mit_eigentuemer)], ['Im Netzwerk', n(a.netzwerk.length)], ['Ausserhalb Bestand', n(a.nachbarn_ausserhalb)]]
-          .map(([t, w]) => <div key={t} className="rounded-xl border p-3"><p className="text-xs text-slate-500">{t}</p><p className="text-xl font-semibold">{w}</p></div>)}
+          .map(([t, w]) => <div key={t} className="rounded border p-3"><p className="text-xs text-slate-500">{t}</p><p className="text-xl font-semibold">{w}</p></div>)}
       </div>
       <section className="grid gap-6 sm:grid-cols-2">
         <div><h2 className="mb-2 text-lg">Zonen</h2>{a.zonen.map(z => <p key={z.zone} className="flex justify-between border-b py-1 text-sm"><span>{z.zone}</span><span>{z.n}</span></p>)}</div>

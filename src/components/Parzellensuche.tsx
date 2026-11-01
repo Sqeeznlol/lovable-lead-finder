@@ -63,7 +63,7 @@ export function Parzellensuche({ kanton }: { kanton?: string | null }) {
   }, [wort, kanton]);
 
   return (
-    <div className="rounded-2xl border bg-card">
+    <div className="rounded-[3px] border bg-card">
       <div className="relative">
         {sucht
           ? <Loader2 className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
@@ -71,8 +71,8 @@ export function Parzellensuche({ kanton }: { kanton?: string | null }) {
         <Input
           value={wort}
           onChange={e => setWort(e.target.value)}
-          placeholder="Parzelle, EGRID oder Adresse suchen …"
-          className="h-12 border-0 bg-transparent pl-10 text-base focus-visible:ring-0"
+          placeholder="Parzelle, EGRID oder Adresse …"
+          className="h-11 border-0 bg-transparent pl-10 text-[15px] ring-0 focus-visible:ring-0"
         />
       </div>
 

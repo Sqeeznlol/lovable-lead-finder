@@ -618,6 +618,7 @@ jobs:
           select pg_temp.mess('Pipedrive uebertragen', $q$select id from properties where pipedrive_deal_id is not null order by last_export_at desc nulls last limit 30$q$);
           select pg_temp.mess('Cockpit Baugesuche 7 Tage', $q$select count(*) from baugesuch where quelle <> 'probe' and publiziert_am >= current_date - 7$q$);
           select pg_temp.mess('Baugesuche Liste', $q$select * from baugesuch where quelle <> 'probe' order by publiziert_am desc limit 500$q$);
+          select pg_temp.mess('Cockpit Potenzial ZH', $q$select id, address, gemeinde, zone, area, hnf_delta, marge_chf, baujahr from properties where kanton = 'ZH' and ausgeschlossen = false and preselection_status <> 'Ausschliessen' and owner_name is null order by marge_chf desc nulls last limit 3$q$);
           select pg_temp.mess('Zentrale Liste', $q$select * from vorhaben_liste order by geaendert_am desc limit 300$q$);
           select pg_temp.mess('Gelegenheiten', $q$select g.*, (select count(*) from gelegenheit_parzelle gp where gp.gelegenheit_id = g.id) from gelegenheit g limit 500$q$);
           select bereich, ms from zeiten;

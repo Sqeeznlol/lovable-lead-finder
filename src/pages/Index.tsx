@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { Building2, LayoutDashboard, Upload, Phone, X, Zap, Search, FileSpreadsheet, Eye, Shield, Share, Plus, Database, Send, Map, Target, BarChart3, Gauge, HardHat, MoreHorizontal, Briefcase } from 'lucide-react';
+import { Building2, LayoutDashboard, Upload, Phone, X, Zap, Search, FileSpreadsheet, Eye, Shield, Share, Plus, Database, Send, Map, Target, BarChart3, Gauge, HardHat, MoreHorizontal, Briefcase, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 const Uebersicht = lazy(() => import('@/components/Uebersicht').then(m => ({ default: m.Uebersicht })));
@@ -33,6 +33,8 @@ const Lesezeichen = lazy(() => import('@/components/Lesezeichen').then(m => ({ d
 const ErweiterungHolen = lazy(() => import('@/components/ErweiterungHolen').then(m => ({ default: m.ErweiterungHolen })));
 const AdminSettings = lazy(() => import('@/components/AdminSettings').then(m => ({ default: m.AdminSettings })));
 import { CantonTabs } from '@/components/CantonTabs';
+import { Parzellensuche } from '@/components/Parzellensuche';
+import { useCanton } from '@/hooks/use-canton';
 import { KeyboardShortcutsOverlay } from '@/components/KeyboardShortcutsOverlay';
 import { AdminZugang } from '@/components/AdminZugang';
 import { Auffang } from '@/components/Auffang';
@@ -110,9 +112,25 @@ const stillgelegt: { id: Tab; label: string; icon: React.ComponentType<{ classNa
 // Auf dem iPhone vier feste Ziele und "Mehr" für den Rest.
 const mobileBottomTabs: Tab[] = ['cockpit', 'zentrale', 'karte', 'gelegenheiten'];
 
+/** Ein Punkt der Icon-Leiste: Symbol, aktiv als schwarzes Quadrat, Name beim Überfahren. */
+function LeistenPunkt({ t, an, onClick }: { t: Eintrag; an: boolean; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} aria-label={t.label} aria-current={an ? 'page' : undefined}
+            className={`group relative grid h-11 w-11 place-items-center rounded-[3px] transition-colors ${an ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'}`}>
+      <t.icon className="h-5 w-5" />
+      <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap rounded-[3px] bg-foreground px-2.5 py-1.5 text-xs font-medium text-background opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+        {t.label}
+      </span>
+    </button>
+  );
+}
+
 export default function Index() {
   const [active, setActive] = useState<Tab>('cockpit');
   const [mehrAuf, setMehrAuf] = useState(false);
+  // Zählt Klicks auf "Neues Vorhaben" oben; die Zentrale öffnet dann das Formular.
+  const [neuesVorhaben, setNeuesVorhaben] = useState(0);
+  const { current: kantonJetzt } = useCanton();
   const [wisch, setWisch] = useState<{ x: number; y: number } | null>(null);
   const { user, signOut } = useAuth();
   const konto = user?.email?.split('@')[0] ?? '';
@@ -155,53 +173,63 @@ export default function Index() {
     <div className="flex min-h-safe-screen bg-background">
       <KeyboardShortcutsOverlay />
 
-      {/* Seitenleiste: hell, in Gruppen, nur auf grossen Bildschirmen. */}
-      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r bg-card lg:flex">
-        <div className="px-6 pb-4 pt-7">
-          <p className="text-xl font-bold tracking-tight">Aurora</p>
-          <p className="mt-0.5 text-xs font-medium text-muted-foreground">Immobilien-Plattform · Schweiz</p>
-        </div>
-        <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-2" aria-label="Hauptnavigation">
-          {gruppen.map(g => (
-            <div key={g.titel}>
-              <p className="px-3 pb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{g.titel}</p>
+      {/* Schmale Leiste nur mit Symbolen, wie in der Vorlage (DESIGN.md):
+          der aktive Punkt als schwarzes Quadrat. Der Name steht beim
+          Überfahren daneben und für Screenreader im Knopf. */}
+      <aside className="sticky top-0 hidden h-screen w-[76px] shrink-0 flex-col items-center border-r bg-card py-5 lg:flex">
+        <button type="button" onClick={() => gehe('cockpit')} aria-label="Cockpit"
+                className="mb-6 grid h-11 w-11 place-items-center rounded-[3px] text-foreground">
+          <Building2 className="h-7 w-7" strokeWidth={2.2} />
+        </button>
+        <nav className="flex flex-1 flex-col items-center gap-1 overflow-y-auto no-scrollbar" aria-label="Hauptnavigation">
+          {gruppen.filter(g => g.titel !== 'Verwaltung').map((g, gi) => (
+            <div key={g.titel} className={`flex flex-col items-center gap-1 ${gi > 0 ? 'mt-3 border-t pt-3' : ''}`}>
               {g.eintraege.map(t => (
-                <button key={t.id} type="button" onClick={() => gehe(t.id)}
-                        aria-current={active === t.id ? 'page' : undefined}
-                        className={`flex h-10 w-full items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors ${
-                          active === t.id ? 'bg-foreground text-background' : 'text-foreground/80 hover:bg-secondary'}`}>
-                  <t.icon className="h-4 w-4" />
-                  {t.label}
-                </button>
+                <LeistenPunkt key={t.id} t={t} an={active === t.id} onClick={() => gehe(t.id)} />
               ))}
             </div>
           ))}
         </nav>
-        <div className="flex items-center justify-between border-t px-6 py-4">
-          <span className="truncate text-sm text-muted-foreground">{konto}</span>
-          <button type="button" onClick={() => void signOut()} className="text-sm font-medium text-muted-foreground hover:text-foreground">
-            Abmelden
-          </button>
+        <div className="flex flex-col items-center gap-1 pt-3">
+          {gruppen.find(g => g.titel === 'Verwaltung')!.eintraege.map(t => (
+            <LeistenPunkt key={t.id} t={t} an={active === t.id} onClick={() => gehe(t.id)} />
+          ))}
+          <LeistenPunkt t={{ id: 'admin', label: 'Abmelden', icon: LogOut }} an={false} onClick={() => void signOut()} />
         </div>
       </aside>
 
       <main className="flex min-w-0 flex-1 flex-col" onTouchStart={e => setWisch({ x: e.touches[0].clientX, y: e.touches[0].clientY })} onTouchEnd={wischEnde}>
-        {/* Kopfzeile: der Kanton gilt für die Akquise-Bereiche. */}
+        {/* Kopfzeile wie in der Vorlage: links die Suche (Parzelle,
+            EGRID, Adresse), rechts die Hauptaktion und das Konto. Auf
+            dem Handy Zeichen und Titel. Deckend, ohne Weichzeichner:
+            Text bleibt scharf (DESIGN.md). */}
         {!karteAktiv && (
-          <header className={`sticky top-0 z-30 flex items-center gap-3 border-b bg-background/85 px-4 py-3 backdrop-blur-xl pt-[max(0.75rem,env(safe-area-inset-top))] lg:px-10 ${akquise ? '' : 'lg:hidden'}`}>
-            {/* Auf dem Desktop steht der Titel als Überschrift der Seite; hier nur auf dem iPhone, sonst doppelt. */}
-            <span className="text-base font-bold lg:hidden">{titel}</span>
-            {/* Der Kanton gilt nur für die Akquise -- über Cockpit oder
-                Baugesuchen stand er da und tat nichts. */}
-            {akquise && (
-              <div className="ml-auto flex items-center gap-2 overflow-x-auto no-scrollbar">
-                <CantonTabs />
+          <header className="sticky top-0 z-30 border-b bg-background pt-[env(safe-area-inset-top)] lg:border-b-0">
+            <div className="flex h-16 items-center gap-3 px-4 lg:h-[76px] lg:px-10">
+              <span className="grid h-9 w-9 place-items-center rounded-[3px] bg-foreground text-background lg:hidden">
+                <Building2 className="h-5 w-5" />
+              </span>
+              <span className="text-lg font-semibold lg:hidden">{titel}</span>
+              <div className="relative hidden h-11 w-[380px] lg:block">
+                <div className="absolute inset-x-0 top-0 z-40"><Parzellensuche kanton={kantonJetzt} /></div>
               </div>
-            )}
+              <div className="ml-auto flex items-center gap-3">
+                {/* Der Kanton gilt nur für die Akquise. */}
+                {akquise && <div className="flex items-center gap-2 overflow-x-auto no-scrollbar"><CantonTabs /></div>}
+                <button type="button" onClick={() => { setNeuesVorhaben(n => n + 1); gehe('zentrale'); }}
+                        className="hidden h-11 items-center gap-2 rounded-[3px] bg-accent px-4 text-[15px] font-medium text-accent-foreground transition-transform active:scale-[0.97] lg:inline-flex">
+                  <Plus className="h-4 w-4" /> Neues Vorhaben
+                </button>
+                <span className="hidden min-w-0 leading-tight lg:block">
+                  <span className="block truncate text-[15px] font-semibold">{konto}</span>
+                  <span className="block truncate text-xs text-muted-foreground">{user?.email}</span>
+                </span>
+              </div>
+            </div>
           </header>
         )}
 
-        <div className={karteAktiv ? 'flex-1' : `w-full flex-1 px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-6 lg:px-10 lg:pb-12 lg:pt-10 animate-fade-in`} key={active}>
+        <div className={karteAktiv ? 'flex-1' : `w-full flex-1 px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-6 lg:px-10 lg:pb-12 lg:pt-4 animate-fade-in`} key={active}>
           <Auffang key={active} bereich={titel}>
           <Suspense fallback={
             <div className="space-y-4">
@@ -210,8 +238,8 @@ export default function Index() {
               <Skeleton className="h-64 w-full" />
             </div>
           }>
-            {active === 'cockpit' && <Cockpit onGehe={z => setActive(z)} />}
-            {active === 'zentrale' && <Zentrale />}
+            {active === 'cockpit' && <Cockpit onGehe={z => gehe(z)} onNeu={() => { setNeuesVorhaben(k => k + 1); gehe('zentrale'); }} />}
+            {active === 'zentrale' && <Zentrale neu={neuesVorhaben} />}
             {active === 'baugesuche' && <Baugesuche />}
             {active === 'uebersicht' && <Uebersicht />}
             {active === 'dashboard' && <Dashboard />}
@@ -290,15 +318,15 @@ export default function Index() {
         </div>
 
         {/* iPhone: vier feste Ziele und "Mehr". Gleich gross, ein Feld. */}
-        <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-card/90 backdrop-blur-2xl pb-safe lg:hidden" aria-label="Hauptnavigation">
+        <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-card pb-safe lg:hidden" aria-label="Hauptnavigation">
           <div className="grid grid-cols-5 px-1 pt-1.5">
             {[...mobileBottomTabs.map(id => tabs.find(x => x.id === id)!), { id: 'mehr' as const, label: 'Mehr', icon: MoreHorizontal }].map(t => {
               const an = t.id === 'mehr' ? mehrAuf : active === t.id && !mehrAuf;
               return (
                 <button key={t.id} type="button"
                         onClick={() => (t.id === 'mehr' ? setMehrAuf(v => !v) : gehe(t.id as Tab))}
-                        className={`flex flex-col items-center gap-1 rounded-xl py-1.5 text-[11px] font-semibold transition-colors ${an ? 'text-foreground' : 'text-muted-foreground'}`}>
-                  <span className={`grid h-8 w-12 place-items-center rounded-full transition-colors ${an ? 'bg-secondary' : ''}`}>
+                        className={`flex flex-col items-center gap-1 py-1.5 text-[11px] font-medium transition-colors ${an ? 'text-foreground' : 'text-muted-foreground'}`}>
+                  <span className={`grid h-8 w-11 place-items-center rounded-[3px] transition-colors ${an ? 'bg-foreground text-background' : ''}`}>
                     <t.icon className="h-5 w-5" />
                   </span>
                   {t.label}
@@ -311,8 +339,8 @@ export default function Index() {
         {/* "Mehr": alle Bereiche als Liste, von unten -- wie auf dem iPhone gewohnt. */}
         {mehrAuf && (
           <div className="fixed inset-0 z-30 lg:hidden" onClick={() => setMehrAuf(false)}>
-            <div className="absolute inset-0 bg-foreground/20 backdrop-blur-sm" />
-            <div className="absolute inset-x-0 bottom-0 max-h-[75vh] overflow-y-auto rounded-t-3xl bg-card px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-3 animate-fade-in"
+            <div className="absolute inset-0 bg-foreground/30" />
+            <div className="absolute inset-x-0 bottom-0 max-h-[75vh] overflow-y-auto rounded-t-md bg-card px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-3 animate-fade-in"
                  onClick={e => e.stopPropagation()}>
               <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-border" />
               {gruppen.map(g => (
@@ -321,7 +349,7 @@ export default function Index() {
                   <div className="grid grid-cols-2 gap-2">
                     {g.eintraege.map(t => (
                       <button key={t.id} type="button" onClick={() => gehe(t.id)}
-                              className={`flex h-12 items-center gap-3 rounded-xl border px-3 text-sm font-medium ${active === t.id ? 'border-foreground bg-foreground text-background' : 'bg-card'}`}>
+                              className={`flex h-12 items-center gap-3 rounded-[3px] border px-3 text-sm font-medium ${active === t.id ? 'border-foreground bg-foreground text-background' : 'bg-card'}`}>
                         <t.icon className="h-4 w-4" /> {t.label}
                       </button>
                     ))}

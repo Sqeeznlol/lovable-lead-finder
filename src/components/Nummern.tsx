@@ -149,7 +149,7 @@ export function Nummern() {
                     bfsNr={p.bfs_nr}
                     gemeinde={p.gemeinde}
                     kanton={p.kanton}
-                    className="hidden h-28 w-40 shrink-0 overflow-hidden rounded-xl sm:block"
+                    className="hidden h-28 w-40 shrink-0 overflow-hidden rounded-[3px] sm:block"
                   />
                   <div className="min-w-0 flex-1 space-y-3">
                     <div className="space-y-0.5">

@@ -83,7 +83,7 @@ export function Uebersicht() {
 
 function Kennzahl({ wert, label, hinweis, betont }: { wert: string; label: string; hinweis: string; betont?: boolean }) {
   return (
-    <div className="rounded-2xl border bg-card p-5 sm:p-6">
+    <div className="rounded border bg-card p-5 sm:p-6">
       <p className="text-sm font-semibold text-muted-foreground">{label}</p>
       <p className={`mt-3 text-3xl font-bold tracking-tight sm:text-4xl ${betont ? 'text-accent' : ''}`}>{wert}</p>
       <p className="mt-1 text-sm text-muted-foreground">{hinweis}</p>

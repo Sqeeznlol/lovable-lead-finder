@@ -24,7 +24,7 @@ export function Kopf({ ueber, titel, children, bild, gross }: {
   );
   if (!bild) return text;
   return (
-    <div className="relative -mx-4 -mt-6 overflow-hidden px-4 pb-8 pt-8 sm:-mx-10 sm:-mt-10 sm:px-10 sm:pb-12 sm:pt-12">
+    <div className={`relative -mx-4 -mt-6 overflow-hidden px-4 pb-10 pt-8 sm:-mx-10 sm:-mt-4 sm:px-10 sm:pt-10 ${gross ? 'flex min-h-[260px] items-start sm:min-h-[340px]' : 'sm:pb-12'}`}>
       <img src={bild} alt="" aria-hidden className="absolute inset-y-0 right-0 h-full w-full object-cover sm:w-3/4" loading="eager" />
       <div aria-hidden className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-background/10 sm:via-background/70" />
       <div aria-hidden className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-background to-transparent" />

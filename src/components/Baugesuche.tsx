@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { FENSTER } from '@/lib/fenster';
+import { FELD, Kopf, Leer, Marke, Reiter } from '@/components/rahmen';
 
 /**
  * Alle Baugesuche, die der Ablauf "Baugesuche" geladen hat -- zum
@@ -88,44 +89,32 @@ export function Baugesuche() {
   const zuletzt = data?.gesuche.reduce((m, g) => (g.erfasst_am > m ? g.erfasst_am : m), '') ?? '';
   const zahl = (s: Sicht) => (data ? filtern(data.gesuche, data.mitGelegenheit, s, tage, '').length : 0);
 
-  const knopf = (an: boolean) => `h-10 rounded-full border px-4 text-sm font-medium transition-colors ${an ? 'border-foreground bg-foreground text-background' : 'bg-card hover:bg-secondary'}`;
-
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <header className="space-y-2">
-        <p className="text-sm font-semibold text-muted-foreground">Kanton Zürich · täglich</p>
-        <h1 className="text-3xl sm:text-4xl">Baugesuche</h1>
-        <p className="text-muted-foreground">
-          Jedes publizierte Gesuch, beim Bund verortet. Trifft eines ein Kundenportfolio oder dessen Nachbarn,
-          entsteht daraus eine Gelegenheit.
-        </p>
-        {zuletzt && <p className="text-sm text-muted-foreground">Zuletzt geladen {zeit(zuletzt)} · {data?.gesuche.length.toLocaleString('de-CH')} Gesuche gespeichert</p>}
-      </header>
+      <Kopf ueber="Kanton Zürich · täglich" titel="Baugesuche">
+        Jedes publizierte Gesuch, beim Bund verortet. Trifft eines ein Kundenportfolio oder dessen Nachbarn,
+        entsteht daraus eine Gelegenheit.
+        {zuletzt && <span className="mt-1 block text-sm">Zuletzt geladen {zeit(zuletzt)} · {data?.gesuche.length.toLocaleString('de-CH')} Gesuche gespeichert</span>}
+      </Kopf>
 
       <div className="flex flex-wrap items-center gap-2">
-        {([['alle', 'Alle'], ['bestand', 'Im Bestand'], ['gelegenheit', 'Mit Gelegenheit']] as [Sicht, string][]).map(([w, t]) => (
-          <button key={w} type="button" className={knopf(sicht === w)} onClick={() => setSicht(w)}>
-            {t} <span className="ml-1 tabular-nums opacity-60">{zahl(w)}</span>
-          </button>
-        ))}
+        <Reiter<Sicht> wahl={sicht} setWahl={setSicht}
+                       optionen={([['alle', 'Alle'], ['bestand', 'Im Bestand'], ['gelegenheit', 'Mit Gelegenheit']] as [Sicht, string][]).map(([w, t]) => ({ wert: w, titel: t, zahl: zahl(w) }))} />
         <select value={tage} onChange={e => setTage(Number(e.target.value))}
-                className="h-10 rounded-full border bg-card px-4 text-sm font-medium">
+                className={`${FELD} pr-8`}>
           <option value={3}>Letzte 3 Tage</option>
           <option value={7}>Letzte 7 Tage</option>
           <option value={30}>Letzte 30 Tage</option>
           <option value={0}>Alle</option>
         </select>
         <input value={wort} onChange={e => setWort(e.target.value)} placeholder="Adresse, Gemeinde, Vorhaben, Nummer"
-               className="h-10 w-full min-w-0 rounded-full border bg-card px-4 text-sm sm:w-auto sm:flex-1 sm:max-w-xs" />
+               className={`${FELD} w-full sm:w-auto sm:flex-1 sm:max-w-xs`} />
       </div>
 
       {isLoading && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> wird geladen …</p>}
       {error && <p className="text-sm text-destructive">Baugesuche nicht lesbar.</p>}
       {data && liste.length === 0 && (
-        <div className="rounded-2xl border bg-card p-8 text-center">
-          <p className="font-medium">Kein Gesuch in dieser Auswahl.</p>
-          <p className="mt-1 text-sm text-muted-foreground">Zeitraum vergrössern oder Filter zurücksetzen.</p>
-        </div>
+        <Leer titel="Kein Gesuch in dieser Auswahl.">Zeitraum vergrössern oder Filter zurücksetzen.</Leer>
       )}
 
       <ul className="space-y-2">
@@ -133,41 +122,41 @@ export function Baugesuche() {
           const auf = offen === g.id;
           const gel = data!.mitGelegenheit.has(g.id);
           return (
-            <li key={g.id} className="rounded-2xl border bg-card transition-shadow hover:shadow-ceramic-hover">
+            <li key={g.id} className="rounded border bg-card transition-colors hover:border-foreground/25">
               <button type="button" onClick={() => setOffen(auf ? null : g.id)} aria-expanded={auf}
                       className="flex w-full items-start justify-between gap-4 p-4 text-left sm:p-5">
                 <span className="min-w-0">
                   <span className="block font-semibold">{g.adresse ?? 'Ohne Adresse'}{g.gemeinde ? `, ${g.gemeinde}` : ''}</span>
                   <span className={`mt-1 block text-sm text-muted-foreground ${auf ? '' : 'line-clamp-2'}`}>{g.beschreibung ?? '–'}</span>
                   <span className="mt-2 flex flex-wrap gap-1.5">
-                    {g.parzelle_id && <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium">Im Bestand</span>}
-                    {gel && <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">Gelegenheit</span>}
-                    {!g.egrid && <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs text-muted-foreground">nicht verortet</span>}
+                    {g.parzelle_id && <Marke art="minze">Im Bestand</Marke>}
+                    {gel && <Marke art="heiss">Gelegenheit</Marke>}
+                    {!g.egrid && <Marke>nicht verortet</Marke>}
                   </span>
                 </span>
                 <span className="shrink-0 text-right text-sm text-muted-foreground">{datum(g.publiziert_am)}</span>
               </button>
               {auf && (
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-t px-4 py-4 text-sm sm:grid-cols-4 sm:px-5">
-                  <div><dt className="text-xs text-muted-foreground">Parzelle</dt><dd className="font-medium">{g.parzelle_nr ?? '–'}</dd></div>
-                  <div><dt className="text-xs text-muted-foreground">EGRID</dt><dd className="font-mono text-xs">{g.egrid ?? '–'}</dd></div>
-                  <div><dt className="text-xs text-muted-foreground">Nachbarn</dt><dd className="font-medium">{g.nachbar_egrids?.length ?? 0}</dd></div>
-                  <div><dt className="text-xs text-muted-foreground">Bauherrschaft</dt><dd className="font-medium">{g.bauherrschaft ?? '–'}</dd></div>
-                  <div><dt className="text-xs text-muted-foreground">Publikation</dt><dd className="font-mono text-xs">{g.publikation_nr ?? '–'}</dd></div>
-                  <div><dt className="text-xs text-muted-foreground">Publiziert</dt><dd className="font-medium">{datum(g.publiziert_am)}</dd></div>
-                  <div><dt className="text-xs text-muted-foreground">Einsprache bis</dt><dd className="font-medium">{g.einsprache_bis ? datum(g.einsprache_bis) : '–'}</dd></div>
-                  <div><dt className="text-xs text-muted-foreground">Publiziert bis</dt><dd className="font-medium">{g.publiziert_bis ? datum(g.publiziert_bis) : '–'}</dd></div>
+                  <div><dt className="text-[11px] uppercase tracking-wide text-muted-foreground">Parzelle</dt><dd className="font-medium">{g.parzelle_nr ?? '–'}</dd></div>
+                  <div><dt className="text-[11px] uppercase tracking-wide text-muted-foreground">EGRID</dt><dd className="font-mono text-xs">{g.egrid ?? '–'}</dd></div>
+                  <div><dt className="text-[11px] uppercase tracking-wide text-muted-foreground">Nachbarn</dt><dd className="font-medium">{g.nachbar_egrids?.length ?? 0}</dd></div>
+                  <div><dt className="text-[11px] uppercase tracking-wide text-muted-foreground">Bauherrschaft</dt><dd className="font-medium">{g.bauherrschaft ?? '–'}</dd></div>
+                  <div><dt className="text-[11px] uppercase tracking-wide text-muted-foreground">Publikation</dt><dd className="font-mono text-xs">{g.publikation_nr ?? '–'}</dd></div>
+                  <div><dt className="text-[11px] uppercase tracking-wide text-muted-foreground">Publiziert</dt><dd className="font-medium">{datum(g.publiziert_am)}</dd></div>
+                  <div><dt className="text-[11px] uppercase tracking-wide text-muted-foreground">Einsprache bis</dt><dd className="font-medium">{g.einsprache_bis ? datum(g.einsprache_bis) : '–'}</dd></div>
+                  <div><dt className="text-[11px] uppercase tracking-wide text-muted-foreground">Publiziert bis</dt><dd className="font-medium">{g.publiziert_bis ? datum(g.publiziert_bis) : '–'}</dd></div>
                   <div className="col-span-2 grid gap-2 sm:col-span-4 sm:grid-cols-2 lg:grid-cols-4">
                     {belege(g).map(b => (
                       <a key={b.url} href={b.url} target={FENSTER.karte}
-                         className="flex min-h-11 flex-col justify-center rounded-xl border px-4 py-2 hover:bg-secondary">
+                         className="flex min-h-11 flex-col justify-center rounded-[3px] border px-4 py-2 hover:bg-secondary">
                         <span className="text-sm font-medium">{b.titel}</span>
                         <span className="text-xs text-muted-foreground">{b.zeile}</span>
                       </a>
                     ))}
                     {g.egrid && (
                       <a href={`https://map.geo.admin.ch/?swisssearch=${g.egrid}&lang=de`} target={FENSTER.karte}
-                         className="flex min-h-11 flex-col justify-center rounded-xl border px-4 py-2 hover:bg-secondary">
+                         className="flex min-h-11 flex-col justify-center rounded-[3px] border px-4 py-2 hover:bg-secondary">
                         <span className="text-sm font-medium">Parzelle im Bundes-GIS</span>
                         <span className="text-xs text-muted-foreground">map.geo.admin.ch</span>
                       </a>
