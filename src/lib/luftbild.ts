@@ -23,5 +23,9 @@ export function luftbildWgs(lat: number, lon: number, breiteM = 160, px = 640): 
   return `${WMS}&CRS=EPSG:4326&BBOX=${bbox}&WIDTH=${px}&HEIGHT=${Math.round((px * 9) / 16)}`;
 }
 
-/** Zürich, Gleisfeld und Europaallee: der Kopf des Cockpits. */
-export const KOPFBILD = luftbildLv95(2682700, 1247925, 800);
+/**
+ * Zürich, Gleisfeld und Europaallee: der Kopf des Cockpits. 1280 px:
+ * mit 1600 px lieferte der Bund 528 kB nach 3 s (Auswerten/luftbild,
+ * 1. November) -- zu schwer für jeden Aufruf des Cockpits.
+ */
+export const KOPFBILD = luftbildLv95(2682700, 1247925, 800, 1280);

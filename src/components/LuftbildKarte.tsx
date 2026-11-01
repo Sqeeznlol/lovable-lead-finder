@@ -21,12 +21,13 @@ export function LuftbildKarte({ adresse, className = '' }: { adresse: string | n
 
   const src = !ort || stufe === 'keins' ? null : stufe === 'wms' ? luftbildWgs(ort.lat, ort.lon) : luftbildTileUrl(ort.lat, ort.lon, 18);
   return (
-    <div className={`overflow-hidden bg-secondary ${className}`}>
+    <div className={`relative overflow-hidden bg-secondary ${className}`}>
       {src && (
         <img src={src} alt={`Luftbild ${adresse}`} loading="lazy" decoding="async"
              onError={() => setStufe(s => (s === 'wms' ? 'kachel' : 'keins'))}
              className="h-full w-full object-cover" />
       )}
+      {src && <span className="absolute bottom-1 right-2 text-[10px] text-white/90 [text-shadow:0_0_3px_rgba(0,0,0,.6)]">© swisstopo</span>}
     </div>
   );
 }

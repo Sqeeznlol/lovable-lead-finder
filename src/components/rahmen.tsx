@@ -28,6 +28,8 @@ export function Kopf({ ueber, titel, children, bild, gross }: {
       <img src={bild} alt="" aria-hidden className="absolute inset-y-0 right-0 h-full w-full object-cover sm:w-3/4" loading="eager" />
       <div aria-hidden className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-background/10 sm:via-background/70" />
       <div aria-hidden className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-background to-transparent" />
+      {/* Die Quelle gehört zum Bild: swisstopo verlangt die Angabe. */}
+      <span className="absolute bottom-2 right-3 text-[10px] text-muted-foreground">Luftbild © swisstopo</span>
       {text}
     </div>
   );
