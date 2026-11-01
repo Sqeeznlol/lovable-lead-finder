@@ -22,12 +22,15 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { CantonTabs } from '@/components/CantonTabs';
 import { KeyboardShortcutsOverlay } from '@/components/KeyboardShortcutsOverlay';
 import { Protokoll } from '@/components/Protokoll';
+import { AdminZugang } from '@/components/AdminZugang';
+import { Anmeldungen } from '@/components/Anmeldungen';
 import { Lesezeichen } from '@/components/Lesezeichen';
 import { ErweiterungHolen } from '@/components/ErweiterungHolen';
 import { Nummern } from '@/components/Nummern';
 import { PipedriveBereit } from '@/components/PipedriveBereit';
 import { AuskunftAusLesezeichen } from '@/components/AuskunftAusLesezeichen';
 import { useCanton } from '@/hooks/use-canton';
+import { useAuth } from '@/hooks/use-auth';
 import { usePlatform } from '@/hooks/use-platform';
 import { useMidnightReset } from '@/hooks/use-phones';
 
@@ -87,6 +90,8 @@ export default function Index() {
   const [active, setActive] = useState<Tab>('uebersicht');
   const [mobileOpen, setMobileOpen] = useState(false);
   const { current, cantons } = useCanton();
+  const { user, signOut } = useAuth();
+  const konto = user?.email?.split('@')[0] ?? '';
   const cantonName = cantons.find(c => c.id === current)?.name ?? '';
   const platform = usePlatform();
   const [showInstallHint, setShowInstallHint] = useState(false);
@@ -138,6 +143,14 @@ export default function Index() {
         <div className="p-5 border-t border-foreground/5 flex items-center justify-between">
           <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Theme</span>
           <ThemeToggle compact />
+        </div>
+        {/* Wer angemeldet ist, und der Weg hinaus -- leise, am Ende der Leiste. */}
+        <div className="px-5 pb-5 flex items-center justify-between">
+          <span className="truncate text-xs text-muted-foreground">{konto}</span>
+          <button type="button" onClick={() => void signOut()}
+                  className="text-xs font-medium text-muted-foreground hover:text-foreground">
+            Abmelden
+          </button>
         </div>
       </aside>
 
@@ -192,7 +205,10 @@ export default function Index() {
             {active === 'import' && <CsvImport />}
             {active === 'phones' && <PhoneManager />}
             {active === 'admin' && (
+              <AdminZugang>
               <div className="space-y-6">
+                {/* Wer war von wo da -- das Erste, was der Admin sieht. */}
+                <Anmeldungen />
                 {/* Das Lesezeichen steht oben, weil es kein
                     Einstellungswert ist, sondern ein Werkzeug, das
                     jeder einmal in seine Leiste zieht. */}
@@ -239,6 +255,7 @@ export default function Index() {
                 </div>
               </div>
               </div>
+              </AdminZugang>
             )}
           </Suspense>
         </div>

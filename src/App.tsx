@@ -6,6 +6,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { CantonProvider } from "@/hooks/use-canton";
+import { AuthProvider } from "@/hooks/use-auth";
+import { Torwaechter } from "@/components/Torwaechter";
 import { useEigentuemerLookupListener } from "@/hooks/use-eigentuemer-lookup";
 import { AuskunftAusLesezeichen } from "@/components/AuskunftAusLesezeichen";
 const Index = lazy(() => import("./pages/Index.tsx"));
@@ -31,28 +33,30 @@ function GlobalListeners() {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
+    <AuthProvider>
     <CantonProvider>
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        {/* Ohne Anmeldung: wer die Adresse kennt, ist drin. Was die
-            Liste hergibt, entscheiden damit allein die Regeln der
-            Datenbank -- in ihr stehen Adressen, Eigentuemernamen und
-            Nummern von Menschen, die nie um ihre Aufnahme gebeten
-            haben. */}
+        {/* Die Liste enthält Adressen, Eigentümernamen und Nummern von
+            Menschen, die nie um ihre Aufnahme gebeten haben. Sie gehört
+            hinter eine Anmeldung -- alle Seiten, auch /swipe. */}
         <BrowserRouter>
-          <GlobalListeners />
-          <Suspense fallback={<div className="min-h-screen bg-background" />}>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/swipe" element={<SwipePage />} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
+          <Torwaechter>
+            <GlobalListeners />
+            <Suspense fallback={<div className="min-h-screen bg-background" />}>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/swipe" element={<SwipePage />} />
+                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
+          </Torwaechter>
         </BrowserRouter>
       </TooltipProvider>
     </CantonProvider>
+    </AuthProvider>
     </ThemeProvider>
   </QueryClientProvider>
 );
