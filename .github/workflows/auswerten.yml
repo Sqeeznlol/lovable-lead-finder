@@ -634,7 +634,7 @@ jobs:
           -- Eine Arrondierung: Ausloeser ist die erste Parzelle, Nachbar
           -- die 1001., deren Eigentuemer der Probe-Investor ist.
           insert into gelegenheit (anlass, mandant_id, titel, fremde_nachbarn)
-            select mandant_id, 'arrondierung', 'Probe Arrondierung', '[{"egrid":"CHX","nummer":"1"},{"egrid":"CHY","nummer":"2"}]'::jsonb
+            select 'arrondierung', mandant_id, 'Probe Arrondierung', '[{"egrid":"CHX","nummer":"1"},{"egrid":"CHY","nummer":"2"}]'::jsonb
             from portfolio where name = 'Probe-Vorhaben';
           insert into gelegenheit_parzelle (gelegenheit_id, parzelle_id, rolle)
             select g.id, (select id from probe_parz limit 1), 'ausloeser' from gelegenheit g where g.titel = 'Probe Arrondierung'
