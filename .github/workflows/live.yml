@@ -71,8 +71,24 @@ jobs:
               echo "### Live" >> "$GITHUB_STEP_SUMMARY"
               echo "Bündel \`$js\` trägt \`$kurz\` -- der Stand ist draussen." \
                 >> "$GITHUB_STEP_SUMMARY"
+              # Die öffentlichen Seiten werden direkt verlinkt; ohne
+              # Weiterleitung auf index.html antworteten sie mit 404 --
+              # unbemerkt, bis es am 1. November gemessen wurde.
+              # Und die Bündel müssen im Browser liegen bleiben dürfen.
+              fehler=0
+              for pfad in /bewertung /potenzial /investor; do
+                code=$(curl -s -o /tmp/p.html -w '%{http_code}' "$adresse$pfad")
+                if [ "$code" = 200 ] && grep -q '/assets/index-' /tmp/p.html; then
+                  echo "- $pfad: 200" >> "$GITHUB_STEP_SUMMARY"
+                else
+                  echo "- $pfad: $code -- nicht erreichbar" >> "$GITHUB_STEP_SUMMARY"; fehler=1
+                fi
+              done
+              cache=$(curl -s -D - -o /dev/null "$adresse$js" | grep -i '^cache-control:' | tr -d '\r')
+              echo "- Bündel: $cache" >> "$GITHUB_STEP_SUMMARY"
+              echo "$cache" | grep -q immutable || fehler=1
               cat "$GITHUB_STEP_SUMMARY"
-              exit 0
+              exit $fehler
             fi
             [ "$n" -lt "$VERSUCHE" ] || break
             sleep 30
