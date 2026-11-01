@@ -38,7 +38,9 @@ export function useGelegenheiten(aktiv = true) {
           + 'gelegenheit_parzelle(rolle, parzelle:parzelle_id(id, address, owner_name, area, gemeinde, egrid))')
         .order('prioritaet', { ascending: false, nullsFirst: false })
         .order('erkannt_am', { ascending: false })
-        .limit(500);
+        // 500 reichten nicht mehr: am 1. November kamen 127 ohne Kunde
+        // und 274 bei Demo-Kunden dazu.
+        .limit(2000);
       if (r.error) throw r.error;
       return r.data ?? [];
     },

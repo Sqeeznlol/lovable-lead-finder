@@ -42,6 +42,9 @@ export function Gelegenheiten() {
   const [bericht, setBericht] = useUrlWert('bericht');
   const berichtZu = useSchliessen('bericht');
 
+  // "ohne" zeigt die Gelegenheiten ohne Kunde ("Nachbar baut").
+  const passtKunde = (g: { mandant?: { id: string } | null }) =>
+    !mandant || (mandant === 'ohne' ? !g.mandant : g.mandant?.id === mandant);
   const mandanten = useMemo(() => {
     const m = new Map<string, string>();
     (data ?? []).forEach(g => g.mandant && m.set(g.mandant.id, g.mandant.akteur?.name ?? 'Ohne Namen'));
@@ -50,7 +53,7 @@ export function Gelegenheiten() {
 
   const liste = (data ?? []).filter(g =>
     (zustand === 'alle' || (zustand === 'offen' ? !['abgeschlossen', 'verworfen'].includes(g.zustand) : g.zustand === zustand))
-    && (!mandant || g.mandant?.id === mandant));
+    && passtKunde(g));
 
   const aendern = async (g: Gel, felder: Partial<Gel>) => {
     const jetzt = new Date().toISOString();
@@ -82,9 +85,9 @@ export function Gelegenheiten() {
 
   if (bericht) return <Bericht mandantId={bericht} gelegenheiten={data ?? []} onZurueck={berichtZu} />;
 
-  const zahl = (z: Zustand) => (data ?? []).filter(g => g.zustand === z && (!mandant || g.mandant?.id === mandant)).length;
+  const zahl = (z: Zustand) => (data ?? []).filter(g => g.zustand === z && passtKunde(g)).length;
 
-  const offenAlle = (data ?? []).filter(g => !['abgeschlossen', 'verworfen'].includes(g.zustand) && (!mandant || g.mandant?.id === mandant)).length;
+  const offenAlle = (data ?? []).filter(g => !['abgeschlossen', 'verworfen'].includes(g.zustand) && passtKunde(g)).length;
   const maxPrio = Math.max(1, ...liste.map(g => Number(g.prioritaet) || 0));
   const ZFARBE: Record<string, 'rosa' | 'lila' | 'violett' | 'minze' | 'grau' | 'heiss'> = {
     erkannt: 'heiss', geprueft: 'lila', gemeldet: 'violett', 'in bearbeitung': 'lila', abgeschlossen: 'minze', verworfen: 'grau',
@@ -97,7 +100,7 @@ export function Gelegenheiten() {
       unter="Was das System erkannt hat, wer daran arbeitet und was daraus wurde."
       kennzahlen={data ? ([['erkannt', 'rosa', 'ungeprüft'], ['gemeldet', 'violett', 'beim Kunden'], ['in bearbeitung', 'lila', 'läuft'], ['abgeschlossen', 'minze', 'erreicht']] as [Zustand, 'rosa' | 'violett' | 'lila' | 'minze', string][])
         .map(([z, art, wort]) => ({ titel: ZUSTAENDE.find(x => x[0] === z)![1], wert: String(zahl(z)), marke: <Marke art={art}>{wort}</Marke>, onClick: () => setZustand(z) })) : undefined}
-      aktionen={mandant ? <button type="button" onClick={() => setBericht(mandant)} className={KNOPF_HAUPT}><Printer className="h-4 w-4" /> Kundenbericht</button> : undefined}
+      aktionen={mandant && mandant !== 'ohne' ? <button type="button" onClick={() => setBericht(mandant)} className={KNOPF_HAUPT}><Printer className="h-4 w-4" /> Kundenbericht</button> : undefined}
       seite={
         <Abschnitt titel="Arrondierung" unter="Nachbarn je Portfolio beim Bund prüfen" symbol={Target} kachel="akzent"
                    hinweis="Darf beliebig oft laufen; Doppeltes wird nicht angelegt.">
@@ -124,6 +127,7 @@ export function Gelegenheiten() {
             .map(([w, t]) => ({ wert: w, titel: t, zahl: w === 'offen' ? offenAlle : w === 'alle' ? undefined : zahl(w as Zustand) }))} />
         <select value={mandant} onChange={e => setMandant(e.target.value)} className={`${FELD} pr-8`}>
           <option value="">Alle Kunden</option>
+          <option value="ohne">Ohne Kunde (Nachbar baut)</option>
           {mandanten.map(([id, n]) => <option key={id} value={id}>{n}</option>)}
         </select>
       </div>
