@@ -24,6 +24,12 @@ on:
         description: 'Gesuche der letzten so vielen Tage'
         required: false
         default: '3'
+      nur_abgleich:
+        description: 'Nichts laden, nur die vorhandenen Gesuche neu zuordnen (z.B. nachdem Parzellen dazukamen)'
+        required: false
+        default: 'nein'
+        type: choice
+        options: ['nein', 'ja']
 
 jobs:
   laden:
@@ -38,10 +44,44 @@ jobs:
         env:
           DB: ${{ secrets.SUPABASE_DB_URL }}
           TAGE: ${{ inputs.tage || '3' }}
+          NUR_ABGLEICH: ${{ inputs.nur_abgleich || 'nein' }}
         run: |
           set -euo pipefail
           [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
           case "$TAGE" in ''|*[!0-9]*) echo "tage muss eine Zahl sein"; exit 1;; esac
+
+          # Rückwirkend: am 1. November kamen 206'238 Zürcher Parzellen
+          # dazu. Gesuche, deren EGRID damals fehlte, finden ihre Parzelle
+          # erst jetzt -- ohne dass etwas neu geladen werden muss.
+          if [ "$NUR_ABGLEICH" = "ja" ]; then
+            psql "$DB" -v ON_ERROR_STOP=1 -v TAGE="$TAGE" -X -q <<'SQL' | tee -a "$GITHUB_STEP_SUMMARY"
+          set statement_timeout = '15min';
+          \echo '### Vorher'
+          select count(*) as gesuche, count(egrid) as mit_egrid, count(parzelle_id) as im_bestand,
+                 (select count(*) from public.gelegenheit where anlass = 'baugesuch') as gelegenheiten
+          from public.baugesuch;
+          \echo '### Abgleich'
+          select * from public.baugesuche_abgleichen(:'TAGE'::int);
+          \echo '### Nachher'
+          select count(*) as gesuche, count(egrid) as mit_egrid, count(parzelle_id) as im_bestand,
+                 count(*) filter (where egrid is not null and parzelle_id is null) as egrid_ohne_parzelle,
+                 (select count(*) from public.gelegenheit where anlass = 'baugesuch') as gelegenheiten
+          from public.baugesuch;
+          \echo '### Betroffene Parzellen'
+          select count(distinct parzelle_id) as parzellen_mit_gesuch,
+                 (select count(distinct p.id) from public.properties p
+                   join public.baugesuch b on p.egrid = any (b.nachbar_egrids)) as parzellen_mit_gesuch_beim_nachbarn
+          from public.baugesuch where parzelle_id is not null;
+          \echo '### Gelegenheiten aus Baugesuchen je Kunde (Demo-Kunden gesondert, keine Namen)'
+          select case when a.name like '%(Demo)' then 'Demo' else 'echt' end as kunde,
+                 count(*) as gelegenheiten,
+                 count(*) filter (where g.titel like 'Baugesuch im Portfolio%') as im_portfolio,
+                 count(*) filter (where g.titel like 'Baugesuch beim Nachbarn%') as beim_nachbarn
+          from public.gelegenheit g join public.mandant m on m.id = g.mandant_id join public.akteur a on a.id = m.akteur_id
+          where g.anlass = 'baugesuch' group by 1;
+          SQL
+            exit 0
+          fi
 
           npx -y tsx@4.19.2 tools/baugesuche_laden.ts "$TAGE" /tmp/baugesuche.csv | tee -a "$GITHUB_STEP_SUMMARY"
 

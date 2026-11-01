@@ -16,6 +16,7 @@ import { ExternalLink, MapPin, Phone, Save, Loader2, Bot, RefreshCw, Archive, Cl
 import { KNOPF, KNOPF_HAUPT, Marke } from '@/components/rahmen';
 import { zoneKurzform } from '@/lib/potential';
 import { supabase } from '@/integrations/supabase/client';
+import { BaugesucheParzelle } from '@/components/BaugesucheParzelle';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Tables } from '@/integrations/supabase/types';
@@ -217,6 +218,8 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
                 <Textarea rows={4} value={data.notes || ''} onChange={e => update({ notes: e.target.value || null })} className="rounded-[3px]" />
               </div>
 
+              {/* Baut hier jemand, oder nebenan? Rückwirkend seit Januar 2026. */}
+              <BaugesucheParzelle parzelleId={data.id} egrid={data.egrid} />
               {/* Wer arrondieren will, fragt zuerst: wem gehört nebenan? */}
               <Nachbarn parzelleId={data.id} />
               {/* Jedes Gespräch als Daten: Absicht, Preis, Grund, Wiedervorlage. */}

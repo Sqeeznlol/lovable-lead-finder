@@ -12,8 +12,12 @@
 -- nichts. Jede Zeile trägt den Vermerk TESTDATEN.
 --
 -- Wegräumen, alles auf einmal (Vorhaben, Portfolio und Positionen
--- hängen am Mandanten und gehen mit):
+-- hängen am Mandanten und gehen mit). Gelegenheiten zuerst: sie
+-- verlieren beim Löschen des Mandanten nur den Bezug (on delete set
+-- null) und blieben sonst ohne Kunde stehen.
 --
+--   delete from public.gelegenheit g using public.mandant m, public.akteur a
+--    where g.mandant_id = m.id and m.akteur_id = a.id and a.bemerkung = 'TESTDATEN -- Demo-Szenario';
 --   delete from public.mandant m using public.akteur a
 --    where m.akteur_id = a.id and a.bemerkung = 'TESTDATEN -- Demo-Szenario';
 --   delete from public.akteur where bemerkung = 'TESTDATEN -- Demo-Szenario';
