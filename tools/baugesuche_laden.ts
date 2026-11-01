@@ -5,6 +5,7 @@
 //
 // Aufruf: npx tsx tools/baugesuche_laden.ts <tage> <ausgabe.csv>
 // Keine Personendaten: von der Bauherrschaft nur die Rechtsform.
+import { parallel } from '../src/lib/parallel';
 import { writeFileSync } from 'node:fs';
 import { adresseWaehlen } from '../src/lib/adresswahl';
 
@@ -79,16 +80,26 @@ if (istHaupt) {
   const neu = daten.filter(z => z[i('publicationDate')] >= ab);
   console.log(`Quelle: ${daten.length} Gesuche, davon ${neu.length} seit ${ab}`);
   const zeilen: string[] = [];
-  let mitEgrid = 0, mitNachbarn = 0;
-  for (const z of neu) {
+  let mitEgrid = 0, mitNachbarn = 0, fertig = 0;
+  // Sechs zugleich und je Adresse nur einmal fragen: für ein ganzes
+  // Jahr (rund 6000 Gesuche, eines je Parzelle mehrfach) dauerte es
+  // nacheinander über eine Stunde.
+  const merk = new Map<string, Promise<{ egrid: string | null; nb: string[] }>>();
+  const verorten = (adresse: string) => {
+    if (!merk.has(adresse)) merk.set(adresse, (async () => {
+      try {
+        const egrid = await egridZurAdresse(adresse);
+        return { egrid, nb: egrid ? await nachbarn(egrid) : [] };
+      } catch { return { egrid: null, nb: [] }; }  // ohne EGRID bleibt die Parzellennummer
+    })());
+    return merk.get(adresse)!;
+  };
+  await parallel(neu, 6, async z => {
     const strasse = [z[i('projectLocation_address_street')], z[i('projectLocation_address_houseNumber')]].filter(Boolean).join(' ');
     const ort = [z[i('projectLocation_address_swissZipCode')], z[i('projectLocation_address_town')]].filter(Boolean).join(' ');
     const adresse = [strasse, ort].filter(Boolean).join(', ');
-    let egrid: string | null = null; let nb: string[] = [];
-    try {
-      if (strasse) egrid = await egridZurAdresse(adresse);
-      if (egrid) { mitEgrid++; nb = await nachbarn(egrid); if (nb.length) mitNachbarn++; }
-    } catch { /* ohne EGRID bleibt die Parzellennummer */ }
+    const { egrid, nb } = strasse ? await verorten(adresse) : { egrid: null, nb: [] as string[] };
+    if (egrid) { mitEgrid++; if (nb.length) mitNachbarn++; }
     zeilen.push([
       z[i('id')], z[i('publicationNumber')], z[i('publicationDate')], z[i('bfs_nr')], z[i('municipality_name')],
       strasse || null, z[i('districtCadastre_relation_cadastre')] || null, egrid,
@@ -98,7 +109,8 @@ if (istHaupt) {
       z[i('publicationNumber')] || null, z[i('id')] || null,
       z[i('entryDeadline')] || null, z[i('expirationDate')] || null, QUELLE,
     ].map(csvFeld).join(','));
-  }
+    if (++fertig % 500 === 0) console.log(`  ${fertig} von ${neu.length}`);
+  });
   writeFileSync(aus, zeilen.join('\n') + (zeilen.length ? '\n' : ''));
   console.log(`Geschrieben: ${zeilen.length}, mit EGRID ${mitEgrid}, mit Nachbarn ${mitNachbarn}`);
 }
