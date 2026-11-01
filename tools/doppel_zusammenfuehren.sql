@@ -8,7 +8,7 @@ declare
 begin
   -- Was K fehlt, kommt von D. Leere Zeichenketten zählen als leer.
   select string_agg(format('%1$I = case when k.%1$I is null or k.%1$I::text = %2$L then d.%1$I else k.%1$I end', name, ''), ', ')
-    into setz from spalte where art = 'fach';
+    into setz from spalte where art in ('fach', 'gebaeude');
   widerspruch := pg_temp.widerspruch_sql();
 
   select max(rang) into maxrang from paar where stueck = p_stueck;

@@ -60,8 +60,15 @@ select c.column_name::text as name,
                            'stage_changed_at', 'notes', 'address', 'ortschaftsname') then 'meta'
     -- gwr_egid: mehrere Häuser auf einer Parzelle haben verschiedene
     -- Gebäudenummern -- das ist kein Widerspruch.
-    when c.column_name in ('parzelle', 'plot_number', 'bfs_nr', 'area', 'kanton', 'gemeinde', 'bezirk', 'gwr_egid',
+    when c.column_name in ('parzelle', 'plot_number', 'bfs_nr', 'area', 'kanton', 'gemeinde', 'bezirk',
                            'gis_url', 'google_maps_url', 'streetview_url', 'housing_stat_url') then 'amtlich'
+    -- Gebäudefelder: auf einer Parzelle mit vielen Häusern (bis 195
+    -- Doppel je Parzelle, gemessen am 1. November) unterscheiden sie
+    -- sich natürlich -- kein Widerspruch. Sie füllen nur Lücken; bei K
+    -- stehen die aus dem Register, je Parzelle zusammengefasst.
+    when c.column_name in ('baujahr', 'renovationsjahr', 'geschosse', 'vollgeschosse', 'wohnungen', 'gebaeudeflaeche',
+                           'nutzflaeche', 'wohnflaeche', 'gebaeudeart', 'geb_status', 'kategorie', 'strassenname',
+                           'hausnummer', 'plz', 'plz_ort', 'objektadresse', 'gebaeude_anzahl', 'gvz_nr', 'gwr_egid') then 'gebaeude'
     when c.column_name ~ '^(hnf_|marge_|erloes_|investition_|potenzial_|gf_|reserve_|bebaubar_|score_|ai_)'
       or c.column_name in ('vollgeschosse_zulaessig', 'az_quelle', 'confidence', 'data_quality', 'deal_score',
                            'ausnuetzung', 'anrechenbare_geschosse') then 'abgeleitet'
@@ -84,7 +91,7 @@ create or replace function pg_temp.widerspruch_sql() returns text language sql a
     || string_agg(format($f$case when nullif(k.%1$I::text, '') is not null and nullif(d.%1$I::text, '') is not null
                          and k.%1$I::text <> d.%1$I::text then %1$L || ': ' || d.%1$I::text end$f$, name), ', ')
     || $f$, case when k.address not like 'Parzelle %' and nullif(d.address, '') is not null
-            and lower(k.address) <> lower(d.address) then 'address: ' || d.address end)$f$
+            and lower(k.address) <> lower(d.address) then 'weitere Adresse: ' || d.address end)$f$
   from spalte where art = 'fach';
 $$;
 
@@ -93,20 +100,27 @@ select count(*) as doppel, count(distinct kid) as parzellen, max(rang) as hoechs
        count(distinct stueck) as stuecke
 from paar;
 
+\echo '### Wie viele Doppel je Parzelle'
+select case when n = 1 then '1' when n <= 3 then '2-3' when n <= 10 then '4-10' else 'mehr als 10' end as doppel_je_parzelle, count(*) as parzellen, sum(n) as doppel
+from (select kid, count(*) n from paar group by kid) x group by 1 order by min(n);
+
 \echo '### Je Feld: ergänzbar (K leer, D gefüllt) und Widerspruch (beide gefüllt, verschieden)'
+-- Alle Felder in einem Durchgang: je Feld einzeln las der erste
+-- Probelauf (1. November) die 70'379 Paare gut hundertmal und lief in
+-- die Zeitgrenze von 20 Minuten.
 create temp table vergleich (spalte text, ergaenzbar bigint, widerspruch bigint);
 do $$
-declare s record; e bigint; w bigint;
+declare q text;
 begin
-  for s in select name from spalte where art = 'fach' order by name loop
-    execute format($q$
-      select count(*) filter (where nullif(k.%1$I::text, '') is null and nullif(d.%1$I::text, '') is not null),
-             count(*) filter (where nullif(k.%1$I::text, '') is not null and nullif(d.%1$I::text, '') is not null
-                                and k.%1$I::text <> d.%1$I::text)
-      from paar p join public.properties d on d.id = p.did join public.properties k on k.id = p.kid$q$, s.name)
-    into e, w;
-    insert into vergleich values (s.name, e, w);
-  end loop;
+  select format($q$
+    insert into vergleich
+    select unnest(%s), unnest(array[%s]), unnest(array[%s])
+    from paar p join public.properties d on d.id = p.did join public.properties k on k.id = p.kid$q$,
+    quote_literal(array_agg(name order by name)::text) || '::text[]',
+    string_agg(format($f$count(*) filter (where nullif(k.%1$I::text, '') is null and nullif(d.%1$I::text, '') is not null)$f$, name), ', ' order by name),
+    string_agg(format($f$count(*) filter (where nullif(k.%1$I::text, '') is not null and nullif(d.%1$I::text, '') is not null and k.%1$I::text <> d.%1$I::text)$f$, name), ', ' order by name))
+  into q from spalte where art in ('fach', 'gebaeude');
+  execute q;
   insert into vergleich
   select 'address', count(*) filter (where k.address like 'Parzelle %' and nullif(d.address, '') is not null),
          count(*) filter (where k.address not like 'Parzelle %' and nullif(d.address, '') is not null and lower(k.address) <> lower(d.address))
