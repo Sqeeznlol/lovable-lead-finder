@@ -51,6 +51,12 @@ jobs:
       - name: Abfrage
         env:
           DB: ${{ secrets.SUPABASE_DB_URL }}
+          # Die Eingaben als Variablen, nicht als ${{ }} im Skript: GitHub
+          # behandelt einen Block mit Ausdruecken als einen einzigen
+          # Ausdruck, und der darf hoechstens 21000 Zeichen lang sein.
+          # Dieser Block ist laenger -- der Ablauf startete gar nicht mehr.
+          FRAGE: ${{ inputs.frage }}
+          EGRID: ${{ inputs.egrid }}
         run: |
           set -euo pipefail
           [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
@@ -64,10 +70,10 @@ jobs:
             echo "" >> "$GITHUB_STEP_SUMMARY"
           }
 
-          if [ "${{ inputs.frage }}" = "objekt" ]; then
+          if [ "$FRAGE" = "objekt" ]; then
             # Nur EGRID-Form zugelassen -- damit steht fest, dass hier
             # keine fremde Abfrage in die Datenbank gelangt.
-            kennung=$(printf '%s' "${{ inputs.egrid }}" \
+            kennung=$(printf '%s' "$EGRID" \
                       | tr -cd 'A-Za-z0-9')
             case "$kennung" in
               CH*) ;;
@@ -97,7 +103,7 @@ jobs:
                      coalesce(pipedrive_deal_id,'(leer)') as deal
               from properties where egrid = '$kennung';"
 
-          elif [ "${{ inputs.frage }}" = "projektiert" ]; then
+          elif [ "$FRAGE" = "projektiert" ]; then
             # Das Gebäuderegister führt den Status: projektiert,
             # bewilligt, im Bau, bestehend. Ein Haus, das noch nicht
             # steht, ist kein Anruf wert -- dort wird gerade gebaut.
@@ -113,7 +119,7 @@ jobs:
               where ausgeschlossen = false and baujahr >= 2020
               group by 1 order by 1 desc;"
 
-          elif [ "${{ inputs.frage }}" = "kette" ]; then
+          elif [ "$FRAGE" = "kette" ]; then
             # Wo bleiben die Objekte? Jede Rubrik der Webseite hat eine
             # Bedingung; hier steht, wie viele sie jeweils erfuellen --
             # und woran die uebrigen scheitern.
@@ -157,7 +163,7 @@ jobs:
               order by coalesce(eigentuemer_fetched_at, updated_at) desc nulls last
               limit 12;"
 
-          elif [ "${{ inputs.frage }}" = "instanzen" ]; then
+          elif [ "$FRAGE" = "instanzen" ]; then
             # Es gibt mehr als ein Supabase-Projekt. Die Frage ist
             # nicht, wie sie heissen, sondern ob Seite und Datenbank
             # auf dasselbe zeigen. Ausgegeben wird deshalb nur ja oder
@@ -196,7 +202,7 @@ jobs:
             cat "$GITHUB_STEP_SUMMARY"
             exit 0
 
-          elif [ "${{ inputs.frage }}" = "kartendienst" ]; then
+          elif [ "$FRAGE" = "kartendienst" ]; then
             # Die Karte holt Grenzen und Bauzonen als ein Bild je
             # Ausschnitt. Wie gross es sein darf, steht in den
             # Capabilities des Dienstes -- und ob er es liefert, sagt
@@ -236,7 +242,7 @@ jobs:
             cat "$GITHUB_STEP_SUMMARY"
             exit 0
 
-          elif [ "${{ inputs.frage }}" = "eigentuemer" ]; then
+          elif [ "$FRAGE" = "eigentuemer" ]; then
             # Das Lesezeichen hat eine Zeitlang die erste Nummer der
             # Seite genommen statt die des Auszugs. Dann steht ein
             # Eigentuemer beim falschen Grundstueck. Hier steht alles
@@ -253,7 +259,7 @@ jobs:
               where coalesce(owner_name,'') <> ''
               order by eigentuemer_fetched_at desc nulls last;"
 
-          elif [ "${{ inputs.frage }}" = "plattform" ]; then
+          elif [ "$FRAGE" = "plattform" ]; then
             # Nur Zahlen. Eigentuemernamen sind Personendaten und
             # haben in einem Ablaufprotokoll nichts verloren -- wer
             # sie sehen will, sieht sie in der Anwendung.
@@ -281,7 +287,7 @@ jobs:
               from public.eigentuemer_zu_pruefen
               group by 1 order by 2 desc;"
 
-          elif [ "${{ inputs.frage }}" = "regeln" ]; then
+          elif [ "$FRAGE" = "regeln" ]; then
             # Am 31. Oktober stellte sich heraus: zugang_beschraenken
             # war eingespielt, und trotzdem las der oeffentliche
             # Schluessel alle 259'057 Objekte. Die alten anon-Regeln
@@ -311,7 +317,7 @@ jobs:
                 and not c.relrowsecurity
               order by 1;"
 
-          elif [ "${{ inputs.frage }}" = "zonen-tg" ]; then
+          elif [ "$FRAGE" = "zonen-tg" ]; then
             # Eine Parzelle kann zur Hälfte Wohnzone und zur Hälfte Wald
             # sein. Solche Fälle sagen über die Zone nichts Klares aus,
             # also zählen hier nur Parzellen mit genau einer Zone.
@@ -341,7 +347,7 @@ jobs:
               where p.kanton = 'TG'
               group by 1 order by 2 desc limit 60;"
 
-          elif [ "${{ inputs.frage }}" = "konten" ]; then
+          elif [ "$FRAGE" = "konten" ]; then
             # Wer kommt heute ueberhaupt herein? Die Anmeldung liegt in
             # auth.users, nicht im Bestand -- von dort ist sonst nichts
             # sichtbar.
@@ -376,7 +382,7 @@ jobs:
               from public.user_roles r
               group by 1 order by 2 desc;"
 
-          elif [ "${{ inputs.frage }}" = "arten" ]; then
+          elif [ "$FRAGE" = "arten" ]; then
             frage "Gebäudearten" "
               select coalesce(gebaeudeart,'(leer)') as art, count(*)
               from properties where ausgeschlossen = false
@@ -429,7 +435,7 @@ jobs:
           # liegt die Zugriffsregel. Deshalb wird beides geprüft --
           # einmal als Datenbank, einmal mit dem öffentlichen
           # Schlüssel, den der Browser benutzt.
-          if [ "${{ inputs.frage }}" = "kantone" ]; then
+          if [ "$FRAGE" = "kantone" ]; then
             # Zuerst der Test, auf den es ankommt: sieht der Browser die
             # Zeilen? Die Zaehlung darunter ist teuer und darf ihn nicht
             # verdraengen, wenn sie in die Zeitgrenze laeuft.
@@ -461,7 +467,7 @@ jobs:
               from properties group by 1 order by 2 desc;"
           fi
 
-          if [ "${{ inputs.frage }}" = "potenzial" ]; then
+          if [ "$FRAGE" = "potenzial" ]; then
             # Fuer Thurgau sollte hier nichts stehen: die Ausnuetzung
             # der Thurgauer Zonen ist nicht hinterlegt. Steht doch
             # etwas da, hat die Zuercher Rechnung auf Thurgauer
