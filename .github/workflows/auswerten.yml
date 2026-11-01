@@ -45,6 +45,7 @@ on:
           - teams-probe  # Ob ein Konto ausserhalb eines Teams dessen Kunden wirklich nicht sieht (wird zurueckgerollt)
           - potenzial-bund # Was der Bund an einem Punkt zu Bauzone und Parzelle liefert (fuer den Potenzialcheck)
           - anfrage-probe # Ob der oeffentliche Schluessel Anfragen einfuegen, aber nicht lesen kann (wird zurueckgerollt)
+          - amtsblatt    # Welche Adresse im Amtsblattportal ein Baugesuch zeigt
       egrid:
         description: 'Nur für "objekt": die EGRID, z.B. CH707709971116'
         required: false
@@ -589,6 +590,9 @@ jobs:
           rollback;
           \echo '```'
           SQL
+
+          elif [ "$FRAGE" = "amtsblatt" ]; then
+            { echo "### Baugesuch im Amtsblattportal"; echo '```'; python3 tools/amtsblatt_pruefen.py 2>&1 || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
           elif [ "$FRAGE" = "ortsdienst" ]; then
             # Die Anmeldung soll den Ort zur Adresse zeigen. Der Browser
