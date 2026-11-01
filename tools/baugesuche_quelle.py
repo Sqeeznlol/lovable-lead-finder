@@ -4,7 +4,10 @@
 import csv, io, json, sys, urllib.request
 
 def holen(url, n=None):
-    with urllib.request.urlopen(url, timeout=60) as r:
+    # Gemessen am 1. November: ohne Browser-Kennung antwortet
+    # opendata.swiss mit 403.
+    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (bauraum-lead-finder; Datenpruefung)', 'Accept': '*/*'})
+    with urllib.request.urlopen(req, timeout=60) as r:
         return r.read(n) if n else r.read()
 
 d = json.loads(holen('https://ckan.opendata.swiss/api/3/action/package_search?q=baugesuch&rows=20'))['result']
