@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Loader2, Lock, ShieldAlert } from 'lucide-react';
+import { useState } from 'react';
+import { Loader2, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/hooks/use-auth';
@@ -14,40 +14,17 @@ import { kennungZuAdresse } from '@/lib/kennung';
  *
  * Der Benutzername steht schon da: es gibt ein Konto für die Arbeit
  * und eines für den Admin-Bereich, mehr nicht. Wer den Namen vorgibt,
- * verrät ihn -- das ist gewollt und bewusst; was zählt, ist das
- * Passwort, und das steht nirgends.
+ * verrät ihn -- das ist gewollt; was zählt, ist das Passwort, und das
+ * steht nirgends.
  *
- * Zur Bremse gegen das Durchprobieren: nach fünf Fehlversuchen bleibt
- * die Maske fünfzehn Minuten gesperrt, danach je Fehlversuch länger.
- * Das geschieht im Browser und ist kein Schutz gegen jemanden, der die
- * Schnittstelle direkt anspricht -- dagegen hilft nur, dass die
- * Datenbank selbst eine Anmeldung verlangt (Migration
- * 20260905230000_zugang_beschraenken.sql). Diese Sperre nimmt dem
- * Gelegenheitsversuch die Geduld, mehr soll sie nicht.
+ * Eine Sperre nach Fehlversuchen gab es hier einmal, im Browser. Sie
+ * hat am ersten Tag den Einzigen ausgesperrt, der das Passwort kennt,
+ * und niemanden sonst gebremst: wer die Schnittstelle direkt
+ * anspricht, sieht den Browser nie. Gegen Durchprobieren hilft, was
+ * Supabase selbst tut -- es begrenzt Anmeldeversuche am Server -- und
+ * dass die Datenbank eine Anmeldung verlangt (Migration
+ * 20260905230000_zugang_beschraenken.sql).
  */
-const SPEICHER = 'anmeldung.versuche';
-const FREI_NACH = 5;
-
-interface Versuche { anzahl: number; gesperrtBis: number }
-
-function lesen(): Versuche {
-  try {
-    const roh = localStorage.getItem(SPEICHER);
-    if (roh) return JSON.parse(roh) as Versuche;
-  } catch { /* kein Speicher -- dann eben ohne Bremse */ }
-  return { anzahl: 0, gesperrtBis: 0 };
-}
-
-function schreiben(v: Versuche) {
-  try { localStorage.setItem(SPEICHER, JSON.stringify(v)); } catch { /* siehe oben */ }
-}
-
-/** Wie lange nach n Fehlversuchen gesperrt wird, in Minuten: 15, 30, 60 … höchstens vier Stunden. */
-export function sperrdauer(anzahl: number): number {
-  if (anzahl < FREI_NACH) return 0;
-  return Math.min(15 * 2 ** (anzahl - FREI_NACH), 240);
-}
-
 interface Props {
   /** Der Benutzername, der schon dasteht. */
   vorgabe?: string;
@@ -68,40 +45,19 @@ export function Anmeldung({
   const [passwort, setPasswort] = useState('');
   const [laeuft, setLaeuft] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
-  const [versuche, setVersuche] = useState<Versuche>(lesen);
-  const [jetzt, setJetzt] = useState(Date.now());
-
-  // Damit die verbleibende Zeit herunterzählt, statt still zu stehen.
-  useEffect(() => {
-    const t = setInterval(() => setJetzt(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
-
-  const gesperrt = versuche.gesperrtBis > jetzt;
-  const restMinuten = Math.ceil((versuche.gesperrtBis - jetzt) / 60000);
 
   const anmelden = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (gesperrt || laeuft) return;
+    if (laeuft) return;
     setLaeuft(true);
     setFehler(null);
-
     const { error } = await signIn(kennungZuAdresse(benutzer), passwort);
     setLaeuft(false);
-    setPasswort('');
-
-    if (!error) {
-      schreiben({ anzahl: 0, gesperrtBis: 0 });
-      setVersuche({ anzahl: 0, gesperrtBis: 0 });
-      return;
+    if (error) {
+      setPasswort('');
+      // Nicht verraten, was genau nicht stimmt.
+      setFehler('Benutzername oder Passwort stimmt nicht.');
     }
-    const anzahl = versuche.anzahl + 1;
-    const dauer = sperrdauer(anzahl);
-    const neu = { anzahl, gesperrtBis: dauer ? Date.now() + dauer * 60000 : 0 };
-    schreiben(neu);
-    setVersuche(neu);
-    // Nicht verraten, was genau nicht stimmt.
-    setFehler('Benutzername oder Passwort stimmt nicht.');
   };
 
   const formular = (
@@ -115,38 +71,21 @@ export function Anmeldung({
         <p className="text-sm text-muted-foreground">{text}</p>
       </div>
 
-      {gesperrt ? (
-        <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3">
-          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-          <p className="text-sm">
-            Zu viele Fehlversuche. Wieder frei in{' '}
-            <span className="font-medium tabular-nums">{restMinuten} Minute{restMinuten === 1 ? '' : 'n'}</span>.
-          </p>
-        </div>
-      ) : (
-        <>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium" htmlFor="benutzer">Benutzername</label>
-            <Input id="benutzer" value={benutzer} onChange={e => setBenutzer(e.target.value)}
-                   autoComplete="username" required />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium" htmlFor="passwort">Passwort</label>
-            <Input id="passwort" type="password" value={passwort} onChange={e => setPasswort(e.target.value)}
-                   autoComplete="current-password" autoFocus required />
-          </div>
-          {fehler && <p className="text-sm text-destructive">{fehler}</p>}
-          {versuche.anzahl > 0 && versuche.anzahl < FREI_NACH && (
-            <p className="text-xs text-muted-foreground">
-              Noch {FREI_NACH - versuche.anzahl} Versuch{FREI_NACH - versuche.anzahl === 1 ? '' : 'e'}, dann wird gesperrt.
-            </p>
-          )}
-          <Button type="submit" className="w-full" disabled={laeuft || !passwort}>
-            {laeuft && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Anmelden
-          </Button>
-        </>
-      )}
+      <div className="space-y-1.5">
+        <label className="text-sm font-medium" htmlFor="benutzer">Benutzername</label>
+        <Input id="benutzer" value={benutzer} onChange={e => setBenutzer(e.target.value)}
+               autoComplete="username" required />
+      </div>
+      <div className="space-y-1.5">
+        <label className="text-sm font-medium" htmlFor="passwort">Passwort</label>
+        <Input id="passwort" type="password" value={passwort} onChange={e => setPasswort(e.target.value)}
+               autoComplete="current-password" autoFocus required />
+      </div>
+      {fehler && <p className="text-sm text-destructive">{fehler}</p>}
+      <Button type="submit" className="w-full" disabled={laeuft || !passwort}>
+        {laeuft && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        Anmelden
+      </Button>
     </form>
   );
 
