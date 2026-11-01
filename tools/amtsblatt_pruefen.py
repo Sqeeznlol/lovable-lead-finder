@@ -41,3 +41,12 @@ for url in [
             print('  kein JSON:', e)
     elif s == 200 and 'xml' in t:
         print('  Anfang:', text[:300].replace('\n', ' '))
+
+# Was die Schnittstelle selbst an Wegen nennt.
+s, t, b = holen(f'https://www.amtsblattportal.ch/api/v1/publications/{pid}')
+j = json.loads(b)
+print('\nlinks:', json.dumps(j.get('links'), ensure_ascii=False)[:600])
+print('attachments:', json.dumps(j.get('attachments'), ensure_ascii=False)[:400])
+m = j.get('meta', {})
+print('meta (Auswahl):', {k: m.get(k) for k in ('publicationNumber', 'publicationDate', 'publicationState', 'rubric', 'subRubric', 'cantons', 'expirationDate') if k in m})
+print('meta Schluessel:', list(m.keys())[:40])
