@@ -31,7 +31,7 @@ const TEXT: Record<Art, { ueber: string; titel: string; satz: string; knopf: str
   },
 };
 
-const feld = 'h-12 w-full rounded-xl border border-input bg-white px-4 text-base text-foreground outline-none focus:border-primary';
+const feld = 'h-12 w-full rounded-[3px] border border-input bg-white px-4 text-base text-foreground outline-none focus:border-primary';
 const marke = 'mb-1.5 block text-sm font-medium text-muted-foreground';
 
 function Adresse({ wert, setWert, onWahl }: { wert: string; setWert: (s: string) => void; onWahl: (v: Vorschlag) => void }) {
@@ -47,7 +47,7 @@ function Adresse({ wert, setWert, onWahl }: { wert: string; setWert: (s: string)
       <input className={feld} value={wert} autoComplete="street-address" placeholder="Strasse Nr., PLZ Ort"
              onChange={e => { setZu(false); setWert(e.target.value); }} />
       {liste.length > 0 && !zu && (
-        <ul className="absolute z-10 mt-1 w-full overflow-hidden rounded-xl border border-input bg-white">
+        <ul className="absolute z-10 mt-1 w-full overflow-hidden rounded-[3px] border border-input bg-white">
           {liste.map(v => (
             <li key={v.label}>
               <button type="button" className="w-full px-4 py-3 text-left text-sm text-foreground hover:bg-background"
@@ -79,7 +79,7 @@ export default function Anfrage({ art }: { art: Art }) {
     if (document.getElementById('gisk-fonts')) return;
     const l = document.createElement('link');
     l.id = 'gisk-fonts'; l.rel = 'stylesheet';
-    l.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap';
+    l.href = 'https://fonts.googleapis.com/css2?family=Urbanist:wght@300;400;500;600;700&display=swap';
     document.head.appendChild(l);
   }, []);
 
@@ -114,19 +114,19 @@ export default function Anfrage({ art }: { art: Art }) {
   const bereit = f.name.trim().length >= 2 && erreichbar && ja && (art === 'investor' || f.adresse.trim().length > 3);
 
   return (
-    <main className="min-h-screen bg-background px-4 py-10 text-foreground sm:py-16" style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', system-ui, sans-serif" }}>
+    <main className="min-h-screen bg-background px-4 py-10 text-foreground sm:py-16" style={{ fontFamily: "'Urbanist', system-ui, sans-serif" }}>
       <div className="mx-auto max-w-lg">
         <p className="text-sm font-semibold text-muted-foreground">{t.ueber}</p>
         <h1 className="mt-2 text-3xl font-bold leading-tight tracking-tight sm:text-4xl" style={{ fontFamily: 'inherit' }}>{t.titel}</h1>
         <p className="mt-3 text-base leading-relaxed text-muted-foreground">{t.satz}</p>
 
         {zustand === 'fertig' ? (
-          <div className="mt-10 rounded-2xl border border-input bg-white p-6">
+          <div className="mt-10 rounded border border-input bg-white p-6">
             <p className="text-lg font-semibold">Danke, Ihre Anfrage ist bei uns.</p>
             <p className="mt-2 text-muted-foreground">Wir melden uns bei Ihnen.</p>
           </div>
         ) : (
-          <form onSubmit={senden} className="mt-10 space-y-5 rounded-2xl border border-input bg-white p-6">
+          <form onSubmit={senden} className="mt-10 space-y-5 rounded border border-input bg-white p-6">
             {art !== 'investor' && (
               <div>
                 <label className={marke}>Adresse der Liegenschaft</label>
@@ -135,7 +135,7 @@ export default function Anfrage({ art }: { art: Art }) {
             )}
 
             {art === 'potenzial' && (sucht || auskunft) && (
-              <div className="rounded-xl bg-background p-4" aria-live="polite">
+              <div className="rounded-[3px] bg-background p-4" aria-live="polite">
                 {sucht && <p className="text-sm text-muted-foreground">Amtliche Daten werden abgefragt …</p>}
                 {auskunft && (
                   <dl className="grid grid-cols-3 gap-3 text-center">
@@ -178,7 +178,7 @@ export default function Anfrage({ art }: { art: Art }) {
               <div><label className={marke}>Telefon</label><input className={feld} type="tel" value={f.telefon} onChange={set('telefon')} autoComplete="tel" /></div>
             </div>
             <div><label className={marke}>Nachricht (freiwillig)</label>
-              <textarea className="w-full rounded-xl border border-input bg-white px-4 py-3 text-base text-foreground outline-none focus:border-primary" rows={3} value={f.nachricht} onChange={set('nachricht')} /></div>
+              <textarea className="w-full rounded-[3px] border border-input bg-white px-4 py-3 text-base text-foreground outline-none focus:border-primary" rows={3} value={f.nachricht} onChange={set('nachricht')} /></div>
 
             {/* Für Programme sichtbar, für Menschen nicht. */}
             <input type="text" name="website" value={f.website} onChange={set('website')} tabIndex={-1} autoComplete="off"
@@ -192,7 +192,7 @@ export default function Anfrage({ art }: { art: Art }) {
             {!erreichbar && (f.name || f.adresse) && <p className="text-sm text-muted-foreground">Bitte E-Mail oder Telefon angeben, damit wir Sie erreichen.</p>}
             {zustand === 'fehler' && <p className="text-sm text-red-600">Das hat nicht geklappt. Bitte versuchen Sie es noch einmal.</p>}
             <button type="submit" disabled={!bereit || zustand === 'sendet'}
-                    className="h-12 w-full rounded-full bg-primary text-[17px] text-primary-foreground transition-transform active:scale-95 disabled:opacity-40">
+                    className="h-12 w-full rounded-[3px] bg-primary text-base font-medium text-primary-foreground transition-transform active:scale-[0.97] disabled:opacity-40">
               {zustand === 'sendet' ? 'Wird gesendet …' : t.knopf}
             </button>
           </form>

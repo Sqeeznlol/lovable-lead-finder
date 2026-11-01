@@ -1,7 +1,6 @@
-/* Eine Schriftfamilie (DESIGN.md): SF Pro auf Apple-Geräten über
-   -apple-system, sonst Inter. Der Browser lädt Inter nur, wo SF fehlt
-   -- auf dem iPhone kommt keine Schriftdatei übers Netz. */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+/* Eine Schriftfamilie (DESIGN.md): Urbanist, geometrisch wie in der
+   Vorlage. 300 für grosse Zahlen, 500 für Titel. */
+@import url('https://fonts.googleapis.com/css2?family=Urbanist:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -9,58 +8,60 @@
 
 @layer base {
   :root {
-    /* Werte aus DESIGN.md (Apple): Parchment-Seite, weisse Flächen,
-       Near-Black-Text, ein Akzent (Action Blue) für alles Klickbare.
-       Kein Orange (Julians Regel). Dieselben Werte hat die Karte (.gisk). */
-    --background: 240 11% 96%;        /* #F5F5F7 Parchment */
-    --foreground: 240 3% 12%;         /* #1D1D1F Near-Black */
+    /* Werte aus DESIGN.md (Vorlage Matchora): helles Grau als Seite,
+       weisse Tafeln mit feiner Linie, Schwarz für Text und die
+       Haupthandlung, ein elektrisches Blau als Akzent. Orange nur als
+       Signal "heiss", Violett für Beträge, Grün für "verfügbar". */
+    --background: 240 5% 96%;         /* #F4F4F5 */
+    --foreground: 0 0% 7%;            /* #111111 */
 
     --card: 0 0% 100%;
-    --card-foreground: 240 3% 12%;
+    --card-foreground: 0 0% 7%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 3% 12%;
+    --popover-foreground: 0 0% 7%;
 
-    --primary: 210 100% 40%;          /* #0066CC Action Blue */
+    --primary: 0 0% 7%;               /* Schwarz: Haupthandlung, aktive Wahl */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 11% 96%;         /* #F5F5F7 */
-    --secondary-foreground: 240 3% 12%;
+    --secondary: 0 0% 95%;            /* #F2F2F2 "View all" */
+    --secondary-foreground: 0 0% 7%;
 
-    --muted: 240 11% 96%;
-    --muted-foreground: 240 2% 44%;   /* #6E6E73, Kontrast >= 4.5 auf Weiss */
+    --muted: 0 0% 96%;
+    --muted-foreground: 220 9% 44%;   /* #646B78 */
 
-    --accent: 210 100% 40%;           /* #0066CC */
+    --accent: 237 90% 60%;            /* #3D45F5 Elektroblau */
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 354 100% 42%;      /* #D70015 */
+    --destructive: 358 75% 56%;       /* #E2454B */
     --destructive-foreground: 0 0% 100%;
 
-    /* Haarlinie statt Rahmen: Schwarz mit 8 %, liegt auf jeder Fläche gleich. */
-    --border: 0 0% 0% / 0.08;
-    --input: 0 0% 0% / 0.12;
-    --ring: 210 100% 45%;             /* #0071E3 Fokus */
+    --heiss: 22 89% 53%;              /* #F26B1D */
+    --violett: 252 96% 67%;           /* #7C5CFC */
+    --gruen: 145 63% 38%;             /* #24A15A */
 
-    --radius: 1.125rem;               /* 18 px, Karten */
+    --border: 0 0% 0% / 0.09;
+    --input: 0 0% 0% / 0.14;
+    --ring: 237 90% 60%;
+
+    --radius: 0.25rem;                /* 4 px */
 
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 240 3% 12%;
-    --sidebar-primary: 210 100% 40%;
+    --sidebar-foreground: 0 0% 7%;
+    --sidebar-primary: 0 0% 7%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 11% 96%;
-    --sidebar-accent-foreground: 240 3% 12%;
-    --sidebar-border: 0 0% 0% / 0.08;
-    --sidebar-ring: 210 100% 45%;
+    --sidebar-accent: 0 0% 95%;
+    --sidebar-accent-foreground: 0 0% 7%;
+    --sidebar-border: 0 0% 0% / 0.09;
+    --sidebar-ring: 237 90% 60%;
 
-    /* Warnung in Gelb statt Orange. */
     --warning: 45 93% 40%;
     --warning-foreground: 0 0% 100%;
-    --success: 136 59% 34%;           /* #248A3D */
+    --success: 145 63% 38%;
     --success-foreground: 0 0% 100%;
 
-    /* Keine Schatten auf Flächen (DESIGN.md): getrennt wird durch Farbe
-       und Haarlinie. Beim Überfahren wird die Linie etwas kräftiger. */
+    /* Keine Schatten auf Tafeln: Linie und Weiss trennen. */
     --shadow-ceramic: 0 0 #0000;
-    --shadow-ceramic-hover: 0 0 0 1px hsl(0 0% 0% / 0.08);
+    --shadow-ceramic-hover: 0 0 0 1px hsl(0 0% 0% / 0.12);
     /* Nicht "none": der Wert wird mit dem Rahmen (ring) zu einem
        box-shadow verbunden, und "none" darin macht den ganzen Wert
        ungültig -- das Passwortfeld war dann ohne Rahmen unsichtbar. */
@@ -75,14 +76,17 @@
     --card-foreground: 240 11% 96%;
     --popover: 240 3% 16%;
     --popover-foreground: 240 11% 96%;
-    --primary: 212 100% 58%;          /* #2997FF */
-    --primary-foreground: 0 0% 100%;
+    --primary: 0 0% 96%;
+    --primary-foreground: 0 0% 7%;
     --secondary: 240 2% 20%;
     --secondary-foreground: 240 11% 96%;
     --muted: 240 2% 20%;
     --muted-foreground: 240 2% 64%;   /* #A1A1A6 */
-    --accent: 212 100% 58%;
+    --accent: 237 95% 70%;
     --accent-foreground: 0 0% 100%;
+    --heiss: 22 89% 58%;
+    --violett: 252 96% 75%;
+    --gruen: 145 55% 48%;
     --destructive: 0 100% 62%;
     --destructive-foreground: 0 0% 100%;
     --border: 0 0% 100% / 0.12;
@@ -183,12 +187,9 @@ input, textarea, select {
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', system-ui, sans-serif;
-    /* 17 px wie bei Apple (DESIGN.md): lesen, nicht überfliegen. Die
-       Zeilenhöhe 1.47 und die leicht engere Laufweite gehören dazu. */
-    font-size: 17px;
-    line-height: 1.47;
-    letter-spacing: -0.011em;
+    font-family: 'Urbanist', system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
@@ -209,17 +210,16 @@ input, textarea, select {
     font-weight: 500;
   }
 
-  /* Titel: dieselbe Familie, Gewicht 600, eng gesetzt -- Apples
-     "tight" Überschrift. Hierarchie über Grösse, nicht über Schrift. */
+  /* Titel wie in der Vorlage: gross, Gewicht 500, eng gesetzt. */
   h1, h2, h3, .font-serif {
-    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', system-ui, sans-serif;
-    font-weight: 600;
+    font-family: 'Urbanist', system-ui, sans-serif;
+    font-weight: 500;
     letter-spacing: -0.02em;
-    line-height: 1.1;
+    line-height: 1.08;
   }
 
   h1 { @apply text-3xl; }
-  h2 { @apply text-2xl; letter-spacing: -0.015em; }
+  h2 { @apply text-xl; letter-spacing: -0.01em; }
   h3 { @apply text-lg; letter-spacing: -0.01em; }
 
   /* Der Fokus ist sichtbar und blau, für Tastatur, nicht für Maus. */

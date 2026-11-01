@@ -47,6 +47,11 @@ export default {
           DEFAULT: "hsl(var(--card) / <alpha-value>)",
           foreground: "hsl(var(--card-foreground) / <alpha-value>)",
         },
+        // Signalfarben der Vorlage (DESIGN.md): Orange nur für "heiss",
+        // Violett für Beträge, Grün für "verfügbar".
+        heiss: "hsl(var(--heiss) / <alpha-value>)",
+        violett: "hsl(var(--violett) / <alpha-value>)",
+        gruen: "hsl(var(--gruen) / <alpha-value>)",
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background) / <alpha-value>)",
           foreground: "hsl(var(--sidebar-foreground) / <alpha-value>)",
@@ -59,15 +64,16 @@ export default {
         },
       },
       fontFamily: {
-        // SF Pro auf Apple-Geräten, sonst Inter (DESIGN.md).
-        sans: ["-apple-system", "BlinkMacSystemFont", "'SF Pro Text'", "'Inter'", "system-ui", "sans-serif"],
+        // Urbanist, geometrisch wie in der Vorlage (DESIGN.md).
+        sans: ["'Urbanist'", "system-ui", "sans-serif"],
         // "serif" bleibt als Name, damit bestehende Klassen nicht brechen --
         // es ist dieselbe Familie (eine Schrift für alles).
-        serif: ["-apple-system", "BlinkMacSystemFont", "'SF Pro Display'", "'Inter'", "system-ui", "sans-serif"],
+        serif: ["'Urbanist'", "system-ui", "sans-serif"],
       },
       borderRadius: {
-        // 18 px für Karten und Flächen wie in DESIGN.md.
+        // Fast eckig wie in der Vorlage: 4 px für Tafeln, 2 px für Knöpfe.
         "2xl": "var(--radius)",
+        xl: "var(--radius)",
         lg: "var(--radius)",
         md: "calc(var(--radius) - 4px)",
         sm: "calc(var(--radius) - 8px)",

@@ -365,7 +365,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
     const l = document.createElement('link');
     l.id = 'gisk-fonts';
     l.rel = 'stylesheet';
-    l.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap';
+    l.href = 'https://fonts.googleapis.com/css2?family=Urbanist:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap';
     document.head.appendChild(l);
   }, []);
 
@@ -1164,10 +1164,10 @@ const STIL = `
 /* Karte zuerst, wie bei Immobilienplattformen: die Karte füllt alles,
    Leiste, Filter und Tafel schweben darüber. Eine Schrift, ruhige
    Grautöne, ein Akzent. */
-.gisk{--bg:#F5F5F7;--weiss:#FFFFFF;--fl:#F5F5F7;--tinte:#1D1D1F;--grau:#6E6E73;--linie:#E0E0E0;--akzent:#0066CC;
+.gisk{--bg:#F4F4F5;--weiss:#FFFFFF;--fl:#F4F4F5;--tinte:#111111;--grau:#646B78;--linie:#E4E4E7;--akzent:#3D45F5;
   --schatten:0 10px 30px -12px rgba(15,23,42,.25),0 2px 6px rgba(15,23,42,.06);
   position:fixed;inset:0;z-index:50;height:100dvh;background:var(--bg);color:var(--tinte);
-  font:14px/1.47 -apple-system,BlinkMacSystemFont,"SF Pro Text","Inter",system-ui,sans-serif;letter-spacing:-.01em;-webkit-font-smoothing:antialiased}
+  font:14px/1.5 "Urbanist",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
 .gisk *{box-sizing:border-box}
 /* :where, damit die Grundregel nur Vorgabe ist: Bausteine mit eigenen
    Klassen (Gespräche, Nachbarn) behalten ihre Farbe -- mit .gisk button
@@ -1188,32 +1188,32 @@ const STIL = `
    war danach schlimmer als vorher. Gemessen mit einfarbigen Kacheln bei
    125 % Skalierung, siehe Commit. */
 .gisk img.leaflet-tile{width:257px!important;height:257px!important;mix-blend-mode:normal!important}
-.gisk .leaflet-bar{border:0!important;box-shadow:var(--schatten)!important;border-radius:12px!important;overflow:hidden}
+.gisk .leaflet-bar{border:0!important;box-shadow:var(--schatten)!important;border-radius:4px!important;overflow:hidden}
 .gisk .leaflet-bar a{width:36px!important;height:36px!important;line-height:36px!important;color:var(--tinte)!important;border-color:var(--linie)!important}
 .gisk .leaflet-bottom.leaflet-right{right:416px}
 .gisk .leaflet-control-attribution{background:rgba(255,255,255,.8)!important;border-radius:6px 0 0 0;font-size:10px}
 
 .gisk .leiste{position:absolute;z-index:700;top:16px;left:16px;right:416px;display:flex;gap:8px;align-items:center;
   background:var(--weiss);border-radius:16px;box-shadow:var(--schatten);padding:8px}
-.gisk .rund{width:40px;height:40px;border-radius:12px;border:0;background:var(--fl);cursor:pointer;font-size:18px}
+.gisk .rund{width:40px;height:40px;border-radius:4px;border:0;background:var(--fl);cursor:pointer;font-size:18px}
 .gisk .rund:hover{background:var(--linie)}
 .gisk .suche{position:relative;flex:1;min-width:160px}
 .gisk .suche .lupe{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--grau);font-size:20px;line-height:1}
-.gisk .suche input{width:100%;height:40px;border:0;border-radius:12px;background:var(--fl);padding:0 12px 0 36px;outline:none}
+.gisk .suche input{width:100%;height:40px;border:0;border-radius:4px;background:var(--fl);padding:0 12px 0 36px;outline:none}
 .gisk .suche input:focus{box-shadow:0 0 0 2px var(--akzent) inset;background:var(--weiss)}
-.gisk .suche .liste{position:absolute;top:48px;left:0;right:0;background:var(--weiss);border-radius:12px;box-shadow:var(--schatten);
+.gisk .suche .liste{position:absolute;top:48px;left:0;right:0;background:var(--weiss);border-radius:4px;box-shadow:var(--schatten);
   max-height:320px;overflow:auto;padding:6px}
-.gisk .treffer{display:block;width:100%;text-align:left;border:0;background:none;padding:9px 10px;border-radius:8px;cursor:pointer}
+.gisk .treffer{display:block;width:100%;text-align:left;border:0;background:none;padding:9px 10px;border-radius:3px;cursor:pointer}
 .gisk .treffer:hover{background:var(--fl)}
 .gisk .treffer b{display:block;font-weight:600}.gisk .treffer small{color:var(--grau);font-size:12px}
 .gisk .treffer.eigen b{color:var(--akzent)}
 .gisk .treffer.eigner b{color:#7C3AED}
 .gisk .leer{margin:0;padding:9px 10px;color:var(--grau)}
 .gisk .werkzeuge{display:contents}
-.gisk .segment{display:flex;background:var(--fl);border-radius:12px;padding:3px}
-.gisk .segment button{border:0;background:none;padding:7px 12px;border-radius:9px;cursor:pointer;color:var(--grau);font-weight:500}
+.gisk .segment{display:flex;background:var(--fl);border-radius:4px;padding:3px}
+.gisk .segment button{border:0;background:none;padding:7px 12px;border-radius:3px;cursor:pointer;color:var(--grau);font-weight:500}
 .gisk .segment button.an{background:var(--weiss);color:var(--tinte);box-shadow:0 1px 3px rgba(15,23,42,.12)}
-.gisk .schalter{height:40px;border:1px solid var(--linie);background:var(--weiss);border-radius:12px;padding:0 14px;cursor:pointer;font-weight:500;color:var(--grau)}
+.gisk .schalter{height:40px;border:1px solid var(--linie);background:var(--weiss);border-radius:4px;padding:0 14px;cursor:pointer;font-weight:500;color:var(--grau)}
 .gisk .schalter.an{background:var(--tinte);border-color:var(--tinte);color:#fff}
 .gisk .schalter.an.lila{background:#7C3AED;border-color:#7C3AED}
 .gisk .eintrag>i.lila{background:#7C3AED}
@@ -1244,12 +1244,12 @@ const STIL = `
 .gisk .filter.genau button{font-size:12px;padding:5px 10px}
 
 .gisk .unten{position:absolute;z-index:650;left:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;align-items:flex-start}
-.gisk .legende{background:var(--weiss);border-radius:12px;box-shadow:var(--schatten);padding:8px 12px;display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--grau)}
+.gisk .legende{background:var(--weiss);border-radius:4px;box-shadow:var(--schatten);padding:8px 12px;display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--grau)}
 .gisk .legende i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
 .gisk .legende.bild{flex-direction:column;gap:6px;padding:0}
 .gisk .legende-knopf{border:0;background:none;padding:8px 12px;font-size:12px;font-weight:600;color:var(--grau);cursor:pointer;display:flex;gap:8px;min-height:36px;align-items:center}
 .gisk .legende.bild img{max-height:220px;display:block;padding:0 12px 10px}
-.gisk .readout{background:rgba(255,255,255,.92);border-radius:10px;box-shadow:var(--schatten);padding:6px 10px;font-size:12px;color:var(--grau);font-variant-numeric:tabular-nums}
+.gisk .readout{background:rgba(255,255,255,.92);border-radius:4px;box-shadow:var(--schatten);padding:6px 10px;font-size:12px;color:var(--grau);font-variant-numeric:tabular-nums}
 
 .gisk .tafel{position:absolute;z-index:700;top:16px;right:16px;bottom:16px;width:384px;background:var(--weiss);
   border-radius:20px;box-shadow:var(--schatten);overflow-y:auto;padding:20px}
@@ -1268,13 +1268,13 @@ const STIL = `
 .gisk .marke.blau{background:#DBEAFE;color:#1D4ED8}.gisk .marke.grau{color:var(--grau)}
 
 .gisk .zahlen{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
-.gisk .zahlen>div{background:var(--fl);border-radius:12px;padding:10px 12px;min-width:0}
+.gisk .zahlen>div{background:var(--fl);border-radius:4px;padding:10px 12px;min-width:0}
 .gisk .zahlen .breit{grid-column:1 / -1}
 .gisk .zahlen small{display:block;font-size:11px;font-weight:600;color:var(--grau);margin-bottom:2px}
 .gisk .zahlen b{font-size:15px;font-weight:600;word-break:break-word}
 
 .gisk .aktionen{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
-.gisk .knopf,.gisk .copy{display:inline-flex;align-items:center;height:32px;padding:0 12px;border-radius:10px;border:1px solid var(--linie);
+.gisk .knopf,.gisk .copy{display:inline-flex;align-items:center;height:32px;padding:0 12px;border-radius:4px;border:1px solid var(--linie);
   background:var(--weiss);color:var(--tinte);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit}
 .gisk .knopf:hover,.gisk .copy:hover{border-color:var(--tinte)}
 .gisk .copy.done{border-color:#16A34A;color:#16A34A}
@@ -1289,14 +1289,14 @@ const STIL = `
 
 .gisk .karten{display:flex;flex-direction:column;gap:6px}
 .gisk .eintrag{display:flex;gap:10px;align-items:center;width:100%;text-align:left;border:1px solid var(--linie);background:var(--weiss);
-  border-radius:12px;padding:10px 12px;cursor:pointer}
+  border-radius:4px;padding:10px 12px;cursor:pointer}
 .gisk .eintrag:hover{border-color:var(--tinte)}
 .gisk .eintrag.still{cursor:default}
 .gisk .eintrag.still:hover{border-color:var(--linie)}
 .gisk .kopf .knopf{margin-top:10px}
 .gisk .import .feld{display:flex;flex-direction:column;gap:4px;margin:0 0 10px;font-size:12px;font-weight:600;color:var(--grau)}
 .gisk .import .feld input,.gisk .import .feld select,.gisk .import .feld textarea{font:inherit;font-size:16px;font-weight:400;color:var(--tinte);
-  border:1px solid var(--linie);border-radius:10px;padding:9px 11px;background:var(--weiss);min-height:44px;width:100%;box-sizing:border-box}
+  border:1px solid var(--linie);border-radius:4px;padding:9px 11px;background:var(--weiss);min-height:44px;width:100%;box-sizing:border-box}
 .gisk .import .feld textarea{resize:vertical;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13px;line-height:1.5}
 .gisk .import .zwei{display:grid;grid-template-columns:1fr 1.6fr;gap:8px}
 .gisk .import .datei{cursor:pointer;margin:0 0 14px}
@@ -1312,7 +1312,7 @@ const STIL = `
 .gisk .eintrag b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gisk .eintrag small{display:block;color:var(--grau);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gisk .betrag{font-weight:700;font-variant-numeric:tabular-nums}
-.gisk-tip{font:13px/1.45 Inter,-apple-system,Arial,sans-serif;border-radius:10px;border:0;box-shadow:0 8px 24px rgba(15,23,42,.2);padding:8px 11px}
+.gisk-tip{font:13px/1.45 Inter,-apple-system,Arial,sans-serif;border-radius:4px;border:0;box-shadow:0 8px 24px rgba(15,23,42,.2);padding:8px 11px}
 
 @media (max-width:900px){
   /* Handy: die Suche allein in der ersten Zeile, Grundkarte und Schalter
@@ -1333,7 +1333,7 @@ const STIL = `
   .gisk .filter::-webkit-scrollbar{display:none}
   .gisk .filter button,.gisk .filter .titel,.gisk .filter select{flex:none}
   .gisk .leaflet-control-zoom,.gisk .leaflet-bottom.leaflet-right,.gisk .legende:not(.bild),.gisk .readout{display:none}
-  .gisk .tafel{top:auto;left:0;right:0;bottom:0;width:auto;height:34vh;border-radius:20px 20px 0 0;padding:12px 16px 16px}
+  .gisk .tafel{top:auto;left:0;right:0;bottom:0;width:auto;height:34vh;border-radius:6px 6px 0 0;padding:12px 16px 16px}
   .gisk .tafel::before{content:"";display:block;width:36px;height:4px;border-radius:2px;background:var(--linie);margin:0 auto 12px}
   .gisk.offen .tafel{height:64vh}
   /* Ein Formular braucht Platz; die Karte darüber hilft beim Ausfüllen nicht. */
