@@ -24,6 +24,7 @@ on:
         type: choice
         options:
           - probe       # Zählen, nichts schreiben
+          - felder      # Welche Werte sich gegenüberstehen (Zone, Ausschluss), nichts schreiben
           - schreiben   # Zusammenführen und Doppel löschen
       grenze_mb:
         description: 'Abbrechen, wenn die Datenbank so gross ist (MB)'
@@ -58,7 +59,14 @@ jobs:
           [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
           {
             echo "\\set grenze ${GRENZE_MB:-1090}"
-            cat tools/doppel_vorbereiten.sql
+            if [ "$SCHRITT" = "felder" ]; then
+              # Nur die Paare bilden, dann die Gegenüberstellung -- der
+              # Vergleich aller Felder ist hier nicht nötig.
+              sed -n '1,/^-- Spalten einteilen/p' tools/doppel_vorbereiten.sql
+              cat tools/doppel_felder.sql
+            else
+              cat tools/doppel_vorbereiten.sql
+            fi
             if [ "$SCHRITT" = "schreiben" ]; then
               cat tools/doppel_zusammenfuehren.sql
               echo "select count(distinct stueck) as n_stuecke from paar \\gset"
