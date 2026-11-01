@@ -229,7 +229,7 @@ export default function Index() {
           </header>
         )}
 
-        <div className={karteAktiv ? 'flex-1' : `w-full flex-1 px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-6 lg:px-10 lg:pb-12 lg:pt-4 animate-fade-in`} key={active}>
+        <div className={karteAktiv ? 'flex-1' : `w-full flex-1 overflow-x-clip px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-6 lg:px-10 lg:pb-12 lg:pt-4 animate-fade-in`} key={active}>
           <Auffang key={active} bereich={titel}>
           <Suspense fallback={
             <div className="space-y-4">

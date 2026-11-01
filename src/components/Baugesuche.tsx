@@ -3,7 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { FENSTER } from '@/lib/fenster';
-import { FELD, Kopf, Leer, Marke, Reiter } from '@/components/rahmen';
+import { FELD, Leer, Marke, Reiter, Seite } from '@/components/rahmen';
+import { BILD } from '@/lib/luftbild';
 
 /**
  * Alle Baugesuche, die der Ablauf "Baugesuche" geladen hat -- zum
@@ -46,23 +47,44 @@ const AMTSBLATT_SEITE = (id: string) => `https://amtsblatt.zh.ch/#!/search/publi
 const datum = (s: string) => new Date(s).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
 const zeit = (s: string) => new Date(s).toLocaleString('de-CH', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
-export function useBaugesuche() {
+/**
+ * Die Gesuche eines Zeitraums. Gefiltert wird in der Datenbank: seit das
+ * ganze Jahr geladen ist (rund 6000), zeigten die neuesten 500 unter
+ * "Alle" nur einen Teil. Gezählt wird ebenfalls dort, nicht im Browser.
+ */
+export function useBaugesuche(tage = 7) {
   return useQuery({
-    queryKey: ['baugesuche'],
+    queryKey: ['baugesuche', tage],
     queryFn: async () => {
-      const [g, o] = await Promise.all([
-        db().from('baugesuch')
-          .select('id, publiziert_am, gemeinde, adresse, parzelle_nr, egrid, beschreibung, bauherrschaft, parzelle_id, nachbar_egrids, erfasst_am, quelle, publikation_nr, publikation_id, einsprache_bis, publiziert_bis, quelle_url')
-          // Proben aus "Auswerten" werden zurückgerollt; sicherheitshalber nie zeigen.
-          .neq('quelle', 'probe')
-          .order('publiziert_am', { ascending: false }).limit(500),
+      const ab = tage > 0 ? new Date(Date.now() - tage * 864e5).toISOString().slice(0, 10) : null;
+      let q = db().from('baugesuch')
+        .select('id, publiziert_am, gemeinde, adresse, parzelle_nr, egrid, beschreibung, bauherrschaft, parzelle_id, nachbar_egrids, erfasst_am, quelle, publikation_nr, publikation_id, einsprache_bis, publiziert_bis, quelle_url')
+        // Proben aus "Auswerten" werden zurückgerollt; sicherheitshalber nie zeigen.
+        .neq('quelle', 'probe');
+      if (ab) q = q.gte('publiziert_am', ab);
+      const zaehle = async (f: (x: any) => any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+        let c = db().from('baugesuch').select('id', { count: 'exact', head: true }).neq('quelle', 'probe');
+        if (ab) c = c.gte('publiziert_am', ab);
+        const r = await f(c);
+        return (r.count as number | null) ?? 0;
+      };
+      const [g, o, gesamt, bestand, ohneOrt, letzte] = await Promise.all([
+        q.order('publiziert_am', { ascending: false }).limit(1000),
         db().from('gelegenheit').select('baugesuch_id').not('baugesuch_id', 'is', null),
+        zaehle(c => c),
+        zaehle(c => c.not('parzelle_id', 'is', null)),
+        zaehle(c => c.is('egrid', null)),
+        db().from('baugesuch').select('erfasst_am').order('erfasst_am', { ascending: false }).limit(1),
       ]);
       if (g.error) throw g.error;
       const mitGelegenheit = new Set(((o.data ?? []) as { baugesuch_id: string }[]).map(x => x.baugesuch_id));
-      return { gesuche: (g.data ?? []) as Gesuch[], mitGelegenheit };
+      return {
+        gesuche: (g.data ?? []) as Gesuch[], mitGelegenheit, gesamt, bestand, ohneOrt,
+        zuletzt: (letzte.data?.[0]?.erfasst_am as string | undefined) ?? '',
+      };
     },
     staleTime: 60 * 1000,
+    placeholderData: prev => prev,
   });
 }
 
@@ -79,24 +101,31 @@ export function filtern(gs: Gesuch[], mitGel: Set<string>, sicht: Sicht, tage: n
 }
 
 export function Baugesuche() {
-  const { data, isLoading, error } = useBaugesuche();
-  const [sicht, setSicht] = useState<Sicht>('alle');
   const [tage, setTage] = useState(7);
+  const { data, isLoading, error } = useBaugesuche(tage);
+  const [sicht, setSicht] = useState<Sicht>('alle');
   const [wort, setWort] = useState('');
   const [offen, setOffen] = useState<string | null>(null);
 
-  const liste = useMemo(() => (data ? filtern(data.gesuche, data.mitGelegenheit, sicht, tage, wort) : []), [data, sicht, tage, wort]);
-  const zuletzt = data?.gesuche.reduce((m, g) => (g.erfasst_am > m ? g.erfasst_am : m), '') ?? '';
-  const zahl = (s: Sicht) => (data ? filtern(data.gesuche, data.mitGelegenheit, s, tage, '').length : 0);
+  // Der Zeitraum ist schon in der Abfrage; hier nur noch Sicht und Suchwort.
+  const liste = useMemo(() => (data ? filtern(data.gesuche, data.mitGelegenheit, sicht, 0, wort) : []), [data, sicht, wort]);
+  const zahl = (s: Sicht) => (data ? filtern(data.gesuche, data.mitGelegenheit, s, 0, '').length : 0);
+  const zeitraum = tage === 0 ? 'insgesamt' : tage === 365 ? 'in diesem Jahr' : `in ${tage} Tagen`;
+  const mitGel = data ? data.gesuche.filter(g => data.mitGelegenheit.has(g.id)).length : 0;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <Kopf ueber="Kanton Zürich · täglich" titel="Baugesuche">
-        Jedes publizierte Gesuch, beim Bund verortet. Trifft eines ein Kundenportfolio oder dessen Nachbarn,
-        entsteht daraus eine Gelegenheit.
-        {zuletzt && <span className="mt-1 block text-sm">Zuletzt geladen {zeit(zuletzt)} · {data?.gesuche.length.toLocaleString('de-CH')} Gesuche gespeichert</span>}
-      </Kopf>
-
+    <Seite bild={BILD.baugesuche} ueber="Baugesuche · Kanton Zürich · täglich"
+      titel={data ? `${data.gesamt.toLocaleString('de-CH')} Baugesuche ${zeitraum}` : ' '}
+      unter={<>
+        Jedes publizierte Gesuch, beim Bund verortet. Trifft eines ein Kundenportfolio oder dessen Nachbarn, entsteht daraus eine Gelegenheit.
+        {data?.zuletzt && <span className="mt-1 block text-sm">Zuletzt geladen {zeit(data.zuletzt)}</span>}
+      </>}
+      kennzahlen={data ? [
+        { titel: 'Publiziert', wert: data.gesamt.toLocaleString('de-CH'), marke: <Marke art="minze">{tage ? `${tage} Tage` : 'alle'}</Marke>, onClick: () => setSicht('alle') },
+        { titel: 'Im Bestand', wert: data.bestand.toLocaleString('de-CH'), marke: data.gesamt ? <Marke art="lila">{Math.round((data.bestand / data.gesamt) * 100)} %</Marke> : undefined, onClick: () => setSicht('bestand') },
+        { titel: 'Gelegenheiten', wert: mitGel.toLocaleString('de-CH'), marke: mitGel ? <Marke art="heiss">heiss</Marke> : undefined, onClick: () => setSicht('gelegenheit') },
+        { titel: 'Nicht verortet', wert: data.ohneOrt.toLocaleString('de-CH'), marke: <Marke>ohne EGRID</Marke> },
+      ] : undefined}>
       <div className="flex flex-wrap items-center gap-2">
         <Reiter<Sicht> wahl={sicht} setWahl={setSicht}
                        optionen={([['alle', 'Alle'], ['bestand', 'Im Bestand'], ['gelegenheit', 'Mit Gelegenheit']] as [Sicht, string][]).map(([w, t]) => ({ wert: w, titel: t, zahl: zahl(w) }))} />
@@ -105,6 +134,8 @@ export function Baugesuche() {
           <option value={3}>Letzte 3 Tage</option>
           <option value={7}>Letzte 7 Tage</option>
           <option value={30}>Letzte 30 Tage</option>
+          <option value={90}>Letzte 90 Tage</option>
+          <option value={365}>Letztes Jahr</option>
           <option value={0}>Alle</option>
         </select>
         <input value={wort} onChange={e => setWort(e.target.value)} placeholder="Adresse, Gemeinde, Vorhaben, Nummer"
@@ -168,6 +199,6 @@ export function Baugesuche() {
           );
         })}
       </ul>
-    </div>
+    </Seite>
   );
 }

@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2 } from 'lucide-react';
+import { Archive, Loader2, Mail, Send } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Abschnitt, KNOPF, KNOPF_HAUPT, Kopf, Leer, LISTE } from '@/components/rahmen';
+import { Abschnitt, KNOPF, KNOPF_HAUPT, Leer, LISTE, Marke, Seite } from '@/components/rahmen';
+import { BILD } from '@/lib/luftbild';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useBereitFuerPipedrive, useUebertragen, usePostObjekte } from '@/hooks/use-properties';
@@ -121,13 +122,19 @@ export function PipedriveBereit() {
   const ort = (p: { plz_ort?: string | null; plz?: string | null; gemeinde?: string | null }) =>
     p.plz_ort || [p.plz, p.gemeinde].filter(Boolean).join(' ');
 
-  return (
-    <div className="mx-auto max-w-4xl space-y-10">
-      <Kopf ueber="Akquise" titel="Pipedrive">
-        Fertige Leads: Eigentümer und Nummer stehen fest, der Deal fehlt noch.
-        Übertragen wird nach Akquise, Phase «Neu».
-      </Kopf>
+  const anzahlPost = (post ?? []).length;
+  const anzahlArchiv = (archiv ?? []).length;
 
+  return (
+    <Seite bild={BILD.pipedrive} ueber="Pipedrive · Akquise"
+      titel={bereit.length ? `${bereit.length} ${bereit.length === 1 ? 'Lead ist' : 'Leads sind'} bereit für Pipedrive` : 'Alles ist in Pipedrive'}
+      unter="Eigentümer und Nummer stehen fest, der Deal fehlt noch. Übertragen wird nach Akquise, Phase «Neu»."
+      kennzahlen={[
+        { titel: 'Bereit', wert: String(bereit.length), marke: bereit.length ? <Marke art="heiss">übertragen</Marke> : undefined },
+        { titel: 'Gewählt', wert: String(gewaehlt.size), marke: <Marke art="lila">von {bereit.length}</Marke> },
+        { titel: 'Brief', wert: String(anzahlPost), marke: <Marke art="minze">per Post</Marke> },
+        { titel: 'Übertragen', wert: String(anzahlArchiv), marke: <Marke art="violett">zuletzt</Marke> },
+      ]}>
       {ergebnis.length > 0 && (
         <ul className={LISTE} aria-live="polite">
           {ergebnis.map((m, i) => (
@@ -143,6 +150,9 @@ export function PipedriveBereit() {
 
       <Abschnitt
         titel="Bereit für Pipedrive"
+        unter="Eigentümer und Nummer da, Deal fehlt"
+        symbol={Send}
+        kachel="heiss"
         zahl={bereit.length ? (gewaehlt.size > 0 ? `${gewaehlt.size} von ${bereit.length} gewählt` : bereit.length) : undefined}
         rechts={bereit.length > 0 && (
           <>
@@ -190,7 +200,7 @@ export function PipedriveBereit() {
 
       {/* Wo der Anruf nicht geht. Der Brief steht hier und nicht in
           "Nummern": dort wird gesucht, hier wird verschickt. */}
-      <Abschnitt titel="Brief statt Anruf" zahl={(post ?? []).length || undefined}>
+      <Abschnitt titel="Brief statt Anruf" unter="Keine Nummer zu finden" symbol={Mail} kachel="akzent" zahl={(post ?? []).length || undefined}>
         {(post ?? []).length === 0 ? (
           <Leer titel="Noch kein Brief fällig.">
             Objekte kommen hierher, wenn unter «Nummern» keine Telefonnummer zu finden ist.
@@ -238,7 +248,7 @@ export function PipedriveBereit() {
 
       {/* Was schon drüben ist -- sichtbar, damit niemand dasselbe ein
           zweites Mal schickt. Zum Nachsehen, nicht zum Tun. */}
-      <Abschnitt titel="Bereits übertragen" zahl={(archiv ?? []).length || undefined}>
+      <Abschnitt titel="Bereits übertragen" unter="Damit nichts doppelt geht" symbol={Archive} kachel="schwarz" zahl={(archiv ?? []).length || undefined}>
         {(archiv ?? []).length === 0 ? (
           <Leer titel="Noch nichts übertragen." />
         ) : (
@@ -262,6 +272,6 @@ export function PipedriveBereit() {
           </ul>
         )}
       </Abschnitt>
-    </div>
+    </Seite>
   );
 }

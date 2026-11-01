@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2 } from 'lucide-react';
-import { Abschnitt, FELD, KNOPF, KNOPF_HAUPT, Kopf, Leer, LISTE } from '@/components/rahmen';
+import { Loader2, Phone, Send } from 'lucide-react';
+import { Abschnitt, FELD, KNOPF, KNOPF_HAUPT, Leer, LISTE, Marke, Seite } from '@/components/rahmen';
+import { BILD } from '@/lib/luftbild';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useOffeneNummern } from '@/hooks/use-properties';
@@ -123,14 +124,20 @@ export function Nummern() {
 
   const offen = data || [];
 
-  return (
-    <div className="mx-auto max-w-4xl space-y-10">
-      <Kopf ueber="Akquise" titel="Nummern">
-        Eigentümer steht fest, die Telefonnummer fehlt. Sobald sie hier steht,
-        entsteht der Deal in Pipedrive, Akquise, Phase «Neu».
-      </Kopf>
+  const firmen = offen.filter(p => /\b(AG|GmbH|SA|Sàrl|Genossenschaft|Stiftung)\b/.test(p.owner_name || '')).length;
+  const mitAdresse = offen.filter(p => p.owner_address).length;
 
-      <Abschnitt titel="Nummer gesucht" zahl={offen.length || undefined}>
+  return (
+    <Seite bild={BILD.nummern} ueber="Nummern · Akquise"
+      titel={offen.length ? `${offen.length} ${offen.length === 1 ? 'Eigentümer wartet' : 'Eigentümer warten'} auf die Nummer` : 'Jeder Eigentümer hat eine Nummer'}
+      unter="Sobald die Nummer hier steht, entsteht der Deal in Pipedrive, Akquise, Phase «Neu»."
+      kennzahlen={[
+        { titel: 'Offen', wert: String(offen.length), marke: offen.length ? <Marke art="rosa">suchen</Marke> : undefined },
+        { titel: 'Firmen', wert: String(firmen), marke: <Marke art="lila">Zefix</Marke> },
+        { titel: 'Mit Adresse', wert: String(mitAdresse), marke: <Marke art="minze">tel.search</Marke> },
+        { titel: 'Übergeben', wert: String(uebergeben.length), marke: <Marke art="violett">zuletzt</Marke> },
+      ]}>
+      <Abschnitt titel="Nummer gesucht" unter="Eigentümer steht fest, die Telefonnummer fehlt" symbol={Phone} kachel="heiss" zahl={offen.length || undefined}>
         {offen.length === 0 ? (
           <Leer titel="Nichts offen.">Alles, was einen Eigentümer hat, hat auch eine Nummer.</Leer>
         ) : (
@@ -226,7 +233,7 @@ export function Nummern() {
       {/* Wohin die Leads gegangen sind. Ohne das ist die Frage
           berechtigt: "jetzt ist er weg -- wo?" */}
       {uebergeben.length > 0 && (
-        <Abschnitt titel="Nach Pipedrive übergeben" hinweis="Akquise, Phase «Neu». Die letzten acht.">
+        <Abschnitt titel="Nach Pipedrive übergeben" unter="Akquise, Phase «Neu». Die letzten acht." symbol={Send} kachel="akzent">
           <ul className={LISTE}>
             {uebergeben.map((u, i) => (
               <li key={`${u.adresse}-${i}`} className="flex items-center justify-between gap-4 px-5 py-3">
@@ -247,6 +254,6 @@ export function Nummern() {
           </ul>
         </Abschnitt>
       )}
-    </div>
+    </Seite>
   );
 }

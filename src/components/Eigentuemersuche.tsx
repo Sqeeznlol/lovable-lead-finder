@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { FileSearch } from 'lucide-react';
 import { Abschnitt, FELD, KNOPF, KNOPF_HAUPT, LISTE } from '@/components/rahmen';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -201,6 +202,9 @@ export function Eigentuemersuche({ objekte }: { objekte: Chance[] }) {
   return (
     <Abschnitt
       titel="Heute nachschlagen"
+      symbol={FileSearch}
+      kachel="heiss"
+      unter="Grösste Marge, Eigentümer noch offen"
       zahl={`${uebrig} von ${proTagHier} Abfragen übrig`}
       hinweis={<>Das Grundbuchportal bestätigt jede Auskunft per SMS und gibt {proTagHier} pro Tag frei.
         Hier stehen die Objekte, bei denen sich das heute am meisten lohnt: grösste Marge, Eigentümer noch offen.</>}

@@ -10,7 +10,8 @@ import {
 import { arrondierungErkennen } from '@/lib/arrondierung';
 import { passendeObjekte, type Treffer } from '@/lib/investor';
 import { useQuery } from '@tanstack/react-query';
-import { Abschnitt, FELD, KNOPF, KNOPF_HAUPT, Kopf, Leer, LISTE, Reiter } from '@/components/rahmen';
+import { Abschnitt, FELD, KNOPF, KNOPF_HAUPT, Kopf, Leer, LISTE, Marke, Reiter, Seite } from '@/components/rahmen';
+import { BILD } from '@/lib/luftbild';
 import { FENSTER } from '@/lib/fenster';
 
 /**
@@ -51,15 +52,22 @@ export function Zentrale({ neu: neuVonOben = 0 }: { neu?: number } = {}) {
   const zahl = (f: Filter) => alle.filter(v => (f === 'aktiv' ? aktiv(v) : v.zustand === f)).length;
   const filterListe: [Filter, string][] = [['aktiv', 'Aktiv'], ...SCHRITTE.map(s => [s.z, s.titel] as [Filter, string]), ['pausiert', 'Pausiert']];
 
-  return (
-    <div className="mx-auto max-w-5xl space-y-8">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <Kopf ueber="Kundenprojekte" titel="Zentrale">
-          Was Kunden entwickeln, kaufen oder verkaufen wollen: Research, Potenzialanalyse und Akquise in ihrem Namen, alles off-market.
-        </Kopf>
-        <button type="button" className={`${KNOPF_HAUPT} lg:hidden`} onClick={() => setNeu(true)}>Neues Vorhaben</button>
-      </div>
+  const laufend = alle.filter(aktiv);
+  const bald = laufend.filter(v => v.zeitraum_bis && new Date(v.zeitraum_bis).getTime() - Date.now() < 30 * 864e5).length;
+  const satz = !data ? ' ' : laufend.length
+    ? `${laufend.length} ${laufend.length === 1 ? 'Vorhaben läuft' : 'Vorhaben laufen'} für Kunden`
+    : 'Noch kein Vorhaben in Arbeit';
 
+  return (
+    <Seite bild={BILD.zentrale} ueber="Zentrale · Kundenprojekte" titel={satz}
+      unter="Was Kunden entwickeln, kaufen oder verkaufen wollen: Research, Potenzialanalyse und Akquise in ihrem Namen, alles off-market."
+      kennzahlen={data ? [
+        { titel: 'Laufend', wert: laufend.length.toLocaleString('de-CH'), onClick: () => setFilter('aktiv') },
+        { titel: 'Adressen', wert: laufend.reduce((s2, v) => s2 + (v.adressen || 0), 0).toLocaleString('de-CH'), marke: <Marke art="lila">in Arbeit</Marke> },
+        { titel: 'In Akquise', wert: zahl('akquise').toLocaleString('de-CH'), onClick: () => setFilter('akquise') },
+        { titel: 'Frist bald', wert: bald.toLocaleString('de-CH'), marke: bald ? <Marke art="rosa">unter 30 Tagen</Marke> : <Marke art="minze">keine</Marke> },
+      ] : undefined}
+      aktionen={<button type="button" className={`${KNOPF_HAUPT} lg:hidden`} onClick={() => setNeu(true)}>Neues Vorhaben</button>}>
       <Reiter<Filter> wahl={filter} setWahl={setFilter}
               optionen={filterListe.filter(([f]) => f === 'aktiv' || zahl(f) > 0 || f === filter).map(([f, t]) => ({ wert: f, titel: t, zahl: zahl(f) }))} />
 
@@ -91,7 +99,7 @@ export function Zentrale({ neu: neuVonOben = 0 }: { neu?: number } = {}) {
           </li>
         ))}
       </ul>
-    </div>
+    </Seite>
   );
 }
 

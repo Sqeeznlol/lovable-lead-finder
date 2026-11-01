@@ -272,12 +272,12 @@ export function Seite({ bild, ueber, titel, unter, kennzahlen, aktionen, seite, 
             <Kopf gross ueber={ueber} titel={titel}>{unter}</Kopf>
           </div>
           {kennzahlen && <Kennzahlen werte={kennzahlen} />}
-          {aktionen && <div className={`grid grid-cols-3 gap-2 xl:hidden ${AUF}`} style={verz(2)}>{aktionen}</div>}
+          {aktionen && <div className={`flex gap-2 xl:hidden [&>*]:min-w-0 [&>*]:flex-1 ${AUF}`} style={verz(2)}>{aktionen}</div>}
           <div className={`space-y-6 ${AUF}`} style={verz(2)}>{children}</div>
         </div>
         {seite && (
           <aside className={`min-w-0 space-y-4 rounded border bg-card p-4 ${AUF}`} style={verz(3)}>
-            {aktionen && <div className="hidden grid-cols-3 gap-2 xl:grid">{aktionen}</div>}
+            {aktionen && <div className="hidden gap-2 xl:flex [&>*]:min-w-0 [&>*]:flex-1">{aktionen}</div>}
             {seite}
           </aside>
         )}

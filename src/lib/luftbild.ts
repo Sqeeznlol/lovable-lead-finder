@@ -29,3 +29,18 @@ export function luftbildWgs(lat: number, lon: number, breiteM = 160, px = 640): 
  * 1. November) -- zu schwer für jeden Aufruf des Cockpits.
  */
 export const KOPFBILD = luftbildLv95(2682700, 1247925, 800, 1280);
+
+/**
+ * Jede Seite hat ihren eigenen Ort (DESIGN.md, Seitenaufbau): so sieht
+ * man beim Wechseln, dass man woanders ist, und alle Orte liegen im
+ * Bestand. Ausschnitte in LV95, 800 m breit, 1280 px.
+ */
+export const BILD = {
+  zentrale: luftbildLv95(2681800, 1248900, 800, 1280),     // Zürich, Escher-Wyss
+  baugesuche: luftbildLv95(2697300, 1261900, 800, 1280),   // Winterthur, Altstadt und Bahnhof
+  uebersicht: luftbildLv95(2683600, 1251800, 800, 1280),   // Zürich-Oerlikon
+  nummern: luftbildLv95(2696400, 1244800, 800, 1280),      // Uster
+  pipedrive: luftbildLv95(2686300, 1256500, 800, 1280),    // Kloten
+  gelegenheiten: luftbildLv95(2685400, 1250300, 800, 1280),// Zürich-Schwamendingen
+  auswertung: luftbildLv95(2693300, 1231300, 800, 1280),   // Wädenswil
+} as const;
