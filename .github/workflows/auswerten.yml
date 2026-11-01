@@ -45,6 +45,7 @@ on:
           - teams-probe  # Ob ein Konto ausserhalb eines Teams dessen Kunden wirklich nicht sieht (wird zurueckgerollt)
           - potenzial-bund # Was der Bund an einem Punkt zu Bauzone und Parzelle liefert (fuer den Potenzialcheck)
           - anfrage-probe # Ob der oeffentliche Schluessel Anfragen einfuegen, aber nicht lesen kann (wird zurueckgerollt)
+          - nachbar-baut # Wie viele Gelegenheiten 'Nachbar baut' je Schwelle entstünden (zählt nur)
           - demo         # Ob die Demo-Szenarien der Zentrale vollständig in der Datenbank stehen
           - ohne-egrid   # Wie die Zürcher Zeilen ohne EGRID aussehen (Gemeindenamen, Nummernformat, Herkunft)
           - indizes      # Welche Indizes auf properties wie gross sind und ob sie je benutzt werden
@@ -603,6 +604,18 @@ jobs:
           select count(*) as egrid_mehrfach from (select egrid from properties where kanton = 'ZH' and egrid is not null group by egrid having count(*) > 1) d;
           \echo '```'
           SQL
+
+          elif [ "$FRAGE" = "nachbar-baut" ]; then
+            # Nur zaehlen (p_schreiben = false): je Mindestreserve und
+            # Zeitraum, mit und ohne Filter auf Bauvorhaben.
+            frage "Nachbar baut: Kandidaten je Schwelle" "
+              set local statement_timeout = '10min';
+              select t.tage, r.reserve, b.nur_bauvorhaben, x.gesuche, x.parzellen
+              from (values (30), (90), (365)) t(tage)
+              cross join (values (200), (500), (1000), (2000)) r(reserve)
+              cross join (values (true), (false)) b(nur_bauvorhaben)
+              cross join lateral public.gelegenheiten_nachbar_baut(t.tage, r.reserve, b.nur_bauvorhaben, false) x
+              order by 1, 3 desc, 2;"
 
           elif [ "$FRAGE" = "demo" ]; then
             # Nur erfundene Firmen (Demo) -- Namen duerfen hier stehen.
