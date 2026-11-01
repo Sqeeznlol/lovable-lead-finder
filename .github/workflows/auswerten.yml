@@ -38,6 +38,7 @@ on:
           - konten       # Welche Anmeldekonten bestehen, und seit wann
           - suche        # Wie schnell die Eigentuemersuche ist, und ob ein Index fehlt
           - ortsdienst   # Welcher Dienst aus einer IP-Adresse den Ort liefert (Felder, CORS)
+          - import       # Ob der Portfolio-Import Adressen der richtigen Parzelle zuordnet
       egrid:
         description: 'Nur für "objekt": die EGRID, z.B. CH707709971116'
         required: false
@@ -438,6 +439,21 @@ jobs:
               from (values ('swisscanto'),('helvetica'),('sfp')) v(w)
               join properties p on p.owner_name ilike '%'||w||'%'
               group by 1 order by 1;"
+
+          elif [ "$FRAGE" = "import" ]; then
+            # Die Parzellen der beiden Test-Portfolios, als Adresse so,
+            # wie ein Kunde sie liefert -- einmal wie im Bestand, einmal
+            # mit "str." und PLZ. Erwartet wird die EGRID aus dem Bestand.
+            psql "$DB" -X -q -A -t -F $'\t' -v ON_ERROR_STOP=1 -c "
+              select p.egrid, p.address || ', ' || p.gemeinde
+              from portfolio_position pp join properties p on p.id = pp.parzelle_id
+              where p.egrid is not null and p.address is not null
+              union all
+              select p.egrid, regexp_replace(p.address, 'strasse', 'str.') || ', ' || coalesce(p.plz::text, '') || ' ' || p.gemeinde
+              from portfolio_position pp join properties p on p.id = pp.parzelle_id
+              where p.egrid is not null and p.address ilike '%strasse%'
+              limit 40;" > /tmp/liste.tsv
+            { echo "### Portfolio-Import gegen den Bund"; echo '```'; node tools/import_pruefen.mjs < /tmp/liste.tsv; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
           elif [ "$FRAGE" = "ortsdienst" ]; then
             # Die Anmeldung soll den Ort zur Adresse zeigen. Der Browser
