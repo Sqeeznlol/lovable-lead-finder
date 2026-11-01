@@ -15,6 +15,10 @@ describe('Kartenebenen', () => {
     }
   });
 
+  it('die Grenzen kommen erst, wenn sie Linien sind und keine grüne Fläche', () => {
+    expect(GRENZEN.minZoom).toBeGreaterThanOrEqual(16);
+  });
+
   it('das Luftbild ist das Luftbild', () => {
     expect(GRUNDKARTEN.luftbild.id).toBe('ch.swisstopo.swissimage');
   });

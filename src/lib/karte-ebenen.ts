@@ -38,8 +38,13 @@ export const GRUNDKARTEN: Record<Grund, Ebene> = {
  * Als WMS und nicht als WMTS-Kachel: die Kacheln des Katasters sind in
  * Web-Mercator umgerechnet und versetzen sich an den Rändern um einige
  * Pixel, Linien und Nummern brechen dort. Ein WMS-Bild wird für genau
- * den Ausschnitt gerechnet und passt. Unter Zoom 14 malt der Kataster
- * ganze Gemeinden grün, dort zeigt die Landeskarte mehr.
+ * den Ausschnitt gerechnet und passt.
+ *
+ * Erst ab Zoom 16. Darunter malt der Kataster die Bauzonen der Gemeinde
+ * als grüne Fläche statt Grenzlinien -- auf dem Luftbild bei Zoom 14
+ * gesehen (1. November, Massstab 500 m): ganz Zürich grün eingefärbt.
+ * Bei Zoom 18 zeigt er saubere Linien mit Nummern. Parzellengrenzen
+ * sind unter Zoom 16 ohnehin nicht lesbar.
  *
  * Halb durchsichtig, damit das Luftbild unter den Linien sichtbar
  * bleibt. Ob 0.55 die richtige Stärke ist, muss man am echten Bild
@@ -47,7 +52,7 @@ export const GRUNDKARTEN: Record<Grund, Ebene> = {
  * erreichbar.
  */
 export const GRENZEN: Ebene = {
-  art: 'wms', id: 'ch.kantone.cadastralwebmap-farbe', minZoom: 14, deckkraft: 0.55,
+  art: 'wms', id: 'ch.kantone.cadastralwebmap-farbe', minZoom: 16, deckkraft: 0.55,
 };
 
 /** Bauzonen Schweiz (ARE), harmonisiert aus den Nutzungsplänen der Kantone. */
