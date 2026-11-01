@@ -10,7 +10,7 @@ export function Kopf({ ueber, titel, children }: { ueber?: string; titel: string
   return (
     <header className="space-y-2">
       {ueber && <p className="text-sm font-semibold text-muted-foreground">{ueber}</p>}
-      <h1 className="text-3xl sm:text-4xl">{titel}</h1>
+      <h1 className="text-[32px] leading-[1.1] sm:text-[40px]">{titel}</h1>
       {children && <div className="max-w-2xl text-muted-foreground">{children}</div>}
     </header>
   );
@@ -45,7 +45,12 @@ export function Leer({ titel, children }: { titel: string; children?: ReactNode 
 /** Liste in einer Fläche, Zeilen durch Linien getrennt. */
 export const LISTE = 'divide-y rounded-2xl border bg-card';
 
-/** Knöpfe und Felder: 44 px hoch, damit sie auf dem Handy treffen. */
-export const KNOPF = 'inline-flex h-11 items-center justify-center rounded-full border bg-card px-4 text-sm font-medium transition-colors hover:bg-secondary disabled:pointer-events-none disabled:opacity-50';
-export const KNOPF_HAUPT = 'inline-flex h-11 items-center justify-center rounded-full bg-foreground px-5 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-40';
-export const FELD = 'h-11 min-w-0 rounded-full border bg-card px-4 text-sm';
+/**
+ * Knöpfe und Felder nach DESIGN.md, 44 px hoch, damit sie auf dem
+ * Handy treffen. Haupthandlung: blaue Pille. Nebenhandlung: Pille mit
+ * blauer Linie -- alles Klickbare ist blau, es gibt keinen zweiten
+ * Akzent. Beim Drücken gibt der Knopf nach (scale 0.95).
+ */
+export const KNOPF = 'inline-flex h-11 items-center justify-center rounded-full border border-primary px-[18px] text-[15px] text-primary transition-[transform,background-color] duration-150 hover:bg-primary/5 active:scale-95 disabled:pointer-events-none disabled:opacity-40';
+export const KNOPF_HAUPT = 'inline-flex h-11 items-center justify-center rounded-full bg-primary px-[22px] text-[15px] text-primary-foreground transition-[transform,background-color] duration-150 hover:bg-primary/90 active:scale-95 disabled:pointer-events-none disabled:bg-foreground/20 disabled:text-foreground/50';
+export const FELD = 'h-11 min-w-0 rounded-full border border-input bg-card px-4 text-[15px] placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25';

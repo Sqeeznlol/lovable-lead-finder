@@ -59,12 +59,15 @@ export default {
         },
       },
       fontFamily: {
-        sans: ["'Schibsted Grotesk'", "ui-sans-serif", "system-ui", "sans-serif"],
+        // SF Pro auf Apple-Geräten, sonst Inter (DESIGN.md).
+        sans: ["-apple-system", "BlinkMacSystemFont", "'SF Pro Text'", "'Inter'", "system-ui", "sans-serif"],
         // "serif" bleibt als Name, damit bestehende Klassen nicht brechen --
         // es ist dieselbe Familie (eine Schrift für alles).
-        serif: ["'Schibsted Grotesk'", "ui-sans-serif", "system-ui", "sans-serif"],
+        serif: ["-apple-system", "BlinkMacSystemFont", "'SF Pro Display'", "'Inter'", "system-ui", "sans-serif"],
       },
       borderRadius: {
+        // 18 px für Karten und Flächen wie in DESIGN.md.
+        "2xl": "var(--radius)",
         lg: "var(--radius)",
         md: "calc(var(--radius) - 4px)",
         sm: "calc(var(--radius) - 8px)",

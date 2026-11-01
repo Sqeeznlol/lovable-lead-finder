@@ -1,7 +1,7 @@
-/* Eine Schriftfamilie für alles (Julians Regel): Schibsted Grotesk,
-   dieselbe wie auf der Karte. Vorher DM Sans für Text und Newsreader
-   für Titel -- zwei Familien, und auf der Karte eine dritte. */
-@import url('https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&display=swap');
+/* Eine Schriftfamilie (DESIGN.md): SF Pro auf Apple-Geräten über
+   -apple-system, sonst Inter. Der Browser lädt Inter nur, wo SF fehlt
+   -- auf dem iPhone kommt keine Schriftdatei übers Netz. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -9,56 +9,58 @@
 
 @layer base {
   :root {
-    /* Hell, ruhig, viel Weiss. Eine Akzentfarbe (Blau) für das, was
-       man anklicken kann; kein Orange (Julians Regel). Dieselben Werte
-       wie die Karte (.gisk), damit alles aus einem Guss ist. */
-    --background: 210 40% 98%;         /* #F8FAFC */
-    --foreground: 222 47% 11%;         /* #0F172A */
+    /* Werte aus DESIGN.md (Apple): Parchment-Seite, weisse Flächen,
+       Near-Black-Text, ein Akzent (Action Blue) für alles Klickbare.
+       Kein Orange (Julians Regel). Dieselben Werte hat die Karte (.gisk). */
+    --background: 240 11% 96%;        /* #F5F5F7 Parchment */
+    --foreground: 240 3% 12%;         /* #1D1D1F Near-Black */
 
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 240 3% 12%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 240 3% 12%;
 
-    --primary: 222 47% 11%;
+    --primary: 210 100% 40%;          /* #0066CC Action Blue */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96%;          /* #F1F5F9 */
-    --secondary-foreground: 222 47% 11%;
+    --secondary: 240 11% 96%;         /* #F5F5F7 */
+    --secondary-foreground: 240 3% 12%;
 
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;   /* #64748B */
+    --muted: 240 11% 96%;
+    --muted-foreground: 240 2% 44%;   /* #6E6E73, Kontrast >= 4.5 auf Weiss */
 
-    --accent: 221 83% 53%;             /* #2563EB */
+    --accent: 210 100% 40%;           /* #0066CC */
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 354 100% 42%;      /* #D70015 */
     --destructive-foreground: 0 0% 100%;
 
-    --border: 214 32% 91%;             /* #E2E8F0 */
-    --input: 214 32% 91%;
-    --ring: 221 83% 53%;
+    /* Haarlinie statt Rahmen: Schwarz mit 8 %, liegt auf jeder Fläche gleich. */
+    --border: 0 0% 0% / 0.08;
+    --input: 0 0% 0% / 0.12;
+    --ring: 210 100% 45%;             /* #0071E3 Fokus */
 
-    --radius: 0.875rem;
+    --radius: 1.125rem;               /* 18 px, Karten */
 
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 222 47% 11%;
-    --sidebar-primary: 222 47% 11%;
+    --sidebar-foreground: 240 3% 12%;
+    --sidebar-primary: 210 100% 40%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 40% 96%;
-    --sidebar-accent-foreground: 222 47% 11%;
-    --sidebar-border: 214 32% 91%;
-    --sidebar-ring: 221 83% 53%;
+    --sidebar-accent: 240 11% 96%;
+    --sidebar-accent-foreground: 240 3% 12%;
+    --sidebar-border: 0 0% 0% / 0.08;
+    --sidebar-ring: 210 100% 45%;
 
     /* Warnung in Gelb statt Orange. */
     --warning: 45 93% 40%;
     --warning-foreground: 0 0% 100%;
-    --success: 142 72% 29%;
+    --success: 136 59% 34%;           /* #248A3D */
     --success-foreground: 0 0% 100%;
 
-    /* Schatten nur als Hauch: Flächen trennen sich durch Weiss und Linie. */
-    --shadow-ceramic: 0 1px 2px hsl(222 47% 11% / 0.04), 0 1px 1px hsl(222 47% 11% / 0.03);
-    --shadow-ceramic-hover: 0 8px 24px -8px hsl(222 47% 11% / 0.12), 0 2px 6px hsl(222 47% 11% / 0.05);
+    /* Keine Schatten auf Flächen (DESIGN.md): getrennt wird durch Farbe
+       und Haarlinie. Beim Überfahren wird die Linie etwas kräftiger. */
+    --shadow-ceramic: 0 0 #0000;
+    --shadow-ceramic-hover: 0 0 0 1px hsl(0 0% 0% / 0.08);
     /* Nicht "none": der Wert wird mit dem Rahmen (ring) zu einem
        box-shadow verbunden, und "none" darin macht den ganzen Wert
        ungültig -- das Passwortfeld war dann ohne Rahmen unsichtbar. */
@@ -66,40 +68,41 @@
   }
 
   .dark {
-    --background: 30 9% 8%;
-    --foreground: 36 14% 92%;
-    --card: 30 9% 12%;
-    --card-foreground: 36 14% 92%;
-    --popover: 30 9% 12%;
-    --popover-foreground: 36 14% 92%;
-    --primary: 36 14% 92%;
-    --primary-foreground: 30 9% 16%;
-    --secondary: 30 9% 18%;
-    --secondary-foreground: 36 14% 92%;
-    --muted: 30 9% 16%;
-    --muted-foreground: 36 8% 60%;
-    --accent: 24 35% 64%;
-    --accent-foreground: 30 9% 12%;
-    --destructive: 0 65% 50%;
-    --destructive-foreground: 36 14% 92%;
-    --border: 36 14% 92% / 0.1;
-    --input: 36 14% 92% / 0.12;
-    --ring: 36 14% 92%;
-    --sidebar-background: 30 9% 6%;
-    --sidebar-foreground: 36 14% 92%;
-    --sidebar-primary: 36 14% 92%;
-    --sidebar-primary-foreground: 30 9% 12%;
-    --sidebar-accent: 30 9% 14%;
-    --sidebar-accent-foreground: 36 14% 92%;
-    --sidebar-border: 36 14% 92% / 0.1;
-    --sidebar-ring: 36 14% 92%;
-    --warning: 35 80% 55%;
-    --warning-foreground: 30 9% 12%;
-    --success: 145 50% 45%;
-    --success-foreground: 30 9% 12%;
-    --shadow-ceramic: 0 10px 40px -10px hsl(0 0% 0% / 0.4), 0 2px 10px -2px hsl(0 0% 0% / 0.2);
-    --shadow-ceramic-hover: 0 20px 40px -10px hsl(0 0% 0% / 0.5), 0 4px 12px -2px hsl(0 0% 0% / 0.3);
-    --shadow-inner-glow: inset 0 1px 2px 0 hsl(0 0% 100% / 0.05);
+    /* Dunkel wie Apples dunkle Kacheln, Akzent Sky Blue. */
+    --background: 240 3% 12%;         /* #1D1D1F */
+    --foreground: 240 11% 96%;
+    --card: 240 3% 16%;               /* #272729 */
+    --card-foreground: 240 11% 96%;
+    --popover: 240 3% 16%;
+    --popover-foreground: 240 11% 96%;
+    --primary: 212 100% 58%;          /* #2997FF */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 2% 20%;
+    --secondary-foreground: 240 11% 96%;
+    --muted: 240 2% 20%;
+    --muted-foreground: 240 2% 64%;   /* #A1A1A6 */
+    --accent: 212 100% 58%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 100% 62%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 100% / 0.12;
+    --input: 0 0% 100% / 0.16;
+    --ring: 212 100% 58%;
+    --sidebar-background: 240 3% 10%;
+    --sidebar-foreground: 240 11% 96%;
+    --sidebar-primary: 212 100% 58%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 2% 20%;
+    --sidebar-accent-foreground: 240 11% 96%;
+    --sidebar-border: 0 0% 100% / 0.12;
+    --sidebar-ring: 212 100% 58%;
+    --warning: 45 93% 55%;
+    --warning-foreground: 240 3% 12%;
+    --success: 136 50% 50%;
+    --success-foreground: 240 3% 12%;
+    --shadow-ceramic: 0 0 #0000;
+    --shadow-ceramic-hover: 0 0 0 1px hsl(0 0% 100% / 0.14);
+    --shadow-inner-glow: 0 0 #0000;
   }
 
   /* Bluelight — warm amber-filtered palette for evening work */
@@ -180,11 +183,12 @@ input, textarea, select {
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Schibsted Grotesk', ui-sans-serif, system-ui, sans-serif;
-    /* Basis auf 15.5px: 14px war auf grossen Bildschirmen zu klein für
-       Listen, die man den ganzen Tag liest. */
-    font-size: 15.5px;
-    line-height: 1.55;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', system-ui, sans-serif;
+    /* 17 px wie bei Apple (DESIGN.md): lesen, nicht überfliegen. Die
+       Zeilenhöhe 1.47 und die leicht engere Laufweite gehören dazu. */
+    font-size: 17px;
+    line-height: 1.47;
+    letter-spacing: -0.011em;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
@@ -205,20 +209,24 @@ input, textarea, select {
     font-weight: 500;
   }
 
-  /* Titel in derselben Familie, nur kräftiger und enger -- Hierarchie
-     über Gewicht und Grösse, nicht über eine zweite Schrift. */
+  /* Titel: dieselbe Familie, Gewicht 600, eng gesetzt -- Apples
+     "tight" Überschrift. Hierarchie über Grösse, nicht über Schrift. */
   h1, h2, h3, .font-serif {
-    font-family: 'Schibsted Grotesk', ui-sans-serif, system-ui, sans-serif;
-    font-weight: 700;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', system-ui, sans-serif;
+    font-weight: 600;
     letter-spacing: -0.02em;
-    line-height: 1.15;
+    line-height: 1.1;
   }
 
-  /* Überschriften bekommen mehr Gewicht gegenüber dem Fliesstext, damit
-     die Hierarchie auch beim Überfliegen trägt. */
   h1 { @apply text-3xl; }
-  h2 { @apply text-2xl; }
-  h3 { @apply text-lg; }
+  h2 { @apply text-2xl; letter-spacing: -0.015em; }
+  h3 { @apply text-lg; letter-spacing: -0.01em; }
+
+  /* Der Fokus ist sichtbar und blau, für Tastatur, nicht für Maus. */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
 
   code, .font-mono {
     font-family: ui-monospace, 'SF Mono', Menlo, monospace;
@@ -253,6 +261,20 @@ input, textarea, select {
 @media print {
   body * { visibility: hidden; }
   .brief-druck, .brief-druck * { visibility: visible; }
+  /* Berichte (Potenzialanalyse, Kundenbericht) ebenso -- ohne diese
+     Regel druckten sie als leeres Blatt, weil oben alles ausgeblendet
+     wird. Gemessen mit einem PDF-Druck am 1. November. */
+  .bericht-druck, .bericht-druck * { visibility: visible; }
+  .bericht-druck {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white;
+  }
+  @page { margin: 1.5cm; }
   .brief-druck {
     position: absolute;
     inset: 0;

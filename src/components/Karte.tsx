@@ -365,7 +365,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
     const l = document.createElement('link');
     l.id = 'gisk-fonts';
     l.rel = 'stylesheet';
-    l.href = 'https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap';
+    l.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap';
     document.head.appendChild(l);
   }, []);
 
@@ -1164,10 +1164,10 @@ const STIL = `
 /* Karte zuerst, wie bei Immobilienplattformen: die Karte füllt alles,
    Leiste, Filter und Tafel schweben darüber. Eine Schrift, ruhige
    Grautöne, ein Akzent. */
-.gisk{--bg:#F8FAFC;--weiss:#FFFFFF;--fl:#F1F5F9;--tinte:#0F172A;--grau:#64748B;--linie:#E2E8F0;--akzent:#2563EB;
+.gisk{--bg:#F5F5F7;--weiss:#FFFFFF;--fl:#F5F5F7;--tinte:#1D1D1F;--grau:#6E6E73;--linie:#E0E0E0;--akzent:#0066CC;
   --schatten:0 10px 30px -12px rgba(15,23,42,.25),0 2px 6px rgba(15,23,42,.06);
   position:fixed;inset:0;z-index:50;height:100dvh;background:var(--bg);color:var(--tinte);
-  font:14px/1.5 "Inter","Schibsted Grotesk",-apple-system,"Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+  font:14px/1.47 -apple-system,BlinkMacSystemFont,"SF Pro Text","Inter",system-ui,sans-serif;letter-spacing:-.01em;-webkit-font-smoothing:antialiased}
 .gisk *{box-sizing:border-box}
 /* :where, damit die Grundregel nur Vorgabe ist: Bausteine mit eigenen
    Klassen (Gespräche, Nachbarn) behalten ihre Farbe -- mit .gisk button

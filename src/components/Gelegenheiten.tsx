@@ -217,7 +217,7 @@ function Bericht({ mandantId, gelegenheiten, onZurueck }: { mandantId: string; g
   const name = eigene[0]?.mandant?.akteur?.name ?? 'Kunde';
   const zahl = (z: Zustand) => eigene.filter(g => g.zustand === z).length;
   return (
-    <div className="mx-auto max-w-3xl space-y-6 bg-white p-6 text-slate-900 print:p-0">
+    <div className="bericht-druck mx-auto max-w-3xl space-y-6 bg-white p-6 text-slate-900 print:p-0">
       <div className="flex items-center justify-between gap-2 print:hidden">
         <button type="button" onClick={onZurueck} className="h-10 rounded-lg border px-3 text-sm">Zurück</button>
         <button type="button" onClick={() => window.print()} className="flex h-10 items-center gap-1.5 rounded-lg bg-slate-900 px-4 text-sm font-medium text-white">

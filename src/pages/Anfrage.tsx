@@ -31,8 +31,8 @@ const TEXT: Record<Art, { ueber: string; titel: string; satz: string; knopf: str
   },
 };
 
-const feld = 'h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-base text-slate-900 outline-none focus:border-slate-900';
-const marke = 'mb-1.5 block text-sm font-medium text-slate-700';
+const feld = 'h-12 w-full rounded-xl border border-input bg-white px-4 text-base text-foreground outline-none focus:border-primary';
+const marke = 'mb-1.5 block text-sm font-medium text-muted-foreground';
 
 function Adresse({ wert, setWert, onWahl }: { wert: string; setWert: (s: string) => void; onWahl: (v: Vorschlag) => void }) {
   const [liste, setListe] = useState<Vorschlag[]>([]);
@@ -47,10 +47,10 @@ function Adresse({ wert, setWert, onWahl }: { wert: string; setWert: (s: string)
       <input className={feld} value={wert} autoComplete="street-address" placeholder="Strasse Nr., PLZ Ort"
              onChange={e => { setZu(false); setWert(e.target.value); }} />
       {liste.length > 0 && !zu && (
-        <ul className="absolute z-10 mt-1 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+        <ul className="absolute z-10 mt-1 w-full overflow-hidden rounded-xl border border-input bg-white">
           {liste.map(v => (
             <li key={v.label}>
-              <button type="button" className="w-full px-4 py-3 text-left text-sm text-slate-900 hover:bg-slate-50"
+              <button type="button" className="w-full px-4 py-3 text-left text-sm text-foreground hover:bg-background"
                       onClick={() => { setWert(v.label); setZu(true); setListe([]); onWahl(v); }}>{v.label}</button>
             </li>
           ))}
@@ -79,7 +79,7 @@ export default function Anfrage({ art }: { art: Art }) {
     if (document.getElementById('gisk-fonts')) return;
     const l = document.createElement('link');
     l.id = 'gisk-fonts'; l.rel = 'stylesheet';
-    l.href = 'https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&display=swap';
+    l.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap';
     document.head.appendChild(l);
   }, []);
 
@@ -114,19 +114,19 @@ export default function Anfrage({ art }: { art: Art }) {
   const bereit = f.name.trim().length >= 2 && erreichbar && ja && (art === 'investor' || f.adresse.trim().length > 3);
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-10 text-slate-900 sm:py-16" style={{ fontFamily: "'Schibsted Grotesk', ui-sans-serif, system-ui, sans-serif" }}>
+    <main className="min-h-screen bg-background px-4 py-10 text-foreground sm:py-16" style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', system-ui, sans-serif" }}>
       <div className="mx-auto max-w-lg">
-        <p className="text-sm font-semibold uppercase tracking-wider text-slate-500">{t.ueber}</p>
+        <p className="text-sm font-semibold text-muted-foreground">{t.ueber}</p>
         <h1 className="mt-2 text-3xl font-bold leading-tight tracking-tight sm:text-4xl" style={{ fontFamily: 'inherit' }}>{t.titel}</h1>
-        <p className="mt-3 text-base leading-relaxed text-slate-600">{t.satz}</p>
+        <p className="mt-3 text-base leading-relaxed text-muted-foreground">{t.satz}</p>
 
         {zustand === 'fertig' ? (
-          <div className="mt-10 rounded-2xl border border-slate-200 bg-white p-6">
+          <div className="mt-10 rounded-2xl border border-input bg-white p-6">
             <p className="text-lg font-semibold">Danke, Ihre Anfrage ist bei uns.</p>
-            <p className="mt-2 text-slate-600">Wir melden uns bei Ihnen.</p>
+            <p className="mt-2 text-muted-foreground">Wir melden uns bei Ihnen.</p>
           </div>
         ) : (
-          <form onSubmit={senden} className="mt-10 space-y-5 rounded-2xl border border-slate-200 bg-white p-6">
+          <form onSubmit={senden} className="mt-10 space-y-5 rounded-2xl border border-input bg-white p-6">
             {art !== 'investor' && (
               <div>
                 <label className={marke}>Adresse der Liegenschaft</label>
@@ -135,16 +135,16 @@ export default function Anfrage({ art }: { art: Art }) {
             )}
 
             {art === 'potenzial' && (sucht || auskunft) && (
-              <div className="rounded-xl bg-slate-50 p-4" aria-live="polite">
-                {sucht && <p className="text-sm text-slate-500">Amtliche Daten werden abgefragt …</p>}
+              <div className="rounded-xl bg-background p-4" aria-live="polite">
+                {sucht && <p className="text-sm text-muted-foreground">Amtliche Daten werden abgefragt …</p>}
                 {auskunft && (
                   <dl className="grid grid-cols-3 gap-3 text-center">
-                    <div><dt className="text-xs text-slate-500">Parzelle</dt><dd className="mt-1 font-semibold">{auskunft.nummer ?? '–'}</dd></div>
-                    <div><dt className="text-xs text-slate-500">Fläche</dt><dd className="mt-1 font-semibold">{auskunft.flaeche ? `${auskunft.flaeche.toLocaleString('de-CH')} m²` : '–'}</dd></div>
-                    <div><dt className="text-xs text-slate-500">Bauzone</dt><dd className="mt-1 font-semibold">{auskunft.zone ?? 'keine'}</dd></div>
+                    <div><dt className="text-xs text-muted-foreground">Parzelle</dt><dd className="mt-1 font-semibold">{auskunft.nummer ?? '–'}</dd></div>
+                    <div><dt className="text-xs text-muted-foreground">Fläche</dt><dd className="mt-1 font-semibold">{auskunft.flaeche ? `${auskunft.flaeche.toLocaleString('de-CH')} m²` : '–'}</dd></div>
+                    <div><dt className="text-xs text-muted-foreground">Bauzone</dt><dd className="mt-1 font-semibold">{auskunft.zone ?? 'keine'}</dd></div>
                   </dl>
                 )}
-                {auskunft && <p className="mt-3 text-xs text-slate-500">Quelle: amtliche Vermessung und Bauzonen Schweiz (geo.admin.ch). Fläche aus dem Umriss gerechnet.</p>}
+                {auskunft && <p className="mt-3 text-xs text-muted-foreground">Quelle: amtliche Vermessung und Bauzonen Schweiz (geo.admin.ch). Fläche aus dem Umriss gerechnet.</p>}
               </div>
             )}
 
@@ -178,21 +178,21 @@ export default function Anfrage({ art }: { art: Art }) {
               <div><label className={marke}>Telefon</label><input className={feld} type="tel" value={f.telefon} onChange={set('telefon')} autoComplete="tel" /></div>
             </div>
             <div><label className={marke}>Nachricht (freiwillig)</label>
-              <textarea className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 outline-none focus:border-slate-900" rows={3} value={f.nachricht} onChange={set('nachricht')} /></div>
+              <textarea className="w-full rounded-xl border border-input bg-white px-4 py-3 text-base text-foreground outline-none focus:border-primary" rows={3} value={f.nachricht} onChange={set('nachricht')} /></div>
 
             {/* Für Programme sichtbar, für Menschen nicht. */}
             <input type="text" name="website" value={f.website} onChange={set('website')} tabIndex={-1} autoComplete="off"
                    aria-hidden="true" className="absolute left-[-10000px] h-px w-px opacity-0" />
 
-            <label className="flex items-start gap-3 text-sm text-slate-600">
+            <label className="flex items-start gap-3 text-sm text-muted-foreground">
               <input type="checkbox" className="mt-0.5 h-5 w-5 shrink-0" checked={ja} onChange={e => setJa(e.target.checked)} />
               <span>Ich bin einverstanden, dass meine Angaben gespeichert und zur Bearbeitung dieser Anfrage verwendet werden. Sie werden nicht weitergegeben.</span>
             </label>
 
-            {!erreichbar && (f.name || f.adresse) && <p className="text-sm text-slate-500">Bitte E-Mail oder Telefon angeben, damit wir Sie erreichen.</p>}
+            {!erreichbar && (f.name || f.adresse) && <p className="text-sm text-muted-foreground">Bitte E-Mail oder Telefon angeben, damit wir Sie erreichen.</p>}
             {zustand === 'fehler' && <p className="text-sm text-red-600">Das hat nicht geklappt. Bitte versuchen Sie es noch einmal.</p>}
             <button type="submit" disabled={!bereit || zustand === 'sendet'}
-                    className="h-12 w-full rounded-xl bg-slate-900 text-base font-semibold text-white disabled:opacity-40">
+                    className="h-12 w-full rounded-full bg-primary text-[17px] text-primary-foreground transition-transform active:scale-95 disabled:opacity-40">
               {zustand === 'sendet' ? 'Wird gesendet …' : t.knopf}
             </button>
           </form>

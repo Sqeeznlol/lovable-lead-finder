@@ -547,7 +547,7 @@ function Verlauf({ v, eintraege }: { v: Vorhaben; eintraege: { id: string; am: s
  */
 function Bericht({ v, a, onZurueck }: { v: Vorhaben; a: Analyse; onZurueck: () => void }) {
   return (
-    <div className="mx-auto max-w-3xl space-y-8 bg-white p-6 text-slate-900 print:max-w-none print:p-0">
+    <div className="bericht-druck mx-auto max-w-3xl space-y-8 bg-white p-6 text-slate-900 print:max-w-none print:p-0">
       <div className="flex justify-between gap-2 print:hidden">
         <button type="button" onClick={onZurueck} className={KNOPF}>Zurück</button>
         <button type="button" onClick={() => window.print()} className={KNOPF_HAUPT}>Drucken oder als PDF sichern</button>
