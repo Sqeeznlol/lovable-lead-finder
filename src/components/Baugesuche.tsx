@@ -16,11 +16,32 @@ export interface Gesuch {
   id: string; publiziert_am: string; gemeinde: string | null; adresse: string | null; parzelle_nr: string | null;
   egrid: string | null; beschreibung: string | null; bauherrschaft: string | null; parzelle_id: string | null;
   nachbar_egrids: string[] | null; erfasst_am: string; quelle: string;
+  publikation_nr?: string | null; publikation_id?: string | null;
+  einsprache_bis?: string | null; publiziert_bis?: string | null; quelle_url?: string | null;
+}
+
+/**
+ * Die Wege zum Nachprüfen eines Gesuchs: die Publikation im Amtsblatt
+ * und der Datensatz, aus dem die Zeile stammt. Nur Adressen, die
+ * "Auswerten / amtsblatt" mit einer echten Publikation geprüft hat:
+ * die Detailseite zeigt die Nummer im Browser (Lauf 64), das PDF kommt
+ * als %PDF zurück. Mit amtsblattportal.ch statt amtsblatt.zh.ch bleibt
+ * die Seite leer, mit der Nummer statt der Kennung meldet sie Fehler.
+ */
+export function belege(g: Gesuch): { titel: string; zeile: string; url: string }[] {
+  const b: { titel: string; zeile: string; url: string }[] = [];
+  if (g.publikation_id) {
+    b.push({ titel: 'Publikation im Amtsblatt', zeile: g.publikation_nr ?? 'Amtsblatt des Kantons Zürich', url: AMTSBLATT_SEITE(g.publikation_id) });
+    b.push({ titel: 'Publikation als PDF', zeile: 'zum Ablegen oder Weitergeben', url: `https://amtsblatt.zh.ch/api/v1/publications/${g.publikation_id}/pdf` });
+  }
+  if (g.quelle_url) b.push({ titel: 'Quelle', zeile: 'Baugesuche im Kanton Zürich, Statistisches Amt', url: g.quelle_url });
+  return b;
 }
 
 // Die erzeugten Typen kennen die Plattform-Tabellen noch nicht.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = () => supabase as any;
+const AMTSBLATT_SEITE = (id: string) => `https://amtsblatt.zh.ch/#!/search/publications/detail/${id}`;
 const datum = (s: string) => new Date(s).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
 const zeit = (s: string) => new Date(s).toLocaleString('de-CH', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
@@ -30,7 +51,7 @@ export function useBaugesuche() {
     queryFn: async () => {
       const [g, o] = await Promise.all([
         db().from('baugesuch')
-          .select('id, publiziert_am, gemeinde, adresse, parzelle_nr, egrid, beschreibung, bauherrschaft, parzelle_id, nachbar_egrids, erfasst_am, quelle')
+          .select('id, publiziert_am, gemeinde, adresse, parzelle_nr, egrid, beschreibung, bauherrschaft, parzelle_id, nachbar_egrids, erfasst_am, quelle, publikation_nr, publikation_id, einsprache_bis, publiziert_bis, quelle_url')
           // Proben aus "Auswerten" werden zurückgerollt; sicherheitshalber nie zeigen.
           .neq('quelle', 'probe')
           .order('publiziert_am', { ascending: false }).limit(500),
@@ -53,7 +74,7 @@ export function filtern(gs: Gesuch[], mitGel: Set<string>, sicht: Sicht, tage: n
   return gs.filter(g =>
     (!ab || g.publiziert_am >= ab)
     && (sicht === 'alle' || (sicht === 'bestand' ? !!g.parzelle_id : mitGel.has(g.id)))
-    && (!w || [g.adresse, g.gemeinde, g.beschreibung, g.parzelle_nr].some(x => (x ?? '').toLowerCase().includes(w))));
+    && (!w || [g.adresse, g.gemeinde, g.beschreibung, g.parzelle_nr, g.publikation_nr].some(x => (x ?? '').toLowerCase().includes(w))));
 }
 
 export function Baugesuche() {
@@ -94,8 +115,8 @@ export function Baugesuche() {
           <option value={30}>Letzte 30 Tage</option>
           <option value={0}>Alle</option>
         </select>
-        <input value={wort} onChange={e => setWort(e.target.value)} placeholder="Adresse, Gemeinde, Vorhaben"
-               className="h-10 min-w-0 flex-1 rounded-full border bg-card px-4 text-sm sm:max-w-xs" />
+        <input value={wort} onChange={e => setWort(e.target.value)} placeholder="Adresse, Gemeinde, Vorhaben, Nummer"
+               className="h-10 w-full min-w-0 rounded-full border bg-card px-4 text-sm sm:w-auto sm:flex-1 sm:max-w-xs" />
       </div>
 
       {isLoading && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> wird geladen …</p>}
@@ -132,14 +153,26 @@ export function Baugesuche() {
                   <div><dt className="text-xs text-muted-foreground">EGRID</dt><dd className="font-mono text-xs">{g.egrid ?? '–'}</dd></div>
                   <div><dt className="text-xs text-muted-foreground">Nachbarn</dt><dd className="font-medium">{g.nachbar_egrids?.length ?? 0}</dd></div>
                   <div><dt className="text-xs text-muted-foreground">Bauherrschaft</dt><dd className="font-medium">{g.bauherrschaft ?? '–'}</dd></div>
-                  {g.egrid && (
-                    <div className="col-span-2 sm:col-span-4">
-                      <a className="inline-flex h-10 items-center rounded-full border px-4 text-sm font-medium hover:bg-secondary"
-                         href={`https://map.geo.admin.ch/?swisssearch=${g.egrid}&lang=de`} target={FENSTER.karte}>
-                        Im Bundes-GIS zeigen
+                  <div><dt className="text-xs text-muted-foreground">Publikation</dt><dd className="font-mono text-xs">{g.publikation_nr ?? '–'}</dd></div>
+                  <div><dt className="text-xs text-muted-foreground">Publiziert</dt><dd className="font-medium">{datum(g.publiziert_am)}</dd></div>
+                  <div><dt className="text-xs text-muted-foreground">Einsprache bis</dt><dd className="font-medium">{g.einsprache_bis ? datum(g.einsprache_bis) : '–'}</dd></div>
+                  <div><dt className="text-xs text-muted-foreground">Publiziert bis</dt><dd className="font-medium">{g.publiziert_bis ? datum(g.publiziert_bis) : '–'}</dd></div>
+                  <div className="col-span-2 grid gap-2 sm:col-span-4 sm:grid-cols-2 lg:grid-cols-4">
+                    {belege(g).map(b => (
+                      <a key={b.url} href={b.url} target={FENSTER.karte}
+                         className="flex min-h-11 flex-col justify-center rounded-xl border px-4 py-2 hover:bg-secondary">
+                        <span className="text-sm font-medium">{b.titel}</span>
+                        <span className="text-xs text-muted-foreground">{b.zeile}</span>
                       </a>
-                    </div>
-                  )}
+                    ))}
+                    {g.egrid && (
+                      <a href={`https://map.geo.admin.ch/?swisssearch=${g.egrid}&lang=de`} target={FENSTER.karte}
+                         className="flex min-h-11 flex-col justify-center rounded-xl border px-4 py-2 hover:bg-secondary">
+                        <span className="text-sm font-medium">Parzelle im Bundes-GIS</span>
+                        <span className="text-xs text-muted-foreground">map.geo.admin.ch</span>
+                      </a>
+                    )}
+                  </div>
                 </dl>
               )}
             </li>
