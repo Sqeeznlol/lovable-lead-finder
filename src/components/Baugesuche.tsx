@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { FENSTER } from '@/lib/fenster';
 import { FELD, Leer, Marke, Reiter, Seite } from '@/components/rahmen';
 import { BILD } from '@/lib/luftbild';
+import { BetroffeneParzellen } from '@/components/BetroffeneParzellen';
 
 /**
  * Alle Baugesuche, die der Ablauf "Baugesuche" geladen hat -- zum
@@ -171,6 +172,7 @@ export function Baugesuche() {
                       </a>
                     )}
                   </div>
+                  <div className="col-span-2 sm:col-span-4"><BetroffeneParzellen g={g} /></div>
                 </dl>
               )}
             </li>
