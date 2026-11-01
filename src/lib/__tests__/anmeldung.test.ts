@@ -12,7 +12,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { geraetName } from '@/lib/geraet';
+import { geraetGenau, geraetName } from '@/lib/geraet';
 import { kennungZuAdresse } from '@/lib/kennung';
 
 describe('Anmeldung', () => {
@@ -34,6 +34,14 @@ describe('Anmeldung', () => {
     expect(m).toMatch(/security definer/);
   });
 
+  it('Gerätenamen setzt nur der Admin, und das Protokoll bleibt ohne Schreibregel', () => {
+    const m = readFileSync('supabase/migrations/20261101200000_anmeldung_ort_geraet.sql', 'utf8');
+    expect(m).toMatch(/on public\.geraet_benennung\s+for all to authenticated\s+using \(public\.has_role\(auth\.uid\(\), 'admin'\)\)\s+with check \(public\.has_role\(auth\.uid\(\), 'admin'\)\)/);
+    expect(m).not.toMatch(/on public\.anmeldung\s+for (insert|update|delete|all)/i);
+    // Die Adresse kommt weiterhin vom Rand, nicht aus einem Parameter.
+    expect(m).toMatch(/current_setting\('request\.headers'/);
+  });
+
   it('macht aus dem Benutzernamen eine Adresse', () => {
     expect(kennungZuAdresse('AUI')).toBe('aui@wohntraums.life');
     expect(kennungZuAdresse(' Sqeezn ')).toBe('sqeezn@wohntraums.life');
@@ -51,5 +59,25 @@ describe('Anmeldung', () => {
     expect(geraetName(macSafari, true)).toBe('iPad · Safari');
     expect(geraetName(macSafari, false)).toBe('Mac · Safari');
     expect(geraetName(macChrome, false)).toBe('Mac · Chrome');
+  });
+});
+
+describe('Gerät genau', () => {
+  const iphone = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1';
+  const win = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+  const android = 'Mozilla/5.0 (Linux; Android 14; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36';
+
+  it('nennt beim iPhone die iOS-Version, die Safari-Version und den Bildschirm', () => {
+    expect(geraetGenau(iphone, true, {}, { w: 390, h: 844 })).toBe('iPhone · iOS 18.1 · Safari 18 · 390×844');
+  });
+
+  it('erkennt Windows 11 nur an den Hinweisen des Browsers', () => {
+    expect(geraetGenau(win, false, { platformVersion: '15.0.0' }, { w: 1920, h: 1080 })).toBe('Windows 11 · Chrome 131 · 1080×1920');
+    expect(geraetGenau(win, false, { platformVersion: '10.0.0' }, null)).toBe('Windows 10 · Chrome 131');
+    expect(geraetGenau(win, false, {}, null)).toBe('Windows · Chrome 131');
+  });
+
+  it('setzt beim Android das Modell aus den Hinweisen ein', () => {
+    expect(geraetGenau(android, true, { model: 'SM-S918B' }, null)).toBe('Android 14 · SM-S918B · Chrome 131');
   });
 });

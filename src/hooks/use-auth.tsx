@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, createContext, useContext, type React
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { protokolliere } from '@/lib/protokoll';
-import { geraetName } from '@/lib/geraet';
+import { geraetGenau, geraetHinweise, geraetKennung } from '@/lib/geraet';
+import { ortHolen } from '@/lib/ort';
 
 /**
  * Die Anmeldung, zurück seit dem 1. November.
@@ -61,7 +62,15 @@ async function anmeldungMerken(): Promise<void> {
     // Die erzeugten Typen kennen die neue Funktion noch nicht --
     // dieselbe Lage wie bei `parzellen_karte` in use-karte.ts.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase as any).rpc('anmeldung_merken', { p_geraet: geraetName() });
+    // Ort und Hinweise parallel, und beide mit Zeitgrenze: die
+    // Anmeldung ist schon geschehen, hier wird nur noch festgehalten.
+    const [ort, hinweise] = await Promise.all([ortHolen(), geraetHinweise()]);
+    await (supabase as any).rpc('anmeldung_merken', {
+      p_geraet: geraetGenau(undefined, undefined, hinweise),
+      p_geraet_id: geraetKennung(),
+      p_ort: ort?.text ?? null,
+      p_ort_ip: ort?.ip ?? null,
+    });
   } catch {
     /* Ein fehlender Eintrag hält niemanden auf. */
   }
