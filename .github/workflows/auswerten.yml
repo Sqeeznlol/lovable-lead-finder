@@ -448,10 +448,11 @@ jobs:
             for url in https://get.geojs.io/v1/ip/geo.json https://ipapi.co/json/ https://ipwho.is/ https://freeipapi.com/api/json; do
               {
                 echo "### $url"; echo '```'
+                rm -f /tmp/k /tmp/b
                 curl -s -m 15 -D /tmp/k -o /tmp/b -H 'Origin: https://example.org' "$url" \
                   -w 'HTTP %{http_code}\n' || echo "keine Antwort"
-                grep -i '^access-control-allow-origin' /tmp/k || echo "kein CORS-Kopf"
-                python3 -c "import json;d=json.load(open('/tmp/b'));print('Felder:',sorted(d.keys()));print('Ort:',{k:d.get(k) for k in ('city','region','country','country_name','regionName','cityName','countryName') if k in d})" 2>&1 | head -5
+                grep -i '^access-control-allow-origin' /tmp/k 2>/dev/null || echo "kein CORS-Kopf"
+                python3 -c "import json;d=json.load(open('/tmp/b'));print('Felder:',sorted(d.keys()));print('Ort:',{k:d.get(k) for k in ('city','region','country','country_name','regionName','cityName','countryName') if k in d})" 2>&1 | head -5 || true
                 echo '```'
               } >> "$GITHUB_STEP_SUMMARY"
             done
