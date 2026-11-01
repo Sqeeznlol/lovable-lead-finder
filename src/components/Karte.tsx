@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import { useParzellenImAusschnitt, type Ausschnitt, type ParzelleEigenschaften } from '@/hooks/use-karte';
 import { Nachbarn } from '@/components/Nachbarn';
 import { NachbarnBund } from '@/components/NachbarnBund';
+import { usePortfolios, umrissVomBund, type Portfolio } from '@/hooks/use-portfolio';
 import { supabase } from '@/integrations/supabase/client';
 import { FENSTER } from '@/lib/fenster';
 import { BAUZONEN, GRENZEN, GRUNDKARTEN, WMS_MAX, wmsAdresse, type Ebene, type Grund } from '@/lib/karte-ebenen';
@@ -117,6 +118,13 @@ const AB_ZOOM = 15;
 // Die Karte zeigt den ganzen Bestand, nicht einen Kanton: sie startet
 // deshalb über der ganzen Schweiz und hängt nicht an der Kantonswahl.
 const SCHWEIZ: [number, number] = [46.82, 8.23];
+/**
+ * Die Schweiz, Landesgrenze mit etwas Rand. Die Karte startet so, dass
+ * sie den Bildschirm füllt, und lässt sich weder weiter heraus- noch
+ * darüber hinaus schieben: ausserhalb liegt nichts, was hier jemand
+ * braucht, und die Landeskarte endet dort ohnehin mit weissen Rändern.
+ */
+const SCHWEIZ_RAHMEN = L.latLngBounds([45.75, 5.9], [47.85, 10.55]);
 
 /** WGS84 nach LV95, Näherungsformeln swisstopo (aus der Vorlage). */
 function toLV95(lat: number, lon: number) {
@@ -284,6 +292,11 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
 
   const [grund, setGrund] = useState<Grund>('karte');
   const [grenzenAn, setGrenzenAn] = useState(true);
+  // Portfolios der Mandanten: eine eigene Farbe, eine eigene Tafel.
+  const [portfolioAn, setPortfolioAn] = useState(false);
+  const { data: portfolios, isLoading: portfoliosLaden, error: portfolioFehler } = usePortfolios(portfolioAn);
+  const portfolioEbene = useRef<L.GeoJSON | null>(null);
+  const [umrisseGeladen, setUmrisseGeladen] = useState<{ fertig: number; gesamt: number }>({ fertig: 0, gesamt: 0 });
   const grenzenEbene = useRef<L.Layer | null>(null);
   const [zonenAn, setZonenAn] = useState(false);
   const [zonenFilter, setZonenFilter] = useState<Set<Zonenart>>(new Set());
@@ -327,7 +340,21 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
     const m = L.map(box.current, {
       center: SCHWEIZ, zoom: 8, maxZoom: 21,
       zoomControl: false, preferCanvas: true,
+      maxBounds: SCHWEIZ_RAHMEN, maxBoundsViscosity: 1,
+      // Bruchteile erlaubt, damit die Schweiz den Bildschirm wirklich
+      // füllt und nicht auf die nächste ganze Stufe zurückfällt.
+      zoomSnap: 0.25,
     });
+    // Herauszoomen nur bis die Schweiz den Bildschirm füllt -- "inside":
+    // die Schweiz deckt das ganze Bild, kein Rand darum.
+    const schweizFuellen = () => {
+      const z = m.getBoundsZoom(SCHWEIZ_RAHMEN, true);
+      m.setMinZoom(z);
+      if (m.getZoom() < z) m.setZoom(z);
+    };
+    m.fitBounds(SCHWEIZ_RAHMEN, { animate: false });
+    schweizFuellen();
+    m.on('resize', schweizFuellen);
     // Unten rechts, wie bei Google Maps: oben links stehen die Zonen.
     L.control.zoom({ position: 'bottomright' }).addTo(m);
     L.control.scale({ imperial: false, position: 'bottomright' }).addTo(m);
@@ -514,6 +541,49 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
     });
   }
 
+  // ---------------------------------------------- Portfolio
+  // Violett, weil die Margen-Farben grün bis orange sind und Rot die
+  // angeklickte Parzelle ist: ein Portfolio soll man auf einen Blick
+  // vom Bestand unterscheiden.
+  useEffect(() => {
+    const m = karte.current;
+    portfolioEbene.current?.remove(); portfolioEbene.current = null;
+    if (!m || !portfolioAn || !portfolios?.length) return;
+    let abgebrochen = false;
+    const ebene = L.geoJSON(undefined, {
+      style: { color: '#7C3AED', weight: 3, fillColor: '#7C3AED', fillOpacity: 0.25 },
+    }).addTo(m);
+    portfolioEbene.current = ebene;
+    const alle = portfolios.flatMap(pf => pf.positionen.map(p => ({ pf, p }))).filter(x => x.p.egrid);
+    setUmrisseGeladen({ fertig: 0, gesamt: alle.length });
+    (async () => {
+      let fertig = 0;
+      for (const { pf, p } of alle) {
+        try {
+          const g = await umrissVomBund(p.egrid!);
+          if (abgebrochen) return;
+          if (g) {
+            const f = L.geoJSON(g as GeoJSON.GeoJsonObject, {
+              style: { color: '#7C3AED', weight: 3, fillColor: '#7C3AED', fillOpacity: 0.25 },
+            });
+            f.bindTooltip(`<b>${p.adresse ?? 'Parzelle ' + (p.parzelle ?? '')}</b><br>${pf.name}`
+              + (pf.manager.length ? `<br>Manager: ${pf.manager.join(', ')}` : ''),
+              { sticky: true, direction: 'top', className: 'gisk-tip' });
+            f.on('click', (ev: L.LeafletMouseEvent) => {
+              L.DomEvent.stopPropagation(ev);
+              if (p.parzelleId) oeffnePerId(p.parzelleId);
+            });
+            f.eachLayer(l => ebene.addLayer(l));
+          }
+        } catch { /* eine fehlende Parzelle hält die übrigen nicht auf */ }
+        fertig += 1;
+        setUmrisseGeladen({ fertig, gesamt: alle.length });
+      }
+      if (!abgebrochen && ebene.getLayers().length) m.fitBounds(ebene.getBounds(), { padding: [60, 60], maxZoom: 17 });
+    })();
+    return () => { abgebrochen = true; };
+  }, [portfolioAn, portfolios]);
+
   // ------------------------------------------------------------ Suche
   useEffect(() => {
     const s = suche.trim();
@@ -562,7 +632,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
   // ---------------------------------------------- Bestand im Bild
   const bestand = useMemo(() => {
     if (!data) return [];
-    return [...data.features]
+    return [...(data.features ?? [])]
       .filter(f => !f.properties?.ausgeschlossen)
       .filter(f => passtZone(f.properties?.zone, zonenFilter, zonenGenau))
       .sort((a, b) => (Number(b.properties?.marge) || 0) - (Number(a.properties?.marge) || 0))
@@ -575,7 +645,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
   const zonenImBild = useMemo(() => {
     if (!data || zonenFilter.size === 0) return [] as string[];
     const menge = new Set<string>();
-    for (const f of data.features) {
+    for (const f of data.features ?? []) {
       const z = String(f.properties?.zone ?? '').trim();
       if (z && zonenFilter.has(zonenart(z))) menge.add(z);
     }
@@ -660,6 +730,10 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
           <button type="button" className={`schalter${zonenAn ? ' an' : ''}`} onClick={() => setZonenAn(v => !v)}>
             Bauzonen
           </button>
+          <button type="button" className={`schalter${portfolioAn ? ' an lila' : ''}`}
+                  onClick={() => { setPortfolioAn(v => !v); setAuswahl({ art: 'leer' }); markieren(null); }}>
+            Portfolios
+          </button>
         </div>
       </header>
 
@@ -693,13 +767,17 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
         )}
         <div className="readout">
           {!genugNah ? 'Näher heranzoomen für den Bestand · ' : ''}
-          {genugNah && data ? `${data.features.length} eigene Parzellen im Bild · ` : ''}
+          {genugNah && data ? `${data.features?.length ?? 0} eigene Parzellen im Bild · ` : ''}
           LV95 {gr(lvMitte.E)} / {gr(lvMitte.N)}
         </div>
       </div>
 
       <aside className="tafel">
-        {auswahl.art === 'leer' && (
+        {auswahl.art === 'leer' && portfolioAn && (
+          <PortfolioTafel portfolios={portfolios} laedt={portfoliosLaden} fehler={!!portfolioFehler}
+                          umrisse={umrisseGeladen} onOeffnen={id => oeffnePerId(id)} />
+        )}
+        {auswahl.art === 'leer' && !portfolioAn && (
           <>
             <div className="kopf">
               <p className="ueber">Bestand im Bild</p>
@@ -817,6 +895,52 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
   );
 }
 
+/** Die Portfolios in der Tafel: wem sie gehören, wer sie bewirtschaftet, welche Parzellen. */
+function PortfolioTafel({ portfolios, laedt, fehler, umrisse, onOeffnen }: {
+  portfolios?: Portfolio[]; laedt: boolean; fehler: boolean;
+  umrisse: { fertig: number; gesamt: number }; onOeffnen: (id: string) => void;
+}) {
+  if (laedt) return <div className="kopf"><p className="ueber">Portfolios</p><h2>Wird geladen …</h2></div>;
+  if (fehler) return (
+    <div className="kopf"><p className="ueber">Portfolios</p><h2>Nicht lesbar</h2>
+      <p className="sanft">Portfolios sieht nur, wer angemeldet ist.</p></div>);
+  if (!portfolios?.length) return (
+    <div className="kopf"><p className="ueber">Portfolios</p><h2>Noch keines</h2>
+      <p className="sanft">Es ist kein Portfolio erfasst.</p></div>);
+  return (
+    <>
+      {portfolios.map(pf => (
+        <div key={pf.id} className="abschnitt" style={{ borderTop: 0, marginTop: 0, paddingTop: 0 }}>
+          <div className="kopf">
+            <p className="ueber">Portfolio · {pf.positionen.length} Parzellen</p>
+            <h2>{pf.name.replace(/\s*--\s*/, ' · ')}</h2>
+          </div>
+          <dl className="rolle">
+            <dt>Eigner</dt><dd>{pf.eigner ?? '–'}</dd>
+            <dt>Manager</dt><dd>{pf.manager.length ? pf.manager.join(', ') : '–'}</dd>
+          </dl>
+          {umrisse.gesamt > 0 && umrisse.fertig < umrisse.gesamt && (
+            <p className="sanft block">Umrisse vom Bund: {umrisse.fertig} von {umrisse.gesamt} …</p>
+          )}
+          <div className="karten">
+            {pf.positionen.map(p => (
+              <button type="button" key={p.id} className="eintrag" disabled={!p.parzelleId}
+                      onClick={() => p.parzelleId && onOeffnen(p.parzelleId)}>
+                <i className="lila" />
+                <span className="text">
+                  <b>{p.adresse ?? `Parzelle ${p.parzelle ?? '?'}`}</b>
+                  <small>{[p.parzelle ? `Parz. ${p.parzelle}` : null, p.zone,
+                           p.flaeche ? `${gr(p.flaeche)} m²` : null].filter(Boolean).join(' · ')}</small>
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
 /** Die Gestaltung der Vorlage, auf diesen Bereich beschränkt. */
 const STIL = `
 /* Karte zuerst, wie bei Immobilienplattformen: die Karte füllt alles,
@@ -869,6 +993,10 @@ const STIL = `
 .gisk .segment button.an{background:var(--weiss);color:var(--tinte);box-shadow:0 1px 3px rgba(15,23,42,.12)}
 .gisk .schalter{height:40px;border:1px solid var(--linie);background:var(--weiss);border-radius:12px;padding:0 14px;cursor:pointer;font-weight:500;color:var(--grau)}
 .gisk .schalter.an{background:var(--tinte);border-color:var(--tinte);color:#fff}
+.gisk .schalter.an.lila{background:#7C3AED;border-color:#7C3AED}
+.gisk .eintrag>i.lila{background:#7C3AED}
+.gisk .rolle{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px;margin:12px 0 16px}
+.gisk .rolle dt{color:var(--grau)}.gisk .rolle dd{margin:0;font-weight:600}
 
 .gisk .filter{position:absolute;z-index:650;top:76px;left:16px;right:416px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .gisk .filter .titel{font-size:12px;font-weight:600;color:var(--grau);background:var(--weiss);padding:6px 10px;border-radius:999px;box-shadow:var(--schatten)}
