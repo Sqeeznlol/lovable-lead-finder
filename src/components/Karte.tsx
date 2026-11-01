@@ -296,6 +296,8 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
   const [portfolioAn, setPortfolioAn] = useState(false);
   const { data: portfolios, isLoading: portfoliosLaden, error: portfolioFehler } = usePortfolios(portfolioAn);
   const portfolioEbene = useRef<L.GeoJSON | null>(null);
+  // Die Ausdehnung je Portfolio, damit Aufklappen auf genau dieses zoomt.
+  const portfolioRahmen = useRef<Record<string, L.LatLngBounds>>({});
   const [umrisseGeladen, setUmrisseGeladen] = useState<{ fertig: number; gesamt: number }>({ fertig: 0, gesamt: 0 });
   const grenzenEbene = useRef<L.Layer | null>(null);
   const [zonenAn, setZonenAn] = useState(false);
@@ -558,6 +560,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
     }).addTo(m);
     portfolioEbene.current = ebene;
     const alle = portfolios.flatMap(pf => pf.positionen.map(p => ({ pf, p }))).filter(x => x.p.egrid);
+    portfolioRahmen.current = {};
     setUmrisseGeladen({ fertig: 0, gesamt: alle.length });
     (async () => {
       let fertig = 0;
@@ -577,6 +580,9 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
               if (p.parzelleId) oeffnePerId(p.parzelleId);
             });
             f.eachLayer(l => ebene.addLayer(l));
+            const b = f.getBounds();
+            portfolioRahmen.current[pf.id] = portfolioRahmen.current[pf.id]
+              ? portfolioRahmen.current[pf.id].extend(b) : L.latLngBounds(b.getSouthWest(), b.getNorthEast());
           }
         } catch { /* eine fehlende Parzelle hält die übrigen nicht auf */ }
         fertig += 1;
@@ -778,7 +784,9 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
       <aside className="tafel">
         {auswahl.art === 'leer' && portfolioAn && (
           <PortfolioTafel portfolios={portfolios} laedt={portfoliosLaden} fehler={!!portfolioFehler}
-                          umrisse={umrisseGeladen} onOeffnen={id => oeffnePerId(id)} />
+                          umrisse={umrisseGeladen} onOeffnen={id => oeffnePerId(id)}
+                          onZeigen={id => { const b = portfolioRahmen.current[id];
+                            if (b) karte.current?.fitBounds(b, { padding: [60, 60], maxZoom: 18 }); }} />
         )}
         {auswahl.art === 'leer' && !portfolioAn && (
           <>
@@ -899,10 +907,15 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
 }
 
 /** Die Portfolios in der Tafel: wem sie gehören, wer sie bewirtschaftet, welche Parzellen. */
-function PortfolioTafel({ portfolios, laedt, fehler, umrisse, onOeffnen }: {
+function PortfolioTafel({ portfolios, laedt, fehler, umrisse, onOeffnen, onZeigen }: {
   portfolios?: Portfolio[]; laedt: boolean; fehler: boolean;
   umrisse: { fertig: number; gesamt: number }; onOeffnen: (id: string) => void;
+  onZeigen: (portfolioId: string) => void;
 }) {
+  // Zugeklappt, bis man eines wählt: mit zwanzig Parzellen je Portfolio
+  // wird die Tafel sonst zur Liste, durch die man scrollt, statt zur
+  // Übersicht. Offen ist immer höchstens eines.
+  const [offen, setOffen] = useState<string | null>(null);
   if (laedt) return <div className="kopf"><p className="ueber">Portfolios</p><h2>Wird geladen …</h2></div>;
   if (fehler) return (
     <div className="kopf"><p className="ueber">Portfolios</p><h2>Nicht lesbar</h2>
@@ -912,34 +925,51 @@ function PortfolioTafel({ portfolios, laedt, fehler, umrisse, onOeffnen }: {
       <p className="sanft">Es ist kein Portfolio erfasst.</p></div>);
   return (
     <>
-      {portfolios.map(pf => (
-        <div key={pf.id} className="abschnitt" style={{ borderTop: 0, marginTop: 0, paddingTop: 0 }}>
-          <div className="kopf">
-            <p className="ueber">Portfolio · {pf.positionen.length} Parzellen</p>
-            <h2>{pf.name.replace(/\s*--\s*/, ' · ')}</h2>
-          </div>
-          <dl className="rolle">
-            <dt>Eigner</dt><dd>{pf.eigner ?? '–'}</dd>
-            <dt>Manager</dt><dd>{pf.manager.length ? pf.manager.join(', ') : '–'}</dd>
-          </dl>
-          {umrisse.gesamt > 0 && umrisse.fertig < umrisse.gesamt && (
-            <p className="sanft block">Umrisse vom Bund: {umrisse.fertig} von {umrisse.gesamt} …</p>
-          )}
-          <div className="karten">
-            {pf.positionen.map(p => (
-              <button type="button" key={p.id} className="eintrag" disabled={!p.parzelleId}
-                      onClick={() => p.parzelleId && onOeffnen(p.parzelleId)}>
-                <i className="lila" />
+      <div className="kopf">
+        <p className="ueber">Portfolios</p>
+        <h2>{portfolios.length} Portfolios</h2>
+        {umrisse.gesamt > 0 && umrisse.fertig < umrisse.gesamt && (
+          <p className="sanft">Umrisse vom Bund: {umrisse.fertig} von {umrisse.gesamt} …</p>
+        )}
+      </div>
+      <div className="mappen">
+        {portfolios.map(pf => {
+          const auf = offen === pf.id;
+          return (
+            <div key={pf.id} className={`mappe${auf ? ' auf' : ''}`}>
+              <button type="button" className="mappe-kopf" aria-expanded={auf}
+                      onClick={() => { setOffen(auf ? null : pf.id); if (!auf) onZeigen(pf.id); }}>
                 <span className="text">
-                  <b>{p.adresse ?? `Parzelle ${p.parzelle ?? '?'}`}</b>
-                  <small>{[p.parzelle ? `Parz. ${p.parzelle}` : null, p.zone,
-                           p.flaeche ? `${gr(p.flaeche)} m²` : null].filter(Boolean).join(' · ')}</small>
+                  <b>{pf.name.replace(/\s*--\s*/, ' · ')}</b>
+                  <small>{pf.positionen.length} Parzellen · {pf.eigner ?? 'ohne Eigner'}</small>
                 </span>
+                <span className="pfeil" aria-hidden>{auf ? '−' : '+'}</span>
               </button>
-            ))}
-          </div>
-        </div>
-      ))}
+              {auf && (
+                <div className="mappe-inhalt">
+                  <dl className="rolle">
+                    <dt>Eigner</dt><dd>{pf.eigner ?? '–'}</dd>
+                    <dt>Manager</dt><dd>{pf.manager.length ? pf.manager.join(', ') : '–'}</dd>
+                  </dl>
+                  <div className="karten">
+                    {pf.positionen.map(p => (
+                      <button type="button" key={p.id} className="eintrag" disabled={!p.parzelleId}
+                              onClick={() => p.parzelleId && onOeffnen(p.parzelleId)}>
+                        <i className="lila" />
+                        <span className="text">
+                          <b>{p.adresse ?? `Parzelle ${p.parzelle ?? '?'}`}</b>
+                          <small>{[p.parzelle ? `Parz. ${p.parzelle}` : null, p.zone,
+                                   p.flaeche ? `${gr(p.flaeche)} m²` : null].filter(Boolean).join(' · ')}</small>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </>
   );
 }
@@ -998,6 +1028,16 @@ const STIL = `
 .gisk .schalter.an{background:var(--tinte);border-color:var(--tinte);color:#fff}
 .gisk .schalter.an.lila{background:#7C3AED;border-color:#7C3AED}
 .gisk .eintrag>i.lila{background:#7C3AED}
+.gisk .mappen{display:flex;flex-direction:column;gap:8px}
+.gisk .mappe{border:1px solid var(--linie);border-radius:14px;overflow:hidden;background:var(--weiss)}
+.gisk .mappe.auf{border-color:#7C3AED}
+.gisk .mappe-kopf{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:12px 14px;border:0;background:none;text-align:left;cursor:pointer}
+.gisk .mappe-kopf:hover{background:var(--fl)}
+.gisk .mappe-kopf .text{flex:1;min-width:0}
+.gisk .mappe-kopf b{display:block;font-weight:600;font-size:15px}
+.gisk .mappe-kopf small{display:block;color:var(--grau);font-size:12px}
+.gisk .mappe-kopf .pfeil{font-size:20px;color:var(--grau);width:24px;text-align:center}
+.gisk .mappe-inhalt{padding:0 14px 14px}
 .gisk .rolle{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px;margin:12px 0 16px}
 .gisk .rolle dt{color:var(--grau)}.gisk .rolle dd{margin:0;font-weight:600}
 
