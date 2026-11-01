@@ -89,10 +89,11 @@ export function usePortfolios(aktiv: boolean) {
  * haben im Bestand keinen eigenen (gemessen am 1. November: Kloten 0 von
  * 1644). Der Bund liefert ihn -- gemessen: 1 Treffer, Polygon, in WGS84.
  */
-export async function umrissVomBund(egrid: string): Promise<GeoJSON.Geometry | null> {
+export async function umrissVomBund(egrid: string, sr: '4326' | '2056' = '4326'): Promise<GeoJSON.Geometry | null> {
+  // 4326 für die Karte, 2056 (LV95) für die Nachbarsuche beim Bund.
   const p = new URLSearchParams({
     layer: 'ch.kantone.cadastralwebmap-farbe', searchField: 'egris_egrid', searchText: egrid,
-    contains: 'false', returnGeometry: 'true', geometryFormat: 'geojson', sr: '4326',
+    contains: 'false', returnGeometry: 'true', geometryFormat: 'geojson', sr,
   });
   const j = await (await fetch(`https://api3.geo.admin.ch/rest/services/all/MapServer/find?${p}`)).json();
   return (j?.results?.[0]?.geometry as GeoJSON.Geometry) ?? null;

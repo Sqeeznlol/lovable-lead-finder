@@ -302,6 +302,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
   const grenzenEbene = useRef<L.Layer | null>(null);
   const [zonenAn, setZonenAn] = useState(false);
   const [zonenFilter, setZonenFilter] = useState<Set<Zonenart>>(new Set());
+  const [legendeAuf, setLegendeAuf] = useState(false);
   // Die genaue Zone -- W2, W3, Kernzone 2 -- so, wie der Kanton sie schreibt.
   const [zonenGenau, setZonenGenau] = useState<Set<string>>(new Set());
   const zonenEbene = useRef<L.Layer | null>(null);
@@ -445,6 +446,26 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
     }).addTo(m);
   }, [data, genugNah, zonenFilter, zonenGenau, grund, portfolioAn]);
 
+  /**
+   * Den Umriss einer Bestandsparzelle beim Bund holen, wenn der Bestand
+   * keinen hat -- in Zürich keiner (gemessen: Kloten 0 von 1644). Ohne
+   * ihn stand "kein Umriss eingelesen", obwohl der Bund ihn liefert; das
+   * kam vor, wann immer eine Parzelle aus der Liste, der Suche oder einem
+   * Portfolio geöffnet wurde statt per Klick in die Karte. Zwei Fassungen:
+   * LV95 für die Nachbarsuche, WGS84 für den roten Umriss.
+   */
+  async function umrissNachholen(id: string, egrid: unknown) {
+    if (typeof egrid !== 'string' || !/^CH[0-9A-Z]{12}$/.test(egrid)) return;
+    try {
+      const [lv95, wgs] = await Promise.all([umrissVomBund(egrid, '2056'), umrissVomBund(egrid, '4326')]);
+      if (wgs) markieren({ type: 'Feature', properties: {}, geometry: wgs } as GeoJSON.Feature);
+      if (lv95 && (lv95.type === 'Polygon' || lv95.type === 'MultiPolygon')) {
+        setAuswahl(a => (a.art === 'eigen' && a.id === id && !a.umriss
+          ? { ...a, umriss: lv95 as Umriss, egrid } : a));
+      }
+    } catch { /* ohne Umriss bleibt der Hinweis stehen */ }
+  }
+
   async function eigeneZeigen(id: string, e: ParzelleEigenschaften, lat: number, lon: number) {
     setAuswahl({ art: 'eigen', id, e, lat, lon, geholt: false });
     // Der Eigentümer steht in properties und wird erst hier geholt;
@@ -456,6 +477,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
     const z = p as Record<string, unknown> | null;
     setAuswahl(a => (a.art === 'eigen' && a.id === id
       ? { ...a, eigentuemer: (z?.owner_name as string) ?? null, zeile: z, geholt: true } : a));
+    void umrissNachholen(id, z?.egrid);
   }
 
   async function bundAbfragen(lat: number, lon: number) {
@@ -544,6 +566,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
       art: 'eigen', id, lat: mitte.lat, lon: mitte.lng, geholt: true, zeile: z,
       eigentuemer: (z.owner_name as string) ?? null, e: eigenschaftenAus(z),
     });
+    void umrissNachholen(id, z.egrid);
   }
 
   // ---------------------------------------------- Portfolio
@@ -769,9 +792,16 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
           </div>
         )}
         {zonenAn && (
-          <div className="legende bild">
-            <img src="https://api3.geo.admin.ch/static/images/legends/ch.are.bauzonen_de.png" alt="Legende Bauzonen"
-                 onError={e => { (e.currentTarget.parentElement as HTMLElement).style.display = 'none'; }} />
+          // Die Legende der Bauzonen deckt ein Viertel der Karte. Sie ist
+          // zu, bis man sie öffnet -- auf dem Telefon erst recht.
+          <div className={`legende bild${legendeAuf ? ' auf' : ''}`}>
+            <button type="button" className="legende-knopf" onClick={() => setLegendeAuf(v => !v)} aria-expanded={legendeAuf}>
+              Legende Bauzonen <span aria-hidden>{legendeAuf ? '−' : '+'}</span>
+            </button>
+            {legendeAuf && (
+              <img src="https://api3.geo.admin.ch/static/images/legends/ch.are.bauzonen_de.png" alt="Legende Bauzonen"
+                   onError={e => { (e.currentTarget as HTMLElement).style.display = 'none'; }} />
+            )}
           </div>
         )}
         <div className="readout">
@@ -1051,7 +1081,9 @@ const STIL = `
 .gisk .unten{position:absolute;z-index:650;left:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;align-items:flex-start}
 .gisk .legende{background:var(--weiss);border-radius:12px;box-shadow:var(--schatten);padding:8px 12px;display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--grau)}
 .gisk .legende i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
-.gisk .legende.bild img{max-height:220px;display:block}
+.gisk .legende.bild{flex-direction:column;gap:6px;padding:0}
+.gisk .legende-knopf{border:0;background:none;padding:8px 12px;font-size:12px;font-weight:600;color:var(--grau);cursor:pointer;display:flex;gap:8px;min-height:36px;align-items:center}
+.gisk .legende.bild img{max-height:220px;display:block;padding:0 12px 10px}
 .gisk .readout{background:rgba(255,255,255,.92);border-radius:10px;box-shadow:var(--schatten);padding:6px 10px;font-size:12px;color:var(--grau);font-variant-numeric:tabular-nums}
 
 .gisk .tafel{position:absolute;z-index:700;top:16px;right:16px;bottom:16px;width:384px;background:var(--weiss);
@@ -1109,14 +1141,15 @@ const STIL = `
   .gisk .suche{flex:1 1 60%}
   .gisk .werkzeuge{display:flex;flex:1 1 100%;gap:6px;overflow-x:auto;scrollbar-width:none}
   .gisk .werkzeuge::-webkit-scrollbar{display:none}
-  .gisk .segment{flex:1 0 auto}
-  .gisk .segment button{padding:7px 10px}
-  .gisk .schalter{flex:none;padding:0 12px}
+  .gisk .segment{flex:none}
+  .gisk .segment button{padding:7px 6px;font-size:13px}
+  .gisk .schalter{flex:none;padding:0 7px;font-size:13px;height:38px}
+  .gisk .werkzeuge{gap:4px}
   .gisk .filter{top:120px;left:12px;right:12px;flex-wrap:nowrap;overflow-x:auto;padding:0 0 6px;scrollbar-width:none}
   .gisk .filter::-webkit-scrollbar{display:none}
   .gisk .filter button,.gisk .filter .titel{flex:none}
   .gisk .filter.genau{top:158px}
-  .gisk .leaflet-control-zoom,.gisk .leaflet-bottom.leaflet-right,.gisk .legende,.gisk .readout{display:none}
+  .gisk .leaflet-control-zoom,.gisk .leaflet-bottom.leaflet-right,.gisk .legende:not(.bild),.gisk .readout{display:none}
   .gisk .tafel{top:auto;left:0;right:0;bottom:0;width:auto;height:34vh;border-radius:20px 20px 0 0;padding:12px 16px 16px}
   .gisk .tafel::before{content:"";display:block;width:36px;height:4px;border-radius:2px;background:var(--linie);margin:0 auto 12px}
   .gisk.offen .tafel{height:64vh}
