@@ -26,6 +26,23 @@ export default defineConfig(({ mode }) => ({
   define: {
     __FASSUNG__: JSON.stringify(fassung),
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // React und Supabase ändern sich fast nie, die App bei jedem
+        // Push. In eigenen Dateien bleiben sie im Browser liegen, wenn
+        // eine neue Fassung kommt -- statt dass jedes Mal 170 kB neu
+        // geladen werden. Der Commit (__FASSUNG__) bleibt im App-Teil
+        // index-*.js, dort sucht "Was ist live".
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+          if (/[\\/]node_modules[\\/](react|react-dom|scheduler|react-router|react-router-dom|@remix-run)[\\/]/.test(id)) return "react";
+          if (/[\\/]node_modules[\\/]@supabase[\\/]/.test(id)) return "supabase";
+          return undefined;
+        },
+      },
+    },
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

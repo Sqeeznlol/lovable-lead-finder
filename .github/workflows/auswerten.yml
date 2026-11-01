@@ -577,6 +577,7 @@ jobs:
               js=$(curl -s "$a/" | grep -oE '/assets/index-[A-Za-z0-9_-]+\.js' | head -1)
               for i in 1 2; do curl -s -o /dev/null -H 'Accept-Encoding: br, gzip' -w "Buendel $js: %{size_download} Bytes uebertragen, fertig %{time_total}s\n" "$a$js"; done
               curl -s -D - -o /dev/null -H 'Accept-Encoding: br, gzip' "$a$js" | grep -iE '^(cache-control|content-encoding|x-vercel-cache|age):' | sed 's/^/  Buendel /'
+              for pfad in /bewertung /potenzial /investor; do curl -s -o /dev/null -w "$pfad: %{http_code}\n" "$a$pfad"; done
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
             psql "$DB" -X -q >> "$GITHUB_STEP_SUMMARY" 2>&1 <<'SQL' || true
