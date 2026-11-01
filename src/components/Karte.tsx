@@ -3,7 +3,10 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useParzellenImAusschnitt, type Ausschnitt, type ParzelleEigenschaften } from '@/hooks/use-karte';
 import { Nachbarn } from '@/components/Nachbarn';
+import { NachbarnBund } from '@/components/NachbarnBund';
 import { supabase } from '@/integrations/supabase/client';
+import { FENSTER } from '@/lib/fenster';
+import { BAUZONEN, GRENZEN, GRUNDKARTEN, WMS_MAX, wmsAdresse, type Ebene, type Grund } from '@/lib/karte-ebenen';
 
 /**
  * GIS-Parzellenkarte -- nach der Vorlage "gis-karte.html", mit dem
@@ -22,33 +25,91 @@ import { supabase } from '@/integrations/supabase/client';
  * offenen Bundesdienste ab.
  */
 
-const W = 'https://wmts.geo.admin.ch/1.0.0/';
-function lay(id: string, ext: string, max = 19) {
-  return L.tileLayer(`${W}${id}/default/current/3857/{z}/{x}/{y}.${ext}`, {
-    maxZoom: 21, maxNativeZoom: max,
-    attribution: '&copy; swisstopo und Kantone', crossOrigin: true,
-  });
+/** Rand um den Bildschirm, der mitgeladen wird. Klein gehalten: jeder
+ *  Rand kostet Pixel, die innerhalb des Deckels fehlen -- und Schärfe
+ *  zählt mehr als seltenes Nachladen. */
+const RAND = 0.1;
+
+/**
+ * Ein WMS-Bild für den ganzen Ausschnitt statt Kacheln.
+ *
+ * Mit Kacheln liefen Striche über die Karte: an jeder Kachelkante
+ * versetzen sich die Linien, Parzellennummern werden abgeschnitten,
+ * und wo sich halb durchsichtige Kacheln um einen Pixel überlappen,
+ * ist die Farbe doppelt. Ein Bild hat keine Kanten.
+ *
+ * Geladen wird mit Rand. Wer nur ein Stück verschiebt, bleibt im
+ * geladenen Bild; erst darüber hinaus oder bei anderem Zoom wird neu
+ * gerechnet. Bis das neue Bild da ist, bleibt das alte stehen -- ein
+ * Flackern wäre schlimmer als ein kurzer Versatz.
+ */
+class EinBildWms extends L.Layer {
+  private bild: L.ImageOverlay | null = null;
+  private geladen: { grenzen: L.LatLngBounds; zoom: number } | null = null;
+  private lauf = 0;
+
+  constructor(private readonly ebene: Ebene) { super(); }
+
+  onAdd(m: L.Map): this {
+    m.on('moveend', this.nachsehen, this);
+    this.nachsehen();
+    return this;
+  }
+
+  onRemove(m: L.Map): this {
+    m.off('moveend', this.nachsehen, this);
+    this.bild?.remove(); this.bild = null; this.geladen = null;
+    return this;
+  }
+
+  private nachsehen() {
+    const m = this._map;
+    if (!m) return;
+    const zoom = m.getZoom();
+    if (zoom < (this.ebene.minZoom ?? 0)) {
+      this.bild?.remove(); this.bild = null; this.geladen = null;
+      return;
+    }
+    const sicht = m.getBounds();
+    if (this.geladen && this.geladen.zoom === zoom && this.geladen.grenzen.contains(sicht)) return;
+
+    const grenzen = sicht.pad(RAND);
+    const px = m.getSize().multiplyBy(1 + 2 * RAND);
+    // Scharf auf Retina, aber nie über den Deckel des Dienstes.
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const faktor = Math.min(dpr, WMS_MAX / Math.max(px.x, px.y));
+    const sw = L.CRS.EPSG3857.project(grenzen.getSouthWest());
+    const ne = L.CRS.EPSG3857.project(grenzen.getNorthEast());
+    const url = wmsAdresse(this.ebene, { west: sw.x, sued: sw.y, ost: ne.x, nord: ne.y },
+      Math.round(px.x * faktor), Math.round(px.y * faktor));
+
+    // Erst zeigen, wenn es da ist -- und nur, wenn inzwischen nichts
+    // Neueres verlangt wurde.
+    const lauf = ++this.lauf;
+    const img = new Image();
+    img.onload = () => {
+      if (lauf !== this.lauf || !this._map) return;
+      const neu = L.imageOverlay(url, grenzen, {
+        opacity: this.ebene.deckkraft ?? 1, interactive: false, pane: 'wms',
+      }).addTo(this._map);
+      this.bild?.remove();
+      this.bild = neu;
+      this.geladen = { grenzen, zoom };
+    };
+    img.src = url;
+  }
 }
-// Der Kataster kommt als WMS, nicht als WMTS-Kachel: die Kacheln des
-// Katasters sind in Web-Mercator umgerechnet und versetzen sich an den
-// Kachelrändern um einige Pixel -- Linien und Nummern brechen dort.
-// Ein WMS-Bild wird für genau den Ausschnitt gerechnet und passt.
-// Unter Zoom 14 malt der Kataster ganze Gemeinden grün; dort zeigt die
-// Landeskarte mehr, deshalb setzt er erst darüber ein.
-function wms(id: string, minZoom = 14) {
-  return L.tileLayer.wms('https://wms.geo.admin.ch/', {
-    layers: id, format: 'image/png', transparent: true, tileSize: 512,
-    minZoom, maxZoom: 21, attribution: '&copy; swisstopo und Kantone',
-  });
+
+/** Eine Ebenenbeschreibung aus karte-ebenen.ts als Leaflet-Ebene. */
+function ebene(e: Ebene): L.Layer {
+  if (e.art === 'wmts') {
+    return L.tileLayer(`https://wmts.geo.admin.ch/1.0.0/${e.id}/default/current/3857/{z}/{x}/{y}.${e.ext}`, {
+      maxZoom: 21, maxNativeZoom: e.maxNativeZoom, crossOrigin: true,
+      attribution: '&copy; swisstopo und Kantone',
+    });
+  }
+  return new EinBildWms(e);
 }
-type Grund = 'kataster' | 'luftbild' | 'karte' | 'grau';
-const GRUNDKARTEN: Record<Grund, () => L.TileLayer[]> = {
-  kataster: () => [lay('ch.swisstopo.pixelkarte-farbe', 'jpeg', 19), wms('ch.kantone.cadastralwebmap-farbe')],
-  luftbild: () => [lay('ch.swisstopo.swissimage', 'jpeg', 20),
-                   wms('ch.swisstopo-vd.amtliche-vermessung')],
-  karte:    () => [lay('ch.swisstopo.pixelkarte-farbe', 'jpeg', 19)],
-  grau:     () => [lay('ch.swisstopo.pixelkarte-grau', 'jpeg', 19)],
-};
 
 /** Erst ab hier werden eigene Umrisse geholt -- darunter sind sie Pixel. */
 const AB_ZOOM = 15;
@@ -163,6 +224,11 @@ type Zonenart = 'W' | 'WG' | 'K' | 'Z' | 'IG' | 'U';
 const ZONENARTEN: [Zonenart, string][] = [
   ['W', 'Wohnen'], ['WG', 'Wohnen/Gewerbe'], ['K', 'Kern'], ['Z', 'Zentrum'], ['IG', 'Industrie/Gewerbe'], ['U', 'Übrige'],
 ];
+/** Ob eine Parzelle durch den Filter kommt: erst die genaue Zone, sonst die Art. */
+function passtZone(zone: string | null | undefined, arten: Set<Zonenart>, genau: Set<string>): boolean {
+  if (genau.size > 0) return genau.has(String(zone ?? '').trim());
+  return arten.size === 0 || arten.has(zonenart(zone));
+}
 function zonenart(z: string | null | undefined): Zonenart {
   const t = String(z ?? '');
   if (/wohn.*gewerb|misch|\bWG\s?\d/i.test(t)) return 'WG';
@@ -178,26 +244,31 @@ function wertZeigen(v: unknown) {
   if (typeof v === 'boolean') return v ? 'Ja' : 'Nein';
   if (typeof v === 'number') return gr(v);
   const t = typeof v === 'object' ? JSON.stringify(v) : String(v);
-  if (/^https?:\/\//.test(t)) return <a href={t} target="_blank" rel="noopener">öffnen ↗</a>;
+  if (/^https?:\/\//.test(t)) return <a href={t} target={FENSTER.portal}>öffnen ↗</a>;
   const d = /^(\d{4})-(\d{2})-(\d{2})T/.exec(t);
   if (d) return `${d[3]}.${d[2]}.${d[1]}`;
   if (/^-?\d+(\.\d+)?$/.test(t)) return gr(Number(t));
   return t;
 }
 
+/** Ein Umriss vom Bund, in LV95 -- so, wie identify ihn liefert. */
+type Umriss = GeoJSON.Polygon | GeoJSON.MultiPolygon;
+
 type Auswahl =
   | { art: 'leer' }
   | { art: 'eigen'; id: string; e: ParzelleEigenschaften; lat: number; lon: number;
-      eigentuemer?: string | null; geholt: boolean; zeile?: Record<string, unknown> | null }
+      eigentuemer?: string | null; geholt: boolean; zeile?: Record<string, unknown> | null;
+      umriss?: Umriss | null; egrid?: string | null }
   | { art: 'bund'; lat: number; lon: number; laeuft: boolean; fehler?: boolean;
-      treffer: { titel: string; adresse: string; info: string; egid?: string }[] };
+      treffer: { titel: string; adresse: string; info: string; egid?: string }[];
+      umriss?: Umriss | null; egrid?: string | null };
 
 interface Treffer { label: string; origin: string; lat: number; lon: number; eigen?: { id: string; e: ParzelleEigenschaften } }
 
 export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
   const box = useRef<HTMLDivElement | null>(null);
   const karte = useRef<L.Map | null>(null);
-  const grundLagen = useRef<L.TileLayer[]>([]);
+  const grundLagen = useRef<L.Layer[]>([]);
   const eigenEbene = useRef<L.GeoJSON | null>(null);
   // Die angeklickte Parzelle als eigener, kräftiger Umriss -- man soll
   // sehen, welche gemeint ist, auch wenn sie nicht zum Bestand gehört.
@@ -211,11 +282,14 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
     }).addTo(karte.current);
   }
 
-  const [grund, setGrund] = useState<Grund>('kataster');
-  const [bestandAn, setBestandAn] = useState(true);
+  const [grund, setGrund] = useState<Grund>('karte');
+  const [grenzenAn, setGrenzenAn] = useState(true);
+  const grenzenEbene = useRef<L.Layer | null>(null);
   const [zonenAn, setZonenAn] = useState(false);
   const [zonenFilter, setZonenFilter] = useState<Set<Zonenart>>(new Set());
-  const zonenEbene = useRef<L.TileLayer | null>(null);
+  // Die genaue Zone -- W2, W3, Kernzone 2 -- so, wie der Kanton sie schreibt.
+  const [zonenGenau, setZonenGenau] = useState<Set<string>>(new Set());
+  const zonenEbene = useRef<L.Layer | null>(null);
   // Bauzonen Schweiz (ARE, harmonisiert aus den Nutzungsplänen der
   // Kantone -- dieselbe Grundlage wie der ÖREB-Kataster).
   useEffect(() => {
@@ -223,10 +297,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
     if (!m) return;
     zonenEbene.current?.remove(); zonenEbene.current = null;
     if (zonenAn) {
-      zonenEbene.current = L.tileLayer.wms('https://wms.geo.admin.ch/', {
-        layers: 'ch.are.bauzonen', format: 'image/png', transparent: true, tileSize: 512,
-        opacity: 0.55, minZoom: 11, maxZoom: 21, attribution: '&copy; ARE und Kantone',
-      }).addTo(m);
+      zonenEbene.current = ebene(BAUZONEN).addTo(m);
     }
   }, [zonenAn]);
   const [ausschnitt, setAusschnitt] = useState<Ausschnitt | null>(null);
@@ -238,7 +309,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
   const [sucheStatus, setSucheStatus] = useState<'ruhe' | 'laeuft' | 'fehler'>('ruhe');
 
   const genugNah = zoom >= AB_ZOOM;
-  const { data } = useParzellenImAusschnitt(ausschnitt, genugNah && bestandAn);
+  const { data } = useParzellenImAusschnitt(ausschnitt, genugNah);
 
   // Schriften der Vorlage, einmal geladen.
   useEffect(() => {
@@ -255,9 +326,15 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
     if (!box.current || karte.current) return;
     const m = L.map(box.current, {
       center: SCHWEIZ, zoom: 8, maxZoom: 21,
-      zoomControl: true, preferCanvas: true,
+      zoomControl: false, preferCanvas: true,
     });
+    // Unten rechts, wie bei Google Maps: oben links stehen die Zonen.
+    L.control.zoom({ position: 'bottomright' }).addTo(m);
     L.control.scale({ imperial: false, position: 'bottomright' }).addTo(m);
+    // Grenzen und Bauzonen liegen in einer eigenen Schicht zwischen der
+    // Grundkarte (200) und den eigenen Umrissen (400): so bleibt der
+    // Bestand immer oben, egal in welcher Reihenfolge geschaltet wird.
+    m.createPane('wms').style.zIndex = '350';
     const merken = () => {
       const b = m.getBounds();
       setZoom(m.getZoom());
@@ -277,10 +354,21 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
     const m = karte.current;
     if (!m) return;
     grundLagen.current.forEach(l => m.removeLayer(l));
-    grundLagen.current = GRUNDKARTEN[grund]();
+    grundLagen.current = [ebene(GRUNDKARTEN[grund])];
     grundLagen.current.forEach(l => l.addTo(m));
-    eigenEbene.current?.bringToFront();
   }, [grund]);
+
+  // Die Grenzen stehen hinter dem Karten-Effekt: beim ersten Durchlauf
+  // gibt es die Karte sonst noch nicht, und ein Effekt, der dann abbricht,
+  // läuft erst beim nächsten Umschalten wieder.
+  useEffect(() => {
+    const m = karte.current;
+    if (!m) return;
+    grenzenEbene.current?.remove(); grenzenEbene.current = null;
+    if (grenzenAn) {
+      grenzenEbene.current = ebene(GRENZEN).addTo(m);
+    }
+  }, [grenzenAn]);
 
 
   // ---------------------------------------------- eigene Umrisse
@@ -289,16 +377,20 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
     if (!m) return;
     eigenEbene.current?.remove();
     eigenEbene.current = null;
-    if (!data || !genugNah || !bestandAn) return;
+    if (!data || !genugNah) return;
     eigenEbene.current = L.geoJSON(data, {
-      filter: f => zonenFilter.size === 0 || zonenFilter.has(zonenart((f.properties as ParzelleEigenschaften)?.zone)),
+      filter: f => passtZone((f.properties as ParzelleEigenschaften)?.zone, zonenFilter, zonenGenau),
       // Farbe nach Marge in Stufen, wie bei Regrid/LandGlide: man sieht
       // die guten Parzellen, bevor man klickt. Legende unten links.
       style: f => {
         const e = (f?.properties ?? {}) as ParzelleEigenschaften;
         if (e.ausgeschlossen) return { color: '#64748B', weight: 1, fillOpacity: 0.04 };
         const c = margeFarbe(Number(e.marge) || 0);
-        return { color: c, weight: 2, fillColor: c, fillOpacity: 0.32 };
+        // Auf dem Luftbild muss die Linie gegen Dächer und Schatten
+        // bestehen: dicker, und die Füllung zurückhaltender.
+        return grund === 'luftbild'
+          ? { color: c, weight: 3, fillColor: c, fillOpacity: 0.22 }
+          : { color: c, weight: 2, fillColor: c, fillOpacity: 0.32 };
       },
       onEachFeature: (f, schicht) => {
         const e = (f.properties ?? {}) as ParzelleEigenschaften;
@@ -319,7 +411,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
         });
       },
     }).addTo(m);
-  }, [data, genugNah, bestandAn, zonenFilter]);
+  }, [data, genugNah, zonenFilter, zonenGenau, grund]);
 
   async function eigeneZeigen(id: string, e: ParzelleEigenschaften, lat: number, lon: number) {
     setAuswahl({ art: 'eigen', id, e, lat, lon, geholt: false });
@@ -337,6 +429,10 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
   async function bundAbfragen(lat: number, lon: number) {
     const lv = toLV95(lat, lon);
     setAuswahl({ art: 'bund', lat, lon, laeuft: true, treffer: [] });
+    // Umriss und EGRID vom Bund bleiben erhalten: daran hängen die
+    // Nachbarn dort, wo der Kanton noch nicht eingelesen ist.
+    let umriss: Umriss | null = null;
+    let egridBund: string | null = null;
     // Erst fragen, welche Parzelle hier liegt, und sie per EGRID im
     // eigenen Bestand suchen -- auch dort, wo noch kein Umriss geladen ist.
     try {
@@ -349,24 +445,27 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
       const erster = kj?.results?.[0];
       markieren(null);
       if (erster?.geometry) {
+        umriss = erster.geometry as Umriss;
         const um = (c: unknown): unknown => Array.isArray(c) && typeof c[0] === 'number'
           ? (([la, lo]) => [lo, la])(fromLV95(c[0] as number, c[1] as number)) : (c as unknown[]).map(um);
         markieren({ type: 'Feature', properties: {},
           geometry: { ...erster.geometry, coordinates: um(erster.geometry.coordinates) } } as GeoJSON.Feature);
       }
-      // Den Attributnamen kenne ich nicht sicher; die EGRID erkennt man
-      // an ihrer Form, also wird nach der Form gesucht.
+      // Gemessen am 1. November: die EGRID steht in `egris_egrid`.
+      // Gesucht wird trotzdem nach der Form -- ändert der Dienst den
+      // Namen, fällt es so nicht still aus.
       const egrid = (kj?.results ?? []).flatMap((x: { attributes?: Record<string, unknown>; properties?: Record<string, unknown> }) =>
         Object.values({ ...x.attributes, ...x.properties })).map(String).find((v: string) => /^CH[0-9A-Z]{12}$/.test(v));
+      egridBund = egrid ?? null;
       if (egrid) {
         const { data: p } = await supabase.from('properties').select('*').eq('egrid', egrid).maybeSingle();
         const z = p as Record<string, unknown> | null;
         if (z) {
           setAuswahl({
             art: 'eigen', id: String(z.id), lat, lon, geholt: true, zeile: z,
+            umriss, egrid,
             eigentuemer: (z.owner_name as string) ?? null,
-            e: { parzelle: z.plot_number, adresse: z.address, gemeinde: z.gemeinde ?? z.municipality,
-                 zone: z.zone, flaeche: z.area, marge: z.marge } as unknown as ParzelleEigenschaften,
+            e: eigenschaftenAus(z),
           });
           return;
         }
@@ -380,7 +479,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
       const j = await (await fetch(url)).json();
       const res = (j?.results ?? []).slice(0, 4);
       setAuswahl({
-        art: 'bund', lat, lon, laeuft: false,
+        art: 'bund', lat, lon, laeuft: false, umriss, egrid: egridBund,
         treffer: res.map((r: { layerName?: string; layerBodId?: string; attributes?: Record<string, string> }) => {
           const a = r.attributes ?? {};
           const adresse = [a.strname_deinr || a.strname1 || '', a.plz_plz6 || a.dplz4 || '', a.ggdename || '']
@@ -392,8 +491,27 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
         }),
       });
     } catch {
-      setAuswahl({ art: 'bund', lat, lon, laeuft: false, fehler: true, treffer: [] });
+      setAuswahl({ art: 'bund', lat, lon, laeuft: false, fehler: true, treffer: [], umriss, egrid: egridBund });
     }
+  }
+
+  /** Die Kopfangaben einer Zeile des Bestands, wie die Kartenfunktion sie liefern würde. */
+  function eigenschaftenAus(z: Record<string, unknown>): ParzelleEigenschaften {
+    return { parzelle: z.plot_number, adresse: z.address, gemeinde: z.gemeinde ?? z.municipality,
+             zone: z.zone, flaeche: z.area, marge: z.marge_chf ?? z.marge,
+             ausgeschlossen: z.ausgeschlossen } as unknown as ParzelleEigenschaften;
+  }
+
+  // Eine Parzelle des Bestands per Kennung öffnen -- aus der Nachbarliste.
+  async function oeffnePerId(id: string) {
+    const { data: p } = await supabase.from('properties').select('*').eq('id', id).maybeSingle();
+    const z = p as Record<string, unknown> | null;
+    if (!z) return;
+    markieren(null);
+    setAuswahl({
+      art: 'eigen', id, lat: mitte.lat, lon: mitte.lng, geholt: true, zeile: z,
+      eigentuemer: (z.owner_name as string) ?? null, e: eigenschaftenAus(z),
+    });
   }
 
   // ------------------------------------------------------------ Suche
@@ -446,9 +564,22 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
     if (!data) return [];
     return [...data.features]
       .filter(f => !f.properties?.ausgeschlossen)
-      .filter(f => zonenFilter.size === 0 || zonenFilter.has(zonenart(f.properties?.zone)))
+      .filter(f => passtZone(f.properties?.zone, zonenFilter, zonenGenau))
       .sort((a, b) => (Number(b.properties?.marge) || 0) - (Number(a.properties?.marge) || 0))
       .slice(0, 15);
+  }, [data, zonenFilter, zonenGenau]);
+
+  // Die genauen Zonen der gewählten Arten, wie sie im Bild vorkommen.
+  // Nur dann: ohne gewählte Art wären es dreissig Chips, und das hilft
+  // niemandem. Sortiert so, dass W2 vor W10 steht.
+  const zonenImBild = useMemo(() => {
+    if (!data || zonenFilter.size === 0) return [] as string[];
+    const menge = new Set<string>();
+    for (const f of data.features) {
+      const z = String(f.properties?.zone ?? '').trim();
+      if (z && zonenFilter.has(zonenart(z))) menge.add(z);
+    }
+    return [...menge].sort((a, b) => a.localeCompare(b, 'de', { numeric: true }));
   }, [data, zonenFilter]);
 
   function mitteVon(f: GeoJSON.Feature): [number, number] {
@@ -475,14 +606,22 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
     eigeneZeigen(t.eigen.id, t.eigen.e, Number.isFinite(lat) ? lat : mitte.lat, Number.isFinite(lon) ? lon : mitte.lng);
   }
 
-  const umschalten = (z: Zonenart) => setZonenFilter(alt => {
+  const umschalten = (z: Zonenart) => {
+    setZonenGenau(new Set());
+    setZonenFilter(alt => {
+      const neu = new Set(alt);
+      if (neu.has(z)) neu.delete(z); else neu.add(z);
+      return neu;
+    });
+  };
+  const genauUmschalten = (z: string) => setZonenGenau(alt => {
     const neu = new Set(alt);
     if (neu.has(z)) neu.delete(z); else neu.add(z);
     return neu;
   });
 
   return (
-    <div className="gisk">
+    <div className={`gisk${auswahl.art !== 'leer' ? ' offen' : ''}`}>
       <style>{STIL}</style>
 
       <div ref={box} className="map" />
@@ -509,30 +648,39 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
             </div>
           )}
         </div>
-        <div className="segment">
-          {([['karte', 'Karte'], ['kataster', 'Kataster'], ['luftbild', 'Luftbild']] as [Grund, string][]).map(([g, t]) => (
-            <button type="button" key={g} className={grund === g ? 'an' : ''} onClick={() => setGrund(g)}>{t}</button>
-          ))}
+        <div className="werkzeuge">
+          <div className="segment">
+            {([['karte', 'Karte'], ['luftbild', 'Luftbild']] as [Grund, string][]).map(([g, t]) => (
+              <button type="button" key={g} className={grund === g ? 'an' : ''} onClick={() => setGrund(g)}>{t}</button>
+            ))}
+          </div>
+          <button type="button" className={`schalter${grenzenAn ? ' an' : ''}`} onClick={() => setGrenzenAn(v => !v)}>
+            Grenzen
+          </button>
+          <button type="button" className={`schalter${zonenAn ? ' an' : ''}`} onClick={() => setZonenAn(v => !v)}>
+            Bauzonen
+          </button>
         </div>
-        <button type="button" className={`schalter${zonenAn ? ' an' : ''}`} onClick={() => setZonenAn(v => !v)}>
-          Bauzonen
-        </button>
-        <button type="button" className={`schalter${bestandAn ? ' an' : ''}`} onClick={() => setBestandAn(v => !v)}>
-          Bestand
-        </button>
       </header>
 
       {/* Zonenfilter wie bei Immobilienportalen: Chips, mehrere wählbar. */}
       <div className="filter">
         <span className="titel">Zone</span>
-        <button type="button" className={zonenFilter.size === 0 ? 'an' : ''} onClick={() => setZonenFilter(new Set())}>Alle</button>
+        <button type="button" className={zonenFilter.size === 0 ? 'an' : ''} onClick={() => { setZonenFilter(new Set()); setZonenGenau(new Set()); }}>Alle</button>
         {ZONENARTEN.map(([z, t]) => (
           <button type="button" key={z} className={zonenFilter.has(z) ? 'an' : ''} onClick={() => umschalten(z)}>{t}</button>
         ))}
       </div>
+      {zonenImBild.length > 0 && (
+        <div className="filter genau">
+          {zonenImBild.map(z => (
+            <button type="button" key={z} className={zonenGenau.has(z) ? 'an' : ''} onClick={() => genauUmschalten(z)}>{z}</button>
+          ))}
+        </div>
+      )}
 
       <div className="unten">
-        {bestandAn && genugNah && (
+        {genugNah && (
           <div className="legende">
             {STUFEN.map(([, c, t]) => <span key={t}><i style={{ background: c }} />{t}</span>)}
           </div>
@@ -544,8 +692,8 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
           </div>
         )}
         <div className="readout">
-          {!genugNah && bestandAn ? 'Näher heranzoomen für den Bestand · ' : ''}
-          {genugNah && bestandAn && data ? `${data.features.length} eigene Parzellen im Bild · ` : ''}
+          {!genugNah ? 'Näher heranzoomen für den Bestand · ' : ''}
+          {genugNah && data ? `${data.features.length} eigene Parzellen im Bild · ` : ''}
           LV95 {gr(lvMitte.E)} / {gr(lvMitte.N)}
         </div>
       </div>
@@ -555,11 +703,11 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
           <>
             <div className="kopf">
               <p className="ueber">Bestand im Bild</p>
-              <h2>{bestandAn && genugNah ? `${bestand.length} Parzellen nach Marge` : 'Parzelle wählen'}</h2>
+              <h2>{genugNah ? `${bestand.length} Parzellen nach Marge` : 'Parzelle wählen'}</h2>
               <p className="sanft">Auf eine Parzelle klicken, um alle Angaben zu sehen.</p>
             </div>
-            {bestandAn && !genugNah && <p className="sanft block">Näher heranzoomen, dann erscheinen die eigenen Parzellen.</p>}
-            {bestandAn && genugNah && bestand.length === 0 && (
+            {!genugNah && <p className="sanft block">Näher heranzoomen, dann erscheinen die eigenen Parzellen.</p>}
+            {genugNah && bestand.length === 0 && (
               <p className="sanft block">Keine eigenen Parzellen in diesem Ausschnitt.</p>
             )}
             <div className="karten">
@@ -613,13 +761,18 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
 
               <div className="aktionen">
                 {e.adresse && <Kopieren wert={e.adresse} text="Adresse kopieren" />}
-                {maps && <a className="knopf" href={maps} target="_blank" rel="noopener">Google Maps</a>}
-                <a className="knopf" href={geoadminLink(auswahl.lat, auswahl.lon, 12)} target="_blank" rel="noopener">Bundes-GIS</a>
+                {maps && <a className="knopf" href={maps} target={FENSTER.karte}>Google Maps</a>}
+                <a className="knopf" href={geoadminLink(auswahl.lat, auswahl.lon, 12)} target={FENSTER.karte}>Bundes-GIS</a>
                 <Kopieren wert={`${gr(lv.E)} / ${gr(lv.N)}`} text="LV95" />
               </div>
 
               {auswahl.zeile && <div className="abschnitt"><AlleFelder z={auswahl.zeile} /></div>}
-              <div className="abschnitt"><Nachbarn parzelleId={auswahl.id} /></div>
+              <div className="abschnitt">
+                <Nachbarn parzelleId={auswahl.id} onOeffnen={oeffnePerId}
+                  ohneUmriss={auswahl.umriss
+                    ? <NachbarnBund umriss={auswahl.umriss} egrid={auswahl.egrid} onOeffnen={oeffnePerId} />
+                    : undefined} />
+              </div>
             </>
           );
         })()}
@@ -648,9 +801,14 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
                 ))}
               </div>
               <div className="aktionen">
-                <a className="knopf" href={geoadminLink(auswahl.lat, auswahl.lon, 12)} target="_blank" rel="noopener">Bundes-GIS</a>
+                <a className="knopf" href={geoadminLink(auswahl.lat, auswahl.lon, 12)} target={FENSTER.karte}>Bundes-GIS</a>
                 <Kopieren wert={`${gr(lv.E)} / ${gr(lv.N)}`} text="LV95" />
               </div>
+              {auswahl.umriss && (
+                <div className="abschnitt">
+                  <NachbarnBund umriss={auswahl.umriss} egrid={auswahl.egrid} onOeffnen={oeffnePerId} />
+                </div>
+              )}
             </>
           );
         })()}
@@ -673,7 +831,6 @@ const STIL = `
 .gisk a{color:var(--akzent);text-decoration:none}
 .gisk .map{position:absolute;inset:0;background:var(--fl)}
 .gisk .leaflet-container{font:inherit}
-.gisk .leaflet-top.leaflet-left{top:124px;left:16px}
 .gisk .leaflet-bar{border:0!important;box-shadow:var(--schatten)!important;border-radius:12px!important;overflow:hidden}
 .gisk .leaflet-bar a{width:36px!important;height:36px!important;line-height:36px!important;color:var(--tinte)!important;border-color:var(--linie)!important}
 .gisk .leaflet-bottom.leaflet-right{right:416px}
@@ -694,6 +851,7 @@ const STIL = `
 .gisk .treffer b{display:block;font-weight:600}.gisk .treffer small{color:var(--grau);font-size:12px}
 .gisk .treffer.eigen b{color:var(--akzent)}
 .gisk .leer{margin:0;padding:9px 10px;color:var(--grau)}
+.gisk .werkzeuge{display:contents}
 .gisk .segment{display:flex;background:var(--fl);border-radius:12px;padding:3px}
 .gisk .segment button{border:0;background:none;padding:7px 12px;border-radius:9px;cursor:pointer;color:var(--grau);font-weight:500}
 .gisk .segment button.an{background:var(--weiss);color:var(--tinte);box-shadow:0 1px 3px rgba(15,23,42,.12)}
@@ -704,6 +862,8 @@ const STIL = `
 .gisk .filter .titel{font-size:12px;font-weight:600;color:var(--grau);background:var(--weiss);padding:6px 10px;border-radius:999px;box-shadow:var(--schatten)}
 .gisk .filter button{border:0;background:var(--weiss);padding:6px 12px;border-radius:999px;cursor:pointer;font-size:13px;font-weight:500;box-shadow:var(--schatten)}
 .gisk .filter button.an{background:var(--akzent);color:#fff}
+.gisk .filter.genau{top:112px}
+.gisk .filter.genau button{font-size:12px;padding:5px 10px}
 
 .gisk .unten{position:absolute;z-index:650;left:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;align-items:flex-start}
 .gisk .legende{background:var(--weiss);border-radius:12px;box-shadow:var(--schatten);padding:8px 12px;display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--grau)}
@@ -757,10 +917,28 @@ const STIL = `
 .gisk-tip{font:13px/1.45 Inter,-apple-system,Arial,sans-serif;border-radius:10px;border:0;box-shadow:0 8px 24px rgba(15,23,42,.2);padding:8px 11px}
 
 @media (max-width:900px){
-  .gisk .leiste{right:16px;flex-wrap:wrap}.gisk .filter{right:16px;top:124px}
-  .gisk .leaflet-top.leaflet-left{top:170px}
-  .gisk .tafel{top:auto;left:16px;width:auto;height:46vh}
-  .gisk .leaflet-bottom.leaflet-right{right:0}
-  .gisk .unten{bottom:calc(46vh + 24px)}
+  /* Handy: die Suche allein in der ersten Zeile, Grundkarte und Schalter
+     als wischbare zweite Zeile, die Zonen als wischbare Zeile darunter.
+     Die Zoomknöpfe und der Massstab fehlen mit Absicht: zwei Finger
+     reichen, und der Platz ist knapp. Die Tafel wird ein Blatt am
+     unteren Rand, das wächst, sobald eine Parzelle offen ist. */
+  .gisk .leiste{top:12px;left:12px;right:12px;flex-wrap:wrap;gap:8px}
+  .gisk .suche{flex:1 1 60%}
+  .gisk .werkzeuge{display:flex;flex:1 1 100%;gap:6px;overflow-x:auto;scrollbar-width:none}
+  .gisk .werkzeuge::-webkit-scrollbar{display:none}
+  .gisk .segment{flex:1 0 auto}
+  .gisk .segment button{padding:7px 10px}
+  .gisk .schalter{flex:none;padding:0 12px}
+  .gisk .filter{top:120px;left:12px;right:12px;flex-wrap:nowrap;overflow-x:auto;padding:0 0 6px;scrollbar-width:none}
+  .gisk .filter::-webkit-scrollbar{display:none}
+  .gisk .filter button,.gisk .filter .titel{flex:none}
+  .gisk .filter.genau{top:158px}
+  .gisk .leaflet-control-zoom,.gisk .leaflet-bottom.leaflet-right,.gisk .legende,.gisk .readout{display:none}
+  .gisk .tafel{top:auto;left:0;right:0;bottom:0;width:auto;height:34vh;border-radius:20px 20px 0 0;padding:12px 16px 16px}
+  .gisk .tafel::before{content:"";display:block;width:36px;height:4px;border-radius:2px;background:var(--linie);margin:0 auto 12px}
+  .gisk.offen .tafel{height:64vh}
+  .gisk .unten{left:12px;bottom:calc(34vh + 12px)}
+  .gisk.offen .unten{bottom:calc(64vh + 12px)}
+  .gisk h2{font-size:18px}
 }
 `;

@@ -13,16 +13,17 @@ import { supabase } from '@/integrations/supabase/client';
  * Mausbewegung. Und es wird nie gewartet: ein Protokoll, das die
  * Arbeit aufhält, wird abgeschaltet.
  *
- * Seit die Anmeldung weg ist, schreibt das hier nichts mehr: die Regel
- * `aktivitaet_schreiben` lässt nur Angemeldete eintragen, und zwar nur
- * unter ihrer eigenen Kennung (`user_id = auth.uid()`). Ohne Sitzung
- * bricht die Funktion unten gleich ab. Die Einträge von früher bleiben
- * lesbar, neue entstehen erst wieder, wenn entweder die Anmeldung
- * zurückkommt oder diese Regel anonyme Einträge zulässt. "angemeldet"
- * und "abgemeldet" sind als Aktionen entfallen -- es gibt sie nicht
- * mehr.
+ * Die Regel `aktivitaet_schreiben` lässt nur Angemeldete eintragen, und
+ * nur unter eigener Kennung (`user_id = auth.uid()`). Vom 31. Oktober
+ * bis zum 1. November gab es keine Anmeldung, und so lange stand hier
+ * nichts Neues. Seit sie zurück ist, schreibt das Protokoll wieder --
+ * samt An- und Abmeldung. Wo sich jemand angemeldet hat (Adresse,
+ * Gerät), steht nicht hier, sondern in `anmeldung`: das liest nur der
+ * Admin.
  */
 export type Aktion =
+  | 'anmeldung'
+  | 'abmeldung'
   | 'abfrage'
   | 'eigentuemer'
   | 'archiviert'
