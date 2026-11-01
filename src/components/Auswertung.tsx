@@ -224,6 +224,88 @@ function Kennzahlen() {
   );
 }
 
+interface AnfrageZeile {
+  id: string; art: 'bewertung' | 'potenzial' | 'investor'; name: string; email: string | null; telefon: string | null;
+  adresse: string | null; angaben: Record<string, unknown>; nachricht: string | null; erstellt_am: string; bearbeitet: boolean;
+}
+const ART_TITEL: Record<AnfrageZeile['art'], string> = { bewertung: 'Bewertung', potenzial: 'Potenzialcheck', investor: 'Investor' };
+
+/** "2 Mio.", "850'000" -> Zahl; die öffentliche Seite nimmt Freitext. */
+const zahl = (v: unknown) => {
+  const t = String(v ?? '').toLowerCase().replace(/chf|['’\s]/g, '');
+  const n = Number(t.replace(/mio\.?$/, '').replace(',', '.'));
+  return Number.isFinite(n) && n > 0 ? Math.round(/mio/.test(t) ? n * 1e6 : n) : null;
+};
+
+/**
+ * Anfragen von den öffentlichen Seiten (/bewertung, /potenzial,
+ * /investor). Eine Investor-Anfrage wird mit einem Tipp zum Akteur mit
+ * Suchprofil -- dann taucht sie im Investoren-Abgleich auf.
+ */
+function Anfragen() {
+  const [alle, setAlle] = useState(false);
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['anfragen', alle],
+    queryFn: async (): Promise<AnfrageZeile[]> => {
+      let q = db().from('anfrage').select('*').order('erstellt_am', { ascending: false }).limit(200);
+      if (!alle) q = q.eq('bearbeitet', false);
+      const r = await q;
+      if (r.error) throw r.error;
+      return r.data ?? [];
+    },
+  });
+  const erledigt = async (a: AnfrageZeile) => { await db().from('anfrage').update({ bearbeitet: true }).eq('id', a.id); await refetch(); };
+  const alsInvestor = async (a: AnfrageZeile) => {
+    const liste = (v: unknown) => String(v ?? '').split(/[,;]/).map(x => x.trim()).filter(Boolean);
+    const ak = await db().from('akteur').insert({ name: a.name, art: 'firma', bemerkung: 'Aus Investor-Anfrage' }).select('id').single();
+    if (ak.error) return;
+    await db().from('kontakt').insert({ akteur_id: ak.data.id, name: a.name, email: a.email, telefon: a.telefon });
+    await db().from('investorprofil').insert({
+      akteur_id: ak.data.id, lagen: liste(a.angaben.lagen), objekttypen: liste(a.angaben.objekttypen),
+      budget_min_chf: zahl(a.angaben.budget_von), budget_max_chf: zahl(a.angaben.budget_bis),
+      kriterien: a.nachricht, erfasst_von: 'Anfrage',
+    });
+    await erledigt(a);
+  };
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-lg font-medium" style={{ fontFamily: 'inherit' }}>Anfragen</h2>
+        <label className="flex items-center gap-2 text-sm text-muted-foreground">
+          <input type="checkbox" checked={alle} onChange={e => setAlle(e.target.checked)} /> auch erledigte
+        </label>
+      </div>
+      <p className="text-sm text-muted-foreground">Von den öffentlichen Seiten /bewertung, /potenzial und /investor.</p>
+      {isLoading && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> wird geladen …</p>}
+      {error && <p className="text-sm text-destructive">Anfragen nicht lesbar.</p>}
+      {data && data.length === 0 && <p className="text-sm text-muted-foreground">Keine offene Anfrage.</p>}
+      <ul className="space-y-2">
+        {data?.map(a => (
+          <li key={a.id} className="rounded-xl border p-4 text-sm">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <span className="font-medium">{ART_TITEL[a.art]} · {a.name}</span>
+              <span className="text-xs text-muted-foreground">{datum(a.erstellt_am)}{a.bearbeitet ? ' · erledigt' : ''}</span>
+            </div>
+            <p className="text-muted-foreground">{[a.adresse, a.email, a.telefon].filter(Boolean).join(' · ')}</p>
+            <p className="text-xs text-muted-foreground">
+              {Object.entries(a.angaben ?? {}).filter(([k, v]) => v != null && k !== 'lv95').map(([k, v]) => `${k}: ${v}`).join(' · ')}
+            </p>
+            {a.nachricht && <p className="mt-1">{a.nachricht}</p>}
+            {!a.bearbeitet && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {a.art === 'investor' && (
+                  <button type="button" onClick={() => void alsInvestor(a)} className="h-10 rounded-lg bg-slate-900 px-3 text-sm font-medium text-white">Als Investor übernehmen</button>
+                )}
+                <button type="button" onClick={() => void erledigt(a)} className="h-10 rounded-lg border px-3 text-sm">Erledigt</button>
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function Auswertung() {
   return (
     <div className="mx-auto max-w-5xl space-y-8 p-4 md:p-6">
@@ -232,6 +314,7 @@ export function Auswertung() {
         <p className="text-sm text-muted-foreground">Reaktivierung, Investoren und Kennzahlen -- aus den erfassten Gesprächen und Gelegenheiten.</p>
       </div>
       <Kennzahlen />
+      <Anfragen />
       <Reaktivierung />
       <Investoren />
     </div>

@@ -43,7 +43,8 @@ on:
           - baugesuche   # Wo der Zuercher Baugesuch-Datensatz liegt, und wie er aufgebaut ist
           - baugesuch-probe # Ob ein Gesuch beim Nachbarn einer Portfolio-Parzelle eine Gelegenheit erzeugt (wird zurueckgerollt)
           - teams-probe  # Ob ein Konto ausserhalb eines Teams dessen Kunden wirklich nicht sieht (wird zurueckgerollt)
-          - potenzial    # Was der Bund an einem Punkt zu Bauzone und Parzelle liefert (fuer den Potenzialcheck)
+          - potenzial-bund # Was der Bund an einem Punkt zu Bauzone und Parzelle liefert (fuer den Potenzialcheck)
+          - anfrage-probe # Ob der oeffentliche Schluessel Anfragen einfuegen, aber nicht lesen kann (wird zurueckgerollt)
       egrid:
         description: 'Nur für "objekt": die EGRID, z.B. CH707709971116'
         required: false
@@ -560,8 +561,34 @@ jobs:
           \echo '```'
           SQL
 
-          elif [ "$FRAGE" = "potenzial" ]; then
+          elif [ "$FRAGE" = "potenzial-bund" ]; then
+            # Eigener Name: "potenzial" gab es schon (unten), beide liefen.
             { echo "### Bauzone und Parzelle am Punkt"; echo '```'; node tools/potenzial_quelle.mjs 2>&1 || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+          elif [ "$FRAGE" = "anfrage-probe" ]; then
+            # Als "anon" -- die Rolle der oeffentlichen Seiten. Einfuegen
+            # muss gehen, Lesen darf nichts zeigen, ohne Einwilligung darf
+            # nichts gespeichert werden. Zurueckgerollt.
+            psql "$DB" -X -q >> "$GITHUB_STEP_SUMMARY" 2>&1 <<'SQL' || true
+          \echo '### Probe: oeffentliche Anfragen'
+          \echo '```'
+          begin;
+          set local role anon;
+          insert into anfrage (art, name, email, einwilligung) values ('bewertung', 'Probe Person', 'probe@example.ch', true);
+          \echo 'Einfuegen als anon: ok'
+          select count(*) as anon_sieht_anfragen from anfrage;
+          savepoint s;
+          insert into anfrage (art, name, email, einwilligung) values ('bewertung', 'Ohne Einwilligung', 'x@example.ch', false);
+          rollback to savepoint s;
+          savepoint t;
+          update anfrage set bearbeitet = true;
+          \echo 'Update als anon (muss 0 Zeilen treffen oder scheitern)'
+          rollback to savepoint t;
+          reset role;
+          select count(*) as probe_zeilen_als_admin from anfrage where name = 'Probe Person';
+          rollback;
+          \echo '```'
+          SQL
 
           elif [ "$FRAGE" = "ortsdienst" ]; then
             # Die Anmeldung soll den Ort zur Adresse zeigen. Der Browser

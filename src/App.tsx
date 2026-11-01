@@ -13,6 +13,7 @@ import { AuskunftAusLesezeichen } from "@/components/AuskunftAusLesezeichen";
 const Index = lazy(() => import("./pages/Index.tsx"));
 const SwipePage = lazy(() => import("./pages/SwipePage.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
+const Anfrage = lazy(() => import("./pages/Anfrage.tsx"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -40,19 +41,33 @@ const App = () => (
         <Sonner />
         {/* Die Liste enthält Adressen, Eigentümernamen und Nummern von
             Menschen, die nie um ihre Aufnahme gebeten haben. Sie gehört
-            hinter eine Anmeldung -- alle Seiten, auch /swipe. */}
+            hinter eine Anmeldung -- alle Seiten, auch /swipe; offen sind nur
+            die drei Anfrage-Seiten, die nichts lesen können. */}
         <BrowserRouter>
-          <Torwaechter>
-            <GlobalListeners />
-            <Suspense fallback={<div className="min-h-screen bg-background" />}>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/swipe" element={<SwipePage />} />
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Suspense>
-          </Torwaechter>
+          <Suspense fallback={<div className="min-h-screen bg-background" />}>
+            <Routes>
+              {/* Die drei öffentlichen Seiten -- die einzigen Ausnahmen.
+                  Sie können nur eine Anfrage einfügen, nichts lesen
+                  (20261101240000_anfrage.sql). Alles andere bleibt
+                  hinter dem Torwächter. */}
+              <Route path="/bewertung" element={<Anfrage art="bewertung" />} />
+              <Route path="/potenzial" element={<Anfrage art="potenzial" />} />
+              <Route path="/investor" element={<Anfrage art="investor" />} />
+              <Route path="*" element={
+                <Torwaechter>
+                  <GlobalListeners />
+                  <Suspense fallback={<div className="min-h-screen bg-background" />}>
+                    <Routes>
+                      <Route path="/" element={<Index />} />
+                      <Route path="/swipe" element={<SwipePage />} />
+                      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </Suspense>
+                </Torwaechter>
+              } />
+            </Routes>
+          </Suspense>
         </BrowserRouter>
       </TooltipProvider>
     </CantonProvider>

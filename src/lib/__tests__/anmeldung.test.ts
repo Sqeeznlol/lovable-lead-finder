@@ -16,10 +16,25 @@ import { geraetGenau, geraetName } from '@/lib/geraet';
 import { kennungZuAdresse } from '@/lib/kennung';
 
 describe('Anmeldung', () => {
-  it('die ganze Anwendung steht hinter dem Torwächter', () => {
+  it('die ganze Anwendung steht hinter dem Torwächter -- bis auf die drei öffentlichen Seiten', () => {
     const app = readFileSync('src/App.tsx', 'utf8');
     expect(app).toMatch(/<AuthProvider>/);
-    expect(app).toMatch(/<Torwaechter>[\s\S]*<Routes>[\s\S]*<\/Torwaechter>/);
+    expect(app).toMatch(/<Torwaechter>[\s\S]*<Route path="\/" element=\{<Index \/>\}[\s\S]*<\/Torwaechter>/);
+    // Ausserhalb des Torwächters stehen genau diese drei, und nur die Anfrage-Seite.
+    const aussen = app.replace(/<Torwaechter>[\s\S]*<\/Torwaechter>/, '');
+    const offen = [...aussen.matchAll(/<Route path="([^"]+)" element=\{<(\w+)/g)].map(m => `${m[1]} ${m[2]}`);
+    expect(offen).toEqual(['/bewertung Anfrage', '/potenzial Anfrage', '/investor Anfrage']);
+  });
+
+  it('die öffentliche Seite liest nichts aus der Datenbank, sie fügt nur ein', () => {
+    const seite = readFileSync('src/pages/Anfrage.tsx', 'utf8');
+    expect(seite.match(/\.from\('(\w+)'\)/g)).toEqual([".from('anfrage')"]);
+    expect(seite).toMatch(/\.from\('anfrage'\)\.insert\(/);
+    expect(seite).not.toMatch(/\.select\(|\.rpc\(/);
+    const m = readFileSync('supabase/migrations/20261101240000_anfrage.sql', 'utf8');
+    expect(m).toMatch(/for insert to anon, authenticated/);
+    expect(m).toMatch(/for select to authenticated/);
+    expect(m).not.toMatch(/for (select|update|delete|all) to anon/);
   });
 
   it('der Admin-Bereich verlangt die Admin-Rolle', () => {
