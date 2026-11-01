@@ -56,9 +56,14 @@ jobs:
           insert into public.baugesuch
             (quelle, fremd_id, publiziert_am, kanton, bfs_nr, gemeinde, adresse, parzelle_nr, egrid,
              bauherrschaft, beschreibung, zustand, nachbar_egrids)
-          select 'zh-statistik', fremd_id, publiziert_am, 'ZH', bfs_nr, gemeinde, adresse, parzelle_nr,
-                 nullif(egrid, ''), bauherrschaft, beschreibung, 'eingereicht', nachbar_egrids
+          -- Gemessen im ersten Lauf: dieselbe Publikation steht mehrfach in
+          -- der Quelle, eine Zeile je betroffener Parzelle. Der Schlüssel
+          -- ist darum Publikation und Parzelle, und Doppel fallen weg.
+          select distinct on (fremd_id || coalesce(':' || parzelle_nr, ''))
+                 'zh-statistik', fremd_id || coalesce(':' || parzelle_nr, ''), publiziert_am, 'ZH', bfs_nr, gemeinde,
+                 adresse, parzelle_nr, nullif(egrid, ''), bauherrschaft, beschreibung, 'eingereicht', nachbar_egrids
           from neu
+          order by fremd_id || coalesce(':' || parzelle_nr, ''), egrid nulls last
           on conflict (quelle, fremd_id) do update
             set egrid = coalesce(excluded.egrid, baugesuch.egrid),
                 nachbar_egrids = coalesce(excluded.nachbar_egrids, baugesuch.nachbar_egrids);
