@@ -831,6 +831,13 @@ const STIL = `
 .gisk a{color:var(--akzent);text-decoration:none}
 .gisk .map{position:absolute;inset:0;background:var(--fl)}
 .gisk .leaflet-container{font:inherit}
+/* Die weissen Linien im Raster: Leaflet legt die Kacheln Kante an
+   Kante, und bei Windows-Skalierung (125 %, 150 %) oder Browserzoom
+   rundet der Browser die Positionen auf Bruchteile von Pixeln -- dann
+   bleibt zwischen zwei Kacheln ein Haarspalt, durch den der helle
+   Hintergrund scheint. Jede Kachel ist deshalb einen Pixel grösser und
+   überlappt die nächste; bei deckenden Kacheln sieht man das nicht. */
+.gisk img.leaflet-tile{width:257px!important;height:257px!important}
 .gisk .leaflet-bar{border:0!important;box-shadow:var(--schatten)!important;border-radius:12px!important;overflow:hidden}
 .gisk .leaflet-bar a{width:36px!important;height:36px!important;line-height:36px!important;color:var(--tinte)!important;border-color:var(--linie)!important}
 .gisk .leaflet-bottom.leaflet-right{right:416px}
