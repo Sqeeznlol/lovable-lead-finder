@@ -45,6 +45,7 @@ on:
           - teams-probe  # Ob ein Konto ausserhalb eines Teams dessen Kunden wirklich nicht sieht (wird zurueckgerollt)
           - potenzial-bund # Was der Bund an einem Punkt zu Bauzone und Parzelle liefert (fuer den Potenzialcheck)
           - anfrage-probe # Ob der oeffentliche Schluessel Anfragen einfuegen, aber nicht lesen kann (wird zurueckgerollt)
+          - indizes      # Welche Indizes auf properties wie gross sind und ob sie je benutzt werden
           - parzellen-zh # Ob jede Zürcher Parzelle im Bestand ist und welche Felder leer sind
           - amtsblatt-jahr # Ob die Baugesuche des Jahres (Amtsblatt-Export) in Quelle und Datenbank stehen
           - luftbild     # Ob der Bund Luftbilder (SWISSIMAGE) als ein Bild je Ausschnitt liefert
@@ -600,6 +601,30 @@ jobs:
           select count(*) as egrid_mehrfach from (select egrid from properties where kanton = 'ZH' and egrid is not null group by egrid having count(*) > 1) d;
           \echo '```'
           SQL
+
+          elif [ "$FRAGE" = "indizes" ]; then
+            # Die Datenbank steht bei 1093 MB, nur-lesen kam bei 1107 MB.
+            # properties traegt 522 MB Indizes auf 395 MB Daten. Vor
+            # jedem Loeschen: welche werden seit dem letzten Neustart
+            # der Statistik nie gelesen?
+            frage "Indizes auf properties" "
+              select s.indexrelname as index,
+                     pg_size_pretty(pg_relation_size(s.indexrelid)) as groesse,
+                     s.idx_scan as gelesen,
+                     i.indisunique as eindeutig
+              from pg_stat_user_indexes s
+              join pg_index i on i.indexrelid = s.indexrelid
+              where s.relname = 'properties'
+              order by pg_relation_size(s.indexrelid) desc;"
+            frage "Seit wann die Statistik zaehlt" "
+              select stats_reset from pg_stat_database where datname = current_database();"
+            frage "Spalten mit dem meisten Platz (Stichprobe 5000 Zeilen)" "
+              select a.attname as spalte,
+                     round(avg(pg_column_size(t.*))) as zeile_gesamt
+              from (select * from properties tablesample system (2) limit 5000) t,
+                   pg_attribute a
+              where a.attrelid = 'properties'::regclass and a.attnum = 1
+              group by 1;"
 
           elif [ "$FRAGE" = "amtsblatt-jahr" ]; then
             { echo "### Baugesuche des Jahres"; echo '```'; python3 tools/amtsblatt_jahr.py 2>&1 || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
