@@ -12,10 +12,11 @@ import { kennungZuAdresse } from '@/lib/kennung';
  * Menschen, die nie um ihre Aufnahme gebeten haben. Sie gehört hinter
  * eine Anmeldung, nicht ins offene Netz.
  *
- * Der Benutzername steht schon da: es gibt ein Konto für die Arbeit
- * und eines für den Admin-Bereich, mehr nicht. Wer den Namen vorgibt,
- * verrät ihn -- das ist gewollt; was zählt, ist das Passwort, und das
- * steht nirgends.
+ * Nur ein Feld: das Passwort. Es gibt ein Konto für die Arbeit und
+ * eines für den Admin-Bereich; welches gemeint ist, weiss die Stelle,
+ * die die Maske zeigt, und füllt die Adresse selbst ein. Hinter dem
+ * Feld steht trotzdem eine echte Sitzung bei Supabase -- nur die kann
+ * die Datenbank später schützen. Das Passwort steht nirgends im Code.
  *
  * Eine Sperre nach Fehlversuchen gab es hier einmal, im Browser. Sie
  * hat am ersten Tag den Einzigen ausgesperrt, der das Passwort kennt,
@@ -26,8 +27,8 @@ import { kennungZuAdresse } from '@/lib/kennung';
  * 20260905230000_zugang_beschraenken.sql).
  */
 interface Props {
-  /** Der Benutzername, der schon dasteht. */
-  vorgabe?: string;
+  /** Welches Konto: "aui" für die Arbeit, "sqeezn" für den Admin. */
+  konto?: string;
   titel?: string;
   text?: string;
   /** In einen Bereich eingebettet statt als ganze Seite. */
@@ -35,13 +36,12 @@ interface Props {
 }
 
 export function Anmeldung({
-  vorgabe = 'AUI',
+  konto = 'aui',
   titel = 'Anmeldung',
   text = 'Die Liste enthält Personendaten. Zugang nur mit Konto.',
   eingebettet = false,
 }: Props) {
   const { signIn } = useAuth();
-  const [benutzer, setBenutzer] = useState(vorgabe);
   const [passwort, setPasswort] = useState('');
   const [laeuft, setLaeuft] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
@@ -51,12 +51,12 @@ export function Anmeldung({
     if (laeuft) return;
     setLaeuft(true);
     setFehler(null);
-    const { error } = await signIn(kennungZuAdresse(benutzer), passwort);
+    const { error } = await signIn(kennungZuAdresse(konto), passwort);
     setLaeuft(false);
     if (error) {
       setPasswort('');
       // Nicht verraten, was genau nicht stimmt.
-      setFehler('Benutzername oder Passwort stimmt nicht.');
+      setFehler('Das Passwort stimmt nicht.');
     }
   };
 
@@ -71,11 +71,9 @@ export function Anmeldung({
         <p className="text-sm text-muted-foreground">{text}</p>
       </div>
 
-      <div className="space-y-1.5">
-        <label className="text-sm font-medium" htmlFor="benutzer">Benutzername</label>
-        <Input id="benutzer" value={benutzer} onChange={e => setBenutzer(e.target.value)}
-               autoComplete="username" required />
-      </div>
+      {/* Für den Passwortspeicher des Browsers: er merkt sich ein
+          Passwort nur zusammen mit einem Namen. Unsichtbar. */}
+      <input type="text" name="username" autoComplete="username" value={konto} readOnly hidden />
       <div className="space-y-1.5">
         <label className="text-sm font-medium" htmlFor="passwort">Passwort</label>
         <Input id="passwort" type="password" value={passwort} onChange={e => setPasswort(e.target.value)}

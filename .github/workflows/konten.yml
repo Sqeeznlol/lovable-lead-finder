@@ -1,0 +1,84 @@
+# =====================================================================
+# Konten anlegen
+# =====================================================================
+# Die Anmeldung kennt nur ein Passwortfeld; dahinter stehen zwei Konten
+# bei Supabase: aui@wohntraums.life (Arbeit) und sqeezn@wohntraums.life
+# (Admin). Dieser Ablauf legt sie an oder setzt ihr Passwort neu.
+#
+# Die Passwörter kommen aus GitHub-Secrets (KONTO_AUI, KONTO_ADMIN) und
+# nirgends sonst her: nicht aus dem Code, nicht aus einer Eingabe beim
+# Start -- dieses Repository ist öffentlich. An die Datenbank gehen sie
+# als psql-Variable; die Prüfsumme rechnet die Datenbank selbst
+# (crypt mit bcrypt). Ins Protokoll kommt nur, ob es geklappt hat.
+# =====================================================================
+
+name: Konten
+
+on:
+  workflow_dispatch:
+
+jobs:
+  konten:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Werkzeuge
+        run: sudo apt-get install -y -qq postgresql-client
+
+      - name: Anlegen
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+          AUI: ${{ secrets.KONTO_AUI }}
+          ADMIN: ${{ secrets.KONTO_ADMIN }}
+        run: |
+          set -euo pipefail
+          [ -n "${DB:-}" ]    || { echo "SUPABASE_DB_URL fehlt."; exit 1; }
+          [ -n "${AUI:-}" ]   || { echo "Secret KONTO_AUI fehlt."; exit 1; }
+          [ -n "${ADMIN:-}" ] || { echo "Secret KONTO_ADMIN fehlt."; exit 1; }
+
+          cat > /tmp/konto.sql <<'SQL'
+          -- Eine Funktion nur fuer diese Sitzung: legt das Konto an oder
+          -- setzt sein Passwort neu, und sorgt fuer den Eintrag in
+          -- auth.identities, ohne den GoTrue die Anmeldung ablehnt.
+          create or replace function pg_temp.konto(p_email text, p_pw text)
+          returns text language plpgsql as $f$
+          declare uid uuid; hash text := extensions.crypt(p_pw, extensions.gen_salt('bf', 10));
+          begin
+            select id into uid from auth.users where lower(email) = lower(p_email);
+            if uid is null then
+              uid := gen_random_uuid();
+              -- Leere Zeichenketten sind Pflicht: GoTrue bricht sonst mit
+              -- "converting NULL to string" ab.
+              insert into auth.users (instance_id, id, aud, role, email, encrypted_password,
+                email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+                confirmation_token, recovery_token, email_change, email_change_token_new)
+              values ('00000000-0000-0000-0000-000000000000', uid, 'authenticated', 'authenticated',
+                lower(p_email), hash, now(), '{"provider":"email","providers":["email"]}', '{}',
+                now(), now(), '', '', '', '');
+            else
+              update auth.users set encrypted_password = hash,
+                     email_confirmed_at = coalesce(email_confirmed_at, now()), updated_at = now()
+               where id = uid;
+            end if;
+            if not exists (select 1 from auth.identities where user_id = uid and provider = 'email') then
+              insert into auth.identities (id, user_id, provider_id, identity_data, provider,
+                                           last_sign_in_at, created_at, updated_at)
+              values (gen_random_uuid(), uid, uid::text,
+                      jsonb_build_object('sub', uid::text, 'email', lower(p_email), 'email_verified', true),
+                      'email', now(), now(), now());
+            end if;
+            return lower(p_email) || ' bereit';
+          end $f$;
+          select pg_temp.konto('aui@wohntraums.life', :'aui');
+          select pg_temp.konto('sqeezn@wohntraums.life', :'admin');
+          insert into public.user_roles (user_id, role)
+          select id, 'admin' from auth.users where lower(email) = 'sqeezn@wohntraums.life'
+          on conflict (user_id, role) do nothing;
+          -- Gegenprobe in der Datenbank: stimmt die Pruefsumme zum Passwort?
+          select lower(u.email) as konto,
+                 u.encrypted_password = extensions.crypt(:'aui', u.encrypted_password) as passwort_stimmt
+            from auth.users u where lower(u.email) = 'aui@wohntraums.life';
+          select r.role from public.user_roles r join auth.users u on u.id = r.user_id
+           where lower(u.email) = 'sqeezn@wohntraums.life';
+          SQL
+          psql "$DB" -v ON_ERROR_STOP=1 -X -q --single-transaction \
+               -v aui="$AUI" -v admin="$ADMIN" -f /tmp/konto.sql

@@ -16,7 +16,7 @@ export function AdminZugang({ children }: { children: ReactNode }) {
   if (isAdmin) return <>{children}</>;
   return (
     <Anmeldung
-      vorgabe="Sqeezn"
+      konto="sqeezn"
       titel="Admin"
       text="Hier stehen die Anmeldungen, die Einstellungen und der Import. Nur mit dem Admin-Konto."
       eingebettet
