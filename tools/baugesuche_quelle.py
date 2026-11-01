@@ -10,7 +10,14 @@ def holen(url, n=None):
     with urllib.request.urlopen(req, timeout=60) as r:
         return r.read(n) if n else r.read()
 
-d = json.loads(holen('https://ckan.opendata.swiss/api/3/action/package_search?q=baugesuch&rows=20'))['result']
+import urllib.parse
+# Nur Kanton Zürich: die erste, breite Suche brachte 20 Treffer aus BL, BE,
+# LU, SH und der Stadt Zürich, aber nicht den kantonalen Datensatz.
+q = urllib.parse.quote('baugesuche')
+fq = urllib.parse.quote('organization:(statistisches-amt-kanton-zuerich OR kanton-zuerich OR geoinformation-kanton-zuerich OR amt-fur-raumentwicklung-kanton-zuerich)')
+d = json.loads(holen(f'https://ckan.opendata.swiss/api/3/action/package_search?q={q}&fq={fq}&rows=10'))['result']
+if d['count'] == 0:
+    d = json.loads(holen('https://ckan.opendata.swiss/api/3/action/package_search?q=title_de:baugesuche&rows=10'))['result']
 print('Treffer:', d['count'])
 csvs = []
 for p in d['results']:
@@ -20,7 +27,7 @@ for p in d['results']:
     for r in p.get('resources', [])[:10]:
         url = r.get('download_url') or r.get('url')
         print('  -', r.get('format'), '|', (r.get('title') or {}).get('de'), '|', url)
-        if (r.get('format') or '').upper() == 'CSV' and 'zh' in (p.get('organization') or {}).get('name', '').lower() + p['name']:
+        if (r.get('format') or '').upper() == 'CSV' and 'zuerich' in (p.get('organization') or {}).get('name', '').lower():
             csvs.append(url)
 
 for url in csvs[:2]:
