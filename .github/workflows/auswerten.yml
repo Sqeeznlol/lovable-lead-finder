@@ -43,6 +43,7 @@ on:
           - baugesuche   # Wo der Zuercher Baugesuch-Datensatz liegt, und wie er aufgebaut ist
           - baugesuch-probe # Ob ein Gesuch beim Nachbarn einer Portfolio-Parzelle eine Gelegenheit erzeugt (wird zurueckgerollt)
           - teams-probe  # Ob ein Konto ausserhalb eines Teams dessen Kunden wirklich nicht sieht (wird zurueckgerollt)
+          - potenzial    # Was der Bund an einem Punkt zu Bauzone und Parzelle liefert (fuer den Potenzialcheck)
       egrid:
         description: 'Nur für "objekt": die EGRID, z.B. CH707709971116'
         required: false
@@ -558,6 +559,9 @@ jobs:
           rollback;
           \echo '```'
           SQL
+
+          elif [ "$FRAGE" = "potenzial" ]; then
+            { echo "### Bauzone und Parzelle am Punkt"; echo '```'; node tools/potenzial_quelle.mjs 2>&1 || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
           elif [ "$FRAGE" = "ortsdienst" ]; then
             # Die Anmeldung soll den Ort zur Adresse zeigen. Der Browser
