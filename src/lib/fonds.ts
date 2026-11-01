@@ -22,9 +22,13 @@ export interface Universum {
   gesellschaft: string | null; mandant: string | null; fonds: Fonds[]; punkte: Punkt[]; kanten: Kante[]; potenziale: Potenzial[];
 }
 
-/** Die Abfrage in der Datenbank (Migration 20261101300000_fonds.sql). */
-export async function universumLaden(): Promise<Universum> {
-  const r = await db().rpc('fonds_universum');
+/**
+ * Die Abfrage in der Datenbank (Migrationen 20261101300000_fonds.sql und
+ * 20261101320000_fonds_konten.sql). `team` wählt die Fondsleitung; für
+ * einen Fondsmanager zählt sie nicht, er sieht immer die eigene.
+ */
+export async function universumLaden(team: string | null): Promise<Universum> {
+  const r = await db().rpc('fonds_universum', { p_team: team });
   if (r.error) throw r.error;
   return r.data as Universum;
 }

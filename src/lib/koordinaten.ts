@@ -39,3 +39,16 @@ export function wgs84NachLv95(lat: number, lon: number): Landeskoordinaten {
 
   return { e: Math.round(y * 100) / 100, n: Math.round(x * 100) / 100 };
 }
+
+/**
+ * Zurück: Landeskoordinaten in Längen- und Breitengrad, gleiche Quelle
+ * und Genauigkeit. Die Punkte der Liegenschaften liegen in LV95 vor
+ * (parzelle_punkt), die Kacheln der Karte erwarten WGS84.
+ */
+export function lv95NachWgs84(e: number, n: number): { lat: number; lon: number } {
+  const y = (e - 2600000) / 1e6;
+  const x = (n - 1200000) / 1e6;
+  const l = 2.6779094 + 4.728982 * y + 0.791484 * y * x + 0.1306 * y * x * x - 0.0436 * y * y * y;
+  const b = 16.9023892 + 3.238272 * x - 0.270978 * y * y - 0.002528 * x * x - 0.0447 * y * y * x - 0.014 * x * x * x;
+  return { lat: (b * 100) / 36, lon: (l * 100) / 36 };
+}

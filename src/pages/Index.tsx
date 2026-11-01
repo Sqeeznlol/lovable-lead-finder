@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { Building2, LayoutDashboard, Upload, Phone, X, Zap, Search, FileSpreadsheet, Eye, Shield, Share, Plus, Database, Send, Map, Target, BarChart3, Gauge, HardHat, MoreHorizontal, Briefcase, LogOut, Orbit } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { KontoMenu } from '@/components/KontoMenu';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -253,10 +254,7 @@ export default function Index() {
                   <Plus className="h-4 w-4" /> Neues Vorhaben
                 </button>
                 <ThemeToggle />
-                <span className="hidden min-w-0 leading-tight lg:block">
-                  <span className="block truncate text-[15px] font-semibold">{konto}</span>
-                  <span className="block truncate text-xs text-muted-foreground">{user?.email}</span>
-                </span>
+                <KontoMenu />
               </div>
             </div>
           </header>

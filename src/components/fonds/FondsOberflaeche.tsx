@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/use-auth';
 import { useUrlWert } from '@/hooks/use-url-wert';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { KontoMenu, useGesellschaften } from '@/components/KontoMenu';
 import { Abschnitt, AUF, KNOPF, KNOPF_HAUPT, Kennzahlen, Leer, LISTE, Marke, Reiter, Strichbalken } from '@/components/rahmen';
 import { Universum } from '@/components/fonds/Universum';
 import { FondsImport } from '@/components/fonds/FondsImport';
@@ -29,7 +30,15 @@ export function FondsOberflaeche() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { signOut } = useAuth();
-  const { data, isLoading, error } = useQuery({ queryKey: ['fonds-universum'], queryFn: universumLaden, staleTime: 60 * 1000 });
+  // Unsere Konten wählen oben rechts eine Fondsleitung (?als=); ohne
+  // Wahl die erste, damit nie mehrere Gesellschaften vermischt sind.
+  const { data: leitungen, isLoading: leitungenLaden } = useGesellschaften();
+  const [alsWert] = useUrlWert('als');
+  const als = alsWert ?? leitungen?.[0]?.id ?? null;
+  const intern = (leitungen?.length ?? 0) > 0;
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['fonds-universum', als], queryFn: () => universumLaden(als), staleTime: 60 * 1000, enabled: !leitungenLaden,
+  });
   const [gewaehlt, setGewaehlt] = useUrlWert('liegenschaft');
   const [artWert, setArt] = useUrlWert('potenzial', 'alle');
   const [import_, setImport] = useUrlWert('einspielen');
@@ -49,7 +58,7 @@ export function FondsOberflaeche() {
   const nr = useMemo(() => new Map((data?.fonds ?? []).map(f => [f.id, f.nr])), [data]);
   const punkt = useMemo(() => new Map((data?.punkte ?? []).map(p => [p.id, p])), [data]);
 
-  if (isLoading) return <div className="grid min-h-safe-screen place-items-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
+  if (isLoading || leitungenLaden) return <div className="grid min-h-safe-screen place-items-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
   if (error || !data) return <div className="p-10"><Leer titel="Das Universum lässt sich nicht laden.">Angemeldet? Sonst später nochmals.</Leer></div>;
 
   const fremd = data.kanten.filter(k => k.fremd);
@@ -72,8 +81,10 @@ export function FondsOberflaeche() {
           </span>
           <span className="ml-auto flex items-center gap-2">
             <ThemeToggle />
-            <button type="button" onClick={() => void signOut()} aria-label="Abmelden" title="Abmelden"
-                    className="grid h-11 w-11 place-items-center rounded-[3px] border bg-card hover:bg-secondary"><LogOut className="h-5 w-5" /></button>
+            {intern ? <KontoMenu aktiv={als} /> : (
+              <button type="button" onClick={() => void signOut()} aria-label="Abmelden" title="Abmelden"
+                      className="grid h-11 w-11 place-items-center rounded-[3px] border bg-card hover:bg-secondary"><LogOut className="h-5 w-5" /></button>
+            )}
           </span>
         </div>
       </header>
@@ -85,8 +96,8 @@ export function FondsOberflaeche() {
             {n(data.punkte.length)} Liegenschaften{anFremd ? `, ${n(anFremd)} grenzen an einen anderen Ihrer Fonds` : ''}
           </h1>
           <p className="max-w-2xl text-muted-foreground">
-            Jeder Punkt eine Liegenschaft an ihrem Ort, die Farbe ist der Fonds. Leuchtende Linien: hier liegen Liegenschaften
-            verschiedener Fonds nebeneinander -- gemeinsam lässt sich mehr entwickeln.
+            Jeder Punkt eine Liegenschaft an ihrem Ort, die Farbe ist der Fonds. Orange Linie: hier grenzen Liegenschaften
+            verschiedener Fonds aneinander -- gemeinsam lässt sich mehr entwickeln.
           </p>
         </div>
 
