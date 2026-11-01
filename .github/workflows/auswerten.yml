@@ -225,6 +225,18 @@ jobs:
                 || echo "000")
               echo "GetMap ${S}x${S}:  $ST" >> "$GITHUB_STEP_SUMMARY"
             done
+            # Ab welchem Zoom zeigt der Kataster Linien statt gruener
+            # Flaeche? Derselbe Punkt in Zuerich (Stadelhofen), Bildgroesse
+            # wie ein Bildschirm, Ausschnitt so gross wie bei Zoom z.
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Kataster, Anteil Flaeche je Zoom (Zuerich Stadelhofen, 1000x600):" >> "$GITHUB_STEP_SUMMARY"
+            for Z in 13 14 15 16 17 18; do
+              M=$(python3 -c "print(40075016.69/256/2**$Z)")
+              B=$(python3 -c "x,y=950980,6003550; m=$M; print(f'{x-500*m},{y-300*m},{x+500*m},{y+300*m}')")
+              curl -s -o /tmp/z.png --max-time 120 \
+                "https://wms.geo.admin.ch/?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=ch.kantone.cadastralwebmap-farbe&STYLES=&SRS=EPSG:3857&BBOX=$B&WIDTH=1000&HEIGHT=600&FORMAT=image/png&TRANSPARENT=TRUE" || true
+              echo "  Zoom $Z:  $(python3 tools/gruen_zaehlen.py /tmp/z.png 2>&1 | tail -1)" >> "$GITHUB_STEP_SUMMARY"
+            done
             # Und: findet identify die Parzellen, die ein Polygon beruehrt?
             # Davon haengt ab, ob Nachbarn auch ohne eigenen Umriss gehen.
             POLY='{"rings":[[[2683800,1246700],[2683900,1246700],[2683900,1246800],[2683800,1246800],[2683800,1246700]]]}'
