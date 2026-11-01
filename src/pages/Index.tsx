@@ -26,6 +26,7 @@ import { KeyboardShortcutsOverlay } from '@/components/KeyboardShortcutsOverlay'
 import { Protokoll } from '@/components/Protokoll';
 import { AdminZugang } from '@/components/AdminZugang';
 import { Anmeldungen } from '@/components/Anmeldungen';
+import { Teams } from '@/components/Teams';
 import { Lesezeichen } from '@/components/Lesezeichen';
 import { ErweiterungHolen } from '@/components/ErweiterungHolen';
 import { Nummern } from '@/components/Nummern';
@@ -215,6 +216,8 @@ export default function Index() {
               <div className="space-y-6">
                 {/* Wer war von wo da -- das Erste, was der Admin sieht. */}
                 <Anmeldungen />
+                {/* Wer welchen Kunden sieht -- die Grenze zieht die Datenbank. */}
+                <Teams />
                 {/* Das Lesezeichen steht oben, weil es kein
                     Einstellungswert ist, sondern ein Werkzeug, das
                     jeder einmal in seine Leiste zieht. */}
