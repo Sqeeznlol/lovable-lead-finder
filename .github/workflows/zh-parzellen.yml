@@ -2,23 +2,31 @@
 # Zürcher Parzellen vervollständigen
 # =====================================================================
 # Gemessen am 1. November: die Amtliche Vermessung Zürich führt 392'666
-# Liegenschaften, im Bestand stehen 185'210 mit EGRID. Dazu 73'847
-# Zürcher Zeilen ohne EGRID, und bei allen fehlt die BFS-Nummer.
+# Liegenschaften (391'418 verschiedene EGRID), im Bestand standen davon
+# 184'824. Dazu 73'847 Zürcher Zeilen ohne EGRID, alle aus
+# "parzellen-zusammengefuehrt.csv", mit Ortschafts- statt
+# Gemeindenamen (Effretikon, Gockhausen) -- über den Namen trafen nur
+# 156. Aber 73'436 davon tragen eine Gebäudenummer (EGID), und das
+# Gebäuderegister des Bundes führt zu jeder EGID die EGRID.
 #
-# Dieser Ablauf holt alle Liegenschaften (EGRID, Nummer, BFS-Nummer,
-# Fläche) aus dem WFS des Kantons und
-#   1. ergänzt bestehende Zeilen über die EGRID (BFS-Nummer, Fläche,
-#      Parzellennummer -- nur, wo leer),
-#   2. gibt Zeilen ohne EGRID ihre EGRID, wenn Gemeinde und
-#      Parzellennummer genau eine amtliche Liegenschaft treffen,
-#   3. legt jede fehlende Liegenschaft neu an.
+# Der Ablauf
+#   1. holt alle Liegenschaften (EGRID, Nummer, BFS-Nummer, Fläche) aus
+#      dem WFS des Kantons und das Gebäuderegister des Bundes,
+#   2. gibt Zeilen ohne EGRID ihre EGRID -- zuerst über die EGID, sonst
+#      über Gemeinde und Parzellennummer, nur bei eindeutigem Treffer
+#      und nur, wenn die EGRID noch frei ist. Das kommt vor dem
+#      Anlegen, sonst entstünde dieselbe Parzelle ein zweites Mal,
+#   3. legt jede fehlende Liegenschaft neu an,
+#   4. ergänzt BFS-Nummer, Fläche und Parzellennummer, wo leer,
+#   5. ergänzt aus dem Register Adresse, PLZ, Baujahr, Geschosse,
+#      Wohnungen, Gebäudefläche, Objektart -- nur, wo leer.
 #
 # Platz: bei 1107 MB schaltet Supabase auf nur-lesen. Geschrieben wird
 # in Stücken, vor jedem Stück wird gemessen; über der Grenze bricht der
 # Lauf ab, und der nächste macht beim Rest weiter (jeder Schritt nimmt
 # nur, was noch offen ist). Nach jedem Stück Änderungen räumt VACUUM
-# die alten Zeilenfassungen weg, sonst wächst die Tabelle mit jedem
-# Update um die alte Fassung.
+# die alten Zeilenfassungen weg, damit die Tabelle nicht um jede alte
+# Fassung wächst.
 # =====================================================================
 
 name: Zürcher Parzellen
@@ -42,7 +50,7 @@ on:
 jobs:
   zh:
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    timeout-minutes: 300
     steps:
       - uses: actions/checkout@v4
 
@@ -54,7 +62,16 @@ jobs:
           set -euo pipefail
           python3 tools/av_zh_laden.py /tmp/av.csv /tmp/gemeinden.csv \
             | tee -a "$GITHUB_STEP_SUMMARY"
-          wc -l /tmp/av.csv /tmp/gemeinden.csv | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Gebäuderegister holen
+        run: |
+          set -euo pipefail
+          curl -sSL --retry 4 -o /tmp/gwr.zip "https://public.madd.bfs.admin.ch/zh.zip"
+          ls -lh /tmp/gwr.zip
+          mkdir -p /tmp/gwr && unzip -o -q /tmp/gwr.zip -d /tmp/gwr
+          python3 tools/gwr_zh.py /tmp/gwr /tmp/gwr_egid.csv /tmp/gwr_parzelle.csv \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+          rm -rf /tmp/gwr /tmp/gwr.zip
 
       - name: Abgleichen und schreiben
         env:
@@ -70,28 +87,56 @@ jobs:
           # und verschwinden mit ihr -- kein liegengebliebenes
           # Zwischenlager wie am 31. Oktober.
           #
-          # Die Stücke laufen in einer Schleife innerhalb von psql nicht
-          # gut (VACUUM darf nicht in einem Block stehen). Darum erzeugt
-          # die Shell das Skript, und psql arbeitet es mit \gexec und
-          # \if ab -- weiterhin in einer Sitzung.
+          # VACUUM darf in keinem Block stehen; darum schreibt die Shell
+          # die Stücke einzeln aus, und psql prüft vor jedem mit \if die
+          # Grösse -- weiterhin in einer Sitzung.
+          stuecke() {   # $1 = Name, $2 = Anzahl-Variable, $3 = SQL mit STUECK
+            for i in $(seq 0 30); do
+              cat <<SQL
+          select (pg_database_size(current_database())/1024/1024)::int as mb \gset
+          select :mb >= :grenze as voll, $i >= :$2 as fertig \gset
+          \if :voll
+            \echo 'ABBRUCH vor $1 $i: Datenbank bei' :mb 'MB. Der nächste Lauf macht weiter.'
+            \quit
+          \endif
+          \if :fertig
+          \else
+          ${3//STUECK/$i}
+            \echo '$1 $i fertig, Datenbank vorher' :mb 'MB'
+          \endif
+          SQL
+            done
+          }
+
           {
-          cat <<'SQL'
+          cat <<SQL
           \set ON_ERROR_STOP on
+          \set grenze $GRENZE_MB
+          SQL
+          cat <<'SQL'
           set statement_timeout = '20min';
           create temp table av (egrid text, nummer text, bfsnr text, flaeche numeric, nbident text);
           create temp table gem (bfsnr text, name text);
+          create temp table gwr_egid (egid text, egrid text);
+          create temp table gwr (egrid text, egid text, bfsnr text, gemeinde text, baujahr int,
+                                 geschosse int, wohnungen int, flaeche numeric, anzahl int,
+                                 strasse text, hausnr text, plz text, objektart text,
+                                 gebaeudeart text, zustand text);
           \copy av from '/tmp/av.csv' with (format csv)
           \copy gem from '/tmp/gemeinden.csv' with (format csv)
+          \copy gwr_egid from '/tmp/gwr_egid.csv' with (format csv)
+          \copy gwr from '/tmp/gwr_parzelle.csv' with (format csv)
           update av set egrid = nullif(trim(egrid), ''), nummer = nullif(trim(nummer), ''), bfsnr = nullif(trim(bfsnr), '');
           create index on av (egrid);
-          analyze av;
+          create index on gwr_egid (egid);
+          create index on gwr (egrid);
+          analyze av; analyze gwr_egid; analyze gwr;
 
           \echo '### Amtlich'
-          select count(*) as liegenschaften, count(distinct egrid) as mit_egrid,
-                 count(*) filter (where egrid is null) as ohne_egrid,
-                 count(distinct bfsnr) as gemeinden
-          from av;
-          select count(*) as gemeinden_mit_name from gem where nullif(name, '') is not null;
+          select count(*) as liegenschaften, count(distinct egrid) as verschiedene_egrid,
+                 count(distinct bfsnr) as gemeinden from av;
+          select count(*) as gebaeude_mit_egrid, count(distinct egrid) as parzellen_mit_gebaeude from gwr_egid;
+          select count(*) as parzellen_mit_bestehendem_gebaeude from gwr;
 
           \echo '### Abgleich mit dem Bestand ZH'
           select count(*) filter (where p.egrid is not null) as schon_da,
@@ -99,120 +144,145 @@ jobs:
           from (select distinct egrid from av where egrid is not null) a
           left join public.properties p on p.egrid = a.egrid;
 
-          -- Zeilen ohne EGRID: über Gemeindename und Parzellennummer.
-          -- Nur eindeutige Treffer, und nur EGRID, die noch frei sind.
+          -- Zeilen ohne EGRID. Rang 1: über die Gebäudenummer. Rang 2:
+          -- über Gemeinde und Parzellennummer. Je Zeile der beste Rang,
+          -- und dort nur ein eindeutiger Treffer; je EGRID nur eine
+          -- Zeile; und nur EGRID, die noch frei sind.
           create temp table zuordnung as
           with kandidat as (
-            select p.id, a.egrid
+            select p.id, m.egrid, 1 as rang
+            from public.properties p
+            join gwr_egid m on m.egid = trim(p.gwr_egid)
+            where p.kanton = 'ZH' and p.egrid is null
+            union
+            select p.id, a.egrid, 2
             from public.properties p
             join gem g on lower(trim(g.name)) = lower(trim(p.gemeinde))
             join av a on a.bfsnr = g.bfsnr
                      and a.nummer = trim(coalesce(nullif(p.parzelle, ''), p.plot_number))
             where p.kanton = 'ZH' and p.egrid is null and a.egrid is not null
+          ), bester as (
+            select distinct on (id) id, rang from kandidat order by id, rang
           ), eindeutig as (
-            select id, min(egrid) as egrid from kandidat group by id having count(*) = 1
+            select k.id, min(k.egrid) as egrid
+            from kandidat k join bester b on b.id = k.id and b.rang = k.rang
+            group by k.id having count(distinct k.egrid) = 1
+          ), frei as (
+            select e.* from eindeutig e
+            where not exists (select 1 from public.properties q where q.egrid = e.egrid)
           )
-          select e.id, e.egrid from eindeutig e
-          where not exists (select 1 from public.properties q where q.egrid = e.egrid)
-            and e.egrid in (select egrid from eindeutig group by egrid having count(*) = 1);
+          select distinct on (egrid) id, egrid from frei order by egrid, id;
+
           select (select count(*) from public.properties where kanton = 'ZH' and egrid is null) as zh_ohne_egrid,
-                 count(*) as davon_zuordenbar
-          from zuordnung;
-          select count(*) as gemeindenamen_ohne_treffer from (
-            select distinct gemeinde from public.properties p
-            where kanton = 'ZH' and not exists (select 1 from gem g where lower(trim(g.name)) = lower(trim(p.gemeinde)))
-          ) x;
+                 (select count(*) from zuordnung) as bekommen_egrid,
+                 (select count(distinct p.id) from public.properties p
+                    join gwr_egid m on m.egid = trim(p.gwr_egid)
+                    join public.properties q on q.egrid = m.egrid
+                   where p.kanton = 'ZH' and p.egrid is null) as parzelle_schon_im_bestand;
           SQL
 
           if [ "$SCHRITT" = "schreiben" ]; then
-          cat <<SQL
-          \set grenze $GRENZE_MB
-          SQL
           cat <<'SQL'
           select (pg_database_size(current_database())/1024/1024)::int as mb \gset
           \echo 'Datenbank vorher:' :mb 'MB'
 
-          -- 2. EGRID für Zeilen ohne -- vor dem Anlegen, sonst würde
-          --    dieselbe Parzelle ein zweites Mal entstehen.
+          -- 2. EGRID für Zeilen ohne -- vor dem Anlegen.
           update public.properties p set egrid = z.egrid
           from zuordnung z where p.id = z.id and p.egrid is null;
           vacuum public.properties;
+          \echo 'EGRID zugeordnet.'
 
-          -- 3. Fehlende anlegen, je 20'000.
+          -- 3. Fehlende anlegen.
           create temp table neu as
-          select distinct on (a.egrid) a.*, g.name as gemeinde
-          from av a left join gem g on g.bfsnr = a.bfsnr
-          where a.egrid is not null
-            and not exists (select 1 from public.properties p where p.egrid = a.egrid)
-          order by a.egrid;
-          alter table neu add column stueck int;
-          update neu set stueck = s.n from (select egrid, (row_number() over (order by bfsnr, egrid) - 1) / 20000 as n from neu) s where s.egrid = neu.egrid;
-          select count(*) as anzulegen, coalesce(max(stueck) + 1, 0) as stuecke from neu \gset
-          \echo 'Anzulegen:' :anzulegen 'in' :stuecke 'Stücken'
+          select a.*, g.name as gemeinde,
+                 (row_number() over (order by a.bfsnr, a.egrid) - 1) / 20000 as stueck
+          from (select distinct on (egrid) * from av where egrid is not null order by egrid) a
+          left join gem g on g.bfsnr = a.bfsnr
+          where not exists (select 1 from public.properties p where p.egrid = a.egrid);
+          select count(*) as anzulegen, coalesce(max(stueck) + 1, 0) as n_neu from neu \gset
+          \echo 'Anzulegen:' :anzulegen 'in' :n_neu 'Stücken'
           SQL
-          # Die Shell schreibt jedes Stück aus; psql prüft vor jedem die Grösse.
-          for i in $(seq 0 25); do
-          cat <<SQL
-          select (pg_database_size(current_database())/1024/1024)::int as mb \gset
-          select :mb >= :grenze as voll, $i >= :stuecke as fertig \gset
-          \if :voll
-            \echo 'ABBRUCH vor Stück $i: Datenbank bei' :mb 'MB. Der nächste Lauf macht weiter.'
-            \quit
-          \endif
-          \if :fertig
-          \else
-            insert into public.properties (address, egrid, parzelle, plot_number, bfs_nr, kanton, gemeinde, area, source_file)
+          stuecke "Anlegen" n_neu "insert into public.properties (address, egrid, parzelle, plot_number, bfs_nr, kanton, gemeinde, area, source_file)
             select 'Parzelle ' || coalesce(nummer, '?'), egrid, nummer, nummer, bfsnr, 'ZH', gemeinde, flaeche, 'AV ZH (maps.zh.ch)'
-            from neu where stueck = $i
-            on conflict (egrid) where egrid is not null do nothing;
-            \echo 'Stück $i angelegt, Datenbank' :mb 'MB vorher'
-          \endif
-          SQL
-          done
+            from neu where stueck = STUECK
+            on conflict (egrid) where egrid is not null do nothing;"
+
           cat <<'SQL'
-          -- 1. Bestehende ergänzen, je 20'000, mit VACUUM dazwischen.
+          -- 4. Vermessung ergänzen.
           create temp table ergaenzen as
           select p.id, a.bfsnr, a.flaeche, a.nummer,
                  (row_number() over (order by p.id) - 1) / 20000 as stueck
-          from public.properties p join av a on a.egrid = p.egrid
-          where p.bfs_nr is null or p.area is null or p.area = 0 or nullif(p.parzelle, '') is null;
-          select count(*) as zu_ergaenzen, coalesce(max(stueck) + 1, 0) as stuecke_e from ergaenzen \gset
-          \echo 'Zu ergänzen:' :zu_ergaenzen 'in' :stuecke_e 'Stücken'
+          from public.properties p
+          join (select distinct on (egrid) * from av where egrid is not null order by egrid) a on a.egrid = p.egrid
+          where p.kanton = 'ZH'
+            and (p.bfs_nr is null or p.area is null or p.area = 0 or nullif(p.parzelle, '') is null);
+          select count(*) as zu_ergaenzen, coalesce(max(stueck) + 1, 0) as n_av from ergaenzen \gset
+          \echo 'Vermessung ergänzen:' :zu_ergaenzen 'in' :n_av 'Stücken'
           SQL
-          for i in $(seq 0 25); do
-          cat <<SQL
-          select (pg_database_size(current_database())/1024/1024)::int as mb \gset
-          select :mb >= :grenze as voll, $i >= :stuecke_e as fertig \gset
-          \if :voll
-            \echo 'ABBRUCH vor Ergänzung $i: Datenbank bei' :mb 'MB.'
-            \quit
-          \endif
-          \if :fertig
-          \else
-            update public.properties p set
+          stuecke "Vermessung" n_av "update public.properties p set
               bfs_nr      = coalesce(p.bfs_nr, e.bfsnr),
               area        = case when p.area is null or p.area = 0 then e.flaeche else p.area end,
               parzelle    = coalesce(nullif(p.parzelle, ''), e.nummer),
               plot_number = coalesce(nullif(p.plot_number, ''), e.nummer)
-            from ergaenzen e where e.id = p.id and e.stueck = $i;
-            vacuum public.properties;
-            \echo 'Ergänzung $i fertig'
-          \endif
+            from ergaenzen e where e.id = p.id and e.stueck = STUECK;
+            vacuum public.properties;"
+
+          cat <<'SQL'
+          -- 5. Register ergänzen -- nur Zeilen, bei denen etwas leer ist.
+          create temp table register as
+          select p.id, (row_number() over (order by p.id) - 1) / 20000 as stueck
+          from public.properties p join gwr r on r.egrid = p.egrid
+          where p.kanton = 'ZH'
+            and (p.address like 'Parzelle %' or p.baujahr is null or p.geschosse is null
+                 or p.wohnungen is null or p.gebaeudeflaeche is null
+                 or nullif(p.kategorie, '') is null or p.plz is null or p.gwr_egid is null);
+          select count(*) as aus_register, coalesce(max(stueck) + 1, 0) as n_gwr from register \gset
+          \echo 'Register ergänzen:' :aus_register 'in' :n_gwr 'Stücken'
           SQL
-          done
+          stuecke "Register" n_gwr "update public.properties p set
+              address     = case when p.address like 'Parzelle %' and nullif(r.strasse, '') is not null
+                                 then trim(r.strasse || ' ' || coalesce(r.hausnr, '')) else p.address end,
+              strassenname = coalesce(p.strassenname, nullif(r.strasse, '')),
+              hausnummer  = coalesce(p.hausnummer, nullif(r.hausnr, '')),
+              plz         = coalesce(p.plz, nullif(r.plz, '')),
+              gwr_egid    = coalesce(p.gwr_egid, r.egid),
+              baujahr     = coalesce(p.baujahr, r.baujahr),
+              geschosse   = coalesce(p.geschosse, r.geschosse),
+              wohnungen   = coalesce(p.wohnungen, r.wohnungen),
+              gebaeudeflaeche = coalesce(p.gebaeudeflaeche, r.flaeche),
+              gebaeude_anzahl = case when coalesce(p.gebaeude_anzahl, 0) = 0 then r.anzahl else p.gebaeude_anzahl end,
+              kategorie   = coalesce(nullif(p.kategorie, ''), nullif(r.objektart, '')),
+              gebaeudeart = coalesce(nullif(p.gebaeudeart, ''), nullif(r.gebaeudeart, '')),
+              geb_status  = coalesce(nullif(p.geb_status, ''), nullif(r.zustand, ''))
+            from register x join gwr r on true
+            where x.id = p.id and x.stueck = STUECK and r.egrid = p.egrid;
+            vacuum public.properties;"
+
           cat <<'SQL'
           select pg_size_pretty(pg_database_size(current_database())) as datenbank_nachher;
           SQL
           fi
 
           cat <<'SQL'
-          \echo '### Bestand ZH danach'
+          \echo '### Bestand ZH'
           select count(*) as parzellen, count(distinct egrid) as mit_egrid,
                  count(*) filter (where egrid is null) as ohne_egrid,
                  count(*) filter (where bfs_nr is null) as ohne_bfs,
                  count(*) filter (where area is null or area = 0) as ohne_flaeche,
-                 count(*) filter (where nullif(trim(zone), '') is null) as ohne_zone
+                 count(*) filter (where nullif(trim(zone), '') is null) as ohne_zone,
+                 count(*) filter (where address like 'Parzelle %') as ohne_adresse,
+                 count(*) filter (where baujahr is null) as ohne_baujahr,
+                 count(*) filter (where nullif(kategorie, '') is null) as ohne_objektart
           from public.properties where kanton = 'ZH';
+          -- Wie viele der leeren Baujahre haben laut Register gar kein
+          -- bestehendes Gebäude (Strasse, Wald, Bauland) -- dort ist
+          -- leer richtig.
+          select count(*) as ohne_baujahr_und_ohne_gebaeude
+          from public.properties p
+          where p.kanton = 'ZH' and p.baujahr is null
+            and not exists (select 1 from gwr r where r.egrid = p.egrid);
+          select kategorie, count(*) from public.properties
+          where kanton = 'ZH' group by 1 order by 2 desc limit 12;
           SQL
           } > /tmp/zh.sql
 
