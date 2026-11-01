@@ -6,6 +6,7 @@ import { useCanton } from '@/hooks/use-canton';
 import { Abschnitt, Kennzahlen, KNOPF, KNOPF_HAUPT, KNOPF_LEISE, Kopf, Leer, LISTE, Marke, Strichbalken } from '@/components/rahmen';
 import { LuftbildKarte } from '@/components/LuftbildKarte';
 import { KOPFBILD } from '@/lib/luftbild';
+import { zoneKurzform } from '@/lib/potential';
 
 /**
  * Das Cockpit, gebaut wie das Dashboard der Vorlage (DESIGN.md):
@@ -116,12 +117,23 @@ export function Cockpit({ onGehe, onNeu }: { onGehe: (z: Ziel) => void; onNeu?: 
   const FARBEN = ['heiss', 'akzent', 'gruen', 'heiss'] as const;
 
   return (
-    <div className="mx-auto max-w-[1400px] space-y-6">
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+    <div className="relative mx-auto max-w-[1400px] space-y-6">
+      {/* Das Luftbild liegt hinter dem ganzen oberen Bereich, über beide
+          Spalten, wie in der Vorlage: rechts voll, nach links und unten
+          in die Seitenfarbe auslaufend. Vorher sass es in der linken
+          Spalte und war an beiden Rändern hart abgeschnitten. */}
+      <div aria-hidden className="pointer-events-none absolute -left-4 -right-4 -top-6 h-[420px] overflow-hidden sm:-left-10 sm:-right-10 sm:-top-4 sm:h-[480px]">
+        <img src={KOPFBILD} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/85 to-background/0 sm:via-background/60" />
+        <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-background to-background/0" />
+        <span className="absolute bottom-2 right-4 text-[10px] text-muted-foreground">Luftbild © swisstopo</span>
+      </div>
+      <div className="relative grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
         {/* Links: Kopf, Kennzahlen, Tafeln */}
         <div className="min-w-0 space-y-6">
-          <Kopf bild={KOPFBILD} gross ueber={`${gruss()}${name ? `, ${name}` : ''}`}
-                titel={data ? satzDesTages(data) : ' '} />
+          <div className="flex min-h-[220px] items-start pt-2 sm:min-h-[300px] sm:pt-8">
+            <Kopf gross ueber={`${gruss()}${name ? `, ${name}` : ''}`} titel={data ? satzDesTages(data) : ' '} />
+          </div>
 
           {isLoading && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> wird gezählt …</p>}
 
@@ -179,7 +191,9 @@ export function Cockpit({ onGehe, onNeu }: { onGehe: (z: Ziel) => void; onNeu?: 
         </div>
 
         {/* Rechts: Handlungen und Objekte mit Luftbild */}
-        <aside className="min-w-0 space-y-4">
+        {/* Die rechte Spalte als eigene Tafel wie in der Vorlage: so liegt
+            ihr Titel nie direkt auf dem Luftbild und bleibt lesbar. */}
+        <aside className="min-w-0 space-y-4 rounded border bg-card p-4">
           <div className="grid grid-cols-3 gap-2">
             <button type="button" className={`${KNOPF} px-2 text-sm`} onClick={() => onGehe('karte')}><MapPin className="h-4 w-4 shrink-0" /> Karte</button>
             <button type="button" className={`${KNOPF} px-2 text-sm`} onClick={() => onGehe('baugesuche')}><FileSearch className="h-4 w-4 shrink-0" /> Baugesuche</button>
@@ -205,8 +219,8 @@ export function Cockpit({ onGehe, onNeu }: { onGehe: (z: Ziel) => void; onNeu?: 
                         <span className="truncate text-lg font-medium">{o.address}</span>
                       </span>
                       <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-                        {[o.area ? `${n(Math.round(o.area))} m²` : null, o.zone, o.baujahr ? `Baujahr ${o.baujahr}` : null]
-                          .filter(Boolean).map((x, i) => <span key={i} className={i ? 'border-l pl-3' : ''}>{x}</span>)}
+                        {[o.area ? `${n(Math.round(o.area))} m²` : null, zoneKurzform(o.zone), o.baujahr ? `Baujahr ${o.baujahr}` : null]
+                          .filter(Boolean).map((x, i) => <span key={i} className={`whitespace-nowrap ${i ? 'border-l pl-3' : ''}`}>{x}</span>)}
                       </span>
                       <span className="flex items-center justify-between border-t pt-3">
                         <span className="text-xl font-semibold text-violett">{mio(o.marge_chf)}</span>
