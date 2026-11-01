@@ -14,6 +14,7 @@ const Index = lazy(() => import("./pages/Index.tsx"));
 const SwipePage = lazy(() => import("./pages/SwipePage.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 const Anfrage = lazy(() => import("./pages/Anfrage.tsx"));
+const FondsSeite = lazy(() => import("./pages/Fonds.tsx"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -53,6 +54,9 @@ const App = () => (
               <Route path="/bewertung" element={<Anfrage art="bewertung" />} />
               <Route path="/potenzial" element={<Anfrage art="potenzial" />} />
               <Route path="/investor" element={<Anfrage art="investor" />} />
+              {/* Wohntraums, die Oberfläche für Fondsleitungen: eigene
+                  Adresse, eigene Anmeldung. */}
+              <Route path="/fonds" element={<FondsSeite />} />
               <Route path="*" element={
                 <Torwaechter>
                   <GlobalListeners />

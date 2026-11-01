@@ -1,7 +1,9 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { Building2, LayoutDashboard, Upload, Phone, X, Zap, Search, FileSpreadsheet, Eye, Shield, Share, Plus, Database, Send, Map, Target, BarChart3, Gauge, HardHat, MoreHorizontal, Briefcase, LogOut } from 'lucide-react';
+import { Building2, LayoutDashboard, Upload, Phone, X, Zap, Search, FileSpreadsheet, Eye, Shield, Share, Plus, Database, Send, Map, Target, BarChart3, Gauge, HardHat, MoreHorizontal, Briefcase, LogOut, Orbit } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { PropertyDetailDialog } from '@/components/PropertyDetailDialog';
 import { useSchliessen, useUrlWert } from '@/hooks/use-url-wert';
 import { Button } from '@/components/ui/button';
@@ -137,6 +139,18 @@ export default function Index() {
   const { bereich } = useParams();
   const navigate = useNavigate();
   const active: Tab = istTab(bereich) ? bereich : 'cockpit';
+  // Ein Fondsmanager-Konto gehört nach Wohntraums (/fonds) und sieht
+  // die interne Oberfläche nie.
+  const { data: fondsmanager } = useQuery({
+    queryKey: ['ist-fondsmanager'],
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const r = await (supabase as any).rpc('ist_fondsmanager');
+      return r.error ? false : Boolean(r.data);
+    },
+    staleTime: 10 * 60 * 1000,
+  });
+  useEffect(() => { if (fondsmanager) navigate('/fonds', { replace: true }); }, [fondsmanager, navigate]);
   // Die Objektansicht einer Parzelle -- eine für alle Bereiche, offen
   // über ?parzelle=..., damit auch sie "Zurück" kennt.
   const [parzelle] = useUrlWert('parzelle');
@@ -205,6 +219,10 @@ export default function Index() {
           ))}
         </nav>
         <div className="flex flex-col items-center gap-1 pt-3">
+          {/* Wohntraums ist ein eigenes Programm für Fondsleitungen --
+              darum abgesetzt, unten, und es öffnet eine eigene Adresse. */}
+          <LeistenPunkt t={{ id: 'admin', label: 'Wohntraums · Fonds', icon: Orbit }} an={false} onClick={() => navigate('/fonds')} />
+          <span className="my-1 h-px w-6 bg-border" aria-hidden />
           {gruppen.find(g => g.titel === 'Verwaltung')!.eintraege.map(t => (
             <LeistenPunkt key={t.id} t={t} an={active === t.id} onClick={() => gehe(t.id)} />
           ))}
@@ -371,6 +389,10 @@ export default function Index() {
                   </div>
                 </div>
               ))}
+              <button type="button" onClick={() => navigate('/fonds')}
+                      className="mb-4 flex h-12 w-full items-center gap-3 rounded-[3px] border px-3 text-sm font-medium">
+                <Orbit className="h-4 w-4" /> Wohntraums · Fonds <span className="ml-auto text-xs text-muted-foreground">eigenes Programm</span>
+              </button>
               <div className="flex items-center justify-between border-t px-2 pt-4">
                 <span className="text-sm text-muted-foreground">{konto}</span>
                 <button type="button" onClick={() => void signOut()} className="text-sm font-semibold">Abmelden</button>

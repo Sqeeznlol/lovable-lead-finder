@@ -33,6 +33,8 @@ interface Props {
   text?: string;
   /** In einen Bereich eingebettet statt als ganze Seite. */
   eingebettet?: boolean;
+  /** Der Name über der Maske -- "Wohntraums" für die Fondsleitungen. */
+  marke?: string;
 }
 
 export function Anmeldung({
@@ -40,6 +42,7 @@ export function Anmeldung({
   titel = 'Anmeldung',
   text = 'Die Liste enthält Personendaten. Zugang nur mit Konto.',
   eingebettet = false,
+  marke = 'Aurora',
 }: Props) {
   const { signIn } = useAuth();
   const [passwort, setPasswort] = useState('');
@@ -65,7 +68,7 @@ export function Anmeldung({
       <div className="space-y-1">
         <div className="flex items-center gap-2 text-primary">
           <Lock className="h-4 w-4" />
-          <span className="text-xs font-medium uppercase tracking-wider">Aurora</span>
+          <span className="text-xs font-medium uppercase tracking-wider">{marke}</span>
         </div>
         <h1 className="font-serif text-2xl">{titel}</h1>
         <p className="text-sm text-muted-foreground">{text}</p>

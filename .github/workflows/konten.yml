@@ -29,6 +29,9 @@ jobs:
           DB: ${{ secrets.SUPABASE_DB_URL }}
           AUI: ${{ secrets.KONTO_AUI }}
           ADMIN: ${{ secrets.KONTO_ADMIN }}
+          # Wohntraums-Testmaske (/fonds): ein Konto, das nur die Fonds
+          # der Demo-Fondsleitung sieht. Fehlt das Secret, bleibt es weg.
+          FONDS: ${{ secrets.KONTO_FONDS }}
         run: |
           set -euo pipefail
           [ -n "${DB:-}" ]    || { echo "SUPABASE_DB_URL fehlt."; exit 1; }
@@ -82,3 +85,22 @@ jobs:
           SQL
           psql "$DB" -v ON_ERROR_STOP=1 -X -q --single-transaction \
                -v aui="$AUI" -v admin="$ADMIN" -f /tmp/konto.sql
+
+          if [ -n "${FONDS:-}" ]; then
+            # Dieselbe Funktion, eigene Sitzung; dann ins Team der Fonds,
+            # damit Index das Konto nach /fonds schickt und die Abfrage
+            # nur diese Fondsleitung zeigt.
+            sed -n '/create or replace function pg_temp.konto/,/end \$f\$;/p' /tmp/konto.sql > /tmp/fonds.sql
+            cat >> /tmp/fonds.sql <<'SQL'
+          select pg_temp.konto('fonds@wohntraums.life', :'fonds');
+          insert into public.team_mitglied (team_id, user_id)
+          select t.id, u.id from public.team t, auth.users u
+           where t.name = 'Wohntraums Fonds' and lower(u.email) = 'fonds@wohntraums.life'
+          on conflict do nothing;
+          select count(*) as im_team_wohntraums from public.team_mitglied tm join public.team t on t.id = tm.team_id
+           join auth.users u on u.id = tm.user_id where t.name = 'Wohntraums Fonds' and lower(u.email) = 'fonds@wohntraums.life';
+          SQL
+            psql "$DB" -v ON_ERROR_STOP=1 -X -q --single-transaction -v fonds="$FONDS" -f /tmp/fonds.sql
+          else
+            echo "KONTO_FONDS nicht gesetzt -- Fonds-Konto übersprungen."
+          fi
