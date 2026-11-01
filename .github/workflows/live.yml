@@ -84,6 +84,13 @@ jobs:
                   echo "- $pfad: $code -- nicht erreichbar" >> "$GITHUB_STEP_SUMMARY"; fehler=1
                 fi
               done
+              # Ein Programmteil einer älteren Fassung muss "nicht gefunden"
+              # melden, nicht index.html liefern -- sonst zeigt Safari
+              # "'text/html' is not a valid JavaScript MIME type" statt
+              # neu zu laden (1. November).
+              alt=$(curl -s -o /dev/null -w '%{http_code} %{content_type}' "$adresse/assets/Gibt-es-nicht-00000000.js")
+              echo "- fehlender Programmteil: $alt" >> "$GITHUB_STEP_SUMMARY"
+              case "$alt" in 404*) ;; *) fehler=1;; esac
               cache=$(curl -s -D - -o /dev/null "$adresse$js" | grep -i '^cache-control:' | tr -d '\r')
               echo "- Bündel: $cache" >> "$GITHUB_STEP_SUMMARY"
               echo "$cache" | grep -q immutable || fehler=1
