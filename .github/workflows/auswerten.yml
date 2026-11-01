@@ -45,6 +45,7 @@ on:
           - teams-probe  # Ob ein Konto ausserhalb eines Teams dessen Kunden wirklich nicht sieht (wird zurueckgerollt)
           - potenzial-bund # Was der Bund an einem Punkt zu Bauzone und Parzelle liefert (fuer den Potenzialcheck)
           - anfrage-probe # Ob der oeffentliche Schluessel Anfragen einfuegen, aber nicht lesen kann (wird zurueckgerollt)
+          - ohne-egrid   # Wie die Zürcher Zeilen ohne EGRID aussehen (Gemeindenamen, Nummernformat, Herkunft)
           - indizes      # Welche Indizes auf properties wie gross sind und ob sie je benutzt werden
           - parzellen-zh # Ob jede Zürcher Parzelle im Bestand ist und welche Felder leer sind
           - amtsblatt-jahr # Ob die Baugesuche des Jahres (Amtsblatt-Export) in Quelle und Datenbank stehen
@@ -601,6 +602,47 @@ jobs:
           select count(*) as egrid_mehrfach from (select egrid from properties where kanton = 'ZH' and egrid is not null group by egrid having count(*) > 1) d;
           \echo '```'
           SQL
+
+          elif [ "$FRAGE" = "ohne-egrid" ]; then
+            # 73'847 Zuercher Zeilen ohne EGRID; nur 156 trafen ueber
+            # Gemeindename und Parzellennummer eine amtliche Liegenschaft.
+            # Bevor 206'594 Parzellen neu entstehen, muss klar sein, wie
+            # diese Zeilen aussehen -- sonst gibt es Doppel. Nur
+            # Gemeindenamen, Nummernformate und Zaehlungen, keine Personen.
+            frage "Herkunft" "
+              set local statement_timeout = '10min';
+              select coalesce(source_file, '(leer)') as quelle, count(*) as zeilen
+              from properties where kanton = 'ZH' and egrid is null
+              group by 1 order by 2 desc limit 15;"
+            frage "Welche Felder gefuellt sind" "
+              set local statement_timeout = '10min';
+              select count(*) filter (where nullif(parzelle, '') is not null) as mit_parzelle,
+                     count(*) filter (where nullif(plot_number, '') is not null) as mit_plot_number,
+                     count(*) filter (where nullif(gemeinde, '') is not null) as mit_gemeinde,
+                     count(*) filter (where nullif(gwr_egid, '') is not null) as mit_egid,
+                     count(*) filter (where nullif(strassenname, '') is not null) as mit_strasse,
+                     count(*) filter (where nullif(plz, '') is not null) as mit_plz,
+                     count(*) filter (where nullif(gvz_nr, '') is not null) as mit_gvz,
+                     count(*) filter (where pipedrive_deal_id is not null) as in_pipedrive,
+                     count(*) filter (where status <> 'Neu') as bearbeitet
+              from properties where kanton = 'ZH' and egrid is null;"
+            frage "Gemeindenamen (haeufigste 40)" "
+              set local statement_timeout = '10min';
+              select gemeinde, count(*) as zeilen
+              from properties where kanton = 'ZH' and egrid is null
+              group by 1 order by 2 desc limit 40;"
+            frage "Form der Parzellennummer" "
+              set local statement_timeout = '10min';
+              select regexp_replace(regexp_replace(coalesce(nullif(parzelle, ''), plot_number, '(leer)'), '[0-9]', '9', 'g'), '[A-Za-z]', 'A', 'g') as form,
+                     count(*) as zeilen
+              from properties where kanton = 'ZH' and egrid is null
+              group by 1 order by 2 desc limit 20;"
+            frage "Zum Vergleich: Form bei Zeilen mit EGRID" "
+              set local statement_timeout = '10min';
+              select regexp_replace(regexp_replace(coalesce(nullif(parzelle, ''), plot_number, '(leer)'), '[0-9]', '9', 'g'), '[A-Za-z]', 'A', 'g') as form,
+                     count(*) as zeilen
+              from properties where kanton = 'ZH' and egrid is not null
+              group by 1 order by 2 desc limit 10;"
 
           elif [ "$FRAGE" = "indizes" ]; then
             # Die Datenbank steht bei 1093 MB, nur-lesen kam bei 1107 MB.
