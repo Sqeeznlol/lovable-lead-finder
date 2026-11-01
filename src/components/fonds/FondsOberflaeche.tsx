@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeftRight, Building2, CalendarDays, Download, X, Loader2, LogOut, Map as Karte, Orbit, Sparkles, Upload } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { ArrowLeftRight, Building2, CalendarDays, Download, X, Gauge, HardHat, Map as KarteSymbol, MessageSquare, MoreHorizontal, Search, Loader2, LogOut, Map as Karte, Orbit, Sparkles, Upload } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/use-auth';
 import { useUrlWert } from '@/hooks/use-url-wert';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -10,6 +10,9 @@ import { Abschnitt, AUF, KNOPF, KNOPF_HAUPT, KNOPF_LEISE, Kennzahlen, Leer, LIST
 import { Universum } from '@/components/fonds/Universum';
 import { FondsImport } from '@/components/fonds/FondsImport';
 import { ImmoKalender } from '@/components/ImmoKalender';
+import { FondsBaugesuche, FondsGespraeche, FondsKalender, FondsKarte, FondsPotenziale, FondsSuchprofile, type BereichProps } from '@/components/fonds/FondsBereiche';
+import { baugesucheLaden, faellig, fondsTeam, notizenLaden } from '@/lib/fonds-werkzeuge';
+import type { ComponentType } from 'react';
 import { fondsFarbe, POTENZIAL, potenzialeAlsCsv, universumLaden, verorten, type PotenzialArt } from '@/lib/fonds';
 import { FENSTER } from '@/lib/fenster';
 
@@ -27,6 +30,17 @@ const MARKE: Record<PotenzialArt, 'heiss' | 'lila' | 'violett' | 'grau'> = { arr
  * Datensätzen herausliest: die pendenten Potenziale, das grösste zuerst.
  * Eigentümer sind hier nachrangig -- es geht um das eigene Portfolio.
  */
+/** Die Bereiche von Wohntraums, in der Reihenfolge der Leiste. */
+const BEREICHE: { id: string; titel: string; symbol: ComponentType<{ className?: string }>; unten?: boolean; inhalt?: ComponentType<BereichProps> }[] = [
+  { id: 'uebersicht', titel: 'Übersicht', symbol: Gauge, unten: true },
+  { id: 'karte', titel: 'Karte', symbol: KarteSymbol, unten: true, inhalt: FondsKarte },
+  { id: 'potenziale', titel: 'Potenziale', symbol: Sparkles, unten: true, inhalt: FondsPotenziale },
+  { id: 'baugesuche', titel: 'Baugesuche', symbol: HardHat, unten: true, inhalt: FondsBaugesuche },
+  { id: 'gespraeche', titel: 'Gespräche', symbol: MessageSquare, inhalt: FondsGespraeche },
+  { id: 'suchprofile', titel: 'Suchprofile', symbol: Search, inhalt: FondsSuchprofile },
+  { id: 'kalender', titel: 'Immo-Kalender', symbol: CalendarDays, inhalt: FondsKalender },
+];
+
 export function FondsOberflaeche() {
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -40,6 +54,21 @@ export function FondsOberflaeche() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['fonds-universum', als], queryFn: () => universumLaden(als), staleTime: 60 * 1000, enabled: !leitungenLaden,
   });
+  // Jeder Bereich eine eigene Adresse (/fonds/baugesuche ...), damit
+  // "Zurück" im Browser geht -- wie in Bauraum.
+  const { bereich: bereichWert } = useParams();
+  const bereich = BEREICHE.some(b => b.id === bereichWert) ? bereichWert! : 'uebersicht';
+  const [mehrAuf, setMehrAuf] = useState(false);
+  const { data: team } = useQuery({ queryKey: ['fonds-team', als], queryFn: () => fondsTeam(als), enabled: !leitungenLaden });
+  const { data: woche } = useQuery({ queryKey: ['fonds-baugesuche', als, 7], queryFn: () => baugesucheLaden(als, 7), enabled: !leitungenLaden });
+  const { data: notizen } = useQuery({ queryKey: ['fonds-notizen', team], queryFn: () => notizenLaden(team!), enabled: !!team });
+  const gehe = (b: string, extra: Record<string, string> = {}) => {
+    const q = new URLSearchParams(extra);
+    if (alsWert) q.set('als', alsWert);
+    navigate(`/fonds${b === 'uebersicht' ? '' : `/${b}`}${q.toString() ? `?${q}` : ''}`);
+    setMehrAuf(false);
+    window.scrollTo({ top: 0 });
+  };
   const [gewaehlt, setGewaehlt] = useUrlWert('liegenschaft');
   const [artWert, setArt] = useUrlWert('potenzial', 'alle');
   const [import_, setImport] = useUrlWert('einspielen');
@@ -81,7 +110,19 @@ export function FondsOberflaeche() {
   const maxLieg = Math.max(...data.fonds.map(f => f.liegenschaften), 1);
 
   return (
-    <div className="min-h-safe-screen bg-background">
+    <div className="flex min-h-safe-screen bg-background">
+      {/* Die Leiste wie in Bauraum: Symbole, der aktive Bereich schwarz. */}
+      <aside className="sticky top-0 hidden h-screen w-[76px] shrink-0 flex-col items-center gap-1 border-r bg-card py-5 lg:flex" aria-label="Bereiche">
+        <span className="mb-5 grid h-11 w-11 place-items-center rounded-[3px] bg-foreground text-background"><Orbit className="h-6 w-6" /></span>
+        {BEREICHE.map(b => (
+          <button key={b.id} type="button" onClick={() => gehe(b.id)} aria-label={b.titel} aria-current={bereich === b.id ? 'page' : undefined}
+                  className={`group relative grid h-11 w-11 place-items-center rounded-[3px] transition-colors ${bereich === b.id ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'}`}>
+            <b.symbol className="h-5 w-5" />
+            <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap rounded-[3px] bg-foreground px-2.5 py-1.5 text-xs font-medium text-background opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">{b.titel}</span>
+          </button>
+        ))}
+      </aside>
+      <div className="min-w-0 flex-1">
       <header className="sticky top-0 z-30 border-b bg-background pt-[env(safe-area-inset-top)]">
         <div className="mx-auto flex h-16 max-w-[1400px] items-center gap-3 px-4 lg:px-10">
           <span className="grid h-9 w-9 place-items-center rounded-[3px] bg-foreground text-background"><Orbit className="h-5 w-5" /></span>
@@ -99,9 +140,13 @@ export function FondsOberflaeche() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1400px] space-y-6 px-4 pb-16 pt-6 lg:px-10">
+      <main className="mx-auto max-w-[1400px] space-y-6 overflow-x-clip px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-6 lg:px-10 lg:pb-16" key={bereich}>
+        {bereich !== 'uebersicht' ? (() => {
+          const B = BEREICHE.find(b => b.id === bereich)!.inhalt!;
+          return <B data={data} als={als} team={team ?? null} gehe={gehe} />;
+        })() : (<>
         <div className={`space-y-2 ${AUF}`}>
-          <p className="text-sm text-muted-foreground">Ihr Portfolio-Universum · {data.fonds.length} Fonds</p>
+          <p className="text-sm text-muted-foreground">Ihr Portfolio · {data.fonds.length} Fonds · Reserve {flaeche(reserve)} · pendente Marge {chf(marge)}</p>
           <h1 className="max-w-3xl text-[34px] leading-[1.08] sm:text-[48px]">
             {n(data.punkte.length)} Liegenschaften{anFremd ? `, ${n(anFremd)} grenzen an einen anderen Ihrer Fonds` : ''}
           </h1>
@@ -116,8 +161,8 @@ export function FondsOberflaeche() {
         <Kennzahlen werte={[
           { titel: 'Liegenschaften', wert: n(data.punkte.length), marke: <Marke art="lila">{data.fonds.length} Fonds</Marke> },
           { titel: 'Grenzen an anderen Fonds', wert: n(fremd.length), marke: fremd.length ? <Marke art="heiss">Arrondierung</Marke> : <Marke>keine</Marke>, onClick: () => setArt('arrondierung') },
-          { titel: 'Reserve', wert: flaeche(reserve), marke: <Marke art="violett">Hauptnutzfläche</Marke>, onClick: () => setArt('reserve') },
-          { titel: 'Pendente Marge', wert: chf(marge), marke: <Marke art="minze">gerechnet</Marke> },
+          { titel: 'Baugesuche 7 Tage', wert: woche ? n(new Set(woche.map(g => g.id)).size) : '–', marke: <Marke art="minze">an oder neben Ihren</Marke>, onClick: () => gehe('baugesuche', { tage: '7' }) },
+          { titel: 'Wiedervorlagen', wert: notizen ? n(notizen.filter(x => faellig(x)).length) : '–', marke: <Marke art="rosa">fällig</Marke>, onClick: () => gehe('gespraeche', { sicht: 'faellig' }) },
         ]} />
 
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
@@ -255,7 +300,39 @@ export function FondsOberflaeche() {
             {intern && <button type="button" onClick={() => navigate('/')} className="min-h-11 w-full text-sm text-muted-foreground hover:text-foreground">Zur internen Oberfläche</button>}
           </aside>
         </div>
+        </>)}
       </main>
+      </div>
+
+      {/* Handy: vier feste Ziele und "Mehr", wie in Bauraum. */}
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background pb-[env(safe-area-inset-bottom)] lg:hidden" aria-label="Bereiche">
+        <div className="grid grid-cols-5">
+          {[...BEREICHE.filter(b => b.unten), { id: 'mehr', titel: 'Mehr', symbol: MoreHorizontal }].map(b => {
+            const an = b.id === 'mehr' ? mehrAuf || !BEREICHE.find(x => x.id === bereich)?.unten : bereich === b.id;
+            return (
+              <button key={b.id} type="button" onClick={() => (b.id === 'mehr' ? setMehrAuf(v => !v) : gehe(b.id))}
+                      className="flex min-h-[60px] flex-col items-center justify-center gap-1 text-[11px]">
+                <span className={`grid h-8 w-12 place-items-center rounded-[3px] ${an ? 'bg-foreground text-background' : 'text-muted-foreground'}`}><b.symbol className="h-5 w-5" /></span>
+                <span className={an ? 'font-medium' : 'text-muted-foreground'}>{b.titel}</span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+      {mehrAuf && (
+        <div className="fixed inset-0 z-50 flex items-end bg-black/40 lg:hidden" onClick={() => setMehrAuf(false)}>
+          <div className="w-full rounded-t-[6px] bg-background p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]" onClick={e => e.stopPropagation()}>
+            <div className="grid grid-cols-1 gap-1">
+              {BEREICHE.filter(b => !b.unten).map(b => (
+                <button key={b.id} type="button" onClick={() => gehe(b.id)}
+                        className={`flex min-h-12 items-center gap-3 rounded-[3px] px-3 text-left ${bereich === b.id ? 'bg-foreground text-background' : 'hover:bg-secondary'}`}>
+                  <b.symbol className="h-5 w-5" /> {b.titel}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -57,6 +57,7 @@ const App = () => (
               {/* Wohntraums, die Oberfläche für Fondsleitungen: eigene
                   Adresse, eigene Anmeldung. */}
               <Route path="/fonds" element={<FondsSeite />} />
+              <Route path="/fonds/:bereich" element={<FondsSeite />} />
               <Route path="*" element={
                 <Torwaechter>
                   <GlobalListeners />
