@@ -108,8 +108,42 @@ export const FELD = 'h-11 min-w-0 rounded-[3px] border border-input bg-card px-3
 export function Reiter<T extends string>({ wahl, setWahl, optionen }: {
   wahl: T; setWahl: (w: T) => void; optionen: { wert: T; titel: string; zahl?: number }[];
 }) {
+  // Kein sichtbarer Scrollbalken: unter der Leiste wirkte er wie ein
+  // Fremdkörper (Julian: "hässlich"). Dass es weitergeht, zeigt statt
+  // dessen ein weiches Ausblenden an genau dem Rand, hinter dem noch
+  // Reiter liegen -- und nur dort.
+  const huelle = useRef<HTMLDivElement>(null);
+  const [rand, setRand] = useState({ links: false, rechts: false });
+  useEffect(() => {
+    const el = huelle.current;
+    if (!el) return;
+    const messen = () => setRand({
+      links: el.scrollLeft > 2,
+      rechts: el.scrollLeft + el.clientWidth < el.scrollWidth - 2,
+    });
+    messen();
+    el.addEventListener('scroll', messen, { passive: true });
+    const ro = new ResizeObserver(messen);
+    ro.observe(el);
+    return () => { el.removeEventListener('scroll', messen); ro.disconnect(); };
+  }, []);
+  // Der gewählte Reiter soll nie halb hinter dem Rand stehen. Nur die
+  // Leiste selbst wird verschoben, nicht die Seite -- scrollIntoView
+  // würde beim Laden die ganze Seite zur Leiste springen lassen.
+  useEffect(() => {
+    const h = huelle.current;
+    const el = h?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (!h || !el) return;
+    const links = el.offsetLeft - 16, rechts = el.offsetLeft + el.offsetWidth + 16 - h.clientWidth;
+    if (h.scrollLeft > links) h.scrollTo({ left: links, behavior: 'smooth' });
+    else if (h.scrollLeft < rechts) h.scrollTo({ left: rechts, behavior: 'smooth' });
+  }, [wahl]);
+  const maske = rand.links || rand.rechts
+    ? `linear-gradient(to right, ${rand.links ? 'transparent, #000 40px' : '#000'}, ${rand.rechts ? '#000 calc(100% - 40px), transparent' : '#000'})`
+    : undefined;
   return (
-    <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+    <div ref={huelle} className="no-scrollbar relative -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0"
+         style={{ maskImage: maske, WebkitMaskImage: maske }}>
       <div className="inline-flex min-w-max rounded-[3px] border bg-card p-1" role="tablist">
         {optionen.map(o => {
           const an = o.wert === wahl;
