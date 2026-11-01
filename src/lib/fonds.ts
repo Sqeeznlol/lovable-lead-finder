@@ -88,18 +88,56 @@ export async function zuordnenAlle(zeilen: Zeile[], fortschritt?: (f: number, t:
   return aus;
 }
 
-/** Positionen in einen bestehenden Fonds oder einen neuen schreiben. */
-export async function einspielen(mandant: string, fonds: string | null, neuerName: string, ergebnisse: Ergebnis[]): Promise<string> {
+/**
+ * Positionen in einen bestehenden Fonds oder einen neuen schreiben.
+ *
+ * Wer dieselbe Liste zweimal einspielte, hatte jede Liegenschaft doppelt
+ * (Prüfung, 1. November). Was im Ziel-Fonds schon steht, wird darum
+ * übersprungen und als Zahl zurückgegeben.
+ */
+export async function einspielen(mandant: string, fonds: string | null, neuerName: string, ergebnisse: Ergebnis[]): Promise<{ id: string; neu: number; schon: number }> {
   let id = fonds;
-  if (!id) {
+  let vorhanden = new Set<string>();
+  if (id) {
+    const r = await db().from('portfolio_position').select('parzelle_id, roh_adresse').eq('portfolio_id', id).limit(20000);
+    if (r.error) throw r.error;
+    vorhanden = new Set(((r.data ?? []) as { parzelle_id: string | null; roh_adresse: string | null }[])
+      .map(x => x.parzelle_id ?? `roh:${(x.roh_adresse ?? '').trim().toLowerCase()}`));
+  } else {
     const pf = await db().from('portfolio').insert({ mandant_id: mandant, name: neuerName.trim() }).select('id').single();
     if (pf.error) throw pf.error;
     id = pf.data.id as string;
   }
-  const pos = ergebnisse.map(e => ({ portfolio_id: id, parzelle_id: e.parzelleId, roh_adresse: e.roh, zuordnung: e.zuordnung }));
+  const schluessel = (e: Ergebnis) => e.parzelleId ?? `roh:${e.roh.trim().toLowerCase()}`;
+  const gesehen = new Set<string>();
+  const pos = ergebnisse
+    .filter(e => { const k = schluessel(e); if (vorhanden.has(k) || gesehen.has(k)) return false; gesehen.add(k); return true; })
+    .map(e => ({ portfolio_id: id, parzelle_id: e.parzelleId, roh_adresse: e.roh, zuordnung: e.zuordnung }));
   if (pos.length) {
     const r = await db().from('portfolio_position').insert(pos);
     if (r.error) throw r.error;
   }
-  return id!;
+  return { id: id!, neu: pos.length, schon: ergebnisse.length - pos.length };
+}
+
+/** Die Potenziale als CSV (Excel, Semikolon) -- für den Bericht an die Geschäftsleitung. */
+export function potenzialeAlsCsv(liste: Potenzial[], punkt: Map<string, Punkt>, nr: Map<string, number>, datei: string) {
+  const zelle = (v: unknown) => {
+    const t = v == null ? '' : String(v);
+    return /[";\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+  };
+  const kopf = ['Art', 'Titel', 'Fonds', 'Adresse', 'Gemeinde', 'EGRID', 'Fläche m²', 'Reserve m²', 'Marge CHF', 'Zone'];
+  const zeilen = liste.map(p => {
+    const a = punkt.get(p.parzelle), b = p.parzelle2 ? punkt.get(p.parzelle2) : undefined;
+    const fonds = [a, b].filter(Boolean).map(x => `Fonds ${nr.get(x!.fonds) ?? ''}`).join(' + ');
+    return [POTENZIAL[p.art].kurz, p.titel, fonds, a?.adresse ?? p.wo, a?.gemeinde ?? '', a?.egrid ?? '',
+      p.flaeche != null ? Math.round(p.flaeche) : '', p.reserve != null ? Math.round(p.reserve) : '',
+      p.marge != null ? Math.round(p.marge) : '', a?.zone ?? ''].map(zelle).join(';');
+  });
+  // Mit BOM, sonst zeigt Excel die Umlaute falsch.
+  const blob = new Blob(['\ufeff' + [kopf.join(';'), ...zeilen].join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const l = document.createElement('a');
+  l.href = url; l.download = datei; l.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

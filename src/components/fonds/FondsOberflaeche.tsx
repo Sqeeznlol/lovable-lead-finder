@@ -1,16 +1,16 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeftRight, Building2, CalendarDays, Loader2, LogOut, Map as Karte, Orbit, Sparkles, Upload } from 'lucide-react';
+import { ArrowLeftRight, Building2, CalendarDays, Download, X, Loader2, LogOut, Map as Karte, Orbit, Sparkles, Upload } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/use-auth';
 import { useUrlWert } from '@/hooks/use-url-wert';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { KontoMenu, useGesellschaften } from '@/components/KontoMenu';
-import { Abschnitt, AUF, KNOPF, KNOPF_HAUPT, Kennzahlen, Leer, LISTE, Marke, Reiter, Strichbalken } from '@/components/rahmen';
+import { Abschnitt, AUF, KNOPF, KNOPF_HAUPT, KNOPF_LEISE, Kennzahlen, Leer, LISTE, Marke, Reiter, Strichbalken } from '@/components/rahmen';
 import { Universum } from '@/components/fonds/Universum';
 import { FondsImport } from '@/components/fonds/FondsImport';
 import { ImmoKalender } from '@/components/ImmoKalender';
-import { fondsFarbe, POTENZIAL, universumLaden, verorten, type PotenzialArt } from '@/lib/fonds';
+import { fondsFarbe, POTENZIAL, potenzialeAlsCsv, universumLaden, verorten, type PotenzialArt } from '@/lib/fonds';
 import { FENSTER } from '@/lib/fenster';
 
 const n = (x: number | null | undefined) => (x == null ? '–' : Math.round(x).toLocaleString('de-CH'));
@@ -44,18 +44,23 @@ export function FondsOberflaeche() {
   const [artWert, setArt] = useUrlWert('potenzial', 'alle');
   const [import_, setImport] = useUrlWert('einspielen');
   const [kalender, setKalender] = useUrlWert('kalender');
+  // Ein Fonds antippen zeigt nur seine Potenziale (Prüfung, 1. November).
+  const [nurFonds, setNurFonds] = useUrlWert('fonds');
+  const [alleZeigen, setAlleZeigen] = useState(false);
   const art = artWert as PotenzialArt | 'alle';
 
   // Wer noch keinen Punkt hat, wird beim Bund verortet -- einmal je
   // Laden, im Hintergrund; danach steht er im Universum.
-  const verortet = useRef(false);
+  // Je Fondsleitung einmal: nach einem Wechsel über das Kontomenü
+  // wurde sonst nie mehr verortet.
+  const verortet = useRef<string | null | undefined>(undefined);
   useEffect(() => {
-    if (!data || verortet.current) return;
+    if (!data || verortet.current === als) return;
     const offen = data.punkte.filter(p => p.e == null && p.egrid).map(p => ({ id: p.id, egrid: p.egrid }));
     if (!offen.length) return;
-    verortet.current = true;
+    verortet.current = als;
     void verorten(offen).then(() => qc.invalidateQueries({ queryKey: ['fonds-universum'] }));
-  }, [data, qc]);
+  }, [data, qc, als]);
 
   const nr = useMemo(() => new Map((data?.fonds ?? []).map(f => [f.id, f.nr])), [data]);
   const punkt = useMemo(() => new Map((data?.punkte ?? []).map(p => [p.id, p])), [data]);
@@ -68,7 +73,10 @@ export function FondsOberflaeche() {
   const reserve = data.fonds.reduce((s, f) => s + f.reserve, 0);
   const marge = data.fonds.reduce((s, f) => s + f.marge, 0);
   const zahl = (a: PotenzialArt) => data.potenziale.filter(p => p.art === a).length;
-  const liste = data.potenziale.filter(p => art === 'alle' || p.art === art);
+  const imFonds = (id: string | null) => !nurFonds || (id != null && punkt.get(id)?.fonds === nurFonds);
+  const liste = data.potenziale.filter(p => (art === 'alle' || p.art === art) && (imFonds(p.parzelle) || imFonds(p.parzelle2)));
+  const fondsWahl = nurFonds ? data.fonds.find(f => f.id === nurFonds) : undefined;
+  const csv = () => potenzialeAlsCsv(liste, punkt, nr, `potenziale-${(data.gesellschaft ?? 'fonds').replace(/[^\wäöü-]+/gi, '-').toLowerCase()}.csv`);
   const wahl = gewaehlt ? punkt.get(gewaehlt) : undefined;
   const maxLieg = Math.max(...data.fonds.map(f => f.liegenschaften), 1);
 
@@ -114,8 +122,16 @@ export function FondsOberflaeche() {
 
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
           <div className="min-w-0 space-y-6">
-            <Abschnitt titel="Pendente Potenziale" zahl={data.potenziale.length} symbol={Sparkles} kachel="schwarz"
-                       unter="Aus Ihren Datensätzen gerechnet, das grösste zuerst">
+            <Abschnitt titel="Pendente Potenziale" zahl={liste.length} symbol={Sparkles} kachel="schwarz"
+                       unter="Aus Ihren Datensätzen gerechnet, das grösste zuerst"
+                       rechts={liste.length > 0 && <button type="button" className={KNOPF_LEISE} onClick={csv}><Download className="h-4 w-4" /> CSV</button>}>
+              {fondsWahl && (
+                <button type="button" onClick={() => setNurFonds(null)}
+                        className="inline-flex min-h-11 items-center gap-2 rounded-[3px] bg-foreground px-3 text-sm text-background">
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: fondsFarbe(fondsWahl.nr) }} />
+                  Nur Fonds {fondsWahl.nr} <X className="h-4 w-4" />
+                </button>
+              )}
               <Reiter<string> wahl={art} setWahl={w => setArt(w)} optionen={[
                 { wert: 'alle', titel: 'Alle', zahl: data.potenziale.length },
                 ...(['arrondierung', 'nachbar_baut', 'reserve', 'offen'] as PotenzialArt[])
@@ -123,7 +139,7 @@ export function FondsOberflaeche() {
               ]} />
               {liste.length === 0 ? <Leer titel="Keine Potenziale in dieser Auswahl." /> : (
                 <ul className={LISTE}>
-                  {liste.slice(0, 80).map((p, i) => {
+                  {liste.slice(0, alleZeigen ? undefined : 80).map((p, i) => {
                     const a = punkt.get(p.parzelle), b = p.parzelle2 ? punkt.get(p.parzelle2) : undefined;
                     return (
                       <li key={`${p.art}-${p.parzelle}-${p.parzelle2 ?? ''}-${i}`}>
@@ -150,12 +166,18 @@ export function FondsOberflaeche() {
                   })}
                 </ul>
               )}
+              {/* Vorher still bei 80 abgeschnitten, während Kopf und Reiter die volle Zahl nannten. */}
+              {!alleZeigen && liste.length > 80 && (
+                <button type="button" className={`${KNOPF_LEISE} w-full`} onClick={() => setAlleZeigen(true)}>Alle {n(liste.length)} zeigen</button>
+              )}
             </Abschnitt>
 
             <Abschnitt titel="Fonds" zahl={data.fonds.length} symbol={Building2} kachel="akzent" unter="Liegenschaften, Reserve und Marge je Fonds">
               <ul className={LISTE}>
                 {data.fonds.map(f => (
-                  <li key={f.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-5 py-4 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto]">
+                  <li key={f.id}>
+                  <button type="button" onClick={() => setNurFonds(nurFonds === f.id ? null : f.id)} aria-pressed={nurFonds === f.id}
+                          className={`grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-5 py-4 text-left hover:bg-secondary sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto] ${nurFonds === f.id ? 'bg-secondary' : ''}`}>
                     <span className="flex min-w-0 items-center gap-2">
                       <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: fondsFarbe(f.nr) }} />
                       <span className="truncate font-semibold">Fonds {f.nr}</span>
@@ -163,6 +185,7 @@ export function FondsOberflaeche() {
                     </span>
                     <span className="order-3 col-span-2 sm:order-none sm:col-span-1"><Strichbalken anteil={f.liegenschaften / maxLieg} farbe="akzent" /></span>
                     <span className="text-right text-sm"><span className="font-semibold">{n(f.liegenschaften)}</span> <span className="text-muted-foreground">· {chf(f.marge)}</span></span>
+                  </button>
                   </li>
                 ))}
               </ul>
@@ -228,7 +251,8 @@ export function FondsOberflaeche() {
 
             {/* Für unsere Konten: zurück in die eigene Arbeit. Ein
                 Fondsmanager kommt hier nicht hin (Index leitet ihn um). */}
-            <button type="button" onClick={() => navigate('/')} className="w-full text-sm text-muted-foreground hover:text-foreground">Zur internen Oberfläche</button>
+            {/* Nur für unsere Konten -- ein Fondsmanager hat dort nichts verloren. */}
+            {intern && <button type="button" onClick={() => navigate('/')} className="min-h-11 w-full text-sm text-muted-foreground hover:text-foreground">Zur internen Oberfläche</button>}
           </aside>
         </div>
       </main>

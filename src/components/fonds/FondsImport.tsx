@@ -21,6 +21,7 @@ export function FondsImport({ mandant, fonds, onFertig }: { mandant: string; fon
   const [lauf, setLauf] = useState<string | null>(null);
   const [ergebnis, setErgebnis] = useState<Ergebnis[] | null>(null);
   const [fehler, setFehler] = useState<string | null>(null);
+  const [bilanz, setBilanz] = useState<{ neu: number; schon: number } | null>(null);
 
   const zeilen = zeilenLesen(text);
   const datei = async (f: File | undefined) => { if (f) setText(await f.text()); };
@@ -30,17 +31,21 @@ export function FondsImport({ mandant, fonds, onFertig }: { mandant: string; fon
     try {
       setLauf('Zuordnen beim Bund …');
       const e = await zuordnenAlle(zeilen, (f, t) => setLauf(`Zuordnen beim Bund: ${f} von ${t}`));
-      setErgebnis(e);
       setLauf('Einspielen …');
-      await einspielen(mandant, ziel === 'neu' ? null : ziel, name || `Fonds ${fonds.length + 1}`, e);
+      // Das Ergebnis erst nach dem Einspielen zeigen: vorher erschien
+      // "eingespielt" auch, wenn das Speichern scheiterte.
+      const b = await einspielen(mandant, ziel === 'neu' ? null : ziel, name || `Fonds ${fonds.length + 1}`, e);
+      setBilanz(b);
+      setErgebnis(e);
       const neu = e.filter(x => x.parzelleId).map(x => ({ id: x.parzelleId!, egrid: x.egrid }));
       setLauf('Lage und Nachbarn beim Bund …');
       await verorten(neu, (f, t) => setLauf(`Lage und Nachbarn beim Bund: ${f} von ${t}`));
       await qc.invalidateQueries({ queryKey: ['fonds-universum'] });
       setLauf(null);
-    } catch {
+    } catch (x) {
       setLauf(null);
-      setFehler('Einspielen nicht möglich. Angemeldet?');
+      const grund = x instanceof Error ? x.message : (x as { message?: string })?.message;
+      setFehler(`Einspielen nicht möglich${grund ? `: ${grund}` : '.'}`);
     }
   };
 
@@ -49,7 +54,10 @@ export function FondsImport({ mandant, fonds, onFertig }: { mandant: string; fon
   if (ergebnis && !lauf) {
     return (
       <div className="space-y-4">
-        <p className="font-semibold">{zahl('zugeordnet')} von {ergebnis.length} Liegenschaften eingespielt.</p>
+        <p className="font-semibold">{zahl('zugeordnet')} von {ergebnis.length} Liegenschaften zugeordnet.</p>
+        {bilanz && bilanz.schon > 0 && (
+          <p className="text-sm text-muted-foreground">{bilanz.neu} neu im Fonds, {bilanz.schon} standen schon drin und wurden nicht doppelt eingetragen.</p>
+        )}
         <dl className="grid grid-cols-3 gap-2 text-sm">
           {([['zugeordnet', 'Zugeordnet'], ['mehrdeutig', 'Mehrdeutig'], ['nicht gefunden', 'Nicht gefunden']] as const).map(([z, t]) => (
             <div key={z} className="rounded-[3px] border px-3 py-2"><dt className="text-xs text-muted-foreground">{t}</dt><dd className="text-lg font-semibold">{zahl(z)}</dd></div>
