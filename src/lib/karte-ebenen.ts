@@ -54,3 +54,38 @@ export const GRENZEN: Ebene = {
 export const BAUZONEN: Ebene = {
   art: 'wms', id: 'ch.are.bauzonen', minZoom: 11, deckkraft: 0.55,
 };
+
+/** Ein Ausschnitt in Web-Mercator-Metern (EPSG:3857), wie Leaflet ihn rechnet. */
+export interface Ausschnitt3857 { west: number; sued: number; ost: number; nord: number }
+
+/**
+ * Grösstes Bild je Seite, das wir vom Dienst verlangen. Der Wert ist
+ * nicht gemessen -- aus der Entwicklungsumgebung ist der Dienst nicht
+ * erreichbar -- sondern die übliche Grenze von Kartendiensten. Liefert
+ * der Dienst mehr, darf er steigen; liefert er weniger, bleibt die
+ * Ebene leer, und dann ist das die erste Zahl, die man ändert.
+ */
+export const WMS_MAX = 2048;
+
+/**
+ * Die Adresse für ein einzelnes WMS-Bild über den ganzen Ausschnitt.
+ *
+ * Warum ein Bild und nicht Kacheln: Jede Kachel wird für sich
+ * gezeichnet. Am Rand versetzen sich die Linien um einen Pixel,
+ * Parzellennummern werden abgeschnitten, und bei einer halb
+ * durchsichtigen Ebene überlappen die Kacheln um einen Pixel -- dort
+ * ist die Farbe doppelt, und über die Karte laufen Striche. Ein Bild
+ * hat keine Kanten.
+ *
+ * Rein und ohne Leaflet, damit der Test die Anfrage prüfen kann.
+ */
+export function wmsAdresse(e: Ebene, a: Ausschnitt3857, breite: number, hoehe: number): string {
+  const p = new URLSearchParams({
+    SERVICE: 'WMS', VERSION: '1.1.1', REQUEST: 'GetMap',
+    LAYERS: e.id, STYLES: '', SRS: 'EPSG:3857',
+    BBOX: [a.west, a.sued, a.ost, a.nord].join(','),
+    WIDTH: String(breite), HEIGHT: String(hoehe),
+    FORMAT: 'image/png', TRANSPARENT: 'TRUE',
+  });
+  return `https://wms.geo.admin.ch/?${p.toString()}`;
+}

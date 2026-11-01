@@ -30,6 +30,7 @@ on:
           - kette        # Wo die abgefragten Objekte gerade stehen
           - eigentuemer  # Jede eingetragene Auskunft, zum Nachpruefen
           - instanzen    # Zeigen Seite und Datenbank auf dasselbe Projekt?
+          - kartendienst # Was der WMS des Bundes an Bildgroesse liefert
           - regeln       # Wer darf was -- die Zugriffsregeln der Tabellen
           - plattform    # Was im neuen Modell steht (Zahlen, keine Namen)
       egrid:
@@ -190,6 +191,46 @@ jobs:
             else
               echo "im Buendel der Seite:  Buendel nicht gefunden" >> "$GITHUB_STEP_SUMMARY"
             fi
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            cat "$GITHUB_STEP_SUMMARY"
+            exit 0
+
+          elif [ "${{ inputs.frage }}" = "kartendienst" ]; then
+            # Die Karte holt Grenzen und Bauzonen als ein Bild je
+            # Ausschnitt. Wie gross es sein darf, steht in den
+            # Capabilities des Dienstes -- und ob er es liefert, sagt
+            # nur eine Anfrage. Beides hier, damit der Deckel in
+            # src/lib/karte-ebenen.ts gemessen ist und nicht geraten.
+            # Aus der Entwicklungsumgebung ist der Dienst nicht
+            # erreichbar; von hier schon.
+            echo "### Kartendienst wms.geo.admin.ch" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            CAP=$(curl -sL --max-time 90 \
+              'https://wms.geo.admin.ch/?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetCapabilities' || true)
+            echo "Capabilities:  $(printf '%s' "$CAP" | wc -c) Zeichen" >> "$GITHUB_STEP_SUMMARY"
+            echo "MaxWidth:      $(printf '%s' "$CAP" | grep -o '<MaxWidth>[0-9]*' | head -1 | tr -dc 0-9)" >> "$GITHUB_STEP_SUMMARY"
+            echo "MaxHeight:     $(printf '%s' "$CAP" | grep -o '<MaxHeight>[0-9]*' | head -1 | tr -dc 0-9)" >> "$GITHUB_STEP_SUMMARY"
+            # Ein Ausschnitt in Zuerich (Web-Mercator), zwei Kilometer breit.
+            BBOX=950000,5990000,952000,5991000
+            for S in 1024 2048 4096 8192; do
+              ST=$(curl -s -o /tmp/bild.png -w '%{http_code} %{content_type} %{size_download}B' --max-time 180 \
+                "https://wms.geo.admin.ch/?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=ch.kantone.cadastralwebmap-farbe&STYLES=&SRS=EPSG:3857&BBOX=$BBOX&WIDTH=$S&HEIGHT=$S&FORMAT=image/png&TRANSPARENT=TRUE" \
+                || echo "000")
+              echo "GetMap ${S}x${S}:  $ST" >> "$GITHUB_STEP_SUMMARY"
+            done
+            # Und: findet identify die Parzellen, die ein Polygon beruehrt?
+            # Davon haengt ab, ob Nachbarn auch ohne eigenen Umriss gehen.
+            POLY='{"rings":[[[2683800,1246700],[2683900,1246700],[2683900,1246800],[2683800,1246800],[2683800,1246700]]]}'
+            ST=$(curl -s -o /tmp/ident.json -w '%{http_code}' --max-time 90 -G \
+              'https://api3.geo.admin.ch/rest/services/all/MapServer/identify' \
+              --data-urlencode "geometry=$POLY" --data-urlencode 'geometryType=esriGeometryPolygon' \
+              --data-urlencode 'sr=2056' --data-urlencode 'tolerance=0' --data-urlencode 'returnGeometry=false' \
+              --data-urlencode 'layers=all:ch.kantone.cadastralwebmap-farbe' \
+              --data-urlencode 'mapExtent=2683500,1246400,2684200,1247100' --data-urlencode 'imageDisplay=700,700,96' \
+              --data-urlencode 'lang=de' || echo "000")
+            TREFFER=$(python3 -c "import json;print(len(json.load(open('/tmp/ident.json')).get('results',[])))" 2>/dev/null || echo '?')
+            echo "identify Polygon:  HTTP $ST, $TREFFER Parzellen" >> "$GITHUB_STEP_SUMMARY"
+            echo "Attribute des ersten Treffers: $(python3 -c "import json;r=json.load(open('/tmp/ident.json')).get('results',[]);print(sorted((r[0].get('attributes') or {}).keys()) if r else '-')" 2>/dev/null)" >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
             cat "$GITHUB_STEP_SUMMARY"
             exit 0
