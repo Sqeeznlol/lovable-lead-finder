@@ -31,6 +31,7 @@ on:
           - eigentuemer  # Jede eingetragene Auskunft, zum Nachpruefen
           - instanzen    # Zeigen Seite und Datenbank auf dasselbe Projekt?
           - kartendienst # Was der WMS des Bundes an Bildgroesse liefert
+          - nachbarn     # Ob die Nachbarsuche beim Bund mit echten Umrissen geht
           - regeln       # Wer darf was -- die Zugriffsregeln der Tabellen
           - plattform    # Was im neuen Modell steht (Zahlen, keine Namen)
           - konten       # Welche Anmeldekonten bestehen, und seit wann
@@ -199,6 +200,15 @@ jobs:
               echo "im Buendel der Seite:  Buendel nicht gefunden" >> "$GITHUB_STEP_SUMMARY"
             fi
             echo '```' >> "$GITHUB_STEP_SUMMARY"
+            cat "$GITHUB_STEP_SUMMARY"
+            exit 0
+
+          elif [ "$FRAGE" = "nachbarn" ]; then
+            # Die Karte fragt beim Bund nach den Nachbarn einer Parzelle,
+            # mit ihrem Umriss. Aus der Entwicklungsumgebung ist der Dienst
+            # nicht erreichbar; hier wird die Anfrage mit echten Umrissen
+            # nachgestellt. Siehe tools/nachbarn_pruefen.mjs.
+            { echo "### Nachbarsuche beim Bund"; echo '```'; node tools/nachbarn_pruefen.mjs; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
             cat "$GITHUB_STEP_SUMMARY"
             exit 0
 
