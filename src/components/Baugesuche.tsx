@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Auswahl } from '@/components/Auswahl';
 import { useQuery } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -115,15 +116,10 @@ export function Baugesuche() {
       <div className="flex flex-wrap items-center gap-2">
         <Reiter<Sicht> wahl={sicht} setWahl={setSicht}
                        optionen={([['alle', 'Alle'], ['bestand', 'Im Bestand'], ['gelegenheit', 'Mit Gelegenheit']] as [Sicht, string][]).map(([w, t]) => ({ wert: w, titel: t, zahl: zahl(w) }))} />
-        <select value={tage} onChange={e => setTage(Number(e.target.value))}
-                className={`${FELD} pr-8`}>
-          <option value={3}>Letzte 3 Tage</option>
-          <option value={7}>Letzte 7 Tage</option>
-          <option value={30}>Letzte 30 Tage</option>
-          <option value={90}>Letzte 90 Tage</option>
-          <option value={365}>Letztes Jahr</option>
-          <option value={0}>Alle</option>
-        </select>
+        <Auswahl label="Zeitraum" wert={String(tage)} setWert={w => setTage(Number(w))} className="min-w-[170px]" optionen={[
+          { wert: '3', titel: 'Letzte 3 Tage' }, { wert: '7', titel: 'Letzte 7 Tage' }, { wert: '30', titel: 'Letzte 30 Tage' },
+          { wert: '90', titel: 'Letzte 90 Tage' }, { wert: '365', titel: 'Letztes Jahr' }, { wert: '0', titel: 'Alle' },
+        ]} />
         <input value={wort} onChange={e => setWort(e.target.value)} placeholder="Adresse, Gemeinde, Vorhaben, Nummer"
                className={`${FELD} w-full sm:w-auto sm:flex-1 sm:max-w-xs`} />
       </div>

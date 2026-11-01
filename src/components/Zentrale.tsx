@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Auswahl } from '@/components/Auswahl';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Flag, Handshake, Loader2, MapPin, Network, Search, Sparkles, Users } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
@@ -193,9 +194,9 @@ function Erfassen({ onFertig, onAbbrechen }: { onFertig: (id: string) => void; o
         <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
           {feld('Kunde', <input list="kunden" value={f.kunde} onChange={e => setze({ kunde: e.target.value })} className={`${FELD} w-full`} placeholder="z.B. Pensionskasse A" />)}
           {feld('Art', (
-            <select value={f.kundeArt} onChange={e => setze({ kundeArt: e.target.value })} className={`${FELD} w-full`}>
-              <option value="institution">Institution</option><option value="firma">Firma</option><option value="person">Person</option>
-            </select>
+            <Auswahl label="Art" wert={f.kundeArt} setWert={w => setze({ kundeArt: w })} className="w-full min-w-[160px]" optionen={[
+              { wert: 'institution', titel: 'Institution' }, { wert: 'firma', titel: 'Firma' }, { wert: 'person', titel: 'Person' },
+            ]} />
           ))}
           <datalist id="kunden">{(kunden ?? []).map(k => <option key={k.name} value={k.name} />)}</datalist>
         </div>

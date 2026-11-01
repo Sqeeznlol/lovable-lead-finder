@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Auswahl } from '@/components/Auswahl';
 import { useQueryClient } from '@tanstack/react-query';
 import { portfolioSpeichern, zeilenLesen, zuordnen, type Ergebnis } from '@/lib/portfolio-import';
 
@@ -79,9 +80,7 @@ export function PortfolioImport({ onFertig, onAbbrechen }: { onFertig: () => voi
       </label>
       <div className="zwei">
         <label className="feld"><span>Art</span>
-          <select value={art} onChange={e => setArt(e.target.value)}>
-            {ARTEN.map(([w, t]) => <option key={w} value={w}>{t}</option>)}
-          </select>
+          <Auswahl label="Art" wert={art} setWert={setArt} className="w-full" optionen={ARTEN.map(([w, t]) => ({ wert: w, titel: t }))} />
         </label>
         <label className="feld"><span>Name des Portfolios</span>
           <input value={name} onChange={e => setName(e.target.value)} placeholder={eigner ? `${eigner} Portfolio` : 'z. B. Wohnen Zürich'} />

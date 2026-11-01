@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Auswahl } from '@/components/Auswahl';
 import L from 'leaflet';
 import { Layers, SlidersHorizontal, X } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
@@ -890,21 +891,16 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
             <button type="button" key={z} className={zonenFilter.has(z) ? 'an' : ''} onClick={() => umschalten(z)}>{t}</button>
           ))}
         </div>
-        {/* Auswahlfelder statt Chips: auf dem iPhone öffnet sich die
-            Systemliste, und drei Gruppen Chips passten nicht in eine Zeile. */}
+        {/* Auswahl statt drei Gruppen Chips -- die passten nicht in eine
+            Zeile. Die eigene Auswahl statt der des Browsers: dessen
+            "Dächlein" sah neben den Chips fremd aus (Julian, 1. November). */}
         <div className="filter wahl">
-          <select aria-label="Parzellengrösse" className={filter.flaecheAb ? 'an' : ''} value={filter.flaecheAb}
-                  onChange={e => setFilter(f => ({ ...f, flaecheAb: Number(e.target.value) }))}>
-            {FLAECHEN.map(([w, t]) => <option key={w} value={w}>{t}</option>)}
-          </select>
-          <select aria-label="Potenzial" className={filter.margeAb ? 'an' : ''} value={filter.margeAb}
-                  onChange={e => setFilter(f => ({ ...f, margeAb: Number(e.target.value) }))}>
-            {MARGEN.map(([w, t]) => <option key={w} value={w}>{t}</option>)}
-          </select>
-          <select aria-label="Objektart" className={filter.art ? 'an' : ''} value={filter.art}
-                  onChange={e => setFilter(f => ({ ...f, art: e.target.value }))}>
-            {ARTEN.map(([w, t]) => <option key={w} value={w}>{t}</option>)}
-          </select>
+          <Auswahl label="Parzellengrösse" chip={{ an: !!filter.flaecheAb }} wert={String(filter.flaecheAb)}
+                   setWert={w => setFilter(f => ({ ...f, flaecheAb: Number(w) }))} optionen={FLAECHEN.map(([w, t]) => ({ wert: String(w), titel: t }))} />
+          <Auswahl label="Potenzial" chip={{ an: !!filter.margeAb }} wert={String(filter.margeAb)}
+                   setWert={w => setFilter(f => ({ ...f, margeAb: Number(w) }))} optionen={MARGEN.map(([w, t]) => ({ wert: String(w), titel: t }))} />
+          <Auswahl label="Objektart" chip={{ an: !!filter.art }} wert={filter.art}
+                   setWert={w => setFilter(f => ({ ...f, art: w }))} optionen={ARTEN.map(([w, t]) => ({ wert: w, titel: t }))} />
           {filterAktiv(filter) && (
             <button type="button" onClick={() => setFilter(OHNE_FILTER)}>Zurücksetzen</button>
           )}

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Auswahl } from '@/components/Auswahl';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Phone } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -138,19 +139,16 @@ export function Gespraeche({ parzelleId, ownerName }: { parzelleId: string; owne
           {f.erreicht && (
             <>
               <label className="block space-y-1"><span className={marke}>Verkaufsabsicht</span>
-                <select className={feld} value={f.verkaufsabsicht} onChange={set('verkaufsabsicht')}>
-                  <option value="">–</option>
-                  {ABSICHTEN.map(([w, t]) => <option key={w} value={w}>{t}</option>)}
-                </select>
+                <Auswahl label="Verkaufsabsicht" wert={f.verkaufsabsicht} setWert={w => set('verkaufsabsicht')({ target: { value: w } })} className="w-full"
+                         optionen={[{ wert: '', titel: '–' }, ...ABSICHTEN.map(([w, t]) => ({ wert: w, titel: t }))]} />
               </label>
               <div className="grid grid-cols-2 gap-2">
                 <label className="block space-y-1"><span className={marke}>Preisvorstellung</span>
                   <input className={feld} inputMode="decimal" value={f.preis} onChange={set('preis')} placeholder="z. B. 2,4 Mio." />
                 </label>
                 <label className="block space-y-1"><span className={marke}>Grund, falls nicht</span>
-                  <select className={feld} value={f.grund} onChange={set('grund')}>
-                    {GRUENDE.map(([w, t]) => <option key={w} value={w}>{t}</option>)}
-                  </select>
+                  <Auswahl label="Grund, falls nicht" wert={f.grund} setWert={w => set('grund')({ target: { value: w } })} className="w-full"
+                           optionen={GRUENDE.map(([w, t]) => ({ wert: w, titel: t }))} />
                 </label>
               </div>
               <label className="block space-y-1"><span className={marke}>Weitere Objekte des Eigentümers</span>

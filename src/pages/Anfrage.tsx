@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Auswahl } from '@/components/Auswahl';
 import { supabase } from '@/integrations/supabase/client';
 import { adressVorschlaege, parzelleAmPunkt, type ParzellenAuskunft, type Vorschlag } from '@/lib/ortsabfrage';
 
@@ -151,10 +152,8 @@ export default function Anfrage({ art }: { art: Art }) {
             {art === 'bewertung' && (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div><label className={marke}>Objektart</label>
-                  <select className={feld} value={f.objektart} onChange={set('objektart')}>
-                    <option value="">Bitte wählen</option>
-                    {['Einfamilienhaus', 'Mehrfamilienhaus', 'Eigentumswohnung', 'Bauland', 'Gewerbe'].map(o => <option key={o}>{o}</option>)}
-                  </select></div>
+                  <Auswahl label="Objektart" wert={f.objektart} setWert={w => set('objektart')({ target: { value: w } })} className="w-full"
+                           optionen={[{ wert: '', titel: 'Bitte wählen' }, ...['Einfamilienhaus', 'Mehrfamilienhaus', 'Eigentumswohnung', 'Bauland', 'Gewerbe'].map(o => ({ wert: o, titel: o }))]} /></div>
                 <div><label className={marke}>Baujahr</label><input className={feld} inputMode="numeric" value={f.baujahr} onChange={set('baujahr')} placeholder="1985" /></div>
                 <div><label className={marke}>Wohnfläche m²</label><input className={feld} inputMode="numeric" value={f.wohnflaeche} onChange={set('wohnflaeche')} placeholder="140" /></div>
               </div>

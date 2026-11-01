@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Auswahl } from '@/components/Auswahl';
 import { Loader2, Upload } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { zeilenLesen, type Ergebnis } from '@/lib/portfolio-import';
@@ -68,10 +69,8 @@ export function FondsImport({ mandant, fonds, onFertig }: { mandant: string; fon
     <div className="space-y-3">
       <label className="block space-y-1.5">
         <span className="text-sm font-medium">In welchen Fonds</span>
-        <select value={ziel} onChange={e => setZiel(e.target.value)} className={`${FELD} w-full`}>
-          {fonds.map(f => <option key={f.id} value={f.id}>Fonds {f.nr} · {f.name}</option>)}
-          <option value="neu">Neuer Fonds …</option>
-        </select>
+        <Auswahl label="In welchen Fonds" wert={ziel} setWert={setZiel} className="w-full"
+                 optionen={[...fonds.map(f => ({ wert: f.id, titel: `Fonds ${f.nr} · ${f.name.replace(/^Immofonds \d+ · /, '')}` })), { wert: 'neu', titel: 'Neuer Fonds …' }]} />
       </label>
       {ziel === 'neu' && (
         <input value={name} onChange={e => setName(e.target.value)} placeholder="Name des Fonds" aria-label="Name des neuen Fonds" className={`${FELD} w-full`} />

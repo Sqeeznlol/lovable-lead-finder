@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Auswahl } from '@/components/Auswahl';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Users } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -109,11 +110,9 @@ export function Teams() {
                 {data.kunden.map(k => (
                   <li key={k.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 text-sm">
                     <span>{k.akteur?.name ?? 'Ohne Namen'}</span>
-                    <select value={k.team_id ?? ''} className="h-10 rounded-lg border bg-white px-2 text-sm text-slate-900"
-                            onChange={e => void lauf(db().from('mandant').update({ team_id: e.target.value || null }).eq('id', k.id))}>
-                      <option value="">Alle sehen ihn</option>
-                      {data.teams.map(t => <option key={t.id} value={t.id}>Nur {t.name}</option>)}
-                    </select>
+                    <Auswahl label={`Team für ${k.akteur?.name ?? 'Kunde'}`} wert={k.team_id ?? ''} klein className="min-w-[200px]"
+                             setWert={w => void lauf(db().from('mandant').update({ team_id: w || null }).eq('id', k.id))}
+                             optionen={[{ wert: '', titel: 'Alle sehen ihn' }, ...data.teams.map(t => ({ wert: t.id, titel: `Nur ${t.name}` }))]} />
                   </li>
                 ))}
               </ul>

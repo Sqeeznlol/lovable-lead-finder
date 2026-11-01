@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Auswahl } from '@/components/Auswahl';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, Printer, Target } from 'lucide-react';
 import { Abschnitt, FELD, KNOPF, KNOPF_HAUPT, Leer, LISTE, Marke, Reiter, Seite, Strichbalken } from '@/components/rahmen';
@@ -125,11 +126,10 @@ export function Gelegenheiten() {
         <Reiter<string> wahl={zustand} setWahl={w => setZustand(w as typeof zustand)}
           optionen={([['offen', 'Offen'], ...ZUSTAENDE, ['alle', 'Alle']] as [string, string][])
             .map(([w, t]) => ({ wert: w, titel: t, zahl: w === 'offen' ? offenAlle : w === 'alle' ? undefined : zahl(w as Zustand) }))} />
-        <select value={mandant} onChange={e => setMandant(e.target.value)} className={`${FELD} pr-8`}>
-          <option value="">Alle Kunden</option>
-          <option value="ohne">Ohne Kunde (Nachbar baut)</option>
-          {mandanten.map(([id, n]) => <option key={id} value={id}>{n}</option>)}
-        </select>
+        <Auswahl label="Kunde" wert={mandant} setWert={setMandant} className="min-w-[220px]" optionen={[
+          { wert: '', titel: 'Alle Kunden' }, { wert: 'ohne', titel: 'Ohne Kunde (Nachbar baut)' },
+          ...mandanten.map(([id, n]) => ({ wert: id, titel: n })),
+        ]} />
       </div>
 
       {isLoading && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> wird geladen …</p>}
@@ -161,9 +161,8 @@ export function Gelegenheiten() {
                   <div className="space-y-4 border-t bg-secondary/30 px-4 py-4">
                     <div className="grid gap-3 sm:grid-cols-2">
                       <label className="block space-y-1.5"><span className="text-[11px] uppercase tracking-wide text-muted-foreground">Zustand</span>
-                        <select value={g.zustand} onChange={e => void aendern(g, { zustand: e.target.value as Zustand })} className={feld}>
-                          {ZUSTAENDE.map(([w, t]) => <option key={w} value={w}>{t}</option>)}
-                        </select>
+                        <Auswahl label="Zustand" wert={g.zustand} setWert={w => void aendern(g, { zustand: w as Zustand })} className="w-full"
+                                 optionen={ZUSTAENDE.map(([w, t]) => ({ wert: w, titel: t }))} />
                       </label>
                       <label className="block space-y-1.5"><span className="text-[11px] uppercase tracking-wide text-muted-foreground">Zuständig</span>
                         <input defaultValue={g.zustaendig ?? ''} placeholder="Name"
