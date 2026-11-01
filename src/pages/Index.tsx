@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { Building2, LayoutDashboard, Upload, Phone, X, Zap, Search, FileSpreadsheet, Eye, Shield, Share, Plus, Database, Send, Map, Target, BarChart3, Gauge, HardHat, MoreHorizontal, Briefcase, LogOut, Orbit } from 'lucide-react';
+import { Building2, LayoutDashboard, Upload, Phone, X, Zap, Search, FileSpreadsheet, Eye, Shield, Share, Plus, Database, Send, Map, Target, BarChart3, Gauge, HardHat, MoreHorizontal, Briefcase, LogOut, Orbit, CalendarDays } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { KontoMenu } from '@/components/KontoMenu';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -24,6 +24,7 @@ const Auswertung = lazy(() => import('@/components/Auswertung').then(m => ({ def
 const Cockpit = lazy(() => import('@/components/Cockpit').then(m => ({ default: m.Cockpit })));
 const Baugesuche = lazy(() => import('@/components/Baugesuche').then(m => ({ default: m.Baugesuche })));
 const Gelegenheiten = lazy(() => import('@/components/Gelegenheiten').then(m => ({ default: m.Gelegenheiten })));
+const Kalender = lazy(() => import('@/components/Kalender').then(m => ({ default: m.Kalender })));
 const Nachbarschaft = lazy(() => import('@/components/Nachbarschaft').then(m => ({ default: m.Nachbarschaft })));
 // Die Karte zieht Leaflet nach -- das gehoert nicht ins erste
 // Buendel, sondern wird geholt, wenn jemand den Reiter oeffnet.
@@ -52,7 +53,7 @@ import { useMidnightReset } from '@/hooks/use-phones';
 
 // Jeder Bereich ist eine Adresse: /zentrale, /baugesuche ... ("/" ist
 // das Cockpit). So führt "Zurück" im Browser in den vorigen Bereich.
-const TABS = ['cockpit', 'zentrale', 'baugesuche', 'pipedrive', 'nummern', 'karte', 'nachbarschaft', 'gelegenheiten', 'auswertung', 'uebersicht', 'dashboard', 'master', 'vorauswahl', 'akquise', 'telsuche', 'properties', 'import', 'masterimport', 'phones', 'export', 'admin'] as const;
+const TABS = ['cockpit', 'zentrale', 'baugesuche', 'pipedrive', 'nummern', 'karte', 'nachbarschaft', 'gelegenheiten', 'auswertung', 'kalender', 'uebersicht', 'dashboard', 'master', 'vorauswahl', 'akquise', 'telsuche', 'properties', 'import', 'masterimport', 'phones', 'export', 'admin'] as const;
 type Tab = typeof TABS[number];
 const istTab = (x: string | undefined): x is Tab => !!x && (TABS as readonly string[]).includes(x);
 
@@ -88,6 +89,8 @@ const gruppen: { titel: string; eintraege: Eintrag[] }[] = [
     { id: 'baugesuche', label: 'Baugesuche', icon: HardHat },
     { id: 'auswertung', label: 'Auswertung', icon: BarChart3 },
     { id: 'nachbarschaft', label: 'Nachbarschaft', icon: Share },
+    // Messen und Kongresse der Branche: wann, wo, mit Adresse.
+    { id: 'kalender', label: 'Immo-Kalender', icon: CalendarDays },
   ] },
   { titel: 'Akquise', eintraege: [
     { id: 'uebersicht', label: 'Übersicht', icon: LayoutDashboard },
@@ -279,6 +282,7 @@ export default function Index() {
             {active === 'karte' && <Karte onSchliessen={() => gehe('cockpit')} />}
             {active === 'nachbarschaft' && <Nachbarschaft />}
             {active === 'gelegenheiten' && <Gelegenheiten />}
+            {active === 'kalender' && <Kalender />}
             {active === 'auswertung' && <Auswertung />}
             {active === 'pipedrive' && <PipedriveBereit />}
             {active === 'masterimport' && <MasterImport />}

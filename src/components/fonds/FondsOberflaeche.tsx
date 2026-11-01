@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeftRight, Building2, Loader2, LogOut, Map as Karte, Orbit, Sparkles, Upload } from 'lucide-react';
+import { ArrowLeftRight, Building2, CalendarDays, Loader2, LogOut, Map as Karte, Orbit, Sparkles, Upload } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/use-auth';
 import { useUrlWert } from '@/hooks/use-url-wert';
@@ -9,6 +9,7 @@ import { KontoMenu, useGesellschaften } from '@/components/KontoMenu';
 import { Abschnitt, AUF, KNOPF, KNOPF_HAUPT, Kennzahlen, Leer, LISTE, Marke, Reiter, Strichbalken } from '@/components/rahmen';
 import { Universum } from '@/components/fonds/Universum';
 import { FondsImport } from '@/components/fonds/FondsImport';
+import { ImmoKalender } from '@/components/ImmoKalender';
 import { fondsFarbe, POTENZIAL, universumLaden, verorten, type PotenzialArt } from '@/lib/fonds';
 import { FENSTER } from '@/lib/fenster';
 
@@ -42,6 +43,7 @@ export function FondsOberflaeche() {
   const [gewaehlt, setGewaehlt] = useUrlWert('liegenschaft');
   const [artWert, setArt] = useUrlWert('potenzial', 'alle');
   const [import_, setImport] = useUrlWert('einspielen');
+  const [kalender, setKalender] = useUrlWert('kalender');
   const art = artWert as PotenzialArt | 'alle';
 
   // Wer noch keinen Punkt hat, wird beim Bund verortet -- einmal je
@@ -164,6 +166,14 @@ export function FondsOberflaeche() {
                   </li>
                 ))}
               </ul>
+            </Abschnitt>
+
+            {/* Messen und Kongresse der Branche -- dort trifft man die
+                Gegenseite einer Arrondierung. */}
+            <Abschnitt titel="Immo-Kalender" symbol={CalendarDays} kachel="hell" unter="Messen und Kongresse, wann und wo"
+                       rechts={<button type="button" className="text-sm text-muted-foreground hover:text-foreground" onClick={() => setKalender(kalender ? null : 'alle')}>
+                         {kalender ? 'Weniger zeigen' : 'Alle zeigen'}</button>}>
+              <ImmoKalender kurz={kalender ? undefined : 4} />
             </Abschnitt>
           </div>
 

@@ -43,4 +43,5 @@ export const BILD = {
   pipedrive: luftbildLv95(2686300, 1256500, 800, 1280),    // Kloten
   gelegenheiten: luftbildLv95(2685400, 1250300, 800, 1280),// Zürich-Schwamendingen
   auswertung: luftbildLv95(2693300, 1231300, 800, 1280),   // Wädenswil
+  kalender: luftbildLv95(2683300, 1252500, 800, 1280),     // Zürich-Oerlikon, Messe und Halle 550
 } as const;
