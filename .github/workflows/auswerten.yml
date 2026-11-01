@@ -45,6 +45,7 @@ on:
           - teams-probe  # Ob ein Konto ausserhalb eines Teams dessen Kunden wirklich nicht sieht (wird zurueckgerollt)
           - potenzial-bund # Was der Bund an einem Punkt zu Bauzone und Parzelle liefert (fuer den Potenzialcheck)
           - anfrage-probe # Ob der oeffentliche Schluessel Anfragen einfuegen, aber nicht lesen kann (wird zurueckgerollt)
+          - tempo        # Wie schnell die Seite und die Abfragen der Hauptbereiche sind
           - vorhaben-probe # Ob die Potenzialanalyse eines Vorhabens mit 1000 Adressen stimmt und wie schnell sie ist (wird zurueckgerollt)
           - amtsblatt    # Welche Adresse im Amtsblattportal ein Baugesuch zeigt
       egrid:
@@ -560,6 +561,42 @@ jobs:
           select 'aui legt Kunden ohne Team an' as fall, count(*) as angelegt
           from mandant m join akteur a on a.id = m.akteur_id where a.name = 'Probe Neu';
           rollback;
+          \echo '```'
+          SQL
+
+          elif [ "$FRAGE" = "tempo" ]; then
+            # Gemessen statt vermutet: wie lange die Seite braucht, ob sie
+            # komprimiert und zwischengespeichert ausgeliefert wird, und
+            # wie lange die Abfragen dauern, die beim Oeffnen der
+            # Hauptbereiche laufen (als "authenticated" mit 8 s Grenze).
+            {
+              echo "### Seite"; echo '```'
+              a=https://www.wohntraums.life
+              for i in 1 2 3; do curl -s -o /dev/null -w "Startseite: %{http_code}, erstes Byte %{time_starttransfer}s, fertig %{time_total}s\n" "$a/"; done
+              curl -s -D - -o /dev/null "$a/" | grep -iE '^(cache-control|content-encoding|x-vercel-cache|age):' | sed 's/^/  Startseite /'
+              js=$(curl -s "$a/" | grep -oE '/assets/index-[A-Za-z0-9_-]+\.js' | head -1)
+              for i in 1 2; do curl -s -o /dev/null -H 'Accept-Encoding: br, gzip' -w "Buendel $js: %{size_download} Bytes uebertragen, fertig %{time_total}s\n" "$a$js"; done
+              curl -s -D - -o /dev/null -H 'Accept-Encoding: br, gzip' "$a$js" | grep -iE '^(cache-control|content-encoding|x-vercel-cache|age):' | sed 's/^/  Buendel /'
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            psql "$DB" -X -q >> "$GITHUB_STEP_SUMMARY" 2>&1 <<'SQL' || true
+          \echo '### Abfragen (Ausfuehrungszeit in der Datenbank)'
+          \echo '```'
+          create temp table zeiten (bereich text, ms numeric);
+          create or replace function pg_temp.mess(b text, q text) returns void language plpgsql as $f$
+          declare t0 timestamptz; begin
+            t0 := clock_timestamp(); execute q;
+            insert into zeiten values (b, round(extract(epoch from clock_timestamp() - t0) * 1000));
+          end $f$;
+          select pg_temp.mess('Uebersicht ZH, Seite 1', $q$select id, address, gemeinde, hnf_delta, marge_chf, owner_name from properties where ausgeschlossen = false and kanton = 'ZH' and hnf_delta is not null order by hnf_delta desc nulls last limit 1000$q$);
+          select pg_temp.mess('Uebersicht ZH, Seite 2', $q$select id from properties where ausgeschlossen = false and kanton = 'ZH' and hnf_delta is not null order by hnf_delta desc nulls last offset 1000 limit 1000$q$);
+          select pg_temp.mess('Nummern / Pipedrive', $q$select id, address, owner_name, owner_phone from properties where pipedrive_deal_id is null and owner_name is not null and owner_name <> '' order by marge_chf desc nulls last limit 300$q$);
+          select pg_temp.mess('Pipedrive uebertragen', $q$select id from properties where pipedrive_deal_id is not null order by last_export_at desc nulls last limit 30$q$);
+          select pg_temp.mess('Cockpit Baugesuche 7 Tage', $q$select count(*) from baugesuch where quelle <> 'probe' and publiziert_am >= current_date - 7$q$);
+          select pg_temp.mess('Baugesuche Liste', $q$select * from baugesuch where quelle <> 'probe' order by publiziert_am desc limit 500$q$);
+          select pg_temp.mess('Zentrale Liste', $q$select * from vorhaben_liste order by geaendert_am desc limit 300$q$);
+          select pg_temp.mess('Gelegenheiten', $q$select g.*, (select count(*) from gelegenheit_parzelle gp where gp.gelegenheit_id = g.id) from gelegenheit g limit 500$q$);
+          select bereich, ms from zeiten;
           \echo '```'
           SQL
 
