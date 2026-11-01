@@ -454,16 +454,40 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
    * Portfolio geöffnet wurde statt per Klick in die Karte. Zwei Fassungen:
    * LV95 für die Nachbarsuche, WGS84 für den roten Umriss.
    */
-  async function umrissNachholen(id: string, egrid: unknown) {
+  async function umrissNachholen(id: string, egrid: unknown, hin = false) {
     if (typeof egrid !== 'string' || !/^CH[0-9A-Z]{12}$/.test(egrid)) return;
     try {
       const [lv95, wgs] = await Promise.all([umrissVomBund(egrid, '2056'), umrissVomBund(egrid, '4326')]);
-      if (wgs) markieren({ type: 'Feature', properties: {}, geometry: wgs } as GeoJSON.Feature);
+      if (wgs) {
+        markieren({ type: 'Feature', properties: {}, geometry: wgs } as GeoJSON.Feature);
+        if (hin && markiert.current) hinfliegen((markiert.current as L.GeoJSON).getBounds());
+      }
       if (lv95 && (lv95.type === 'Polygon' || lv95.type === 'MultiPolygon')) {
         setAuswahl(a => (a.art === 'eigen' && a.id === id && !a.umriss
           ? { ...a, umriss: lv95 as Umriss, egrid } : a));
       }
     } catch { /* ohne Umriss bleibt der Hinweis stehen */ }
+  }
+
+  /**
+   * Auf eine Parzelle fliegen, ohne dass sie unter der Tafel oder der
+   * Knopfleiste landet: auf dem Desktop deckt die Tafel rechts 400 px,
+   * auf dem iPhone unten zwei Drittel. Gemessen wird, was tatsächlich
+   * liegt, statt Zahlen aus dem CSS abzuschreiben.
+   */
+  function hinfliegen(b: L.LatLngBounds) {
+    const m = karte.current;
+    if (!m || !b.isValid()) return;
+    const c = m.getContainer().getBoundingClientRect();
+    const r = (sel: string) => document.querySelector(`.gisk ${sel}`)?.getBoundingClientRect();
+    let oben = 40, rechts = 40, unten = 40;
+    for (const k of [r('.leiste'), r('.filter')]) if (k && k.height) oben = Math.max(oben, k.bottom - c.top + 16);
+    const t = r('.tafel');
+    if (t && t.height) {
+      if (t.width >= c.width - 40) unten = Math.max(unten, c.bottom - t.top + 16);
+      else rechts = Math.max(rechts, c.right - t.left + 16);
+    }
+    m.flyToBounds(b, { paddingTopLeft: [40, oben], paddingBottomRight: [rechts, unten], maxZoom: 19, duration: 0.8 });
   }
 
   async function eigeneZeigen(id: string, e: ParzelleEigenschaften, lat: number, lon: number) {
@@ -566,7 +590,8 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
       art: 'eigen', id, lat: mitte.lat, lon: mitte.lng, geholt: true, zeile: z,
       eigentuemer: (z.owner_name as string) ?? null, e: eigenschaftenAus(z),
     });
-    void umrissNachholen(id, z.egrid);
+    // Aus Liste, Portfolio oder Nachbarliste: die Karte soll dorthin.
+    void umrissNachholen(id, z.egrid, true);
   }
 
   // ---------------------------------------------- Portfolio
