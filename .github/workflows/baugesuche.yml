@@ -50,27 +50,34 @@ jobs:
           create temp table neu (
             fremd_id text, nummer text, publiziert_am date, bfs_nr text, gemeinde text,
             adresse text, parzelle_nr text, egrid text, bauherrschaft text, beschreibung text,
-            nachbar_egrids text[]
+            nachbar_egrids text[], publikation_nr text, publikation_id text,
+            einsprache_bis date, publiziert_bis date, quelle_url text
           );
           \copy neu from '/tmp/baugesuche.csv' with (format csv)
           insert into public.baugesuch
             (quelle, fremd_id, publiziert_am, kanton, bfs_nr, gemeinde, adresse, parzelle_nr, egrid,
-             bauherrschaft, beschreibung, zustand, nachbar_egrids)
+             bauherrschaft, beschreibung, zustand, nachbar_egrids,
+             publikation_nr, publikation_id, einsprache_bis, publiziert_bis, quelle_url)
           -- Gemessen im ersten Lauf: dieselbe Publikation steht mehrfach in
           -- der Quelle, eine Zeile je betroffener Parzelle. Der Schlüssel
           -- ist darum Publikation und Parzelle, und Doppel fallen weg.
           select distinct on (fremd_id || coalesce(':' || parzelle_nr, ''))
                  'zh-statistik', fremd_id || coalesce(':' || parzelle_nr, ''), publiziert_am, 'ZH', bfs_nr, gemeinde,
-                 adresse, parzelle_nr, nullif(egrid, ''), bauherrschaft, beschreibung, 'eingereicht', nachbar_egrids
+                 adresse, parzelle_nr, nullif(egrid, ''), bauherrschaft, beschreibung, 'eingereicht', nachbar_egrids,
+                 publikation_nr, publikation_id, einsprache_bis, publiziert_bis, quelle_url
           from neu
           order by fremd_id || coalesce(':' || parzelle_nr, ''), egrid nulls last
           on conflict (quelle, fremd_id) do update
             set egrid = coalesce(excluded.egrid, baugesuch.egrid),
-                nachbar_egrids = coalesce(excluded.nachbar_egrids, baugesuch.nachbar_egrids);
+                nachbar_egrids = coalesce(excluded.nachbar_egrids, baugesuch.nachbar_egrids),
+                publikation_nr = excluded.publikation_nr, publikation_id = excluded.publikation_id,
+                einsprache_bis = excluded.einsprache_bis, publiziert_bis = excluded.publiziert_bis,
+                quelle_url = excluded.quelle_url;
           \echo '### Abgleich'
           select * from public.baugesuche_abgleichen(greatest(:'TAGE'::int, 30));
           \echo '### Bestand der Tabelle'
           select count(*) as gesuche, count(egrid) as mit_egrid, count(parzelle_id) as im_bestand,
+                 count(publikation_nr) as mit_publikation,
                  max(publiziert_am) as neuestes
           from public.baugesuch;
           SQL

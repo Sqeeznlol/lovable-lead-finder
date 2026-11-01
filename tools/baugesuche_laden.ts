@@ -94,6 +94,9 @@ if (istHaupt) {
       strasse || null, z[i('districtCadastre_relation_cadastre')] || null, egrid,
       z[i('buildingContractor_company_legalForm_de')] || null, z[i('projectDescription')] || null,
       nb.length ? `{${nb.join(',')}}` : null,
+      // Zum Nachprüfen: Publikation im Amtsblatt, Fristen, Quelle.
+      z[i('publicationNumber')] || null, z[i('id')] || null,
+      z[i('entryDeadline')] || null, z[i('expirationDate')] || null, QUELLE,
     ].map(csvFeld).join(','));
   }
   writeFileSync(aus, zeilen.join('\n') + (zeilen.length ? '\n' : ''));
