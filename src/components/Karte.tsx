@@ -4,6 +4,8 @@ import 'leaflet/dist/leaflet.css';
 import { useParzellenImAusschnitt, type Ausschnitt, type ParzelleEigenschaften } from '@/hooks/use-karte';
 import { Nachbarn } from '@/components/Nachbarn';
 import { supabase } from '@/integrations/supabase/client';
+import { FENSTER } from '@/lib/fenster';
+import { BAUZONEN, GRENZEN, GRUNDKARTEN, type Ebene, type Grund } from '@/lib/karte-ebenen';
 
 /**
  * GIS-Parzellenkarte -- nach der Vorlage "gis-karte.html", mit dem
@@ -22,33 +24,20 @@ import { supabase } from '@/integrations/supabase/client';
  * offenen Bundesdienste ab.
  */
 
-const W = 'https://wmts.geo.admin.ch/1.0.0/';
-function lay(id: string, ext: string, max = 19) {
-  return L.tileLayer(`${W}${id}/default/current/3857/{z}/{x}/{y}.${ext}`, {
-    maxZoom: 21, maxNativeZoom: max,
-    attribution: '&copy; swisstopo und Kantone', crossOrigin: true,
-  });
-}
-// Der Kataster kommt als WMS, nicht als WMTS-Kachel: die Kacheln des
-// Katasters sind in Web-Mercator umgerechnet und versetzen sich an den
-// Kachelrändern um einige Pixel -- Linien und Nummern brechen dort.
-// Ein WMS-Bild wird für genau den Ausschnitt gerechnet und passt.
-// Unter Zoom 14 malt der Kataster ganze Gemeinden grün; dort zeigt die
-// Landeskarte mehr, deshalb setzt er erst darüber ein.
-function wms(id: string, minZoom = 14) {
+/** Eine Ebenenbeschreibung aus karte-ebenen.ts als Leaflet-Ebene. */
+function ebene(e: Ebene): L.TileLayer {
+  if (e.art === 'wmts') {
+    return L.tileLayer(`https://wmts.geo.admin.ch/1.0.0/${e.id}/default/current/3857/{z}/{x}/{y}.${e.ext}`, {
+      maxZoom: 21, maxNativeZoom: e.maxNativeZoom, crossOrigin: true,
+      attribution: '&copy; swisstopo und Kantone',
+    });
+  }
   return L.tileLayer.wms('https://wms.geo.admin.ch/', {
-    layers: id, format: 'image/png', transparent: true, tileSize: 512,
-    minZoom, maxZoom: 21, attribution: '&copy; swisstopo und Kantone',
+    layers: e.id, format: 'image/png', transparent: true, tileSize: 512,
+    minZoom: e.minZoom, maxZoom: 21, opacity: e.deckkraft,
+    attribution: '&copy; swisstopo und Kantone',
   });
 }
-type Grund = 'kataster' | 'luftbild' | 'karte' | 'grau';
-const GRUNDKARTEN: Record<Grund, () => L.TileLayer[]> = {
-  kataster: () => [lay('ch.swisstopo.pixelkarte-farbe', 'jpeg', 19), wms('ch.kantone.cadastralwebmap-farbe')],
-  luftbild: () => [lay('ch.swisstopo.swissimage', 'jpeg', 20),
-                   wms('ch.swisstopo-vd.amtliche-vermessung')],
-  karte:    () => [lay('ch.swisstopo.pixelkarte-farbe', 'jpeg', 19)],
-  grau:     () => [lay('ch.swisstopo.pixelkarte-grau', 'jpeg', 19)],
-};
 
 /** Erst ab hier werden eigene Umrisse geholt -- darunter sind sie Pixel. */
 const AB_ZOOM = 15;
@@ -178,7 +167,7 @@ function wertZeigen(v: unknown) {
   if (typeof v === 'boolean') return v ? 'Ja' : 'Nein';
   if (typeof v === 'number') return gr(v);
   const t = typeof v === 'object' ? JSON.stringify(v) : String(v);
-  if (/^https?:\/\//.test(t)) return <a href={t} target="_blank" rel="noopener">öffnen ↗</a>;
+  if (/^https?:\/\//.test(t)) return <a href={t} target={FENSTER.portal}>öffnen ↗</a>;
   const d = /^(\d{4})-(\d{2})-(\d{2})T/.exec(t);
   if (d) return `${d[3]}.${d[2]}.${d[1]}`;
   if (/^-?\d+(\.\d+)?$/.test(t)) return gr(Number(t));
@@ -211,8 +200,9 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
     }).addTo(karte.current);
   }
 
-  const [grund, setGrund] = useState<Grund>('kataster');
-  const [bestandAn, setBestandAn] = useState(true);
+  const [grund, setGrund] = useState<Grund>('karte');
+  const [grenzenAn, setGrenzenAn] = useState(true);
+  const grenzenEbene = useRef<L.TileLayer | null>(null);
   const [zonenAn, setZonenAn] = useState(false);
   const [zonenFilter, setZonenFilter] = useState<Set<Zonenart>>(new Set());
   const zonenEbene = useRef<L.TileLayer | null>(null);
@@ -223,10 +213,8 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
     if (!m) return;
     zonenEbene.current?.remove(); zonenEbene.current = null;
     if (zonenAn) {
-      zonenEbene.current = L.tileLayer.wms('https://wms.geo.admin.ch/', {
-        layers: 'ch.are.bauzonen', format: 'image/png', transparent: true, tileSize: 512,
-        opacity: 0.55, minZoom: 11, maxZoom: 21, attribution: '&copy; ARE und Kantone',
-      }).addTo(m);
+      zonenEbene.current = ebene(BAUZONEN).addTo(m);
+      eigenEbene.current?.bringToFront();
     }
   }, [zonenAn]);
   const [ausschnitt, setAusschnitt] = useState<Ausschnitt | null>(null);
@@ -238,7 +226,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
   const [sucheStatus, setSucheStatus] = useState<'ruhe' | 'laeuft' | 'fehler'>('ruhe');
 
   const genugNah = zoom >= AB_ZOOM;
-  const { data } = useParzellenImAusschnitt(ausschnitt, genugNah && bestandAn);
+  const { data } = useParzellenImAusschnitt(ausschnitt, genugNah);
 
   // Schriften der Vorlage, einmal geladen.
   useEffect(() => {
@@ -277,10 +265,26 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
     const m = karte.current;
     if (!m) return;
     grundLagen.current.forEach(l => m.removeLayer(l));
-    grundLagen.current = GRUNDKARTEN[grund]();
+    grundLagen.current = [ebene(GRUNDKARTEN[grund])];
     grundLagen.current.forEach(l => l.addTo(m));
+    grenzenEbene.current?.bringToFront();
+    zonenEbene.current?.bringToFront();
     eigenEbene.current?.bringToFront();
   }, [grund]);
+
+  // Die Grenzen stehen hinter dem Karten-Effekt: beim ersten Durchlauf
+  // gibt es die Karte sonst noch nicht, und ein Effekt, der dann abbricht,
+  // läuft erst beim nächsten Umschalten wieder.
+  useEffect(() => {
+    const m = karte.current;
+    if (!m) return;
+    grenzenEbene.current?.remove(); grenzenEbene.current = null;
+    if (grenzenAn) {
+      grenzenEbene.current = ebene(GRENZEN).addTo(m);
+      zonenEbene.current?.bringToFront();
+      eigenEbene.current?.bringToFront();
+    }
+  }, [grenzenAn]);
 
 
   // ---------------------------------------------- eigene Umrisse
@@ -289,7 +293,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
     if (!m) return;
     eigenEbene.current?.remove();
     eigenEbene.current = null;
-    if (!data || !genugNah || !bestandAn) return;
+    if (!data || !genugNah) return;
     eigenEbene.current = L.geoJSON(data, {
       filter: f => zonenFilter.size === 0 || zonenFilter.has(zonenart((f.properties as ParzelleEigenschaften)?.zone)),
       // Farbe nach Marge in Stufen, wie bei Regrid/LandGlide: man sieht
@@ -298,7 +302,11 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
         const e = (f?.properties ?? {}) as ParzelleEigenschaften;
         if (e.ausgeschlossen) return { color: '#64748B', weight: 1, fillOpacity: 0.04 };
         const c = margeFarbe(Number(e.marge) || 0);
-        return { color: c, weight: 2, fillColor: c, fillOpacity: 0.32 };
+        // Auf dem Luftbild muss die Linie gegen Dächer und Schatten
+        // bestehen: dicker, und die Füllung zurückhaltender.
+        return grund === 'luftbild'
+          ? { color: c, weight: 3, fillColor: c, fillOpacity: 0.22 }
+          : { color: c, weight: 2, fillColor: c, fillOpacity: 0.32 };
       },
       onEachFeature: (f, schicht) => {
         const e = (f.properties ?? {}) as ParzelleEigenschaften;
@@ -319,7 +327,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
         });
       },
     }).addTo(m);
-  }, [data, genugNah, bestandAn, zonenFilter]);
+  }, [data, genugNah, zonenFilter, grund]);
 
   async function eigeneZeigen(id: string, e: ParzelleEigenschaften, lat: number, lon: number) {
     setAuswahl({ art: 'eigen', id, e, lat, lon, geholt: false });
@@ -482,7 +490,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
   });
 
   return (
-    <div className="gisk">
+    <div className={`gisk${auswahl.art !== 'leer' ? ' offen' : ''}`}>
       <style>{STIL}</style>
 
       <div ref={box} className="map" />
@@ -509,17 +517,19 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
             </div>
           )}
         </div>
-        <div className="segment">
-          {([['karte', 'Karte'], ['kataster', 'Kataster'], ['luftbild', 'Luftbild']] as [Grund, string][]).map(([g, t]) => (
-            <button type="button" key={g} className={grund === g ? 'an' : ''} onClick={() => setGrund(g)}>{t}</button>
-          ))}
+        <div className="werkzeuge">
+          <div className="segment">
+            {([['karte', 'Karte'], ['luftbild', 'Luftbild']] as [Grund, string][]).map(([g, t]) => (
+              <button type="button" key={g} className={grund === g ? 'an' : ''} onClick={() => setGrund(g)}>{t}</button>
+            ))}
+          </div>
+          <button type="button" className={`schalter${grenzenAn ? ' an' : ''}`} onClick={() => setGrenzenAn(v => !v)}>
+            Grenzen
+          </button>
+          <button type="button" className={`schalter${zonenAn ? ' an' : ''}`} onClick={() => setZonenAn(v => !v)}>
+            Bauzonen
+          </button>
         </div>
-        <button type="button" className={`schalter${zonenAn ? ' an' : ''}`} onClick={() => setZonenAn(v => !v)}>
-          Bauzonen
-        </button>
-        <button type="button" className={`schalter${bestandAn ? ' an' : ''}`} onClick={() => setBestandAn(v => !v)}>
-          Bestand
-        </button>
       </header>
 
       {/* Zonenfilter wie bei Immobilienportalen: Chips, mehrere wählbar. */}
@@ -532,7 +542,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
       </div>
 
       <div className="unten">
-        {bestandAn && genugNah && (
+        {genugNah && (
           <div className="legende">
             {STUFEN.map(([, c, t]) => <span key={t}><i style={{ background: c }} />{t}</span>)}
           </div>
@@ -544,8 +554,8 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
           </div>
         )}
         <div className="readout">
-          {!genugNah && bestandAn ? 'Näher heranzoomen für den Bestand · ' : ''}
-          {genugNah && bestandAn && data ? `${data.features.length} eigene Parzellen im Bild · ` : ''}
+          {!genugNah ? 'Näher heranzoomen für den Bestand · ' : ''}
+          {genugNah && data ? `${data.features.length} eigene Parzellen im Bild · ` : ''}
           LV95 {gr(lvMitte.E)} / {gr(lvMitte.N)}
         </div>
       </div>
@@ -555,11 +565,11 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
           <>
             <div className="kopf">
               <p className="ueber">Bestand im Bild</p>
-              <h2>{bestandAn && genugNah ? `${bestand.length} Parzellen nach Marge` : 'Parzelle wählen'}</h2>
+              <h2>{genugNah ? `${bestand.length} Parzellen nach Marge` : 'Parzelle wählen'}</h2>
               <p className="sanft">Auf eine Parzelle klicken, um alle Angaben zu sehen.</p>
             </div>
-            {bestandAn && !genugNah && <p className="sanft block">Näher heranzoomen, dann erscheinen die eigenen Parzellen.</p>}
-            {bestandAn && genugNah && bestand.length === 0 && (
+            {!genugNah && <p className="sanft block">Näher heranzoomen, dann erscheinen die eigenen Parzellen.</p>}
+            {genugNah && bestand.length === 0 && (
               <p className="sanft block">Keine eigenen Parzellen in diesem Ausschnitt.</p>
             )}
             <div className="karten">
@@ -613,8 +623,8 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
 
               <div className="aktionen">
                 {e.adresse && <Kopieren wert={e.adresse} text="Adresse kopieren" />}
-                {maps && <a className="knopf" href={maps} target="_blank" rel="noopener">Google Maps</a>}
-                <a className="knopf" href={geoadminLink(auswahl.lat, auswahl.lon, 12)} target="_blank" rel="noopener">Bundes-GIS</a>
+                {maps && <a className="knopf" href={maps} target={FENSTER.karte}>Google Maps</a>}
+                <a className="knopf" href={geoadminLink(auswahl.lat, auswahl.lon, 12)} target={FENSTER.karte}>Bundes-GIS</a>
                 <Kopieren wert={`${gr(lv.E)} / ${gr(lv.N)}`} text="LV95" />
               </div>
 
@@ -648,7 +658,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
                 ))}
               </div>
               <div className="aktionen">
-                <a className="knopf" href={geoadminLink(auswahl.lat, auswahl.lon, 12)} target="_blank" rel="noopener">Bundes-GIS</a>
+                <a className="knopf" href={geoadminLink(auswahl.lat, auswahl.lon, 12)} target={FENSTER.karte}>Bundes-GIS</a>
                 <Kopieren wert={`${gr(lv.E)} / ${gr(lv.N)}`} text="LV95" />
               </div>
             </>
@@ -694,6 +704,7 @@ const STIL = `
 .gisk .treffer b{display:block;font-weight:600}.gisk .treffer small{color:var(--grau);font-size:12px}
 .gisk .treffer.eigen b{color:var(--akzent)}
 .gisk .leer{margin:0;padding:9px 10px;color:var(--grau)}
+.gisk .werkzeuge{display:contents}
 .gisk .segment{display:flex;background:var(--fl);border-radius:12px;padding:3px}
 .gisk .segment button{border:0;background:none;padding:7px 12px;border-radius:9px;cursor:pointer;color:var(--grau);font-weight:500}
 .gisk .segment button.an{background:var(--weiss);color:var(--tinte);box-shadow:0 1px 3px rgba(15,23,42,.12)}
@@ -757,10 +768,27 @@ const STIL = `
 .gisk-tip{font:13px/1.45 Inter,-apple-system,Arial,sans-serif;border-radius:10px;border:0;box-shadow:0 8px 24px rgba(15,23,42,.2);padding:8px 11px}
 
 @media (max-width:900px){
-  .gisk .leiste{right:16px;flex-wrap:wrap}.gisk .filter{right:16px;top:124px}
-  .gisk .leaflet-top.leaflet-left{top:170px}
-  .gisk .tafel{top:auto;left:16px;width:auto;height:46vh}
-  .gisk .leaflet-bottom.leaflet-right{right:0}
-  .gisk .unten{bottom:calc(46vh + 24px)}
+  /* Handy: die Suche allein in der ersten Zeile, Grundkarte und Schalter
+     als wischbare zweite Zeile, die Zonen als wischbare Zeile darunter.
+     Die Zoomknöpfe und der Massstab fehlen mit Absicht: zwei Finger
+     reichen, und der Platz ist knapp. Die Tafel wird ein Blatt am
+     unteren Rand, das wächst, sobald eine Parzelle offen ist. */
+  .gisk .leiste{top:12px;left:12px;right:12px;flex-wrap:wrap;gap:8px}
+  .gisk .suche{flex:1 1 60%}
+  .gisk .werkzeuge{display:flex;flex:1 1 100%;gap:6px;overflow-x:auto;scrollbar-width:none}
+  .gisk .werkzeuge::-webkit-scrollbar{display:none}
+  .gisk .segment{flex:1 0 auto}
+  .gisk .segment button{padding:7px 10px}
+  .gisk .schalter{flex:none;padding:0 12px}
+  .gisk .filter{top:120px;left:12px;right:12px;flex-wrap:nowrap;overflow-x:auto;padding:0 0 6px;scrollbar-width:none}
+  .gisk .filter::-webkit-scrollbar{display:none}
+  .gisk .filter button,.gisk .filter .titel{flex:none}
+  .gisk .leaflet-control-zoom,.gisk .leaflet-bottom.leaflet-right,.gisk .legende,.gisk .readout{display:none}
+  .gisk .tafel{top:auto;left:0;right:0;bottom:0;width:auto;height:34vh;border-radius:20px 20px 0 0;padding:12px 16px 16px}
+  .gisk .tafel::before{content:"";display:block;width:36px;height:4px;border-radius:2px;background:var(--linie);margin:0 auto 12px}
+  .gisk.offen .tafel{height:64vh}
+  .gisk .unten{left:12px;bottom:calc(34vh + 12px)}
+  .gisk.offen .unten{bottom:calc(64vh + 12px)}
+  .gisk h2{font-size:18px}
 }
 `;
