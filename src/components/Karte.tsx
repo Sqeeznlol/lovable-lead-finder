@@ -8,6 +8,7 @@ import { usePortfolios, umrissVomBund, type Portfolio } from '@/hooks/use-portfo
 import { eigentuemerParzellen, eigentuemerSuchen, type EigentuemerTreffer } from '@/hooks/use-eigentuemer-suche';
 import { supabase } from '@/integrations/supabase/client';
 import { FENSTER } from '@/lib/fenster';
+import { ARTEN, FLAECHEN, MARGEN, OHNE_FILTER, filterAktiv, passtFilter, type KartenFilter } from '@/lib/kartenfilter';
 import { BAUZONEN, GRENZEN, GRUNDKARTEN, WMS_MAX, wmsAdresse, type Ebene, type Grund } from '@/lib/karte-ebenen';
 
 /**
@@ -311,6 +312,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
   const grenzenEbene = useRef<L.Layer | null>(null);
   const [zonenAn, setZonenAn] = useState(false);
   const [zonenFilter, setZonenFilter] = useState<Set<Zonenart>>(new Set());
+  const [filter, setFilter] = useState<KartenFilter>(OHNE_FILTER);
   const [legendeAuf, setLegendeAuf] = useState(false);
   // Die genaue Zone -- W2, W3, Kernzone 2 -- so, wie der Kanton sie schreibt.
   const [zonenGenau, setZonenGenau] = useState<Set<string>>(new Set());
@@ -421,7 +423,8 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
     eigenEbene.current = null;
     if (!data || !genugNah || gruppenModus) return;
     eigenEbene.current = L.geoJSON(data, {
-      filter: f => passtZone((f.properties as ParzelleEigenschaften)?.zone, zonenFilter, zonenGenau),
+      filter: f => passtZone((f.properties as ParzelleEigenschaften)?.zone, zonenFilter, zonenGenau)
+        && passtFilter(f.properties as ParzelleEigenschaften, filter),
       // Farbe nach Marge in Stufen, wie bei Regrid/LandGlide: man sieht
       // die guten Parzellen, bevor man klickt. Legende unten links.
       style: f => {
@@ -453,7 +456,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
         });
       },
     }).addTo(m);
-  }, [data, genugNah, zonenFilter, zonenGenau, grund, gruppenModus]);
+  }, [data, genugNah, zonenFilter, zonenGenau, filter, grund, gruppenModus]);
 
   /**
    * Den Umriss einer Bestandsparzelle beim Bund holen, wenn der Bestand
@@ -709,9 +712,10 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
     return [...(data.features ?? [])]
       .filter(f => !f.properties?.ausgeschlossen)
       .filter(f => passtZone(f.properties?.zone, zonenFilter, zonenGenau))
+      .filter(f => passtFilter(f.properties ?? {}, filter))
       .sort((a, b) => (Number(b.properties?.marge) || 0) - (Number(a.properties?.marge) || 0))
       .slice(0, 15);
-  }, [data, zonenFilter, zonenGenau]);
+  }, [data, zonenFilter, zonenGenau, filter]);
 
   // Die genauen Zonen der gewählten Arten, wie sie im Bild vorkommen.
   // Nur dann: ohne gewählte Art wären es dreissig Chips, und das hilft
@@ -819,20 +823,41 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
       </header>
 
       {/* Zonenfilter wie bei Immobilienportalen: Chips, mehrere wählbar. */}
-      {!gruppenModus && (<div className="filter">
-        <span className="titel">Zone</span>
-        <button type="button" className={zonenFilter.size === 0 ? 'an' : ''} onClick={() => { setZonenFilter(new Set()); setZonenGenau(new Set()); }}>Alle</button>
-        {ZONENARTEN.map(([z, t]) => (
-          <button type="button" key={z} className={zonenFilter.has(z) ? 'an' : ''} onClick={() => umschalten(z)}>{t}</button>
-        ))}
-      </div>)}
-      {!gruppenModus && zonenImBild.length > 0 && (
-        <div className="filter genau">
-          {zonenImBild.map(z => (
-            <button type="button" key={z} className={zonenGenau.has(z) ? 'an' : ''} onClick={() => genauUmschalten(z)}>{z}</button>
+      {!gruppenModus && (<div className="filterblock">
+        <div className="filter">
+          <span className="titel">Zone</span>
+          <button type="button" className={zonenFilter.size === 0 ? 'an' : ''} onClick={() => { setZonenFilter(new Set()); setZonenGenau(new Set()); }}>Alle</button>
+          {ZONENARTEN.map(([z, t]) => (
+            <button type="button" key={z} className={zonenFilter.has(z) ? 'an' : ''} onClick={() => umschalten(z)}>{t}</button>
           ))}
         </div>
-      )}
+        {/* Auswahlfelder statt Chips: auf dem iPhone öffnet sich die
+            Systemliste, und drei Gruppen Chips passten nicht in eine Zeile. */}
+        <div className="filter wahl">
+          <select aria-label="Parzellengrösse" className={filter.flaecheAb ? 'an' : ''} value={filter.flaecheAb}
+                  onChange={e => setFilter(f => ({ ...f, flaecheAb: Number(e.target.value) }))}>
+            {FLAECHEN.map(([w, t]) => <option key={w} value={w}>{t}</option>)}
+          </select>
+          <select aria-label="Potenzial" className={filter.margeAb ? 'an' : ''} value={filter.margeAb}
+                  onChange={e => setFilter(f => ({ ...f, margeAb: Number(e.target.value) }))}>
+            {MARGEN.map(([w, t]) => <option key={w} value={w}>{t}</option>)}
+          </select>
+          <select aria-label="Objektart" className={filter.art ? 'an' : ''} value={filter.art}
+                  onChange={e => setFilter(f => ({ ...f, art: e.target.value }))}>
+            {ARTEN.map(([w, t]) => <option key={w} value={w}>{t}</option>)}
+          </select>
+          {filterAktiv(filter) && (
+            <button type="button" onClick={() => setFilter(OHNE_FILTER)}>Zurücksetzen</button>
+          )}
+        </div>
+        {zonenImBild.length > 0 && (
+          <div className="filter genau">
+            {zonenImBild.map(z => (
+              <button type="button" key={z} className={zonenGenau.has(z) ? 'an' : ''} onClick={() => genauUmschalten(z)}>{z}</button>
+            ))}
+          </div>
+        )}
+      </div>)}
 
       <div className="unten">
         {genugNah && !gruppenModus && (
@@ -879,7 +904,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
           <>
             <div className="kopf">
               <p className="ueber">Bestand im Bild</p>
-              <h2>{genugNah ? `${bestand.length} Parzellen nach Marge` : 'Parzelle wählen'}</h2>
+              <h2>{genugNah ? `${bestand.length} ${bestand.length === 1 ? 'Parzelle' : 'Parzellen'} nach Marge` : 'Parzelle wählen'}</h2>
               <p className="sanft">Auf eine Parzelle klicken, um alle Angaben zu sehen.</p>
             </div>
             {!genugNah && <p className="sanft block">Näher heranzoomen, dann erscheinen die eigenen Parzellen.</p>}
@@ -1139,11 +1164,13 @@ const STIL = `
 .gisk .rolle{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px;margin:12px 0 16px}
 .gisk .rolle dt{color:var(--grau)}.gisk .rolle dd{margin:0;font-weight:600}
 
-.gisk .filter{position:absolute;z-index:650;top:76px;left:16px;right:416px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.gisk .filterblock{position:absolute;z-index:650;top:76px;left:16px;right:416px;display:flex;flex-direction:column;gap:6px;pointer-events:none}
+.gisk .filter{display:flex;gap:6px;flex-wrap:wrap;align-items:center;pointer-events:auto;align-self:flex-start;max-width:100%}
+.gisk .filter select{appearance:none;-webkit-appearance:none;field-sizing:content;border:0;background:var(--weiss) no-repeat right 10px center/9px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2364748B' stroke-width='1.6'/%3E%3C/svg%3E");padding:6px 26px 6px 12px;border-radius:999px;cursor:pointer;font:inherit;font-size:13px;font-weight:500;color:var(--tinte);box-shadow:var(--schatten)}
+.gisk .filter select.an{background-color:var(--akzent);color:#fff}
 .gisk .filter .titel{font-size:12px;font-weight:600;color:var(--grau);background:var(--weiss);padding:6px 10px;border-radius:999px;box-shadow:var(--schatten)}
 .gisk .filter button{border:0;background:var(--weiss);padding:6px 12px;border-radius:999px;cursor:pointer;font-size:13px;font-weight:500;box-shadow:var(--schatten)}
 .gisk .filter button.an{background:var(--akzent);color:#fff}
-.gisk .filter.genau{top:112px}
 .gisk .filter.genau button{font-size:12px;padding:5px 10px}
 
 .gisk .unten{position:absolute;z-index:650;left:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;align-items:flex-start}
@@ -1213,10 +1240,10 @@ const STIL = `
   .gisk .segment button{padding:7px 6px;font-size:13px}
   .gisk .schalter{flex:none;padding:0 7px;font-size:13px;height:38px}
   .gisk .werkzeuge{gap:4px}
-  .gisk .filter{top:120px;left:12px;right:12px;flex-wrap:nowrap;overflow-x:auto;padding:0 0 6px;scrollbar-width:none}
+  .gisk .filterblock{top:120px;left:12px;right:12px;gap:2px}
+  .gisk .filter{flex-wrap:nowrap;overflow-x:auto;padding:0 0 6px;scrollbar-width:none;align-self:stretch}
   .gisk .filter::-webkit-scrollbar{display:none}
-  .gisk .filter button,.gisk .filter .titel{flex:none}
-  .gisk .filter.genau{top:158px}
+  .gisk .filter button,.gisk .filter .titel,.gisk .filter select{flex:none}
   .gisk .leaflet-control-zoom,.gisk .leaflet-bottom.leaflet-right,.gisk .legende:not(.bild),.gisk .readout{display:none}
   .gisk .tafel{top:auto;left:0;right:0;bottom:0;width:auto;height:34vh;border-radius:20px 20px 0 0;padding:12px 16px 16px}
   .gisk .tafel::before{content:"";display:block;width:36px;height:4px;border-radius:2px;background:var(--linie);margin:0 auto 12px}

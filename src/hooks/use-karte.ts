@@ -21,6 +21,8 @@ export interface ParzelleEigenschaften {
   zone: string | null;
   marge: number | null;
   ausgeschlossen: boolean | null;
+  /** Objektart aus `kategorie` (Einfamilienhaus, Mehrfamilienhaus, ...). */
+  art?: string | null;
 }
 
 export interface Ausschnitt {
