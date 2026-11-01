@@ -39,6 +39,7 @@ on:
           - suche        # Wie schnell die Eigentuemersuche ist, und ob ein Index fehlt
           - ortsdienst   # Welcher Dienst aus einer IP-Adresse den Ort liefert (Felder, CORS)
           - import       # Ob der Portfolio-Import Adressen der richtigen Parzelle zuordnet
+          - arrondierung # Wie viele Nachbarn der Test-Portfolios der Bund liefert und wie viele im Bestand sind
       egrid:
         description: 'Nur für "objekt": die EGRID, z.B. CH707709971116'
         required: false
@@ -458,6 +459,21 @@ jobs:
               where p.egrid is not null and p.address is not null
               limit 70;" > /tmp/liste.tsv
             { echo "### Portfolio-Import gegen den Bund"; echo '```'; npx -y tsx@4.19.2 tools/import_pruefen.ts < /tmp/liste.tsv; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+          elif [ "$FRAGE" = "arrondierung" ]; then
+            psql "$DB" -X -q -A -t -c "
+              select p.egrid from portfolio_position pp join properties p on p.id = pp.parzelle_id
+              where p.egrid is not null;" > /tmp/egrids.txt
+            node tools/arrondierung_pruefen.mjs < /tmp/egrids.txt > /tmp/nachbarn.txt
+            { echo "### Nachbarn je Portfolio-Parzelle (Bund)"; echo '```'; grep -v '^LISTE ' /tmp/nachbarn.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            liste=$(grep '^LISTE ' /tmp/nachbarn.txt | sed 's/^LISTE //')
+            # Die EGRIDs sind gepruefte Form (CH + 12 Zeichen), also sicher im Text.
+            frage "Davon im Bestand (nur Zahlen)" "
+              select count(*) as im_bestand,
+                     count(owner_name) filter (where owner_name <> '') as mit_eigentuemer,
+                     count(*) filter (where marge_chf > 0) as mit_marge
+              from properties where egrid = any (string_to_array('$liste', ','));"
+            frage "Nachbarn insgesamt" "select array_length(string_to_array('$liste', ','), 1) as nachbarn_vom_bund;"
 
           elif [ "$FRAGE" = "ortsdienst" ]; then
             # Die Anmeldung soll den Ort zur Adresse zeigen. Der Browser
