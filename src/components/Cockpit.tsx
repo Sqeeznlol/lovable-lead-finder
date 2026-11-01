@@ -1,4 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import { useUrlSetzen } from '@/hooks/use-url-wert';
 import { Activity, Archive, Briefcase, FileSearch, Flame, Loader2, MapPin, Sparkles, UserCheck, Workflow } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
@@ -75,6 +77,10 @@ const ARTEN: Record<string, { symbol: typeof Activity; farbe: string; wort: stri
 export function Cockpit({ onGehe, onNeu }: { onGehe: (z: Ziel) => void; onNeu?: () => void }) {
   const { user } = useAuth();
   const { current } = useCanton();
+  // Jede Zeile führt dorthin, wo man mit ihr weiterarbeitet -- nicht in
+  // die ganze Liste (Prüfung der Abläufe, 1. November).
+  const navigate = useNavigate();
+  const setzen = useUrlSetzen();
   const name = (user?.email?.split('@')[0] ?? '').replace(/^./, c => c.toUpperCase());
 
   const { data, isLoading } = useQuery({
@@ -91,7 +97,7 @@ export function Cockpit({ onGehe, onNeu }: { onGehe: (z: Ziel) => void; onNeu?: 
         zaehlen('anfrage', q => q.eq('bearbeitet', false)),
         db().from('gelegenheit').select('id, titel, begruendung, prioritaet, zustand, gelegenheit_parzelle(rolle, properties(gemeinde))')
           .not('zustand', 'in', '(abgeschlossen,verworfen)').order('prioritaet', { ascending: false, nullsFirst: false }).limit(4),
-        db().from('protokoll').select('id, aktion, gegenstand, zeit').in('aktion', ['abfrage', 'eigentuemer', 'archiviert', 'deal'])
+        db().from('aktivitaet').select('id, aktion, gegenstand, zeit').in('aktion', ['abfrage', 'eigentuemer', 'archiviert', 'deal'])
           .order('zeit', { ascending: false }).limit(5),
         db().from('vorhaben_eintrag').select('id, text, am, art, vorhaben(titel)').eq('art', 'schritt').order('am', { ascending: false }).limit(5),
         // Die grössten Margen ohne Eigentümer: was sich abzufragen lohnt.
@@ -138,7 +144,7 @@ export function Cockpit({ onGehe, onNeu }: { onGehe: (z: Ziel) => void; onNeu?: 
                    rechts={<button type="button" className={KNOPF_LEISE} onClick={() => onGehe('uebersicht')}>Alle</button>}>
           {data && data.objekte.length === 0 && <Leer titel="Keine Objekte gefunden." />}
           <Karussell>
-            {(data?.objekte ?? []).map(o => <ObjektKarte key={o.id} o={o} onClick={() => onGehe('uebersicht')} />)}
+            {(data?.objekte ?? []).map(o => <ObjektKarte key={o.id} o={o} onClick={() => setzen({ parzelle: o.id })} />)}
           </Karussell>
         </Abschnitt>
       }>
@@ -151,7 +157,7 @@ export function Cockpit({ onGehe, onNeu }: { onGehe: (z: Ziel) => void; onNeu?: 
               <ul className={LISTE}>
                 {data.heisse.map((h, i) => (
                   <li key={h.id}>
-                    <button type="button" onClick={() => onGehe('gelegenheiten')} className="grid w-full grid-cols-[minmax(0,1fr)_minmax(110px,40%)] items-center gap-4 px-4 py-3.5 text-left hover:bg-secondary/50">
+                    <button type="button" onClick={() => navigate(`/gelegenheiten?gelegenheit=${h.id}`)} className="grid w-full grid-cols-[minmax(0,1fr)_minmax(110px,40%)] items-center gap-4 px-4 py-3.5 text-left hover:bg-secondary/50">
                       <span className="min-w-0">
                         <span className="block truncate font-medium">{h.titel}</span>
                         <span className="block truncate text-sm text-muted-foreground">{[h.gemeinde, h.begruendung].filter(Boolean).join(' · ')}</span>

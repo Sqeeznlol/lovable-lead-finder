@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useUrlSetzen } from '@/hooks/use-url-wert';
 import { sicher } from '@/lib/html';
 import { Auswahl } from '@/components/Auswahl';
 import L from 'leaflet';
@@ -291,6 +292,7 @@ interface Treffer { label: string; origin: string; lat: number; lon: number; eig
   eigentuemer?: EigentuemerTreffer }
 
 export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
+  const setzeUrl = useUrlSetzen();
   const box = useRef<HTMLDivElement | null>(null);
   const karte = useRef<L.Map | null>(null);
   const grundLagen = useRef<L.Layer[]>([]);
@@ -1120,6 +1122,9 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
               </div>
 
               <div className="aktionen">
+                {/* Ins Objekt: Eigentümer abfragen, Gespräche, Pipedrive --
+                    vorher endete der Weg hier (Prüfung, 1. November). */}
+                {auswahl.id && <button type="button" className="knopf haupt" onClick={() => setzeUrl({ parzelle: auswahl.id! })}>Objekt öffnen</button>}
                 {e.adresse && <Kopieren wert={e.adresse} text="Adresse kopieren" />}
                 {/* Google Maps und Street View über die offiziellen Maps-URLs
                     (ohne Schlüssel erlaubt). Als Grundkarte einbetten liesse

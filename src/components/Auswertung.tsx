@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { ObjektLink } from '@/components/ObjektLink';
 import { useQuery } from '@tanstack/react-query';
 import { Marke, Seite } from '@/components/rahmen';
 import { BILD } from '@/lib/luftbild';
@@ -88,7 +89,7 @@ function Reaktivierung() {
           {liste.map(({ a, k }) => (
             <li key={a.id} className="flex flex-wrap items-baseline justify-between gap-2 px-4 py-3 text-sm">
               <span className="min-w-0">
-                <span className="block font-medium">{a.parzelle?.address ?? 'Objekt'}{a.parzelle?.gemeinde ? ` · ${a.parzelle.gemeinde}` : ''}</span>
+                <ObjektLink id={a.parzelle_id} className="block font-medium">{a.parzelle?.address ?? 'Objekt'}{a.parzelle?.gemeinde ? ` · ${a.parzelle.gemeinde}` : ''}</ObjektLink>
                 <span className="block text-xs text-muted-foreground">
                   {[a.parzelle?.owner_name, KATEGORIEN[k].titel, `Gespräch ${datum(a.gefuehrt_am)}`].filter(Boolean).join(' · ')}
                 </span>
@@ -159,7 +160,7 @@ function Investoren() {
                     <ul className="divide-y rounded-lg border">
                       {treffer.objekte.map(o => (
                         <li key={o.id} className="flex justify-between gap-3 px-3 py-2">
-                          <span className="min-w-0 truncate">{o.address ?? 'Objekt'} · {o.gemeinde}</span>
+                          <ObjektLink id={o.id} className="truncate">{o.address ?? 'Objekt'} · {o.gemeinde}</ObjektLink>
                           <span className="shrink-0 text-xs text-muted-foreground">{[o.kategorie, o.area ? `${Math.round(o.area).toLocaleString('de-CH')} m²` : null].filter(Boolean).join(' · ')}</span>
                         </li>
                       ))}

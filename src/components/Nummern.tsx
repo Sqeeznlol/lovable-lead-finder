@@ -5,7 +5,8 @@ import { Abschnitt, FELD, KNOPF, KNOPF_HAUPT, Leer, LISTE, Marke, Seite } from '
 import { BILD } from '@/lib/luftbild';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { useOffeneNummern } from '@/hooks/use-properties';
+import { useBereitFuerPipedrive, useOffeneNummern } from '@/hooks/use-properties';
+import { useNavigate } from 'react-router-dom';
 import { weiterverarbeiten } from '@/hooks/use-eigentuemer-lookup';
 import { Objektansicht } from '@/components/Objektansicht';
 import { FENSTER } from '@/lib/fenster';
@@ -19,11 +20,15 @@ import { FENSTER } from '@/lib/fenster';
  * Ort, weil hier genau eine Frage offen ist und die Antwort ein Feld
  * lang ist.
  *
- * Steht die Nummer, geht der Deal nach Pipedrive, Akquise, Phase
- * "Neu", und die Zeile verschwindet. Das ist die ganze Rubrik.
+ * Steht die Nummer, verschwindet die Zeile und das Objekt steht unter
+ * "Pipedrive" bereit. Der Deal entsteht dort, von Hand und mit Auswahl
+ * (use-eigentuemer-lookup.ts) -- hier wurde früher etwas anderes
+ * versprochen.
  */
 export function Nummern() {
   const { data, isLoading } = useOffeneNummern(200);
+  const { data: bereit } = useBereitFuerPipedrive();
+  const navigate = useNavigate();
   const [entwurf, setEntwurf] = useState<Record<string, string>>({});
   const [speichert, setSpeichert] = useState<string | null>(null);
   // Wohin es ging: sonst verschwindet die Zeile, und niemand weiss,
@@ -130,12 +135,12 @@ export function Nummern() {
   return (
     <Seite bild={BILD.nummern} ueber="Nummern · Akquise"
       titel={offen.length ? `${offen.length} ${offen.length === 1 ? 'Eigentümer wartet' : 'Eigentümer warten'} auf die Nummer` : 'Jeder Eigentümer hat eine Nummer'}
-      unter="Sobald die Nummer hier steht, entsteht der Deal in Pipedrive, Akquise, Phase «Neu»."
+      unter="Sobald die Nummer hier steht, ist das Objekt bereit für Pipedrive -- dort wird der Deal angelegt."
       kennzahlen={[
         { titel: 'Offen', wert: String(offen.length), marke: offen.length ? <Marke art="rosa">suchen</Marke> : undefined },
         { titel: 'Firmen', wert: String(firmen), marke: <Marke art="lila">Zefix</Marke> },
         { titel: 'Mit Adresse', wert: String(mitAdresse), marke: <Marke art="minze">tel.search</Marke> },
-        { titel: 'Übergeben', wert: String(uebergeben.length), marke: <Marke art="violett">zuletzt</Marke> },
+        { titel: 'Bereit für Pipedrive', wert: bereit == null ? '–' : String(bereit.length), marke: <Marke art="violett">Deal anlegen</Marke>, onClick: () => navigate('/pipedrive') },
       ]}>
       <Abschnitt titel="Nummer gesucht" unter="Eigentümer steht fest, die Telefonnummer fehlt" symbol={Phone} kachel="heiss" zahl={offen.length || undefined}>
         {offen.length === 0 ? (
@@ -233,7 +238,8 @@ export function Nummern() {
       {/* Wohin die Leads gegangen sind. Ohne das ist die Frage
           berechtigt: "jetzt ist er weg -- wo?" */}
       {uebergeben.length > 0 && (
-        <Abschnitt titel="Nach Pipedrive übergeben" unter="Akquise, Phase «Neu». Die letzten acht." symbol={Send} kachel="akzent">
+        <Abschnitt titel="Eben eingetragen" unter="Bereit für Pipedrive -- dort den Deal anlegen" symbol={Send} kachel="akzent"
+                   rechts={<button type="button" className={KNOPF_HAUPT} onClick={() => navigate('/pipedrive')}>Zu Pipedrive</button>}>
           <ul className={LISTE}>
             {uebergeben.map((u, i) => (
               <li key={`${u.adresse}-${i}`} className="flex items-center justify-between gap-4 px-5 py-3">
@@ -247,7 +253,7 @@ export function Nummern() {
                     Deal {u.dealId}
                   </a>
                 ) : (
-                  <span className="shrink-0 text-sm text-muted-foreground">kein Deal entstanden</span>
+                  <span className="shrink-0 text-sm text-muted-foreground">bereit, noch kein Deal</span>
                 )}
               </li>
             ))}

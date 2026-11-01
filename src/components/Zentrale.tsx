@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
+import { ObjektLink } from '@/components/ObjektLink';
 import { Auswahl } from '@/components/Auswahl';
 import { useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Flag, Handshake, Loader2, MapPin, Network, Search, Sparkles, Users } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useAnalyse, useInvestoren, useKunden, useVerlauf, useVorhabenListe, useZuordnung } from '@/hooks/use-vorhaben';
 import {
   ARTEN, SCHRITTE, eintragen, fristText, kaeuferAbgleich, offeneZuordnen, positionenMitEgrid,
-  schrittNr, titelVon, vorhabenAnlegen, weiter, adressenHinzu, type Art, type Analyse, type Vorhaben, type Zustand,
+  schrittNr, titelVon, vorhabenAnlegen, weiter, adressenHinzu, zustandVorPause, type Art, type Analyse, type Vorhaben, type Zustand,
 } from '@/lib/vorhaben';
 import { arrondierungErkennen } from '@/lib/arrondierung';
 import { passendeObjekte, type Treffer } from '@/lib/investor';
@@ -256,6 +259,8 @@ function Detail({ v, onZurueck }: { v: Vorhaben; onZurueck: () => void }) {
   const qc = useQueryClient();
   const { user } = useAuth();
   const von = user?.email ?? null;
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const { data: a, isLoading } = useAnalyse(v.id);
   const { data: zu } = useZuordnung(v.portfolio_id);
   const { data: verlauf } = useVerlauf(v.id);
@@ -272,10 +277,22 @@ function Detail({ v, onZurueck }: { v: Vorhaben; onZurueck: () => void }) {
     qc.invalidateQueries({ queryKey: ['gelegenheiten'] }),
   ]);
 
+  // Gesperrt, solange ein Schritt läuft (ein Doppelklick schrieb zwei
+  // Einträge), und ein Fehler wird gezeigt statt verschluckt.
+  const [schrittLaeuft, setSchrittLaeuft] = useState(false);
   const schritt = async (z: Zustand, extra: Record<string, unknown> = {}) => {
-    await weiter(v, z, von, extra);
-    await neuLaden();
+    if (schrittLaeuft) return;
+    setSchrittLaeuft(true);
+    try {
+      await weiter(v, z, von, extra);
+      await neuLaden();
+    } catch (e) {
+      toast({ title: 'Schritt nicht gespeichert', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
+    } finally {
+      setSchrittLaeuft(false);
+    }
   };
+  const fortsetzen = async () => schritt(await zustandVorPause(v.id));
 
   const zuordnenLos = async () => {
     if (!v.portfolio_id) return;
@@ -311,7 +328,7 @@ function Detail({ v, onZurueck }: { v: Vorhaben; onZurueck: () => void }) {
 
   // Was im aktuellen Schritt zu tun ist -- genau eine Haupthandlung.
   const handlung = (() => {
-    if (pausiert) return { text: 'Das Vorhaben ruht.', knopf: <button type="button" className={KNOPF_HAUPT} onClick={() => schritt('eingegangen')}>Fortsetzen</button> };
+    if (pausiert) return { text: 'Das Vorhaben ruht.', knopf: <button type="button" className={KNOPF_HAUPT} disabled={schrittLaeuft} onClick={() => void fortsetzen()}>Fortsetzen</button> };
     switch (v.zustand) {
       case 'eingegangen': return {
         text: zu?.offen ? `${n(zu.offen)} Adressen warten auf die Zuordnung beim Bund.` : 'Die Adressen sind zugeordnet. Als Nächstes: Nachbarn und Netzwerk prüfen.',
@@ -343,7 +360,10 @@ function Detail({ v, onZurueck }: { v: Vorhaben; onZurueck: () => void }) {
       };
       case 'akquise': return {
         text: 'Die Arrondierungen stehen unter Gelegenheiten, dort wird angerufen und festgehalten.',
-        knopf: <button type="button" className={KNOPF_HAUPT} onClick={() => schritt('abgeschlossen')}>Abschliessen</button>,
+        knopf: <>
+          {v.mandant_id && <button type="button" className={KNOPF} onClick={() => navigate(`/gelegenheiten?kunde=${v.mandant_id}`)}>Gelegenheiten des Kunden</button>}
+          <button type="button" className={KNOPF_HAUPT} disabled={schrittLaeuft} onClick={() => schritt('abgeschlossen')}>Abschliessen</button>
+        </>,
       };
       default: return { text: 'Abgeschlossen.', knopf: null };
     }
@@ -540,7 +560,7 @@ function Analyseteil({ v, a }: { v: Vorhaben; a: Analyse }) {
               {(objekte?.objekte ?? []).map((o: Treffer) => (
                 <li key={o.id} className="flex items-center justify-between gap-4 px-5 py-4">
                   <span className="min-w-0">
-                    <span className="block font-semibold">{o.address}</span>
+                    <ObjektLink id={o.id} className="block font-semibold">{o.address}</ObjektLink>
                     <span className="block text-sm text-muted-foreground">{[o.gemeinde, o.kategorie, o.area ? `${n(o.area)} m²` : null].filter(Boolean).join(' · ')}</span>
                   </span>
                   <span className="shrink-0 font-semibold">{chf(o.marge_chf)}</span>

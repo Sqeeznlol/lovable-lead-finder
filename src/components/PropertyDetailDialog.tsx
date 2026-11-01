@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useUrlSetzen } from '@/hooks/use-url-wert';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
@@ -29,7 +30,7 @@ const akquiseStatuses = [
   'Neu', 'In Prüfung', 'Interessant', 'Nicht interessant', 'Eigentümer gesucht',
   'Eigentümer gefunden', 'Eigentümer ermittelt', 'Telefonnummer gesucht', 'Telefon gefunden',
   'Kontaktiert', 'Kein Interesse', 'Interesse vorhanden', 'Termin vereinbart',
-  'Follow-up', 'Exportiert', 'Archiviert',
+  'Follow-up', 'Post', 'Exportiert', 'Archiviert',
 ];
 const preselectionStatuses = [
   'Nicht geprüft', 'Sehr interessant', 'Potenzial vorhanden',
@@ -50,14 +51,19 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
   const qc = useQueryClient();
   const startLookup = useStartEigentuemerLookup();
   const extensionAvailable = useExtensionAvailable();
+  const setzen = useUrlSetzen();
+  // Ohne Treffer drehte das Rad für immer (Prüfung der Abläufe).
+  const [fehlt, setFehlt] = useState(false);
 
   useEffect(() => {
     if (!id) { setData(null); return; }
     setLoading(true);
+    setFehlt(false);
     supabase.from('properties').select('*').eq('id', id).maybeSingle()
       .then(({ data, error }) => {
         if (error) toast({ title: 'Fehler', description: error.message, variant: 'destructive' });
         setData(data || null);
+        setFehlt(!data);
         setLoading(false);
       });
   }, [id, toast]);
@@ -148,7 +154,13 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
   return (
     <Dialog open={!!id} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto rounded border-0 bg-card p-0">
-        {loading || !data ? (
+        {fehlt && !loading ? (
+          <div className="space-y-4 p-8 text-center">
+            <DialogTitle className="text-xl">Objekt nicht gefunden</DialogTitle>
+            <DialogDescription>Die Parzelle steht nicht (mehr) im Bestand, oder der Link ist unvollständig.</DialogDescription>
+            <button type="button" className={KNOPF} onClick={onClose}>Schliessen</button>
+          </div>
+        ) : loading || !data ? (
           <div className="flex justify-center p-12"><Loader2 className="h-6 w-6 animate-spin" /></div>
         ) : (
           <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_340px]">
@@ -221,7 +233,7 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
               {/* Baut hier jemand, oder nebenan? Rückwirkend seit Januar 2026. */}
               <BaugesucheParzelle parzelleId={data.id} egrid={data.egrid} />
               {/* Wer arrondieren will, fragt zuerst: wem gehört nebenan? */}
-              <Nachbarn parzelleId={data.id} />
+              <Nachbarn parzelleId={data.id} onOeffnen={nid => setzen({ parzelle: nid })} />
               {/* Jedes Gespräch als Daten: Absicht, Preis, Grund, Wiedervorlage. */}
               <Gespraeche parzelleId={data.id} ownerName={data.owner_name ?? null} />
             </div>

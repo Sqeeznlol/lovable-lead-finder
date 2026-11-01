@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import { ObjektLink } from '@/components/ObjektLink';
 import { Auswahl } from '@/components/Auswahl';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, Printer, Target } from 'lucide-react';
@@ -56,6 +58,7 @@ export function Gelegenheiten() {
     (zustand === 'alle' || (zustand === 'offen' ? !['abgeschlossen', 'verworfen'].includes(g.zustand) : g.zustand === zustand))
     && passtKunde(g));
 
+  const { toast } = useToast();
   const aendern = async (g: Gel, felder: Partial<Gel>) => {
     const jetzt = new Date().toISOString();
     const z = felder.zustand;
@@ -64,7 +67,10 @@ export function Gelegenheiten() {
       ...(z === 'gemeldet' && !g.gemeldet_am ? { gemeldet_am: jetzt } : {}),
       ...(z === 'abgeschlossen' || z === 'verworfen' ? { abgeschlossen_am: g.abgeschlossen_am ?? jetzt } : {}),
     }).eq('id', g.id);
-    if (!r.error) await qc.invalidateQueries({ queryKey: ['gelegenheiten'] });
+    // Ein Fehler wurde bisher still verschluckt: der Zustand sprang
+    // zurück, und niemand wusste, warum.
+    if (r.error) toast({ title: 'Nicht gespeichert', description: r.error.message, variant: 'destructive' });
+    else await qc.invalidateQueries({ queryKey: ['gelegenheiten'] });
     return !r.error;
   };
 
@@ -176,14 +182,14 @@ export function Gelegenheiten() {
                     <p className="text-xs text-muted-foreground">Erkannt {datum(g.erkannt_am)} · gemeldet {datum(g.gemeldet_am)} · abgeschlossen {datum(g.abgeschlossen_am)}</p>
                     {ausl.length > 0 && (
                       <div className="text-sm"><p className="text-[11px] uppercase tracking-wide text-muted-foreground">Parzelle des Kunden</p>
-                        {ausl.map(p => <p key={p.id} className="font-medium">{p.address ?? p.egrid}{p.gemeinde ? ` · ${p.gemeinde}` : ''}</p>)}</div>
+                        {ausl.map(p => <p key={p.id}><ObjektLink id={p.id} className="min-h-11 font-medium">{p.address ?? p.egrid}{p.gemeinde ? ` · ${p.gemeinde}` : ''}</ObjektLink></p>)}</div>
                     )}
                     {nachb.length > 0 && (
                       <div className="space-y-1.5 text-sm"><p className="text-[11px] uppercase tracking-wide text-muted-foreground">Nachbarn im Bestand</p>
                         <ul className={LISTE}>
                           {nachb.map(p => (
-                            <li key={p.id} className="flex justify-between gap-3 px-3 py-2">
-                              <span className="min-w-0 truncate">{p.address ?? p.egrid}</span>
+                            <li key={p.id} className="flex min-h-11 items-center justify-between gap-3 px-3 py-2">
+                              <ObjektLink id={p.id} className="truncate">{p.address ?? p.egrid}</ObjektLink>
                               <span className="shrink-0 text-xs text-muted-foreground">{[p.owner_name ?? 'Eigentümer offen', m2(p.area)].filter(Boolean).join(' · ')}</span>
                             </li>
                           ))}

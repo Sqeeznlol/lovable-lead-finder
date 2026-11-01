@@ -21,7 +21,17 @@ export function Uebersicht() {
   // Ohne den Kanton zeigte die Übersicht Zürcher Chancen, auch wenn
   // oben Thurgau gewählt war.
   const { current } = useCanton();
-  const { data, isLoading } = useUebersicht(current);
+  const { data, isLoading, error, refetch } = useUebersicht(current);
+
+  // Bei einem Fehler drehte das Rad bisher für immer.
+  if (error && !data) {
+    return (
+      <div className="space-y-3 text-sm">
+        <p className="text-destructive">Die Übersicht liess sich nicht laden.</p>
+        <button type="button" className="inline-flex h-11 items-center rounded-[3px] border bg-card px-4 hover:bg-secondary" onClick={() => void refetch()}>Nochmals versuchen</button>
+      </div>
+    );
+  }
 
   if (isLoading || !data) {
     return (

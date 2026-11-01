@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ObjektLink } from '@/components/ObjektLink';
 import { useQueryClient } from '@tanstack/react-query';
 import { Archive, Loader2, Mail, Send } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -180,7 +181,7 @@ export function PipedriveBereit() {
                   <Checkbox className="mt-1" checked={gewaehlt.has(p.id)} onCheckedChange={() => umschalten(p.id)} />
                   <span className="min-w-0 flex-1">
                     <span className="flex items-start justify-between gap-4">
-                      <span className="block font-semibold">{p.address}</span>
+                      <ObjektLink id={p.id} className="block font-semibold">{p.address}</ObjektLink>
                       {p.marge_chf ? <span className="shrink-0 font-semibold">{(p.marge_chf / 1e6).toFixed(1)} Mio</span> : null}
                     </span>
                     <span className="block text-sm text-muted-foreground">
@@ -210,7 +211,7 @@ export function PipedriveBereit() {
             {(post ?? []).map(p => (
               <li key={p.id} className="flex items-center gap-4 px-5 py-4">
                 <span className="min-w-0 flex-1">
-                  <span className="block font-semibold">{p.address}</span>
+                  <ObjektLink id={p.id} className="block font-semibold">{p.address}</ObjektLink>
                   <span className="block text-sm text-muted-foreground">
                     {[p.parzelle ? `Parzelle ${p.parzelle}` : null, ort(p)].filter(Boolean).join(' · ')}
                   </span>
@@ -256,7 +257,7 @@ export function PipedriveBereit() {
             {(archiv ?? []).map(p => (
               <li key={p.id} className="flex items-center justify-between gap-4 px-5 py-3">
                 <span className="min-w-0">
-                  <span className="block truncate font-medium">{p.address}</span>
+                  <ObjektLink id={p.id} className="block truncate font-medium">{p.address}</ObjektLink>
                   <span className="block truncate text-sm text-muted-foreground">
                     {[p.owner_name,
                       p.last_export_at && new Date(p.last_export_at).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit' }),

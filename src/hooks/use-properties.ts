@@ -250,6 +250,9 @@ export function useOffeneNummern(limit = 200) {
       return (data as unknown as Property[])
         .filter(p => !String(p.owner_phone ?? '').trim())
         .filter(p => p.preselection_status !== 'Ausschliessen')
+        // "Per Post" heisst: hier nicht mehr suchen. Sonst stand das
+        // Objekt in Nummern und unter Brief zugleich.
+        .filter(p => p.status !== 'Post')
         .slice(0, limit);
     },
     staleTime: 15 * 1000,

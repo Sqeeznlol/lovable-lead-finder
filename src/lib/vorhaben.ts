@@ -143,6 +143,23 @@ export async function weiter(v: Pick<Vorhaben, 'id'>, zu: Zustand, von: string |
   await eintragen(v.id, `Schritt: ${titelVon(zu)}.`, von, 'schritt');
 }
 
+/**
+ * Wo ein pausiertes Vorhaben stand. "Fortsetzen" setzte es bisher auf
+ * "Eingegangen" zurück, und der Fortschritt war weg (Prüfung,
+ * 1. November). Der Verlauf hält jeden Schritt fest ("Schritt: X."),
+ * also wird dort nachgesehen statt eine neue Spalte zu führen.
+ */
+export async function zustandVorPause(vorhabenId: string): Promise<Zustand> {
+  const r = await db().from('vorhaben_eintrag').select('text').eq('vorhaben_id', vorhabenId).eq('art', 'schritt')
+    .order('am', { ascending: false }).limit(30);
+  for (const e of (r.data ?? []) as { text: string }[]) {
+    const titel = /^Schritt: (.+)\.$/.exec(e.text)?.[1];
+    const s = SCHRITTE.find(x => x.titel === titel);
+    if (s && s.z !== 'abgeschlossen') return s.z;
+  }
+  return 'eingegangen';
+}
+
 /** Weitere Adressen zu einem bestehenden Vorhaben. */
 export async function adressenHinzu(portfolioId: string, text: string): Promise<number> {
   const zeilen = zeilenLesen(text);
