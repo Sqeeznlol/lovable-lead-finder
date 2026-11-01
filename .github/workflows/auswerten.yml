@@ -55,6 +55,7 @@ on:
           - tempo        # Wie schnell die Seite und die Abfragen der Hauptbereiche sind
           - vorhaben-probe # Ob die Potenzialanalyse eines Vorhabens mit 1000 Adressen stimmt und wie schnell sie ist (wird zurueckgerollt)
           - amtsblatt    # Welche Adresse im Amtsblattportal ein Baugesuch zeigt
+          - gelegenheiten-tempo # Wie lange die Liste der Gelegenheiten als angemeldetes Konto braucht (nur Zahlen)
       egrid:
         description: 'Nur für "objekt": die EGRID, z.B. CH707709971116'
         required: false
@@ -769,6 +770,49 @@ jobs:
           \echo '```'
           explain (analyze, buffers, costs off, timing on) select id, address, gemeinde, plz, parzelle, plot_number, egrid, owner_phone, bfs_nr, kanton, zone, ausnuetzung, area, gebaeudeflaeche, geschosse, baujahr, owner_name, eigentuemer_name, hnf_delta, marge_chf, preselection_status from properties where ausgeschlossen = false and kanton = 'ZH' and hnf_delta is not null order by hnf_delta desc nulls last limit 1000;
           explain (analyze, buffers, costs off, timing on) select id, address, gemeinde, plz, parzelle, plot_number, egrid, owner_phone, bfs_nr, kanton, zone, ausnuetzung, area, gebaeudeflaeche, geschosse, baujahr, owner_name, eigentuemer_name, hnf_delta, marge_chf, preselection_status from properties where ausgeschlossen = false and kanton = 'ZH' and hnf_delta is not null order by hnf_delta desc nulls last limit 1000;
+          \echo '```'
+          SQL
+
+          elif [ "$FRAGE" = "gelegenheiten-tempo" ]; then
+            # Julian (1. November): die Seite blieb bei "wird geladen" mit
+            # lauter Nullen. Gemessen wird die Abfrage der Seite so, wie
+            # PostgREST sie stellt -- als "authenticated" mit den Regeln,
+            # einmal als Admin, einmal als aui. Nur Zahlen und Zeiten.
+            psql "$DB" -X -q >> "$GITHUB_STEP_SUMMARY" 2>&1 <<'SQL' || true
+          \echo '### Gelegenheiten: Umfang'
+          \echo '```'
+          select count(*) as gelegenheiten, (select count(*) from gelegenheit_parzelle) as verknuepfungen from gelegenheit;
+          \echo '```'
+          create temp table konto as
+            select 'admin' as wer, (select ur.user_id from user_roles ur where ur.role = 'admin' limit 1) as id
+            union all select 'aui', (select id from auth.users where email like 'aui@%' limit 1);
+          grant select on konto to authenticated;
+          create temp table zeiten (wer text, abfrage text, ms numeric, zeilen int);
+          grant all on zeiten to authenticated;
+          create or replace function pg_temp.mess(w text, b text, q text) returns void language plpgsql as $f$
+          declare j json; begin
+            execute 'explain (analyze, format json) ' || q into j;
+            insert into zeiten values (w, b, round((j->0->>'Execution Time')::numeric, 1), (j->0->'Plan'->>'Actual Rows')::int);
+          end $f$;
+          \echo '### Zeiten als angemeldetes Konto (ms, Zeilen)'
+          \echo '```'
+          do $$
+          declare k record;
+            voll text := $q$select g.*, (select json_build_object('id', m.id, 'akteur', (select json_build_object('name', a.name) from akteur a where a.id = m.akteur_id)) from mandant m where m.id = g.mandant_id) as mandant,
+              (select json_agg(json_build_object('rolle', gp.rolle, 'parzelle', (select json_build_object('id', p.id, 'address', p.address, 'owner_name', p.owner_name, 'area', p.area, 'gemeinde', p.gemeinde, 'egrid', p.egrid) from properties p where p.id = gp.parzelle_id))) from gelegenheit_parzelle gp where gp.gelegenheit_id = g.id) as gp
+              from gelegenheit g order by g.prioritaet desc nulls last, g.erkannt_am desc limit $q$;
+          begin
+            for k in select * from konto where id is not null loop
+              perform set_config('request.jwt.claims', json_build_object('sub', k.id, 'role', 'authenticated')::text, true);
+              perform set_config('role', 'authenticated', true);
+              perform pg_temp.mess(k.wer, 'nur gelegenheit', 'select * from gelegenheit order by prioritaet desc nulls last, erkannt_am desc limit 2000');
+              perform pg_temp.mess(k.wer, 'mit Kunde und Parzellen, 2000', voll || '2000');
+              perform pg_temp.mess(k.wer, 'mit Kunde und Parzellen, 500', voll || '500');
+              perform pg_temp.mess(k.wer, 'gelegenheit_parzelle allein', 'select * from gelegenheit_parzelle');
+              perform set_config('role', 'postgres', true);
+            end loop;
+          end $$;
+          select * from zeiten;
           \echo '```'
           SQL
 
