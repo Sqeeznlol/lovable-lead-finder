@@ -452,8 +452,12 @@ jobs:
               select p.egrid, regexp_replace(p.address, 'strasse', 'str.') || ', ' || coalesce(p.plz::text, '') || ' ' || p.gemeinde
               from portfolio_position pp join properties p on p.id = pp.parzelle_id
               where p.egrid is not null and p.address ilike '%strasse%'
-              limit 40;" > /tmp/liste.tsv
-            { echo "### Portfolio-Import gegen den Bund"; echo '```'; node tools/import_pruefen.mjs < /tmp/liste.tsv; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+              union all
+              select p.egrid, p.address
+              from portfolio_position pp join properties p on p.id = pp.parzelle_id
+              where p.egrid is not null and p.address is not null
+              limit 70;" > /tmp/liste.tsv
+            { echo "### Portfolio-Import gegen den Bund"; echo '```'; npx -y tsx@4.19.2 tools/import_pruefen.ts < /tmp/liste.tsv; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
           elif [ "$FRAGE" = "ortsdienst" ]; then
             # Die Anmeldung soll den Ort zur Adresse zeigen. Der Browser

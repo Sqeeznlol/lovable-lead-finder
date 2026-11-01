@@ -5,6 +5,7 @@ import { useParzellenImAusschnitt, type Ausschnitt, type ParzelleEigenschaften }
 import { Nachbarn } from '@/components/Nachbarn';
 import { NachbarnBund } from '@/components/NachbarnBund';
 import { usePortfolios, umrissVomBund, type Portfolio } from '@/hooks/use-portfolio';
+import { PortfolioImport } from '@/components/PortfolioImport';
 import { eigentuemerParzellen, eigentuemerSuchen, type EigentuemerTreffer } from '@/hooks/use-eigentuemer-suche';
 import { supabase } from '@/integrations/supabase/client';
 import { FENSTER } from '@/lib/fenster';
@@ -895,7 +896,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
                             if (b?.isValid()) hinfliegen(b, 18); }} />
         )}
         {auswahl.art === 'leer' && !gruppe && !gruppeLaedt && portfolioAn && (
-          <PortfolioTafel portfolios={portfolios} laedt={portfoliosLaden} fehler={!!portfolioFehler}
+          <PortfolioTafel hochladen portfolios={portfolios} laedt={portfoliosLaden} fehler={!!portfolioFehler}
                           umrisse={umrisseGeladen} onOeffnen={id => oeffnePerId(id)}
                           onZeigen={id => { const b = portfolioRahmen.current[id];
                             if (b) hinfliegen(b, 18); }} />
@@ -1020,7 +1021,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
 
 /** Die Portfolios in der Tafel: wem sie gehören, wer sie bewirtschaftet, welche Parzellen. */
 function PortfolioTafel({ portfolios, laedt, fehler, umrisse, onOeffnen, onZeigen,
-  ueber = 'Portfolios', startOffen, onSchliessen }: {
+  ueber = 'Portfolios', startOffen, onSchliessen, hochladen = false }: {
   portfolios?: Portfolio[]; laedt: boolean; fehler: boolean;
   umrisse: { fertig: number; gesamt: number }; onOeffnen: (id: string) => void;
   onZeigen: (portfolioId: string) => void;
@@ -1029,19 +1030,26 @@ function PortfolioTafel({ portfolios, laedt, fehler, umrisse, onOeffnen, onZeige
   /** Eine Gruppe, die gleich offen steht -- bei einem Eigentümer gibt es nur die eine. */
   startOffen?: string;
   onSchliessen?: () => void;
+  /** Ob "Portfolio hochladen" angeboten wird -- bei einer Eigentümersuche nicht. */
+  hochladen?: boolean;
 }) {
   // Zugeklappt, bis man eines wählt: mit zwanzig Parzellen je Portfolio
   // wird die Tafel sonst zur Liste, durch die man scrollt, statt zur
   // Übersicht. Offen ist immer höchstens eines.
   const [offen, setOffen] = useState<string | null>(startOffen ?? null);
+  const [importAuf, setImportAuf] = useState(false);
   useEffect(() => { if (startOffen) setOffen(startOffen); }, [startOffen]);
+  if (importAuf) return <PortfolioImport onFertig={() => setImportAuf(false)} onAbbrechen={() => setImportAuf(false)} />;
+  const knopf = hochladen && (
+    <button type="button" className="knopf" onClick={() => setImportAuf(true)}>Portfolio hochladen</button>
+  );
   if (laedt) return <div className="kopf"><p className="ueber">{ueber}</p><h2>Wird geladen …</h2></div>;
   if (fehler) return (
     <div className="kopf"><p className="ueber">Portfolios</p><h2>Nicht lesbar</h2>
       <p className="sanft">Portfolios sieht nur, wer angemeldet ist.</p></div>);
   if (!portfolios?.length) return (
     <div className="kopf"><p className="ueber">Portfolios</p><h2>Noch keines</h2>
-      <p className="sanft">Es ist kein Portfolio erfasst.</p></div>);
+      <p className="sanft">Es ist kein Portfolio erfasst.</p>{knopf}</div>);
   return (
     <>
       <div className="kopf">
@@ -1050,6 +1058,7 @@ function PortfolioTafel({ portfolios, laedt, fehler, umrisse, onOeffnen, onZeige
         {onSchliessen && (
           <button type="button" className="knopf" onClick={onSchliessen}>Suche schliessen</button>
         )}
+        {knopf}
         {umrisse.gesamt > 0 && umrisse.fertig < umrisse.gesamt && (
           <p className="sanft">Umrisse vom Bund: {umrisse.fertig} von {umrisse.gesamt} …</p>
         )}
@@ -1219,6 +1228,21 @@ const STIL = `
   border-radius:12px;padding:10px 12px;cursor:pointer}
 .gisk .eintrag:hover{border-color:var(--tinte)}
 .gisk .eintrag.still{cursor:default}
+.gisk .eintrag.still:hover{border-color:var(--linie)}
+.gisk .kopf .knopf{margin-top:10px}
+.gisk .import .feld{display:flex;flex-direction:column;gap:4px;margin:0 0 10px;font-size:12px;font-weight:600;color:var(--grau)}
+.gisk .import .feld input,.gisk .import .feld select,.gisk .import .feld textarea{font:inherit;font-size:16px;font-weight:400;color:var(--tinte);
+  border:1px solid var(--linie);border-radius:10px;padding:9px 11px;background:var(--weiss);min-height:44px;width:100%;box-sizing:border-box}
+.gisk .import .feld textarea{resize:vertical;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13px;line-height:1.5}
+.gisk .import .zwei{display:grid;grid-template-columns:1fr 1.6fr;gap:8px}
+.gisk .import .datei{cursor:pointer;margin:0 0 14px}
+.gisk .import .leiste-unten{display:flex;justify-content:flex-end;gap:8px;margin:14px 0}
+.gisk .import .knopf{height:44px;padding:0 16px}
+.gisk .knopf.haupt{background:var(--tinte);border-color:var(--tinte);color:#fff;font-weight:600}
+.gisk .knopf:disabled{opacity:.45;cursor:default}
+.gisk .fehlertext{color:#DC2626;font-size:13px;margin:8px 0}
+/* Beim Gegenlesen zählt der ganze Grund, nicht ein abgeschnittener. */
+.gisk .import .eintrag small,.gisk .import .eintrag b{white-space:normal;overflow:visible;text-overflow:clip}
 .gisk .eintrag>i{width:10px;height:36px;border-radius:4px;flex:none}
 .gisk .eintrag .text{flex:1;min-width:0}
 .gisk .eintrag b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1248,6 +1272,8 @@ const STIL = `
   .gisk .tafel{top:auto;left:0;right:0;bottom:0;width:auto;height:34vh;border-radius:20px 20px 0 0;padding:12px 16px 16px}
   .gisk .tafel::before{content:"";display:block;width:36px;height:4px;border-radius:2px;background:var(--linie);margin:0 auto 12px}
   .gisk.offen .tafel{height:64vh}
+  /* Ein Formular braucht Platz; die Karte darüber hilft beim Ausfüllen nicht. */
+  .gisk .tafel:has(.import){height:86vh}
   .gisk .unten{left:12px;bottom:calc(34vh + 12px)}
   .gisk.offen .unten{bottom:calc(64vh + 12px)}
   .gisk h2{font-size:18px}
