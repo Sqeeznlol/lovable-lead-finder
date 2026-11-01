@@ -5,6 +5,7 @@ import { useParzellenImAusschnitt, type Ausschnitt, type ParzelleEigenschaften }
 import { Nachbarn } from '@/components/Nachbarn';
 import { NachbarnBund } from '@/components/NachbarnBund';
 import { usePortfolios, umrissVomBund, type Portfolio } from '@/hooks/use-portfolio';
+import { alsKartengruppen, useGelegenheiten } from '@/hooks/use-gelegenheiten';
 import { PortfolioImport } from '@/components/PortfolioImport';
 import { Gespraeche } from '@/components/Gespraeche';
 import { eigentuemerParzellen, eigentuemerSuchen, type EigentuemerTreffer } from '@/hooks/use-eigentuemer-suche';
@@ -307,6 +308,14 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
   // andere aus; zwei Gruppen übereinander wären nicht zu lesen.
   const [gruppe, setGruppe] = useState<Portfolio | null>(null);
   const [gruppeLaedt, setGruppeLaedt] = useState(false);
+  // Im Portfolio-Modus zwei Ansichten: die Portfolios selbst, oder die
+  // offenen Gelegenheiten (Arrondierung, Baugesuche) -- Tims "Display
+  // opportunities directly on the map". Kein eigener Knopf in der
+  // Leiste: auf dem iPhone ist dort kein Platz mehr (gemessen 0 px Rest).
+  const [ansicht, setAnsicht] = useState<'portfolios' | 'gelegenheiten'>('portfolios');
+  const gelAn = portfolioAn && ansicht === 'gelegenheiten';
+  const { data: gelegenheiten, isLoading: gelLaedt, error: gelFehler } = useGelegenheiten(gelAn);
+  const gelGruppen = useMemo(() => (gelegenheiten ? alsKartengruppen(gelegenheiten) : undefined), [gelegenheiten]);
   const gruppenModus = portfolioAn || !!gruppe || gruppeLaedt;
   // Die Ausdehnung je Portfolio, damit Aufklappen auf genau dieses zoomt.
   const portfolioRahmen = useRef<Record<string, L.LatLngBounds>>({});
@@ -615,11 +624,13 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
   useEffect(() => {
     const m = karte.current;
     portfolioEbene.current?.remove(); portfolioEbene.current = null;
-    const sichtbar = gruppe ? [gruppe] : portfolioAn ? portfolios ?? [] : [];
+    const sichtbar = gruppe ? [gruppe] : gelAn ? gelGruppen ?? [] : portfolioAn ? portfolios ?? [] : [];
+    // Orange für Gelegenheiten: man soll sie nicht mit einem Portfolio verwechseln.
+    const farbe = gelAn ? '#EA580C' : '#7C3AED';
     if (!m || !sichtbar.length) return;
     let abgebrochen = false;
     const ebene = L.geoJSON(undefined, {
-      style: { color: '#7C3AED', weight: 3, fillColor: '#7C3AED', fillOpacity: 0.25 },
+      style: { color: farbe, weight: 3, fillColor: farbe, fillOpacity: 0.25 },
     }).addTo(m);
     portfolioEbene.current = ebene;
     const alle = sichtbar.flatMap(pf => pf.positionen.map(p => ({ pf, p }))).filter(x => x.p.egrid);
@@ -633,9 +644,10 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
           if (abgebrochen) return;
           if (g) {
             const f = L.geoJSON(g as GeoJSON.GeoJsonObject, {
-              style: { color: '#7C3AED', weight: 3, fillColor: '#7C3AED', fillOpacity: 0.25 },
+              style: { color: farbe, weight: 3, fillColor: farbe, fillOpacity: 0.25 },
             });
             f.bindTooltip(`<b>${p.adresse ?? 'Parzelle ' + (p.parzelle ?? '')}</b><br>${pf.name}`
+              + (p.rolle ? `<br>${p.rolle}` : '')
               + (pf.manager.length ? `<br>Manager: ${pf.manager.join(', ')}` : ''),
               { sticky: true, direction: 'top', className: 'gisk-tip' });
             f.on('click', (ev: L.LeafletMouseEvent) => {
@@ -656,7 +668,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
       if (!abgebrochen && ebene.getLayers().length) hinfliegen(ebene.getBounds(), 17);
     })();
     return () => { abgebrochen = true; };
-  }, [portfolioAn, portfolios, gruppe]);
+  }, [portfolioAn, portfolios, gruppe, gelAn, gelGruppen]);
 
   // ------------------------------------------------------------ Suche
   useEffect(() => {
@@ -897,6 +909,20 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
                             if (b?.isValid()) hinfliegen(b, 18); }} />
         )}
         {auswahl.art === 'leer' && !gruppe && !gruppeLaedt && portfolioAn && (
+          <div className="segment ansicht" role="tablist">
+            {([['portfolios', 'Portfolios'], ['gelegenheiten', 'Gelegenheiten']] as const).map(([w, t]) => (
+              <button key={w} type="button" role="tab" aria-selected={ansicht === w} className={ansicht === w ? 'an' : ''}
+                      onClick={() => { setAnsicht(w); markieren(null); }}>{t}</button>
+            ))}
+          </div>
+        )}
+        {auswahl.art === 'leer' && !gruppe && !gruppeLaedt && gelAn && (
+          <PortfolioTafel key="gel" portfolios={gelGruppen} laedt={gelLaedt} fehler={!!gelFehler}
+                          ueber="Offene Gelegenheiten" einheit="Gelegenheiten"
+                          umrisse={umrisseGeladen} onOeffnen={id => oeffnePerId(id)}
+                          onZeigen={id => { const b = portfolioRahmen.current[id]; if (b) hinfliegen(b, 18); }} />
+        )}
+        {auswahl.art === 'leer' && !gruppe && !gruppeLaedt && portfolioAn && !gelAn && (
           <PortfolioTafel hochladen portfolios={portfolios} laedt={portfoliosLaden} fehler={!!portfolioFehler}
                           umrisse={umrisseGeladen} onOeffnen={id => oeffnePerId(id)}
                           onZeigen={id => { const b = portfolioRahmen.current[id];
@@ -1025,7 +1051,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
 
 /** Die Portfolios in der Tafel: wem sie gehören, wer sie bewirtschaftet, welche Parzellen. */
 function PortfolioTafel({ portfolios, laedt, fehler, umrisse, onOeffnen, onZeigen,
-  ueber = 'Portfolios', startOffen, onSchliessen, hochladen = false }: {
+  ueber = 'Portfolios', startOffen, onSchliessen, hochladen = false, einheit = 'Portfolios' }: {
   portfolios?: Portfolio[]; laedt: boolean; fehler: boolean;
   umrisse: { fertig: number; gesamt: number }; onOeffnen: (id: string) => void;
   onZeigen: (portfolioId: string) => void;
@@ -1036,12 +1062,15 @@ function PortfolioTafel({ portfolios, laedt, fehler, umrisse, onOeffnen, onZeige
   onSchliessen?: () => void;
   /** Ob "Portfolio hochladen" angeboten wird -- bei einer Eigentümersuche nicht. */
   hochladen?: boolean;
+  /** Wie die Gruppen heissen: "Portfolios" oder "Gelegenheiten". */
+  einheit?: string;
 }) {
   // Zugeklappt, bis man eines wählt: mit zwanzig Parzellen je Portfolio
   // wird die Tafel sonst zur Liste, durch die man scrollt, statt zur
   // Übersicht. Offen ist immer höchstens eines.
   const [offen, setOffen] = useState<string | null>(startOffen ?? null);
   const [importAuf, setImportAuf] = useState(false);
+  const gel = einheit === 'Gelegenheiten';
   useEffect(() => { if (startOffen) setOffen(startOffen); }, [startOffen]);
   if (importAuf) return <PortfolioImport onFertig={() => setImportAuf(false)} onAbbrechen={() => setImportAuf(false)} />;
   const knopf = hochladen && (
@@ -1052,13 +1081,13 @@ function PortfolioTafel({ portfolios, laedt, fehler, umrisse, onOeffnen, onZeige
     <div className="kopf"><p className="ueber">Portfolios</p><h2>Nicht lesbar</h2>
       <p className="sanft">Portfolios sieht nur, wer angemeldet ist.</p></div>);
   if (!portfolios?.length) return (
-    <div className="kopf"><p className="ueber">Portfolios</p><h2>Noch keines</h2>
-      <p className="sanft">Es ist kein Portfolio erfasst.</p>{knopf}</div>);
+    <div className="kopf"><p className="ueber">{ueber}</p><h2>Noch keine</h2>
+      <p className="sanft">{gel ? 'Keine offene Gelegenheit. Im Bereich "Gelegenheiten" lässt sich die Arrondierung je Portfolio prüfen.' : 'Es ist kein Portfolio erfasst.'}</p>{knopf}</div>);
   return (
     <>
       <div className="kopf">
         <p className="ueber">{ueber}</p>
-        <h2>{onSchliessen ? `${portfolios[0].positionen.length} Parzellen` : `${portfolios.length} Portfolios`}</h2>
+        <h2>{onSchliessen ? `${portfolios[0].positionen.length} Parzellen` : `${portfolios.length} ${einheit}`}</h2>
         {onSchliessen && (
           <button type="button" className="knopf" onClick={onSchliessen}>Suche schliessen</button>
         )}
@@ -1071,29 +1100,29 @@ function PortfolioTafel({ portfolios, laedt, fehler, umrisse, onOeffnen, onZeige
         {portfolios.map(pf => {
           const auf = offen === pf.id;
           return (
-            <div key={pf.id} className={`mappe${auf ? ' auf' : ''}`}>
+            <div key={pf.id} className={`mappe${auf ? ' auf' : ''}${gel ? ' gel' : ''}`}>
               <button type="button" className="mappe-kopf" aria-expanded={auf}
                       onClick={() => { setOffen(auf ? null : pf.id); if (!auf) onZeigen(pf.id); }}>
                 <span className="text">
                   <b>{pf.name.replace(/\s*--\s*/, ' · ')}</b>
-                  <small>{pf.positionen.length} Parzellen · {pf.eigner ?? 'ohne Eigner'}</small>
+                  <small>{pf.positionen.length} {pf.positionen.length === 1 ? 'Parzelle' : 'Parzellen'} · {pf.eigner ?? 'ohne Eigner'}</small>
                 </span>
                 <span className="pfeil" aria-hidden>{auf ? '−' : '+'}</span>
               </button>
               {auf && (
                 <div className="mappe-inhalt">
                   <dl className="rolle">
-                    <dt>Eigner</dt><dd>{pf.eigner ?? '–'}</dd>
-                    <dt>Manager</dt><dd>{pf.manager.length ? pf.manager.join(', ') : '–'}</dd>
+                    <dt>{gel ? 'Kunde' : 'Eigner'}</dt><dd>{pf.eigner ?? '–'}</dd>
+                    <dt>{gel ? 'Zustand' : 'Manager'}</dt><dd>{pf.manager.length ? pf.manager.join(', ') : '–'}</dd>
                   </dl>
                   <div className="karten">
                     {pf.positionen.map(p => (
                       <button type="button" key={p.id} className="eintrag" disabled={!p.parzelleId}
                               onClick={() => p.parzelleId && onOeffnen(p.parzelleId)}>
-                        <i className="lila" />
+                        <i className={gel ? 'orange' : 'lila'} />
                         <span className="text">
                           <b>{p.adresse ?? `Parzelle ${p.parzelle ?? '?'}`}</b>
-                          <small>{[p.parzelle ? `Parz. ${p.parzelle}` : null, p.zone,
+                          <small>{[p.rolle, p.parzelle ? `Parz. ${p.parzelle}` : null, p.zone,
                                    p.flaeche ? `${gr(p.flaeche)} m²` : null].filter(Boolean).join(' · ')}</small>
                         </span>
                       </button>
@@ -1167,9 +1196,13 @@ const STIL = `
 .gisk .schalter.an{background:var(--tinte);border-color:var(--tinte);color:#fff}
 .gisk .schalter.an.lila{background:#7C3AED;border-color:#7C3AED}
 .gisk .eintrag>i.lila{background:#7C3AED}
+.gisk .eintrag>i.orange{background:#EA580C}
+.gisk .segment.ansicht{margin:0 0 14px}
+.gisk .segment.ansicht button{flex:1;height:36px}
 .gisk .mappen{display:flex;flex-direction:column;gap:8px}
 .gisk .mappe{border:1px solid var(--linie);border-radius:14px;overflow:hidden;background:var(--weiss)}
 .gisk .mappe.auf{border-color:#7C3AED}
+.gisk .mappe.gel.auf{border-color:#EA580C}
 .gisk .mappe-kopf{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:12px 14px;border:0;background:none;text-align:left;cursor:pointer}
 .gisk .mappe-kopf:hover{background:var(--fl)}
 .gisk .mappe-kopf .text{flex:1;min-width:0}

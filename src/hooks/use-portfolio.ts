@@ -22,6 +22,8 @@ export interface Position {
   parzelle: string | null;
   flaeche: number | null;
   zone: string | null;
+  /** Bei Gelegenheiten: welche Rolle die Parzelle spielt (Auslöser, Nachbar, Im Portfolio). */
+  rolle?: string | null;
 }
 
 export interface Portfolio {

@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, Printer } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { usePortfolios } from '@/hooks/use-portfolio';
 import { arrondierungErkennen } from '@/lib/arrondierung';
+import { ANLAESSE, ZUSTAENDE, useGelegenheiten, type Gel, type Parz, type Zustand } from '@/hooks/use-gelegenheiten';
 
 /**
  * Gelegenheiten: was erkannt wurde, wer daran arbeitet, was daraus
@@ -15,46 +16,11 @@ import { arrondierungErkennen } from '@/lib/arrondierung';
  * einen Zustand (erkannt bis abgeschlossen), eine Zuständigkeit und ein
  * Ergebnis; der Bericht zählt sie je Kunde.
  */
-type Zustand = 'erkannt' | 'geprueft' | 'gemeldet' | 'in bearbeitung' | 'abgeschlossen' | 'verworfen';
-const ZUSTAENDE: [Zustand, string][] = [
-  ['erkannt', 'Erkannt'], ['geprueft', 'Geprüft'], ['gemeldet', 'Dem Kunden gemeldet'],
-  ['in bearbeitung', 'In Bearbeitung'], ['abgeschlossen', 'Abgeschlossen'], ['verworfen', 'Verworfen'],
-];
-const ANLAESSE: Record<string, string> = {
-  baugesuch: 'Baugesuch', arrondierung: 'Arrondierung', ausnuetzungsreserve: 'Ausnützungsreserve',
-  zonenaenderung: 'Zonenänderung', investorentreffer: 'Investorentreffer', manuell: 'Manuell',
-};
-
-interface Parz { id: string; address: string | null; owner_name: string | null; area: number | null; gemeinde: string | null; egrid: string | null }
-interface Gel {
-  id: string; anlass: string; zustand: Zustand; titel: string; begruendung: string | null; zustaendig: string | null;
-  erkannt_am: string; gemeldet_am: string | null; abgeschlossen_am: string | null; ergebnis: string | null;
-  prioritaet: number | null; fremde_nachbarn: { egrid: string; nummer: string }[] | null;
-  mandant: { id: string; akteur: { name: string } | null } | null;
-  gelegenheit_parzelle: { rolle: string | null; parzelle: Parz | null }[];
-}
-
 // Die erzeugten Typen kennen die Plattform-Tabellen noch nicht.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = () => supabase as any;
 const datum = (s: string | null) => (s ? new Date(s).toLocaleDateString('de-CH') : '–');
 const m2 = (n: number | null) => (n ? `${Math.round(n).toLocaleString('de-CH')} m²` : null);
-
-export function useGelegenheiten() {
-  return useQuery({
-    queryKey: ['gelegenheiten'],
-    queryFn: async (): Promise<Gel[]> => {
-      const r = await db().from('gelegenheit')
-        .select('*, mandant:mandant_id(id, akteur:akteur_id(name)), '
-          + 'gelegenheit_parzelle(rolle, parzelle:parzelle_id(id, address, owner_name, area, gemeinde, egrid))')
-        .order('prioritaet', { ascending: false, nullsFirst: false })
-        .order('erkannt_am', { ascending: false })
-        .limit(500);
-      if (r.error) throw r.error;
-      return r.data ?? [];
-    },
-  });
-}
 
 export function Gelegenheiten() {
   const qc = useQueryClient();
