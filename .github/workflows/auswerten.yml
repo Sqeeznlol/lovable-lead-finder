@@ -319,6 +319,18 @@ jobs:
               union all select 'Parzellen mit Geometrie',  count(*) from public.properties where geometrie is not null
               union all select 'Nachbarschaftspaare',      count(*) from public.nachbarschaft;"
 
+            frage "Portfolios" "
+              select pf.name as portfolio, a.name as eigner,
+                     count(pp.id) as positionen,
+                     count(pp.parzelle_id) as mit_parzelle,
+                     count(distinct v.akteur_id) as manager
+                from public.portfolio pf
+                join public.mandant m on m.id = pf.mandant_id
+                join public.akteur a on a.id = m.akteur_id
+                left join public.portfolio_position pp on pp.portfolio_id = pf.id
+                left join public.verwaltung v on v.parzelle_id = pp.parzelle_id
+               group by 1, 2 order by 1;"
+
             frage "Hat das Zusammenfuehren gewirkt?" "
               with je as (
                 select akteur_id, count(*) as parzellen
