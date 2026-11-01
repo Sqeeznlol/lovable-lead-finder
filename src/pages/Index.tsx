@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { Building2, LayoutDashboard, Upload, Phone, Menu, X, Zap, Search, FileSpreadsheet, Eye, Shield, Share, Plus, Database, Send, Map, Target } from 'lucide-react';
+import { Building2, LayoutDashboard, Upload, Phone, Menu, X, Zap, Search, FileSpreadsheet, Eye, Shield, Share, Plus, Database, Send, Map, Target, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 const Uebersicht = lazy(() => import('@/components/Uebersicht').then(m => ({ default: m.Uebersicht })));
@@ -13,6 +13,7 @@ const AkquiseMode = lazy(() => import('@/components/AkquiseMode').then(m => ({ d
 const TelefonSuche = lazy(() => import('@/components/TelefonSuche').then(m => ({ default: m.TelefonSuche })));
 const PipedriveExport = lazy(() => import('@/components/PipedriveExport').then(m => ({ default: m.PipedriveExport })));
 const Vorauswahl = lazy(() => import('@/components/Vorauswahl').then(m => ({ default: m.Vorauswahl })));
+const Auswertung = lazy(() => import('@/components/Auswertung').then(m => ({ default: m.Auswertung })));
 const Gelegenheiten = lazy(() => import('@/components/Gelegenheiten').then(m => ({ default: m.Gelegenheiten })));
 const Nachbarschaft = lazy(() => import('@/components/Nachbarschaft').then(m => ({ default: m.Nachbarschaft })));
 // Die Karte zieht Leaflet nach -- das gehoert nicht ins erste
@@ -35,7 +36,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { usePlatform } from '@/hooks/use-platform';
 import { useMidnightReset } from '@/hooks/use-phones';
 
-type Tab = 'pipedrive' | 'nummern' | 'karte' | 'nachbarschaft' | 'gelegenheiten' | 'uebersicht' | 'dashboard' | 'master' | 'vorauswahl' | 'akquise' | 'telsuche' | 'properties' | 'import' | 'masterimport' | 'phones' | 'export' | 'admin';
+type Tab = 'pipedrive' | 'nummern' | 'karte' | 'nachbarschaft' | 'gelegenheiten' | 'auswertung' | 'uebersicht' | 'dashboard' | 'master' | 'vorauswahl' | 'akquise' | 'telsuche' | 'properties' | 'import' | 'masterimport' | 'phones' | 'export' | 'admin';
 
 // Zehn Reiter waren neun zu viel. Was der neue Ablauf selbst erledigt,
 // braucht keinen eigenen Ort mehr:
@@ -64,6 +65,7 @@ const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: st
   { id: 'karte', label: 'Karte', icon: Map },
   { id: 'nachbarschaft', label: 'Nachbarschaft', icon: Share },
   { id: 'gelegenheiten', label: 'Gelegenheiten', icon: Target },
+  { id: 'auswertung', label: 'Auswertung', icon: BarChart3 },
   // Der letzte Schritt vor dem Anruf: fertige Leads, die auf den Deal
   // warten. Vorher war dieser Zustand unsichtbar.
   { id: 'pipedrive', label: 'Pipedrive', icon: Send },
@@ -198,6 +200,7 @@ export default function Index() {
             {active === 'karte' && <Karte onSchliessen={() => setActive('uebersicht')} />}
             {active === 'nachbarschaft' && <Nachbarschaft />}
             {active === 'gelegenheiten' && <Gelegenheiten />}
+            {active === 'auswertung' && <Auswertung />}
             {active === 'pipedrive' && <PipedriveBereit />}
             {active === 'masterimport' && <MasterImport />}
             {active === 'vorauswahl' && <Vorauswahl />}
