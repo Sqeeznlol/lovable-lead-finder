@@ -45,6 +45,7 @@ on:
           - teams-probe  # Ob ein Konto ausserhalb eines Teams dessen Kunden wirklich nicht sieht (wird zurueckgerollt)
           - potenzial-bund # Was der Bund an einem Punkt zu Bauzone und Parzelle liefert (fuer den Potenzialcheck)
           - anfrage-probe # Ob der oeffentliche Schluessel Anfragen einfuegen, aber nicht lesen kann (wird zurueckgerollt)
+          - parzellen-zh # Ob jede Zürcher Parzelle im Bestand ist und welche Felder leer sind
           - amtsblatt-jahr # Ob die Baugesuche des Jahres (Amtsblatt-Export) in Quelle und Datenbank stehen
           - luftbild     # Ob der Bund Luftbilder (SWISSIMAGE) als ein Bild je Ausschnitt liefert
           - tempo        # Wie schnell die Seite und die Abfragen der Hauptbereiche sind
@@ -563,6 +564,40 @@ jobs:
           select 'aui legt Kunden ohne Team an' as fall, count(*) as angelegt
           from mandant m join akteur a on a.id = m.akteur_id where a.name = 'Probe Neu';
           rollback;
+          \echo '```'
+          SQL
+
+          elif [ "$FRAGE" = "parzellen-zh" ]; then
+            { echo "### Amtliche Vermessung: Liegenschaften ZH"; echo '```'; python3 tools/parzellen_zh.py 2>&1 | cut -c1-600 || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            psql "$DB" -X -q >> "$GITHUB_STEP_SUMMARY" 2>&1 <<'SQL' || true
+          \echo '### Bestand ZH: was ausgefüllt ist'
+          \echo '```'
+          set statement_timeout = '10min';
+          select count(*) as parzellen,
+                 count(distinct egrid) as verschiedene_egrid,
+                 count(*) filter (where egrid is null) as ohne_egrid,
+                 count(*) filter (where nullif(trim(address), '') is null) as ohne_adresse,
+                 count(*) filter (where nullif(trim(parzelle), '') is null) as ohne_parzellennr,
+                 count(*) filter (where bfs_nr is null) as ohne_bfs,
+                 count(*) filter (where nullif(trim(gemeinde), '') is null) as ohne_gemeinde,
+                 count(*) filter (where area is null or area = 0) as ohne_flaeche,
+                 count(*) filter (where nullif(trim(zone), '') is null) as ohne_zone,
+                 count(*) filter (where geometrie is null) as ohne_umriss
+          from properties where kanton = 'ZH';
+          select count(*) filter (where nullif(trim(kategorie), '') is null) as ohne_objektart,
+                 count(*) filter (where baujahr is null) as ohne_baujahr,
+                 count(*) filter (where gebaeudeflaeche is null) as ohne_gebaeudeflaeche,
+                 count(*) filter (where wohnungen is null) as ohne_wohnungen,
+                 count(*) filter (where geschosse is null) as ohne_geschosse,
+                 count(*) filter (where hnf_delta is null) as ohne_potenzial,
+                 count(*) filter (where marge_chf is null) as ohne_marge,
+                 count(*) filter (where nullif(trim(owner_name), '') is null and nullif(trim(eigentuemer_name), '') is null) as ohne_eigentuemer,
+                 count(*) filter (where ausgeschlossen) as ausgeschlossen
+          from properties where kanton = 'ZH';
+          select count(distinct bfs_nr) as gemeinden_mit_bfs, count(distinct gemeinde) as gemeinden_mit_namen
+          from properties where kanton = 'ZH';
+          -- Doppelte EGRID: dieselbe Parzelle zweimal im Bestand.
+          select count(*) as egrid_mehrfach from (select egrid from properties where kanton = 'ZH' and egrid is not null group by egrid having count(*) > 1) d;
           \echo '```'
           SQL
 
