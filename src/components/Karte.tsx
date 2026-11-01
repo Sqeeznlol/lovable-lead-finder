@@ -1165,7 +1165,7 @@ const STIL = `
    Leiste, Filter und Tafel schweben darüber. Eine Schrift, ruhige
    Grautöne, ein Akzent. */
 .gisk{--bg:#F4F4F5;--weiss:#FFFFFF;--fl:#F4F4F5;--tinte:#111111;--grau:#646B78;--linie:#E4E4E7;--akzent:#3D45F5;
-  --schatten:0 10px 30px -12px rgba(15,23,42,.25),0 2px 6px rgba(15,23,42,.06);
+  --schatten:0 6px 20px -10px rgba(17,17,17,.28),0 1px 2px rgba(17,17,17,.06);--dunkel:#1E2433;--violett:#7C5CFC;
   position:fixed;inset:0;z-index:50;height:100dvh;background:var(--bg);color:var(--tinte);
   font:14px/1.5 "Urbanist",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
 .gisk *{box-sizing:border-box}
@@ -1194,7 +1194,7 @@ const STIL = `
 .gisk .leaflet-control-attribution{background:rgba(255,255,255,.8)!important;border-radius:6px 0 0 0;font-size:10px}
 
 .gisk .leiste{position:absolute;z-index:700;top:16px;left:16px;right:416px;display:flex;gap:8px;align-items:center;
-  background:var(--weiss);border-radius:16px;box-shadow:var(--schatten);padding:8px}
+  background:var(--weiss);border:1px solid var(--linie);border-radius:4px;box-shadow:var(--schatten);padding:8px}
 .gisk .rund{width:40px;height:40px;border-radius:4px;border:0;background:var(--fl);cursor:pointer;font-size:18px}
 .gisk .rund:hover{background:var(--linie)}
 .gisk .suche{position:relative;flex:1;min-width:160px}
@@ -1207,22 +1207,22 @@ const STIL = `
 .gisk .treffer:hover{background:var(--fl)}
 .gisk .treffer b{display:block;font-weight:600}.gisk .treffer small{color:var(--grau);font-size:12px}
 .gisk .treffer.eigen b{color:var(--akzent)}
-.gisk .treffer.eigner b{color:#7C3AED}
+.gisk .treffer.eigner b{color:var(--violett)}
 .gisk .leer{margin:0;padding:9px 10px;color:var(--grau)}
 .gisk .werkzeuge{display:contents}
 .gisk .segment{display:flex;background:var(--fl);border-radius:4px;padding:3px}
 .gisk .segment button{border:0;background:none;padding:7px 12px;border-radius:3px;cursor:pointer;color:var(--grau);font-weight:500}
-.gisk .segment button.an{background:var(--weiss);color:var(--tinte);box-shadow:0 1px 3px rgba(15,23,42,.12)}
+.gisk .segment button.an{background:var(--dunkel);color:#fff}
 .gisk .schalter{height:40px;border:1px solid var(--linie);background:var(--weiss);border-radius:4px;padding:0 14px;cursor:pointer;font-weight:500;color:var(--grau)}
-.gisk .schalter.an{background:var(--tinte);border-color:var(--tinte);color:#fff}
-.gisk .schalter.an.lila{background:#7C3AED;border-color:#7C3AED}
-.gisk .eintrag>i.lila{background:#7C3AED}
+.gisk .schalter.an{background:var(--dunkel);border-color:var(--dunkel);color:#fff}
+.gisk .schalter.an.lila{background:var(--violett);border-color:var(--violett)}
+.gisk .eintrag>i.lila{background:var(--violett)}
 .gisk .eintrag>i.petrol{background:#0E7490}
 .gisk .segment.ansicht{margin:0 0 14px}
 .gisk .segment.ansicht button{flex:1;height:36px}
 .gisk .mappen{display:flex;flex-direction:column;gap:8px}
-.gisk .mappe{border:1px solid var(--linie);border-radius:14px;overflow:hidden;background:var(--weiss)}
-.gisk .mappe.auf{border-color:#7C3AED}
+.gisk .mappe{border:1px solid var(--linie);border-radius:4px;overflow:hidden;background:var(--weiss)}
+.gisk .mappe.auf{border-color:var(--violett)}
 .gisk .mappe.gel.auf{border-color:#0E7490}
 .gisk .mappe-kopf{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:12px 14px;border:0;background:none;text-align:left;cursor:pointer}
 .gisk .mappe-kopf:hover{background:var(--fl)}
@@ -1236,11 +1236,11 @@ const STIL = `
 
 .gisk .filterblock{position:absolute;z-index:650;top:76px;left:16px;right:416px;display:flex;flex-direction:column;gap:6px;pointer-events:none}
 .gisk .filter{display:flex;gap:6px;flex-wrap:wrap;align-items:center;pointer-events:auto;align-self:flex-start;max-width:100%}
-.gisk .filter select{appearance:none;-webkit-appearance:none;field-sizing:content;border:0;background:var(--weiss) no-repeat right 10px center/9px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2364748B' stroke-width='1.6'/%3E%3C/svg%3E");padding:6px 26px 6px 12px;border-radius:999px;cursor:pointer;font:inherit;font-size:13px;font-weight:500;color:var(--tinte);box-shadow:var(--schatten)}
-.gisk .filter select.an{background-color:var(--akzent);color:#fff}
-.gisk .filter .titel{font-size:12px;font-weight:600;color:var(--grau);background:var(--weiss);padding:6px 10px;border-radius:999px;box-shadow:var(--schatten)}
-.gisk .filter button{border:0;background:var(--weiss);padding:6px 12px;border-radius:999px;cursor:pointer;font-size:13px;font-weight:500;box-shadow:var(--schatten)}
-.gisk .filter button.an{background:var(--akzent);color:#fff}
+.gisk .filter select{appearance:none;-webkit-appearance:none;field-sizing:content;border:0;background:var(--weiss) no-repeat right 10px center/9px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2364748B' stroke-width='1.6'/%3E%3C/svg%3E");padding:6px 26px 6px 12px;border-radius:3px;cursor:pointer;font:inherit;font-size:13px;font-weight:500;color:var(--tinte);box-shadow:var(--schatten)}
+.gisk .filter select.an{background-color:var(--dunkel);color:#fff}
+.gisk .filter .titel{font-size:12px;font-weight:600;color:var(--grau);background:var(--weiss);padding:6px 10px;border-radius:3px;box-shadow:var(--schatten)}
+.gisk .filter button{border:0;background:var(--weiss);padding:7px 12px;border-radius:3px;cursor:pointer;font-size:13px;font-weight:500;box-shadow:var(--schatten)}
+.gisk .filter button.an{background:var(--dunkel);color:#fff}
 .gisk .filter.genau button{font-size:12px;padding:5px 10px}
 
 .gisk .unten{position:absolute;z-index:650;left:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;align-items:flex-start}
@@ -1252,7 +1252,7 @@ const STIL = `
 .gisk .readout{background:rgba(255,255,255,.92);border-radius:4px;box-shadow:var(--schatten);padding:6px 10px;font-size:12px;color:var(--grau);font-variant-numeric:tabular-nums}
 
 .gisk .tafel{position:absolute;z-index:700;top:16px;right:16px;bottom:16px;width:384px;background:var(--weiss);
-  border-radius:20px;box-shadow:var(--schatten);overflow-y:auto;padding:20px}
+  border:1px solid var(--linie);border-radius:4px;box-shadow:var(--schatten);overflow-y:auto;padding:20px}
 .gisk .kopf{margin-bottom:16px}
 .gisk .zurueck{border:0;background:none;color:var(--grau);cursor:pointer;padding:0;margin-bottom:10px;font-size:13px}
 .gisk .zurueck:hover{color:var(--tinte)}
@@ -1260,21 +1260,21 @@ const STIL = `
 /* Die Karte setzt ihre Schrift selbst; für h3 fehlte das früher, die
    Bausteine darin standen in der Serifenschrift der Anwendung. */
 .gisk h3{font-family:inherit!important}
-.gisk h2{font-family:inherit!important;margin:0;font-size:22px;line-height:1.2;font-weight:700;letter-spacing:-.02em}
+.gisk h2{font-family:inherit!important;margin:0;font-size:26px;line-height:1.15;font-weight:500;letter-spacing:-.02em}
 .gisk .sanft{color:var(--grau);margin:6px 0 0;font-size:13px}
 .gisk .sanft.block{margin:0 0 12px}
 .gisk .marken{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
-.gisk .marke{font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--fl);color:var(--tinte)}
-.gisk .marke.blau{background:#DBEAFE;color:#1D4ED8}.gisk .marke.grau{color:var(--grau)}
+.gisk .marke{font-size:12px;font-weight:500;padding:3px 8px;border-radius:2px;background:var(--fl);color:var(--tinte)}
+.gisk .marke.blau{background:rgba(61,69,245,.1);color:var(--akzent)}.gisk .marke.grau{color:var(--grau)}
 
 .gisk .zahlen{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
-.gisk .zahlen>div{background:var(--fl);border-radius:4px;padding:10px 12px;min-width:0}
+.gisk .zahlen>div{background:var(--weiss);border:1px solid var(--linie);border-radius:4px;padding:10px 12px;min-width:0}
 .gisk .zahlen .breit{grid-column:1 / -1}
-.gisk .zahlen small{display:block;font-size:11px;font-weight:600;color:var(--grau);margin-bottom:2px}
-.gisk .zahlen b{font-size:15px;font-weight:600;word-break:break-word}
+.gisk .zahlen small{display:block;font-size:10.5px;font-weight:500;color:var(--grau);margin-bottom:2px;text-transform:uppercase;letter-spacing:.04em}
+.gisk .zahlen b{font-size:16px;font-weight:500;word-break:break-word}
 
 .gisk .aktionen{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
-.gisk .knopf,.gisk .copy{display:inline-flex;align-items:center;height:32px;padding:0 12px;border-radius:4px;border:1px solid var(--linie);
+.gisk .knopf,.gisk .copy{display:inline-flex;align-items:center;gap:6px;height:40px;padding:0 14px;border-radius:3px;border:1px solid var(--linie);
   background:var(--weiss);color:var(--tinte);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit}
 .gisk .knopf:hover,.gisk .copy:hover{border-color:var(--tinte)}
 .gisk .copy.done{border-color:#16A34A;color:#16A34A}
@@ -1302,7 +1302,7 @@ const STIL = `
 .gisk .import .datei{cursor:pointer;margin:0 0 14px}
 .gisk .import .leiste-unten{display:flex;justify-content:flex-end;gap:8px;margin:14px 0}
 .gisk .import .knopf{height:44px;padding:0 16px}
-.gisk .knopf.haupt{background:var(--tinte);border-color:var(--tinte);color:#fff;font-weight:600}
+.gisk .knopf.haupt{background:var(--tinte);border-color:var(--tinte);color:#fff;font-weight:500}
 .gisk .knopf:disabled{opacity:.45;cursor:default}
 .gisk .fehlertext{color:#DC2626;font-size:13px;margin:8px 0}
 /* Beim Gegenlesen zählt der ganze Grund, nicht ein abgeschnittener. */
@@ -1311,8 +1311,8 @@ const STIL = `
 .gisk .eintrag .text{flex:1;min-width:0}
 .gisk .eintrag b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gisk .eintrag small{display:block;color:var(--grau);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.gisk .betrag{font-weight:700;font-variant-numeric:tabular-nums}
-.gisk-tip{font:13px/1.45 Inter,-apple-system,Arial,sans-serif;border-radius:4px;border:0;box-shadow:0 8px 24px rgba(15,23,42,.2);padding:8px 11px}
+.gisk .betrag{font-weight:600;color:var(--violett)}
+.gisk-tip{font:13px/1.45 Urbanist,system-ui,sans-serif;border-radius:3px;border:0;box-shadow:0 8px 24px rgba(15,23,42,.2);padding:8px 11px}
 
 @media (max-width:900px){
   /* Handy: die Suche allein in der ersten Zeile, Grundkarte und Schalter
@@ -1333,7 +1333,7 @@ const STIL = `
   .gisk .filter::-webkit-scrollbar{display:none}
   .gisk .filter button,.gisk .filter .titel,.gisk .filter select{flex:none}
   .gisk .leaflet-control-zoom,.gisk .leaflet-bottom.leaflet-right,.gisk .legende:not(.bild),.gisk .readout{display:none}
-  .gisk .tafel{top:auto;left:0;right:0;bottom:0;width:auto;height:34vh;border-radius:6px 6px 0 0;padding:12px 16px 16px}
+  .gisk .tafel{top:auto;left:0;right:0;bottom:0;width:auto;height:34vh;border-radius:4px 4px 0 0;padding:12px 16px 16px}
   .gisk .tafel::before{content:"";display:block;width:36px;height:4px;border-radius:2px;background:var(--linie);margin:0 auto 12px}
   .gisk.offen .tafel{height:64vh}
   /* Ein Formular braucht Platz; die Karte darüber hilft beim Ausfüllen nicht. */
