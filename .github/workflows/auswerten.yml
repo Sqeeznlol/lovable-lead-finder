@@ -584,10 +584,13 @@ jobs:
           \echo '### Abfragen (Ausfuehrungszeit in der Datenbank)'
           \echo '```'
           create temp table zeiten (bereich text, ms numeric);
+          -- Die Zeit misst die Datenbank selbst (explain analyze). Eine
+          -- Stoppuhr um "execute" in plpgsql zeigte 680 ms, wo die
+          -- Abfrage 2 ms braucht -- die Uhr mass sich selbst.
           create or replace function pg_temp.mess(b text, q text) returns void language plpgsql as $f$
-          declare t0 timestamptz; begin
-            t0 := clock_timestamp(); execute q;
-            insert into zeiten values (b, round(extract(epoch from clock_timestamp() - t0) * 1000));
+          declare j json; begin
+            execute 'explain (analyze, format json) ' || q into j;
+            insert into zeiten values (b, round((j->0->>'Execution Time')::numeric, 1));
           end $f$;
           select pg_temp.mess('Uebersicht ZH, Seite 1', $q$select id, address, gemeinde, hnf_delta, marge_chf, owner_name from properties where ausgeschlossen = false and kanton = 'ZH' and hnf_delta is not null order by hnf_delta desc nulls last limit 1000$q$);
           select pg_temp.mess('Uebersicht ZH, Seite 2', $q$select id from properties where ausgeschlossen = false and kanton = 'ZH' and hnf_delta is not null order by hnf_delta desc nulls last offset 1000 limit 1000$q$);
