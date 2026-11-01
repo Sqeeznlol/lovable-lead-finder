@@ -36,6 +36,7 @@ on:
           - regeln       # Wer darf was -- die Zugriffsregeln der Tabellen
           - plattform    # Was im neuen Modell steht (Zahlen, keine Namen)
           - konten       # Welche Anmeldekonten bestehen, und seit wann
+          - suche        # Wie schnell die Eigentuemersuche ist, und ob ein Index fehlt
       egrid:
         description: 'Nur für "objekt": die EGRID, z.B. CH707709971116'
         required: false
@@ -404,6 +405,38 @@ jobs:
               join eindeutig e on e.egrid = p.egrid
               where p.kanton = 'TG'
               group by 1 order by 2 desc limit 60;"
+
+          elif [ "$FRAGE" = "suche" ]; then
+            # Nur Zahlen und Plaene, keine Namen. Gemessen wird genau die
+            # Abfrage, die die Karte stellt -- als "authenticated", mit
+            # dessen Zeitgrenze, denn die gilt fuer die Seite.
+            frage "Eigentuemer im Bestand" "
+              select count(*) as objekte,
+                     count(owner_name) as mit_eigentuemer,
+                     count(distinct owner_name) as verschiedene_namen
+              from properties;"
+            frage "Zeitgrenzen der Rollen" "
+              select rolname, rolconfig from pg_roles
+              where rolname in ('anon','authenticated','authenticator');"
+            frage "Trigramm-Erweiterung" "
+              select name, installed_version, default_version
+              from pg_available_extensions where name = 'pg_trgm';"
+            frage "Indizes auf owner_name" "
+              select indexname, indexdef from pg_indexes
+              where tablename = 'properties' and indexdef ilike '%owner_name%';"
+            frage "Dauer: Teilsuche wie die Karte (Swisscanto)" "
+              explain (analyze, costs off, timing on)
+              select owner_name from properties
+              where owner_name ilike '%swisscanto%' limit 60;"
+            frage "Dauer: Teilsuche ohne Treffer (seltenes Wort)" "
+              explain (analyze, costs off, timing on)
+              select owner_name from properties
+              where owner_name ilike '%xqzyw%' limit 60;"
+            frage "Treffer fuer Swisscanto, Helvetica, SFP (nur Anzahl)" "
+              select w as wort, count(*) as objekte
+              from (values ('swisscanto'),('helvetica'),('sfp')) v(w)
+              join properties p on p.owner_name ilike '%'||w||'%'
+              group by 1 order by 1;"
 
           elif [ "$FRAGE" = "konten" ]; then
             # Wer kommt heute ueberhaupt herein? Die Anmeldung liegt in
