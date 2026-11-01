@@ -1,0 +1,219 @@
+# =====================================================================
+# Zürcher Parzellen vervollständigen
+# =====================================================================
+# Gemessen am 1. November: die Amtliche Vermessung Zürich führt 392'666
+# Liegenschaften, im Bestand stehen 185'210 mit EGRID. Dazu 73'847
+# Zürcher Zeilen ohne EGRID, und bei allen fehlt die BFS-Nummer.
+#
+# Dieser Ablauf holt alle Liegenschaften (EGRID, Nummer, BFS-Nummer,
+# Fläche) aus dem WFS des Kantons und
+#   1. ergänzt bestehende Zeilen über die EGRID (BFS-Nummer, Fläche,
+#      Parzellennummer -- nur, wo leer),
+#   2. gibt Zeilen ohne EGRID ihre EGRID, wenn Gemeinde und
+#      Parzellennummer genau eine amtliche Liegenschaft treffen,
+#   3. legt jede fehlende Liegenschaft neu an.
+#
+# Platz: bei 1107 MB schaltet Supabase auf nur-lesen. Geschrieben wird
+# in Stücken, vor jedem Stück wird gemessen; über der Grenze bricht der
+# Lauf ab, und der nächste macht beim Rest weiter (jeder Schritt nimmt
+# nur, was noch offen ist). Nach jedem Stück Änderungen räumt VACUUM
+# die alten Zeilenfassungen weg, sonst wächst die Tabelle mit jedem
+# Update um die alte Fassung.
+# =====================================================================
+
+name: Zürcher Parzellen
+
+on:
+  workflow_dispatch:
+    inputs:
+      schritt:
+        description: 'Was ausgeführt werden soll'
+        required: true
+        default: 'probe'
+        type: choice
+        options:
+          - probe       # Holen und abgleichen, nichts schreiben
+          - schreiben   # Holen, abgleichen und schreiben
+      grenze_mb:
+        description: 'Abbrechen, wenn die Datenbank so gross ist (MB)'
+        required: false
+        default: '1080'
+
+jobs:
+  zh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Werkzeuge
+        run: sudo apt-get install -y -qq postgresql-client
+
+      - name: Amtliche Vermessung holen
+        run: |
+          set -euo pipefail
+          python3 tools/av_zh_laden.py /tmp/av.csv /tmp/gemeinden.csv \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+          wc -l /tmp/av.csv /tmp/gemeinden.csv | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Abgleichen und schreiben
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+          SCHRITT: ${{ inputs.schritt }}
+          GRENZE_MB: ${{ inputs.grenze_mb }}
+        run: |
+          set -euo pipefail
+          [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
+          GRENZE_MB=${GRENZE_MB:-1080}
+
+          # Eine Sitzung für alles: die Zwischentabellen sind temporär
+          # und verschwinden mit ihr -- kein liegengebliebenes
+          # Zwischenlager wie am 31. Oktober.
+          #
+          # Die Stücke laufen in einer Schleife innerhalb von psql nicht
+          # gut (VACUUM darf nicht in einem Block stehen). Darum erzeugt
+          # die Shell das Skript, und psql arbeitet es mit \gexec und
+          # \if ab -- weiterhin in einer Sitzung.
+          {
+          cat <<'SQL'
+          \set ON_ERROR_STOP on
+          set statement_timeout = '20min';
+          create temp table av (egrid text, nummer text, bfsnr text, flaeche numeric, nbident text);
+          create temp table gem (bfsnr text, name text);
+          \copy av from '/tmp/av.csv' with (format csv)
+          \copy gem from '/tmp/gemeinden.csv' with (format csv)
+          update av set egrid = nullif(trim(egrid), ''), nummer = nullif(trim(nummer), ''), bfsnr = nullif(trim(bfsnr), '');
+          create index on av (egrid);
+          analyze av;
+
+          \echo '### Amtlich'
+          select count(*) as liegenschaften, count(distinct egrid) as mit_egrid,
+                 count(*) filter (where egrid is null) as ohne_egrid,
+                 count(distinct bfsnr) as gemeinden
+          from av;
+          select count(*) as gemeinden_mit_name from gem where nullif(name, '') is not null;
+
+          \echo '### Abgleich mit dem Bestand ZH'
+          select count(*) filter (where p.egrid is not null) as schon_da,
+                 count(*) filter (where p.egrid is null) as fehlen
+          from (select distinct egrid from av where egrid is not null) a
+          left join public.properties p on p.egrid = a.egrid;
+
+          -- Zeilen ohne EGRID: über Gemeindename und Parzellennummer.
+          -- Nur eindeutige Treffer, und nur EGRID, die noch frei sind.
+          create temp table zuordnung as
+          with kandidat as (
+            select p.id, a.egrid
+            from public.properties p
+            join gem g on lower(trim(g.name)) = lower(trim(p.gemeinde))
+            join av a on a.bfsnr = g.bfsnr
+                     and a.nummer = trim(coalesce(nullif(p.parzelle, ''), p.plot_number))
+            where p.kanton = 'ZH' and p.egrid is null and a.egrid is not null
+          ), eindeutig as (
+            select id, min(egrid) as egrid from kandidat group by id having count(*) = 1
+          )
+          select e.id, e.egrid from eindeutig e
+          where not exists (select 1 from public.properties q where q.egrid = e.egrid)
+            and e.egrid in (select egrid from eindeutig group by egrid having count(*) = 1);
+          select (select count(*) from public.properties where kanton = 'ZH' and egrid is null) as zh_ohne_egrid,
+                 count(*) as davon_zuordenbar
+          from zuordnung;
+          select count(*) as gemeindenamen_ohne_treffer from (
+            select distinct gemeinde from public.properties p
+            where kanton = 'ZH' and not exists (select 1 from gem g where lower(trim(g.name)) = lower(trim(p.gemeinde)))
+          ) x;
+          SQL
+
+          if [ "$SCHRITT" = "schreiben" ]; then
+          cat <<SQL
+          \set grenze $GRENZE_MB
+          SQL
+          cat <<'SQL'
+          select (pg_database_size(current_database())/1024/1024)::int as mb \gset
+          \echo 'Datenbank vorher:' :mb 'MB'
+
+          -- 2. EGRID für Zeilen ohne -- vor dem Anlegen, sonst würde
+          --    dieselbe Parzelle ein zweites Mal entstehen.
+          update public.properties p set egrid = z.egrid
+          from zuordnung z where p.id = z.id and p.egrid is null;
+          vacuum public.properties;
+
+          -- 3. Fehlende anlegen, je 20'000.
+          create temp table neu as
+          select distinct on (a.egrid) a.*, g.name as gemeinde
+          from av a left join gem g on g.bfsnr = a.bfsnr
+          where a.egrid is not null
+            and not exists (select 1 from public.properties p where p.egrid = a.egrid)
+          order by a.egrid;
+          alter table neu add column stueck int;
+          update neu set stueck = s.n from (select egrid, (row_number() over (order by bfsnr, egrid) - 1) / 20000 as n from neu) s where s.egrid = neu.egrid;
+          select count(*) as anzulegen, coalesce(max(stueck) + 1, 0) as stuecke from neu \gset
+          \echo 'Anzulegen:' :anzulegen 'in' :stuecke 'Stücken'
+          SQL
+          # Die Shell schreibt jedes Stück aus; psql prüft vor jedem die Grösse.
+          for i in $(seq 0 25); do
+          cat <<SQL
+          select (pg_database_size(current_database())/1024/1024)::int as mb \gset
+          select :mb >= :grenze as voll, $i >= :stuecke as fertig \gset
+          \if :voll
+            \echo 'ABBRUCH vor Stück $i: Datenbank bei' :mb 'MB. Der nächste Lauf macht weiter.'
+            \quit
+          \endif
+          \if :fertig
+          \else
+            insert into public.properties (address, egrid, parzelle, plot_number, bfs_nr, kanton, gemeinde, area, source_file)
+            select 'Parzelle ' || coalesce(nummer, '?'), egrid, nummer, nummer, bfsnr, 'ZH', gemeinde, flaeche, 'AV ZH (maps.zh.ch)'
+            from neu where stueck = $i
+            on conflict (egrid) where egrid is not null do nothing;
+            \echo 'Stück $i angelegt, Datenbank' :mb 'MB vorher'
+          \endif
+          SQL
+          done
+          cat <<'SQL'
+          -- 1. Bestehende ergänzen, je 20'000, mit VACUUM dazwischen.
+          create temp table ergaenzen as
+          select p.id, a.bfsnr, a.flaeche, a.nummer,
+                 (row_number() over (order by p.id) - 1) / 20000 as stueck
+          from public.properties p join av a on a.egrid = p.egrid
+          where p.bfs_nr is null or p.area is null or p.area = 0 or nullif(p.parzelle, '') is null;
+          select count(*) as zu_ergaenzen, coalesce(max(stueck) + 1, 0) as stuecke_e from ergaenzen \gset
+          \echo 'Zu ergänzen:' :zu_ergaenzen 'in' :stuecke_e 'Stücken'
+          SQL
+          for i in $(seq 0 25); do
+          cat <<SQL
+          select (pg_database_size(current_database())/1024/1024)::int as mb \gset
+          select :mb >= :grenze as voll, $i >= :stuecke_e as fertig \gset
+          \if :voll
+            \echo 'ABBRUCH vor Ergänzung $i: Datenbank bei' :mb 'MB.'
+            \quit
+          \endif
+          \if :fertig
+          \else
+            update public.properties p set
+              bfs_nr      = coalesce(p.bfs_nr, e.bfsnr),
+              area        = case when p.area is null or p.area = 0 then e.flaeche else p.area end,
+              parzelle    = coalesce(nullif(p.parzelle, ''), e.nummer),
+              plot_number = coalesce(nullif(p.plot_number, ''), e.nummer)
+            from ergaenzen e where e.id = p.id and e.stueck = $i;
+            vacuum public.properties;
+            \echo 'Ergänzung $i fertig'
+          \endif
+          SQL
+          done
+          cat <<'SQL'
+          select pg_size_pretty(pg_database_size(current_database())) as datenbank_nachher;
+          SQL
+          fi
+
+          cat <<'SQL'
+          \echo '### Bestand ZH danach'
+          select count(*) as parzellen, count(distinct egrid) as mit_egrid,
+                 count(*) filter (where egrid is null) as ohne_egrid,
+                 count(*) filter (where bfs_nr is null) as ohne_bfs,
+                 count(*) filter (where area is null or area = 0) as ohne_flaeche,
+                 count(*) filter (where nullif(trim(zone), '') is null) as ohne_zone
+          from public.properties where kanton = 'ZH';
+          SQL
+          } > /tmp/zh.sql
+
+          psql "$DB" -X -q -f /tmp/zh.sql 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
