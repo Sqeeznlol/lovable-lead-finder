@@ -32,6 +32,7 @@ on:
           - instanzen    # Zeigen Seite und Datenbank auf dasselbe Projekt?
           - kartendienst # Was der WMS des Bundes an Bildgroesse liefert
           - nachbarn     # Ob die Nachbarsuche beim Bund mit echten Umrissen geht
+          - kloten       # Parzellen in Kloten fuer das Test-Portfolio, und ob der Bund ihre Umrisse liefert
           - regeln       # Wer darf was -- die Zugriffsregeln der Tabellen
           - plattform    # Was im neuen Modell steht (Zahlen, keine Namen)
           - konten       # Welche Anmeldekonten bestehen, und seit wann
@@ -202,6 +203,28 @@ jobs:
             echo '```' >> "$GITHUB_STEP_SUMMARY"
             cat "$GITHUB_STEP_SUMMARY"
             exit 0
+
+          elif [ "$FRAGE" = "kloten" ]; then
+            # Fuer das Test-Portfolio "Test AG": wie viele Parzellen in
+            # Kloten mit EGRID im Bestand sind, und ob der Bund zu einer
+            # EGRID den Umriss liefert -- Zuercher Parzellen haben keinen
+            # eigenen. Nur Nummern und EGRID, keine Adressen, keine Namen.
+            frage "Kloten im Bestand" "
+              select count(*) as parzellen,
+                     count(*) filter (where egrid is not null) as mit_egrid,
+                     count(*) filter (where coalesce(address,'') <> '') as mit_adresse,
+                     count(*) filter (where geometrie is not null) as mit_umriss
+              from properties where gemeinde ilike 'Kloten%';"
+            E=$(psql "$DB" -X -t -A -c "select egrid from properties where gemeinde ilike 'Kloten%' and egrid is not null and coalesce(address,'') <> '' order by area desc nulls last limit 1;")
+            {
+              echo "### Umriss beim Bund per EGRID"; echo '```'
+              curl -s -G 'https://api3.geo.admin.ch/rest/services/all/MapServer/find' \
+                --data-urlencode 'layer=ch.kantone.cadastralwebmap-farbe' --data-urlencode 'searchField=egris_egrid' \
+                --data-urlencode "searchText=$E" --data-urlencode 'contains=false' --data-urlencode 'returnGeometry=true' \
+                --data-urlencode 'geometryFormat=geojson' --data-urlencode 'sr=4326' \
+                | python3 -c "import json,sys; d=json.load(sys.stdin); r=d.get('results',[]); print('Treffer', len(r)); [print(' ', x.get('geometry',{}).get('type'), 'Eckpunkte', len(json.dumps(x.get('geometry',{}).get('coordinates',[])).split('],['))) for x in r[:2]]; print(' Felder', sorted((r[0].get('properties') or r[0].get('attributes') or {}).keys()) if r else '-')"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
 
           elif [ "$FRAGE" = "nachbarn" ]; then
             # Die Karte fragt beim Bund nach den Nachbarn einer Parzelle,
