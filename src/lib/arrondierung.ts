@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { esriRinge } from '@/lib/karte-ebenen';
 import { umrissVomBund } from '@/hooks/use-portfolio';
+import { parallel } from '@/lib/parallel';
 
 /**
  * Arrondierung: zu jeder Parzelle eines Kundenportfolios die Nachbarn
@@ -97,11 +98,13 @@ export async function arrondierungErkennen(
 
   const erg = { neu: 0, schon: 0, ohneNachbarn: 0, fehler: 0 };
   let fertig = 0;
-  for (const pos of positionen) {
+  // Vier Parzellen zugleich: nacheinander dauern 1000 Adressen beim
+  // Bund eine halbe Stunde, alle zugleich drosselt er.
+  await parallel(positionen, 4, async pos => {
     try {
-      if (schonDa.has(pos.parzelleId)) { erg.schon++; continue; }
+      if (schonDa.has(pos.parzelleId)) { erg.schon++; return; }
       const nachbarn = await nachbarnVomBund(pos.egrid);
-      if (!nachbarn.length) { erg.ohneNachbarn++; continue; }
+      if (!nachbarn.length) { erg.ohneNachbarn++; return; }
       const imB = await db().from('properties')
         .select('id, egrid, address, owner_name, area, marge_chf').in('egrid', nachbarn.map(n => n.egrid));
       if (imB.error) throw imB.error;
@@ -123,6 +126,6 @@ export async function arrondierungErkennen(
       if (z.error) throw z.error;
       erg.neu++;
     } catch { erg.fehler++; } finally { fortschritt(++fertig, positionen.length); }
-  }
+  });
   return erg;
 }

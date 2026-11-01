@@ -191,8 +191,11 @@ input, textarea, select {
   }
 
   /* Zahlen in Tabellen müssen untereinander stehen, sonst springt die
-     Spalte und Beträge lassen sich nicht vergleichen. */
-  table, .tabular, [class*="tabular-nums"] {
+     Spalte und Beträge lassen sich nicht vergleichen. Nur in den
+     rechtsbündigen Zahlenspalten: die Schrift setzt mit 'tnum' auch
+     Komma und Punkt ziffernbreit, aus "Weg 4, Zürich" wurde
+     "Weg 4 , Zürich". */
+  td.text-right, th.text-right, .tabular, [class*="tabular-nums"] {
     font-variant-numeric: tabular-nums;
     font-feature-settings: 'tnum';
   }

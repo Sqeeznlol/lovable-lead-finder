@@ -45,6 +45,7 @@ on:
           - teams-probe  # Ob ein Konto ausserhalb eines Teams dessen Kunden wirklich nicht sieht (wird zurueckgerollt)
           - potenzial-bund # Was der Bund an einem Punkt zu Bauzone und Parzelle liefert (fuer den Potenzialcheck)
           - anfrage-probe # Ob der oeffentliche Schluessel Anfragen einfuegen, aber nicht lesen kann (wird zurueckgerollt)
+          - vorhaben-probe # Ob die Potenzialanalyse eines Vorhabens mit 1000 Adressen stimmt und wie schnell sie ist (wird zurueckgerollt)
           - amtsblatt    # Welche Adresse im Amtsblattportal ein Baugesuch zeigt
       egrid:
         description: 'Nur für "objekt": die EGRID, z.B. CH707709971116'
@@ -558,6 +559,70 @@ jobs:
           insert into mandant (akteur_id) select id from a;
           select 'aui legt Kunden ohne Team an' as fall, count(*) as angelegt
           from mandant m join akteur a on a.id = m.akteur_id where a.name = 'Probe Neu';
+          rollback;
+          \echo '```'
+          SQL
+
+          elif [ "$FRAGE" = "vorhaben-probe" ]; then
+            # Ein Vorhaben mit 1000 echten Parzellen, einer Arrondierung
+            # mit einem Nachbarn, dessen Eigentuemer Investor ist (Netzwerk),
+            # und ein zweites Vorhaben in einem fremden Team. Gelesen wird
+            # als "aui" (keine Admin-Rolle) wie die Seite. Ausgegeben werden
+            # nur Zahlen, keine Namen. Zurueckgerollt.
+            psql "$DB" -v ON_ERROR_STOP=1 -X -q >> "$GITHUB_STEP_SUMMARY" 2>&1 <<'SQL' || true
+          \echo '### Probe: Vorhaben und Potenzialanalyse'
+          \echo '```'
+          begin;
+          create temp table probe_ids as
+            select (select id from auth.users where email like 'aui@%') as aui;
+          grant select on probe_ids to authenticated;
+          insert into akteur (name, art) values ('Probe Pensionskasse', 'institution'), ('Probe Investor', 'firma'), ('Probe Fremd', 'firma');
+          insert into investorprofil (akteur_id, lagen, objekttypen) select id, array['Zürich'], array['MFH'] from akteur where name = 'Probe Investor';
+          insert into team (name) values ('Probe-Team-Fremd');
+          insert into mandant (akteur_id) select id from akteur where name = 'Probe Pensionskasse';
+          insert into mandant (akteur_id, team_id) select a.id, t.id from akteur a, team t where a.name = 'Probe Fremd' and t.name = 'Probe-Team-Fremd';
+          insert into portfolio (mandant_id, name) select m.id, 'Probe-Vorhaben' from mandant m join akteur a on a.id = m.akteur_id where a.name = 'Probe Pensionskasse';
+          insert into portfolio (mandant_id, name) select m.id, 'Probe-Fremd' from mandant m join akteur a on a.id = m.akteur_id where a.name = 'Probe Fremd';
+          create temp table probe_parz as
+            select id from properties where kanton = 'ZH' and egrid is not null and ausgeschlossen = false
+            order by marge_chf desc nulls last limit 1002;
+          insert into portfolio_position (portfolio_id, parzelle_id, roh_adresse, zuordnung)
+            select (select id from portfolio where name = 'Probe-Vorhaben'), id, 'probe', 'zugeordnet' from (select id from probe_parz limit 1000) x;
+          insert into portfolio_position (portfolio_id, roh_adresse, zuordnung)
+            select (select id from portfolio where name = 'Probe-Vorhaben'), 'Probe offen ' || g, 'offen' from generate_series(1, 25) g;
+          insert into vorhaben (mandant_id, art, titel, portfolio_id, zeitraum_bis)
+            select p.mandant_id, 'entwickeln', 'Probe 1000 Adressen', p.id, current_date + 180 from portfolio p where p.name = 'Probe-Vorhaben';
+          insert into vorhaben (mandant_id, art, titel, portfolio_id)
+            select p.mandant_id, 'verkaufen', 'Probe fremdes Team', p.id from portfolio p where p.name = 'Probe-Fremd';
+          -- Eine Arrondierung: Ausloeser ist die erste Parzelle, Nachbar
+          -- die 1001., deren Eigentuemer der Probe-Investor ist.
+          insert into gelegenheit (anlass, mandant_id, titel, fremde_nachbarn)
+            select mandant_id, 'arrondierung', 'Probe Arrondierung', '[{"egrid":"CHX","nummer":"1"},{"egrid":"CHY","nummer":"2"}]'::jsonb
+            from portfolio where name = 'Probe-Vorhaben';
+          insert into gelegenheit_parzelle (gelegenheit_id, parzelle_id, rolle)
+            select g.id, (select id from probe_parz limit 1), 'ausloeser' from gelegenheit g where g.titel = 'Probe Arrondierung'
+            union all
+            select g.id, (select id from probe_parz offset 1000 limit 1), 'nachbar' from gelegenheit g where g.titel = 'Probe Arrondierung';
+          insert into eigentum (parzelle_id, akteur_id, quelle)
+            select (select id from probe_parz offset 1000 limit 1), id, 'manuell' from akteur where name = 'Probe Investor';
+          select set_config('request.jwt.claims', json_build_object('sub', (select aui from probe_ids), 'role', 'authenticated')::text, true);
+          set local role authenticated;
+          select count(*) filter (where titel = 'Probe 1000 Adressen') as eigenes_sichtbar,
+                 count(*) filter (where titel = 'Probe fremdes Team') as fremdes_sichtbar,
+                 max(adressen) filter (where titel = 'Probe 1000 Adressen') as adressen_in_liste
+          from vorhaben_liste;
+          \timing on
+          create temp table probe_a as select vorhaben_analyse((select id from vorhaben where titel = 'Probe 1000 Adressen')) as a;
+          \timing off
+          select a->>'adressen' as adressen, a->>'zugeordnet' as zugeordnet, a->>'offen' as offen,
+                 round((a->>'flaeche_m2')::numeric) as flaeche_m2, round((a->>'marge_chf')::numeric / 1e6) as marge_mio,
+                 jsonb_array_length(a->'zonen') as zonen, jsonb_array_length(a->'lage_art') as lage_art,
+                 a->>'arrondierungen' as arrondierungen, a->>'nachbarn' as nachbarn,
+                 a->>'nachbarn_ausserhalb' as ausserhalb,
+                 jsonb_array_length(a->'netzwerk') as netzwerk, a->'netzwerk'->0->'wieso' as netzwerk_wieso,
+                 jsonb_array_length(a->'top') as top
+          from probe_a;
+          select (vorhaben_analyse((select id from vorhaben where titel = 'Probe fremdes Team')))->>'adressen' as fremdes_team_adressen;
           rollback;
           \echo '```'
           SQL

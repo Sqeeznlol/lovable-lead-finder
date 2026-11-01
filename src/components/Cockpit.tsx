@@ -11,7 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
  * dorthin, wo man sie erledigt. Gezählt wird in der Datenbank, nicht
  * geschätzt.
  */
-export type Ziel = 'baugesuche' | 'gelegenheiten' | 'auswertung' | 'karte' | 'uebersicht';
+export type Ziel = 'zentrale' | 'baugesuche' | 'gelegenheiten' | 'auswertung' | 'karte' | 'uebersicht';
 
 // Die erzeugten Typen kennen die Plattform-Tabellen noch nicht.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -30,7 +30,8 @@ export function Cockpit({ onGehe }: { onGehe: (z: Ziel) => void }) {
   const { data, isLoading } = useQuery({
     queryKey: ['cockpit'],
     queryFn: async () => {
-      const [bgNeu, bgBestand, gelOffen, gelNeu, faellig, anfragen, portfolios, letzte, zuletzt] = await Promise.all([
+      const [vorhaben, bgNeu, bgBestand, gelOffen, gelNeu, faellig, anfragen, portfolios, letzte, zuletzt] = await Promise.all([
+        zaehlen('vorhaben', q => q.not('zustand', 'in', '(abgeschlossen,pausiert)')),
         zaehlen('baugesuch', q => q.neq('quelle', 'probe').gte('publiziert_am', tag(7))),
         zaehlen('baugesuch', q => q.neq('quelle', 'probe').gte('publiziert_am', tag(7)).not('parzelle_id', 'is', null)),
         zaehlen('gelegenheit', q => q.not('zustand', 'in', '(abgeschlossen,verworfen)')),
@@ -43,7 +44,7 @@ export function Cockpit({ onGehe }: { onGehe: (z: Ziel) => void }) {
         db().from('baugesuch').select('erfasst_am').order('erfasst_am', { ascending: false }).limit(1),
       ]);
       return {
-        bgNeu, bgBestand, gelOffen, gelNeu, faellig, anfragen, portfolios,
+        vorhaben, bgNeu, bgBestand, gelOffen, gelNeu, faellig, anfragen, portfolios,
         letzte: (letzte.data ?? []) as { id: string; adresse: string | null; gemeinde: string | null; beschreibung: string | null; publiziert_am: string; parzelle_id: string | null }[],
         zuletzt: (zuletzt.data?.[0]?.erfasst_am as string | undefined) ?? null,
       };
@@ -53,6 +54,7 @@ export function Cockpit({ onGehe }: { onGehe: (z: Ziel) => void }) {
 
   const n = (x: number | null | undefined) => (x == null ? '–' : x.toLocaleString('de-CH'));
   const kacheln: { titel: string; wert: string; zeile: string; ziel: Ziel; wichtig: boolean }[] = data ? [
+    { titel: 'Vorhaben', wert: n(data.vorhaben), zeile: 'von Kunden, laufend', ziel: 'zentrale', wichtig: false },
     { titel: 'Neue Baugesuche', wert: n(data.bgNeu), zeile: `letzte 7 Tage · ${n(data.bgBestand)} im Bestand`, ziel: 'baugesuche', wichtig: false },
     { titel: 'Gelegenheiten', wert: n(data.gelOffen), zeile: `offen · ${n(data.gelNeu)} noch nicht geprüft`, ziel: 'gelegenheiten', wichtig: (data.gelNeu ?? 0) > 0 },
     { titel: 'Wiedervorlagen', wert: n(data.faellig), zeile: 'heute fällig oder überfällig', ziel: 'auswertung', wichtig: (data.faellig ?? 0) > 0 },
@@ -76,7 +78,7 @@ export function Cockpit({ onGehe }: { onGehe: (z: Ziel) => void }) {
         {kacheln.map((k, i) => (
           <button key={k.titel} type="button" onClick={() => onGehe(k.ziel)}
                   style={{ animationDelay: `${i * 50}ms` }}
-                  className={`group animate-fade-in rounded-2xl border bg-card p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-ceramic-hover sm:p-6 ${i === 0 ? 'col-span-2 lg:col-span-1' : ''}`}>
+                  className={`group animate-fade-in rounded-2xl border bg-card p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-ceramic-hover sm:p-6 `}>
             <span className="flex items-center justify-between">
               <span className="text-sm font-semibold text-muted-foreground">{k.titel}</span>
               <ArrowUpRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />

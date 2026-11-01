@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { Building2, LayoutDashboard, Upload, Phone, X, Zap, Search, FileSpreadsheet, Eye, Shield, Share, Plus, Database, Send, Map, Target, BarChart3, Gauge, HardHat, MoreHorizontal } from 'lucide-react';
+import { Building2, LayoutDashboard, Upload, Phone, X, Zap, Search, FileSpreadsheet, Eye, Shield, Share, Plus, Database, Send, Map, Target, BarChart3, Gauge, HardHat, MoreHorizontal, Briefcase } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 const Uebersicht = lazy(() => import('@/components/Uebersicht').then(m => ({ default: m.Uebersicht })));
@@ -21,24 +21,27 @@ const Nachbarschaft = lazy(() => import('@/components/Nachbarschaft').then(m => 
 // Die Karte zieht Leaflet nach -- das gehoert nicht ins erste
 // Buendel, sondern wird geholt, wenn jemand den Reiter oeffnet.
 const Karte = lazy(() => import('@/components/Karte').then(m => ({ default: m.Karte })));
+// Was nur ein Reiter braucht, kommt erst mit dem Reiter: das erste
+// Bündel trägt nur den Rahmen und das Cockpit.
+const Zentrale = lazy(() => import('@/components/Zentrale').then(m => ({ default: m.Zentrale })));
+const Nummern = lazy(() => import('@/components/Nummern').then(m => ({ default: m.Nummern })));
+const PipedriveBereit = lazy(() => import('@/components/PipedriveBereit').then(m => ({ default: m.PipedriveBereit })));
+const Protokoll = lazy(() => import('@/components/Protokoll').then(m => ({ default: m.Protokoll })));
+const Anmeldungen = lazy(() => import('@/components/Anmeldungen').then(m => ({ default: m.Anmeldungen })));
+const Teams = lazy(() => import('@/components/Teams').then(m => ({ default: m.Teams })));
+const Lesezeichen = lazy(() => import('@/components/Lesezeichen').then(m => ({ default: m.Lesezeichen })));
+const ErweiterungHolen = lazy(() => import('@/components/ErweiterungHolen').then(m => ({ default: m.ErweiterungHolen })));
 const AdminSettings = lazy(() => import('@/components/AdminSettings').then(m => ({ default: m.AdminSettings })));
 import { CantonTabs } from '@/components/CantonTabs';
 import { KeyboardShortcutsOverlay } from '@/components/KeyboardShortcutsOverlay';
-import { Protokoll } from '@/components/Protokoll';
 import { AdminZugang } from '@/components/AdminZugang';
-import { Anmeldungen } from '@/components/Anmeldungen';
-import { Teams } from '@/components/Teams';
 import { Auffang } from '@/components/Auffang';
-import { Lesezeichen } from '@/components/Lesezeichen';
-import { ErweiterungHolen } from '@/components/ErweiterungHolen';
-import { Nummern } from '@/components/Nummern';
-import { PipedriveBereit } from '@/components/PipedriveBereit';
 import { AuskunftAusLesezeichen } from '@/components/AuskunftAusLesezeichen';
 import { useAuth } from '@/hooks/use-auth';
 import { usePlatform } from '@/hooks/use-platform';
 import { useMidnightReset } from '@/hooks/use-phones';
 
-type Tab = 'cockpit' | 'baugesuche' | 'pipedrive' | 'nummern' | 'karte' | 'nachbarschaft' | 'gelegenheiten' | 'auswertung' | 'uebersicht' | 'dashboard' | 'master' | 'vorauswahl' | 'akquise' | 'telsuche' | 'properties' | 'import' | 'masterimport' | 'phones' | 'export' | 'admin';
+type Tab = 'cockpit' | 'zentrale' | 'baugesuche' | 'pipedrive' | 'nummern' | 'karte' | 'nachbarschaft' | 'gelegenheiten' | 'auswertung' | 'uebersicht' | 'dashboard' | 'master' | 'vorauswahl' | 'akquise' | 'telsuche' | 'properties' | 'import' | 'masterimport' | 'phones' | 'export' | 'admin';
 
 // Zehn Reiter waren neun zu viel. Was der neue Ablauf selbst erledigt,
 // braucht keinen eigenen Ort mehr:
@@ -62,6 +65,9 @@ type Eintrag = { id: Tab; label: string; icon: React.ComponentType<{ className?:
 const gruppen: { titel: string; eintraege: Eintrag[] }[] = [
   { titel: 'Heute', eintraege: [
     { id: 'cockpit', label: 'Cockpit', icon: Gauge },
+    // Jedes Kundenvorhaben an einem Ort: von der Adressliste bis zur
+    // Akquise in seinem Namen.
+    { id: 'zentrale', label: 'Zentrale', icon: Briefcase },
   ] },
   { titel: 'Plattform', eintraege: [
     { id: 'karte', label: 'Karte', icon: Map },
@@ -102,7 +108,7 @@ const stillgelegt: { id: Tab; label: string; icon: React.ComponentType<{ classNa
 
 // Primary tabs visible in the iPhone bottom bar
 // Auf dem iPhone vier feste Ziele und "Mehr" für den Rest.
-const mobileBottomTabs: Tab[] = ['cockpit', 'karte', 'gelegenheiten', 'baugesuche'];
+const mobileBottomTabs: Tab[] = ['cockpit', 'zentrale', 'karte', 'gelegenheiten'];
 
 export default function Index() {
   const [active, setActive] = useState<Tab>('cockpit');
@@ -205,6 +211,7 @@ export default function Index() {
             </div>
           }>
             {active === 'cockpit' && <Cockpit onGehe={z => setActive(z)} />}
+            {active === 'zentrale' && <Zentrale />}
             {active === 'baugesuche' && <Baugesuche />}
             {active === 'uebersicht' && <Uebersicht />}
             {active === 'dashboard' && <Dashboard />}
