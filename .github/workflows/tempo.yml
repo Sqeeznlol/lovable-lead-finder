@@ -146,6 +146,13 @@ jobs:
           select (select count(*) from public.gwr_kode) as kodes, (select count(*) from public.gwr_kode where merkmal = 'GENH') as kodes_genh,
                  (select count(*) from public.gwr_kode where merkmal = 'GWAERZH') as kodes_gwaerzh;
           \echo
+          \echo 'Gemeindenamen in mehreren Schreibweisen ("X (ZH)" und "X ZH"), nur Namen und Zählungen:'
+          select regexp_replace(gemeinde, '\s*\(?(ZH|TG)\)?$', '') as grundname,
+                 string_agg(format('%s [%s] = %s', gemeinde, kanton, total), ' | ' order by total desc) as schreibweisen
+            from public.gemeinde_stats_mv
+            group by 1 having count(*) > 1 order by 1;
+          select count(*) as zeilen_gemeindeliste, count(distinct gemeinde) as verschiedene_namen from public.gemeinde_stats_mv;
+          \echo
           \echo 'Grösste Tabellen und Indizes:'
           select c.relname as name, c.relkind as art, pg_size_pretty(pg_relation_size(c.oid)) as groesse
             from pg_class c join pg_namespace n on n.oid = c.relnamespace
