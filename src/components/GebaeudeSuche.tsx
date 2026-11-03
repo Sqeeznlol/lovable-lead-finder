@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { FileSpreadsheet, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { FELD, KNOPF, KNOPF_HAUPT, Leer, LISTE, Seite } from '@/components/rahmen';
-import { Auswahl } from '@/components/Auswahl';
+import { Auswahl, AuswahlSuche } from '@/components/Auswahl';
 import { useUrlSetzen, useUrlWert } from '@/hooks/use-url-wert';
 import { BILD } from '@/lib/luftbild';
 import { useGwrKodes } from '@/lib/parzelle-gebaeude';
@@ -46,6 +46,15 @@ export function GebaeudeSuche() {
   // Die Suche braucht den genauen Namen (so nutzt sie den Index; mit
   // "ähnlich wie" las sie alle Parzellen und lief in die Zeitgrenze).
   const { data: gemeinden } = useGemeindeStats(null);
+  // "kloten" fand nichts, weil die Suche den Namen genau so braucht, wie er
+  // im Bestand steht (Julian, 3. November). Darum hier auf den Namen aus
+  // der Gemeindeliste abbilden: Gross/klein egal, "(ZH)" darf fehlen.
+  const gemeindeName = (eingabe: string | null) => {
+    const e = eingabe?.trim().toLowerCase();
+    if (!e) return null;
+    const liste = (gemeinden?.gemeinden ?? []).map(g => g.gemeinde);
+    return liste.find(g => g.toLowerCase() === e) ?? liste.find(g => g.toLowerCase().replace(/\s*\([a-z]{2}\)$/, '') === e) ?? eingabe!.trim();
+  };
   const arten = useMemo(() => [...(kodes?.entries() ?? [])]
     .filter(([k]) => k.startsWith('GKLAS:') && /^GKLAS:11/.test(k)) // Wohngebäude (11xx)
     .map(([k, t]) => ({ wert: k.slice(6), titel: t }))
@@ -53,13 +62,14 @@ export function GebaeudeSuche() {
   const gesetzt = FELDER.some(f => werte[f]);
 
   const { data, isFetching, error } = useQuery({
-    queryKey: ['gebaeude-suche', werte],
-    enabled: gesetzt,
+    queryKey: ['gebaeude-suche', werte, gemeindeName(werte.gemeinde)],
+    // Mit Gemeinde erst, wenn die Liste da ist -- sonst ginge der rohe Text raus.
+    enabled: gesetzt && (!werte.gemeinde || !!gemeinden),
     staleTime: 5 * 60 * 1000,
     queryFn: async (): Promise<Treffer[]> => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const r = await (supabase as any).rpc('gebaeude_suchen', {
-        p_gemeinde: werte.gemeinde?.trim() || null,
+        p_gemeinde: gemeindeName(werte.gemeinde),
         p_baujahr_von: zahl(werte.bj_von), p_baujahr_bis: zahl(werte.bj_bis),
         p_zimmer_min: zahl(werte.zi_min), p_zimmer_max: zahl(werte.zi_max),
         p_wohnflaeche_min: zahl(werte.wf_min), p_klasse: zahl(werte.art), p_grenze: GRENZE,
@@ -97,7 +107,6 @@ export function GebaeudeSuche() {
     <label className="block min-w-0">
       <span className="mb-1 block text-xs text-muted-foreground">{titel}</span>
       <input className={`${FELD} w-full`} value={entwurf[f] ?? ''} placeholder={platz} inputMode={zahlfeld ? 'numeric' : undefined}
-             list={f === 'gemeinde' ? 'gebaeudesuche-gemeinden' : undefined}
              onChange={e => setEntwurf(x => ({ ...x, [f]: e.target.value }))} onKeyDown={e => e.key === 'Enter' && suchen()} />
     </label>
   );
@@ -107,12 +116,14 @@ export function GebaeudeSuche() {
       titel={!gesetzt ? 'Gebäude im Bestand finden' : data ? `${n(data.length)}${data.length >= GRENZE ? '+' : ''} Gebäude gefunden` : 'Suche läuft …'}
       unter="Nach Gemeinde, Baujahr, Zimmern, Wohnfläche und Gebäudeart. Zimmer und Fläche sind die Summe aller Wohnungen eines Gebäudes."
       aktionen={data?.length ? <button type="button" onClick={exportieren} className={KNOPF}><FileSpreadsheet className="h-4 w-4" /> Als Excel</button> : undefined}>
-      <datalist id="gebaeudesuche-gemeinden">
-        {(gemeinden?.gemeinden ?? []).map(g => <option key={g.gemeinde} value={g.gemeinde} />)}
-      </datalist>
       <div className="space-y-3 rounded border bg-card p-4">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
-          <div className="col-span-2 sm:col-span-4 lg:col-span-2">{feld('gemeinde', 'Gemeinde', 'z.B. Küsnacht', false)}</div>
+          <div className="col-span-2 sm:col-span-4 lg:col-span-2">
+            <span className="mb-1 block text-xs text-muted-foreground">Gemeinde</span>
+            <AuswahlSuche label="Gemeinde" wert={gemeindeName(entwurf.gemeinde) ?? ''} leer="Alle Gemeinden" platzhalter="Gemeinde suchen …"
+              setWert={w => setEntwurf(x => ({ ...x, gemeinde: w || null }))} className="w-full"
+              optionen={(gemeinden?.gemeinden ?? []).map(g => ({ wert: g.gemeinde, titel: g.gemeinde })).sort((a, b) => a.titel.localeCompare(b.titel, 'de-CH'))} />
+          </div>
           {feld('bj_von', 'Baujahr ab', '1940')}
           {feld('bj_bis', 'Baujahr bis', '1960')}
           {feld('zi_min', 'Zimmer ab', '5')}

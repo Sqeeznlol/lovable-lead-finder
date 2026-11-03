@@ -1,4 +1,6 @@
+import { useMemo, useState } from 'react';
 import * as S from '@radix-ui/react-select';
+import * as P from '@radix-ui/react-popover';
 import { Check, ChevronDown } from 'lucide-react';
 
 /**
@@ -48,5 +50,65 @@ export function Auswahl({ wert, setWert, optionen, label, className = '', klein 
         </S.Content>
       </S.Portal>
     </S.Root>
+  );
+}
+
+/**
+ * Dieselbe Auswahl mit Suchfeld oben in der Liste -- für lange Listen
+ * wie die Gemeinden (Julian, 3. November: "zum Auswählen, nicht zum
+ * Eintippen, aber die Vorauswahl suchen darf man"). Getippt wird nur, um
+ * die Liste zu kürzen; übernommen wird immer ein Eintrag der Liste.
+ */
+export function AuswahlSuche({ wert, setWert, optionen, label, platzhalter = 'Suchen …', leer = 'Alle', className = '' }: {
+  wert: string; setWert: (w: string) => void; optionen: AuswahlOption[]; label: string;
+  platzhalter?: string; leer?: string; className?: string;
+}) {
+  const [offen, setOffen] = useState(false);
+  const [suche, setSuche] = useState('');
+  const [aktiv, setAktiv] = useState(0);
+  const s = suche.trim().toLowerCase();
+  const liste = useMemo(() => {
+    const alle = s ? optionen.filter(o => o.titel.toLowerCase().includes(s)) : optionen;
+    // Wer "klo" tippt, will Kloten oben, nicht Eglisau mit "klo" mittendrin.
+    return [...alle].sort((a, b) => Number(!a.titel.toLowerCase().startsWith(s)) - Number(!b.titel.toLowerCase().startsWith(s))).slice(0, 200);
+  }, [optionen, s]);
+  const titel = optionen.find(o => o.wert === wert)?.titel;
+  const nehmen = (w: string) => { setWert(w); setOffen(false); setSuche(''); };
+  return (
+    <P.Root open={offen} onOpenChange={o => { setOffen(o); if (!o) setSuche(''); setAktiv(0); }}>
+      <P.Trigger aria-label={label}
+        className={`inline-flex h-11 min-w-0 items-center justify-between gap-2 rounded-[3px] border border-input bg-card px-3.5 text-left text-[15px] transition-colors hover:border-foreground/40 focus:border-foreground focus:outline-none data-[state=open]:border-foreground ${className}`}>
+        <span className={`min-w-0 truncate ${titel ? '' : 'text-muted-foreground'}`}>{titel ?? leer}</span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-150 [[data-state=open]_&]:rotate-180" />
+      </P.Trigger>
+      <P.Portal>
+        <P.Content align="start" sideOffset={6} collisionPadding={12}
+          className="z-[1200] w-[max(var(--radix-popover-trigger-width),260px)] max-w-[calc(100vw-24px)] overflow-hidden rounded-[3px] border bg-card text-foreground shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
+          <div className="border-b p-2">
+            <input autoFocus value={suche} placeholder={platzhalter} aria-label={`${label} suchen`}
+              onChange={e => { setSuche(e.target.value); setAktiv(0); }}
+              onKeyDown={e => {
+                if (e.key === 'ArrowDown') { e.preventDefault(); setAktiv(a => Math.min(a + 1, liste.length - 1)); }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); setAktiv(a => Math.max(a - 1, 0)); }
+                else if (e.key === 'Enter' && liste[aktiv]) { e.preventDefault(); nehmen(liste[aktiv].wert); }
+              }}
+              className="h-10 w-full rounded-[3px] border border-input bg-background px-3 text-[15px] focus:border-foreground focus:outline-none" />
+          </div>
+          <ul role="listbox" aria-label={label} className="max-h-[min(50vh,360px)] overflow-y-auto p-1">
+            <li><button type="button" onClick={() => nehmen('')} className="flex min-h-10 w-full items-center rounded-[2px] px-3 text-left text-[15px] text-muted-foreground hover:bg-secondary">{leer}</button></li>
+            {liste.map((o, i) => (
+              <li key={o.wert} role="option" aria-selected={o.wert === wert}>
+                <button type="button" onClick={() => nehmen(o.wert)} onMouseEnter={() => setAktiv(i)}
+                        className={`relative flex min-h-10 w-full items-center rounded-[2px] py-2 pl-3 pr-9 text-left text-[15px] ${i === aktiv ? 'bg-secondary' : ''} ${o.wert === wert ? 'font-medium' : ''}`}>
+                  {o.titel}
+                  {o.wert === wert && <Check className="absolute right-3 h-4 w-4 text-accent" />}
+                </button>
+              </li>
+            ))}
+            {liste.length === 0 && <li className="px-3 py-3 text-sm text-muted-foreground">Nichts gefunden.</li>}
+          </ul>
+        </P.Content>
+      </P.Portal>
+    </P.Root>
   );
 }
