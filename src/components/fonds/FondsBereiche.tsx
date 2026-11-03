@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarDays, Check, HardHat, MessageSquare, Search, Sparkles, Trash2 } from 'lucide-react';
 import { Abschnitt, FELD, KNOPF, KNOPF_HAUPT, KNOPF_LEISE, Leer, LISTE, Marke, Reiter, Seite, Strichbalken } from '@/components/rahmen';
@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { BILD } from '@/lib/luftbild';
 import { zeitraum } from '@/lib/immo-kalender';
+import { lv95NachWgs84 } from '@/lib/koordinaten';
 import { fondsFarbe, POTENZIAL, type PotenzialArt, type Universum as UniversumDaten } from '@/lib/fonds';
 import {
   baugesucheLaden, faellig, lagenLesen, notizErledigt, notizenLaden, notizSpeichern, potenzialSchluessel,
@@ -41,26 +42,85 @@ export interface BereichProps {
 }
 
 // =========================================================== Karte
+// Cesium ist gross (1,1 MB) -- erst laden, wenn jemand auf "3D" tippt.
+const Karte3D = lazy(() => import('@/components/karte3d/Karte3D').then(m => ({ default: m.Karte3D })));
+// Nachgemessen (iPhone 13, iPhone SE, Desktop 900 px): Die Karte beginnt
+// unter Kopf und Umschalter bei 155 px und soll über der unteren Leiste
+// enden. 420 px Mindesthöhe schoben sie auf dem SE 68 px darunter.
+const KARTE_HOEHE = 'h-[calc(100dvh-14.5rem)] min-h-[320px] lg:h-[calc(100dvh-11.5rem)]';
+
+/**
+ * Das Universum als Karte, oder in 3D um eine Liegenschaft: jedes Haus
+ * mit Umriss und Höhe, die Zonen am Boden, die Häuser der Fonds in ihrer
+ * Farbe (Julian, 3. November: "genau so die 3D-Map").
+ */
 export function FondsKarte({ data }: BereichProps) {
   const [gewaehlt, setGewaehlt] = useUrlWert('liegenschaft');
+  const [ansicht, setAnsicht] = useUrlWert('ansicht', 'karte');
   const nr = useMemo(() => new Map(data.fonds.map(f => [f.id, f.nr])), [data]);
   const wahl = data.punkte.find(p => p.id === gewaehlt);
+  const verortet = useMemo(() => data.punkte.filter(p => p.e != null && p.n != null)
+    .sort((a, b) => a.adresse.localeCompare(b.adresse, 'de-CH')), [data]);
+  // In 3D zählt ein Ort: die gewählte Liegenschaft, sonst die mit den
+  // meisten Fondshäusern in Sichtweite -- die erste nach Alphabet stand
+  // im Test allein in Winterthur, und man sah keinen einzigen Fonds.
+  const dichteste = useMemo(() => {
+    let beste = verortet[0], bestZahl = -1;
+    for (const a of verortet) {
+      const zahl = verortet.filter(b => Math.hypot(b.e! - a.e!, b.n! - a.n!) < 900).length;
+      if (zahl > bestZahl || (zahl === bestZahl && (a.marge ?? 0) > (beste?.marge ?? 0))) { beste = a; bestZahl = zahl; }
+    }
+    return beste;
+  }, [verortet]);
+  const ort = wahl?.e != null && wahl.n != null ? wahl : dichteste;
+  const ziel = useMemo(() => (ort ? { ...lv95NachWgs84(ort.e!, ort.n!), abstand: 420 } : null), [ort]);
+  // Markiert werden die Fondshäuser in Sichtweite; weiter weg sieht man sie nicht.
+  const markiert = useMemo(() => (!ort ? [] : verortet
+    .filter(p => p.egrid && Math.hypot(p.e! - ort.e!, p.n! - ort.n!) < 900)
+    .slice(0, 60)
+    .map(p => ({ egrid: p.egrid!, farbe: fondsFarbe(nr.get(p.fonds) ?? 1), titel: p.adresse }))), [ort, verortet, nr]);
+  // Nur die Fonds, die in diesem Ausschnitt vorkommen.
+  const legende = useMemo(() => {
+    const da = new Set(markiert.map(m => m.farbe));
+    return data.fonds.filter(f => da.has(fondsFarbe(f.nr))).map(f => ({ titel: `Fonds ${f.nr}`, farbe: fondsFarbe(f.nr) }));
+  }, [markiert, data.fonds]);
+  const in3d = ansicht === '3d';
   return (
     <div className="space-y-4">
-      <Universum punkte={data.punkte} kanten={data.kanten} fonds={data.fonds} gewaehlt={gewaehlt} onWahl={setGewaehlt}
-                 hoehe="h-[calc(100dvh-13rem)] min-h-[420px] lg:h-[calc(100dvh-9rem)]" />
-      {wahl && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded border bg-card px-5 py-4">
-          <span className="min-w-0">
-            <span className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span className="h-2.5 w-2.5 rounded-full" style={{ background: fondsFarbe(nr.get(wahl.fonds) ?? 1) }} />Fonds {nr.get(wahl.fonds)}
-            </span>
-            <span className="block text-lg font-semibold">{wahl.adresse}</span>
-            <span className="block text-sm text-muted-foreground">{[wahl.gemeinde, wahl.zone, wahl.flaeche ? `${n(wahl.flaeche)} m²` : null].filter(Boolean).join(' · ')}</span>
-          </span>
-          <span className="text-right"><span className="block text-xs text-muted-foreground">Marge</span><span className="text-lg font-semibold text-violett">{chf(wahl.marge)}</span></span>
+      <div className="flex items-center gap-2">
+        <Reiter<string> wahl={in3d ? '3d' : 'karte'} setWahl={w => setAnsicht(w === '3d' ? '3d' : null)}
+          optionen={[{ wert: 'karte', titel: 'Karte' }, { wert: '3d', titel: '3D' }]} />
+        {in3d && verortet.length > 0 && (
+          <Auswahl label="Liegenschaft" wert={ort?.id ?? ''} setWert={setGewaehlt} className="min-w-0 flex-1 sm:max-w-[360px]"
+            optionen={verortet.map(p => ({ wert: p.id, titel: `${p.adresse}${p.gemeinde ? `, ${p.gemeinde}` : ''}` }))} />
+        )}
+      </div>
+      {!in3d ? (
+        <Universum punkte={data.punkte} kanten={data.kanten} fonds={data.fonds} gewaehlt={gewaehlt} onWahl={setGewaehlt} hoehe={KARTE_HOEHE} />
+      ) : !ziel ? (
+        <Leer titel="Noch keine Liegenschaft verortet." />
+      ) : (
+        <div className="overflow-hidden rounded border">
+          <Suspense fallback={<div className={`grid place-items-center bg-[#DCE6EF] text-sm text-[#333] ${KARTE_HOEHE}`}>3D-Karte wird geladen …</div>}>
+            <Karte3D ziel={ziel} markiert={markiert} legende={legende} intern={false} faerbungen={['modell', 'heizung', 'baujahr', 'hoehe']} hoehe={KARTE_HOEHE} />
+          </Suspense>
         </div>
       )}
+      {(wahl ?? (in3d ? ort : undefined)) && (() => {
+        const w = (wahl ?? ort)!;
+        return (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded border bg-card px-5 py-4">
+            <span className="min-w-0">
+              <span className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ background: fondsFarbe(nr.get(w.fonds) ?? 1) }} />Fonds {nr.get(w.fonds)}
+              </span>
+              <span className="block text-lg font-semibold">{w.adresse}</span>
+              <span className="block text-sm text-muted-foreground">{[w.gemeinde, w.zone, w.flaeche ? `${n(w.flaeche)} m²` : null].filter(Boolean).join(' · ')}</span>
+            </span>
+            <span className="text-right"><span className="block text-xs text-muted-foreground">Marge</span><span className="text-lg font-semibold text-violett">{chf(w.marge)}</span></span>
+          </div>
+        );
+      })()}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useUrlSetzen } from '@/hooks/use-url-wert';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
@@ -13,7 +14,7 @@ import { AuskunftEinfuegen } from '@/components/AuskunftEinfuegen';
 import { weiterverarbeiten } from '@/hooks/use-eigentuemer-lookup';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ExternalLink, MapPin, Phone, Save, Loader2, Bot, RefreshCw, Archive, ClipboardPaste } from 'lucide-react';
+import { ExternalLink, MapPin, Phone, Save, Loader2, Bot, RefreshCw, Archive, ClipboardPaste, Box } from 'lucide-react';
 import { KNOPF, KNOPF_HAUPT, Marke } from '@/components/rahmen';
 import { zoneKurzform } from '@/lib/potential';
 import { supabase } from '@/integrations/supabase/client';
@@ -52,6 +53,7 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
   const startLookup = useStartEigentuemerLookup();
   const extensionAvailable = useExtensionAvailable();
   const setzen = useUrlSetzen();
+  const navigate = useNavigate();
   // Ohne Treffer drehte das Rad für immer (Prüfung der Abläufe).
   const [fehlt, setFehlt] = useState(false);
 
@@ -212,6 +214,8 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
               <div className="flex flex-wrap gap-2">
                 {/* Der gespeicherte Link fehlt bei den meisten Objekten;
                     aus Adresse und Ort lässt er sich immer bilden. */}
+                {/* Haus, Dach, Höhe, Heizung und Zone in 3D (Karte3D). */}
+                <button type="button" className={KNOPF} onClick={() => navigate(`/karte3d?objekt=${data.id}`)}><Box className="h-4 w-4" /> 3D</button>
                 <a className={KNOPF} href={data.google_maps_url || `https://www.google.com/maps/search/?api=1&query=${suche}`} target={FENSTER.karte}><MapPin className="h-4 w-4" /> Maps</a>
                 <a className={KNOPF} href={`https://www.google.com/maps/search/?api=1&query=${suche}&basemap=satellite`} target={FENSTER.karte}><MapPin className="h-4 w-4" /> Satellit</a>
                 {data.gis_url && <a className={KNOPF} href={data.gis_url} target={FENSTER.portal}><ExternalLink className="h-4 w-4" /> GIS</a>}

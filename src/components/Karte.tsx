@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useUrlSetzen } from '@/hooks/use-url-wert';
 import { sicher } from '@/lib/html';
 import { Auswahl } from '@/components/Auswahl';
@@ -293,6 +294,13 @@ interface Treffer { label: string; origin: string; lat: number; lon: number; eig
 
 export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
   const setzeUrl = useUrlSetzen();
+  const navigate = useNavigate();
+  // Dorthin, wo man gerade schaut; ist eine eigene Parzelle gewählt, zu ihr.
+  const in3d = () => {
+    if (auswahl.art === 'eigen') { navigate(`/karte3d?objekt=${auswahl.id}`); return; }
+    const m = karte.current?.getCenter();
+    navigate(m ? `/karte3d?lat=${m.lat.toFixed(5)}&lon=${m.lng.toFixed(5)}` : '/karte3d');
+  };
   const box = useRef<HTMLDivElement | null>(null);
   const karte = useRef<L.Map | null>(null);
   const grundLagen = useRef<L.Layer[]>([]);
@@ -882,7 +890,10 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
                   onClick={() => { setPortfolioAn(v => !v); setGruppe(null); setAuswahl({ art: 'leer' }); markieren(null); }}>
             Portfolios
           </button>
+          {/* In 3D: jedes Haus mit Dach und Höhe, Zonen am Boden (Karte3D). */}
+          <button type="button" className="schalter" onClick={in3d}>3D</button>
         </div>
+        <button type="button" className="rund nur-handy" onClick={in3d} aria-label="3D-Karte">3D</button>
       </header>
 
       {/* Zonenfilter wie bei Immobilienportalen: Chips, mehrere wählbar. */}

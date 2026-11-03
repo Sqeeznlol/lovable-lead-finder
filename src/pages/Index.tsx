@@ -24,6 +24,7 @@ const Auswertung = lazy(() => import('@/components/Auswertung').then(m => ({ def
 const Cockpit = lazy(() => import('@/components/Cockpit').then(m => ({ default: m.Cockpit })));
 const Baugesuche = lazy(() => import('@/components/Baugesuche').then(m => ({ default: m.Baugesuche })));
 const Gelegenheiten = lazy(() => import('@/components/Gelegenheiten').then(m => ({ default: m.Gelegenheiten })));
+const Karte3DSeite = lazy(() => import('@/components/karte3d/Karte3DSeite').then(m => ({ default: m.Karte3DSeite })));
 const Kalender = lazy(() => import('@/components/Kalender').then(m => ({ default: m.Kalender })));
 const Nachbarschaft = lazy(() => import('@/components/Nachbarschaft').then(m => ({ default: m.Nachbarschaft })));
 // Die Karte zieht Leaflet nach -- das gehoert nicht ins erste
@@ -53,7 +54,7 @@ import { useMidnightReset } from '@/hooks/use-phones';
 
 // Jeder Bereich ist eine Adresse: /zentrale, /baugesuche ... ("/" ist
 // das Cockpit). So führt "Zurück" im Browser in den vorigen Bereich.
-const TABS = ['cockpit', 'zentrale', 'baugesuche', 'pipedrive', 'nummern', 'karte', 'nachbarschaft', 'gelegenheiten', 'auswertung', 'kalender', 'uebersicht', 'dashboard', 'master', 'vorauswahl', 'akquise', 'telsuche', 'properties', 'import', 'masterimport', 'phones', 'export', 'admin'] as const;
+const TABS = ['cockpit', 'zentrale', 'baugesuche', 'pipedrive', 'nummern', 'karte', 'nachbarschaft', 'gelegenheiten', 'auswertung', 'kalender', 'karte3d', 'uebersicht', 'dashboard', 'master', 'vorauswahl', 'akquise', 'telsuche', 'properties', 'import', 'masterimport', 'phones', 'export', 'admin'] as const;
 type Tab = typeof TABS[number];
 const istTab = (x: string | undefined): x is Tab => !!x && (TABS as readonly string[]).includes(x);
 
@@ -196,7 +197,8 @@ export default function Index() {
     const j = i + (dx < 0 ? 1 : -1);
     if (j >= 0 && j < mobileBottomTabs.length) gehe(mobileBottomTabs[j]);
   };
-  const karteAktiv = active === 'karte';
+  // Die Karten füllen den Bildschirm: ohne Kopfzeile und Ränder.
+  const karteAktiv = active === 'karte' || active === 'karte3d';
   const akquise = gruppen.find(g => g.titel === 'Akquise')!.eintraege.some(t => t.id === active);
   const titel = tabs.find(t => t.id === active)?.label ?? stillgelegt.find(t => t.id === active)?.label ?? '';
 
@@ -283,6 +285,7 @@ export default function Index() {
             {active === 'nachbarschaft' && <Nachbarschaft />}
             {active === 'gelegenheiten' && <Gelegenheiten />}
             {active === 'kalender' && <Kalender />}
+            {active === 'karte3d' && <Karte3DSeite />}
             {active === 'auswertung' && <Auswertung />}
             {active === 'pipedrive' && <PipedriveBereit />}
             {active === 'masterimport' && <MasterImport />}
@@ -403,8 +406,10 @@ export default function Index() {
           </div>
         )}
 
-        {/* iOS Safari: "Zum Home-Bildschirm" */}
-        {showInstallHint && (
+        {/* iOS Safari: "Zum Home-Bildschirm". Nicht über der 3D-Karte: dort
+            fehlt die untere Leiste, über der er sitzt -- er läge auf Legende
+            und Tafel. */}
+        {showInstallHint && active !== 'karte3d' && (
           <div className="fixed inset-x-3 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-50 animate-fade-in lg:hidden">
             <div className="flex items-start gap-3 rounded-2xl border bg-card p-4 shadow-ceramic-hover">
               <div className="min-w-0 flex-1">
