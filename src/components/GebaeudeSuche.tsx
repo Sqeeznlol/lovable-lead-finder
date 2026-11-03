@@ -9,6 +9,7 @@ import { BILD } from '@/lib/luftbild';
 import { useGwrKodes } from '@/lib/parzelle-gebaeude';
 import { heizGruppe } from '@/lib/karte3d';
 import { downloadXlsx, exportTimestamp } from '@/lib/export-utils';
+import { useGemeindeStats } from '@/hooks/use-master';
 
 /**
  * Suche im eigenen Bestand nach Gebäuden: Gemeinde, Baujahr, Zimmer,
@@ -42,6 +43,9 @@ export function GebaeudeSuche() {
   // Eingaben erst beim Suchen in die Adresse -- sonst sucht jede Taste.
   const [entwurf, setEntwurf] = useState(werte);
   const { data: kodes } = useGwrKodes();
+  // Die Suche braucht den genauen Namen (so nutzt sie den Index; mit
+  // "ähnlich wie" las sie alle Parzellen und lief in die Zeitgrenze).
+  const { data: gemeinden } = useGemeindeStats(null);
   const arten = useMemo(() => [...(kodes?.entries() ?? [])]
     .filter(([k]) => k.startsWith('GKLAS:') && /^GKLAS:11/.test(k)) // Wohngebäude (11xx)
     .map(([k, t]) => ({ wert: k.slice(6), titel: t }))
@@ -93,6 +97,7 @@ export function GebaeudeSuche() {
     <label className="block min-w-0">
       <span className="mb-1 block text-xs text-muted-foreground">{titel}</span>
       <input className={`${FELD} w-full`} value={entwurf[f] ?? ''} placeholder={platz} inputMode={zahlfeld ? 'numeric' : undefined}
+             list={f === 'gemeinde' ? 'gebaeudesuche-gemeinden' : undefined}
              onChange={e => setEntwurf(x => ({ ...x, [f]: e.target.value }))} onKeyDown={e => e.key === 'Enter' && suchen()} />
     </label>
   );
@@ -102,6 +107,9 @@ export function GebaeudeSuche() {
       titel={!gesetzt ? 'Gebäude im Bestand finden' : data ? `${n(data.length)}${data.length >= GRENZE ? '+' : ''} Gebäude gefunden` : 'Suche läuft …'}
       unter="Nach Gemeinde, Baujahr, Zimmern, Wohnfläche und Gebäudeart. Zimmer und Fläche sind die Summe aller Wohnungen eines Gebäudes."
       aktionen={data?.length ? <button type="button" onClick={exportieren} className={KNOPF}><FileSpreadsheet className="h-4 w-4" /> Als Excel</button> : undefined}>
+      <datalist id="gebaeudesuche-gemeinden">
+        {(gemeinden?.gemeinden ?? []).map(g => <option key={g.gemeinde} value={g.gemeinde} />)}
+      </datalist>
       <div className="space-y-3 rounded border bg-card p-4">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
           <div className="col-span-2 sm:col-span-4 lg:col-span-2">{feld('gemeinde', 'Gemeinde', 'z.B. Küsnacht', false)}</div>

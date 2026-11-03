@@ -85,9 +85,13 @@ jobs:
           for i in 1 2 3; do
             r=$(curl -sS -o /dev/null -w '%{http_code} %{time_total}' -X POST "$URL/rest/v1/rpc/gebaeude_suchen" \
               -H "apikey: $KEY" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-              -d '{"p_gemeinde":"Küsnacht","p_baujahr_von":1940,"p_baujahr_bis":1960,"p_zimmer_min":5,"p_wohnflaeche_min":120,"p_grenze":500}')
+              -d '{"p_gemeinde":"Kloten","p_baujahr_von":1920,"p_baujahr_bis":1929,"p_grenze":500}')
             echo "| Gebäudesuche, Lauf $i | ${r%% *} | ${r##* } | | |" >> "$GITHUB_STEP_SUMMARY"
           done
+          # Wie viele Treffer (nur die Zahl -- Adressen gehören nicht ins öffentliche Protokoll).
+          curl -sS -X POST "$URL/rest/v1/rpc/gebaeude_suchen" -H "apikey: $KEY" -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" -d '{"p_gemeinde":"Kloten","p_baujahr_von":1920,"p_baujahr_bis":1929,"p_grenze":1000}' \
+            | jq -r '"Gebäudesuche Kloten 1920-1929: \(if type == "array" then length else "Fehler" end) Treffer"' >> "$GITHUB_STEP_SUMMARY" || true
           miss "3D: Gebäude, 200 nach EGID" "gebaeude?select=egid,heizung_energie&egid=in.($(seq -s, 302061100 302061299))"
           miss "3D: Codetabelle" "gwr_kode?select=merkmal,code,text"
           cat "$GITHUB_STEP_SUMMARY"
