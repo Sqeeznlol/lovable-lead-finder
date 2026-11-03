@@ -92,6 +92,13 @@ jobs:
           curl -sS -X POST "$URL/rest/v1/rpc/gebaeude_suchen" -H "apikey: $KEY" -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" -d '{"p_gemeinde":"Kloten","p_baujahr_von":1920,"p_baujahr_bis":1929,"p_grenze":1000}' \
             | jq -r '"Gebäudesuche Kloten 1920-1929: \(if type == "array" then length else "Fehler" end) Treffer"' >> "$GITHUB_STEP_SUMMARY" || true
+          # Beide Schreibweisen einer Gemeinde ("Küsnacht (ZH)" und "Küsnacht ZH"),
+          # Migration 20261103180000. Nur Zahlen, je Schreibweise.
+          curl -sS -X POST "$URL/rest/v1/rpc/gebaeude_suchen" -H "apikey: $KEY" -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" -d '{"p_gemeinde":"Küsnacht (ZH)","p_baujahr_von":1949,"p_baujahr_bis":1949,"p_grenze":1000}' \
+            | jq -r '"Gebäudesuche Küsnacht 1949: \(if type == "array" then "\(length) Treffer, davon \(map(select(.gemeinde == "Küsnacht ZH")) | length) unter \"Küsnacht ZH\"" else "Fehler \(.message // .)" end)"' >> "$GITHUB_STEP_SUMMARY" || true
+          # Merklisten (Migration 20261103170000): 200 = Tabelle da und lesbar.
+          miss "Merklisten" "merkliste?select=id&limit=1"
           miss "3D: Gebäude, 200 nach EGID" "gebaeude?select=egid,heizung_energie&egid=in.($(seq -s, 302061100 302061299))"
           miss "3D: Codetabelle" "gwr_kode?select=merkmal,code,text"
           cat "$GITHUB_STEP_SUMMARY"
