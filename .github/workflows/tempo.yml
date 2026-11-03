@@ -1,0 +1,116 @@
+name: Tempo
+
+# Misst, wo die Seite Zeit verliert (Julian, 3. November: "es lädt alles
+# sehr sehr langsam"). Zwei Blickwinkel:
+#
+#   1. Von aussen: dieselben Abfragen, die die Startseite (Cockpit), die
+#      Masterliste und die 3D-Karte stellen, angemeldet als aui wie die
+#      Seite -- je dreimal, damit ein Ausreisser nicht als Regel gilt.
+#   2. Von innen: die Statistik der Datenbank (pg_stat_statements),
+#      welche Abfragen insgesamt und je Aufruf die meiste Zeit kosten,
+#      und welche Tabellen ohne Index ganz gelesen werden.
+#
+# Ausgegeben werden nur Laufzeiten, Zählungen und Abfragetexte, die die
+# Datenbank selbst ohne Werte speichert ($1, $2 ...) -- das Protokoll ist
+# öffentlich.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  tempo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Werkzeuge
+        run: sudo apt-get install -y -qq postgresql-client >/dev/null
+
+      - name: Zugangsdaten aus .env lesen
+        run: |
+          grep -E '^VITE_SUPABASE_(URL|PUBLISHABLE_KEY)=' .env \
+            | sed 's/VITE_SUPABASE_URL=/URL=/; s/VITE_SUPABASE_PUBLISHABLE_KEY=/KEY=/' \
+            | tr -d '"' >> "$GITHUB_ENV"
+
+      - name: Antwortzeiten wie im Browser
+        env:
+          KONTO_AUI: ${{ secrets.KONTO_AUI }}
+        run: |
+          set -uo pipefail
+          start=$(date +%s.%N)
+          TOKEN=$(tools/anmelden.sh); echo "::add-mask::$TOKEN"
+          anmeldung=$(echo "$(date +%s.%N) - $start" | bc)
+          woche=$(date -d '7 days ago' +%F); heute=$(date +%F)
+
+          {
+            echo "### Antwortzeiten (Sekunden, drei Läufe)"
+            printf '| Abfrage | Status | 1 | 2 | 3 |\n|---|---|---:|---:|---:|\n'
+            printf '| Anmeldung | | %.2f | | |\n' "$anmeldung"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          miss() { # miss <titel> <pfad> [zählen]
+            zeile="| $1 |"; status=""
+            for i in 1 2 3; do
+              extra=(); [ "${3:-}" = zaehlen ] && extra=(-H "Prefer: count=exact" -I)
+              r=$(curl -sS -o /dev/null -w '%{http_code} %{time_total}' "${extra[@]}" "$URL/rest/v1/$2" \
+                -H "apikey: $KEY" -H "Authorization: Bearer $TOKEN" || echo "000 0")
+              status=${r%% *}; zeile="$zeile $(printf '%.2f' "${r##* }") |"
+            done
+            echo "| $1 | $status |${zeile#*|*|}" >> "$GITHUB_STEP_SUMMARY"
+          }
+
+          miss "Kleinste Abfrage (gwr_kode, 1 Zeile)" "gwr_kode?select=code&limit=1"
+          miss "Cockpit: Vorhaben offen (zählen)" "vorhaben?select=*&zustand=not.in.(abgeschlossen,pausiert)" zaehlen
+          miss "Cockpit: Baugesuche 7 Tage (zählen)" "baugesuch?select=*&quelle=neq.probe&publiziert_am=gte.$woche" zaehlen
+          miss "Cockpit: Baugesuche 7 Tage mit Parzelle (zählen)" "baugesuch?select=*&quelle=neq.probe&publiziert_am=gte.$woche&parzelle_id=not.is.null" zaehlen
+          miss "Cockpit: Gelegenheiten offen (zählen)" "gelegenheit?select=*&zustand=not.in.(abgeschlossen,verworfen)" zaehlen
+          miss "Cockpit: Anrufe fällig (zählen)" "anruf?select=*&wiedervorlage_am=lte.$heute" zaehlen
+          miss "Cockpit: Anfragen offen (zählen)" "anfrage?select=*&bearbeitet=eq.false" zaehlen
+          miss "Cockpit: heisse Gelegenheiten" "gelegenheit?select=id,titel,prioritaet,gelegenheit_parzelle(rolle,properties(gemeinde))&zustand=not.in.(abgeschlossen,verworfen)&order=prioritaet.desc.nullslast&limit=4"
+          miss "Cockpit: Protokoll" "aktivitaet?select=id,aktion,zeit&aktion=in.(abfrage,eigentuemer,archiviert,deal)&order=zeit.desc&limit=5"
+          miss "Cockpit: grösste Margen" "properties?select=id,address,marge_chf&kanton=eq.ZH&ausgeschlossen=eq.false&preselection_status=neq.Ausschliessen&owner_name=is.null&order=marge_chf.desc.nullslast&limit=3"
+          miss "Masterliste: nach Potenzial, 50" "properties?select=id,address,hnf_delta&ausgeschlossen=eq.false&order=hnf_delta.desc.nullslast&limit=50"
+          miss "Masterliste: zählen" "properties?select=*&ausgeschlossen=eq.false" zaehlen
+          miss "3D: Gebäude, 200 nach EGID" "gebaeude?select=egid,heizung_energie&egid=in.($(seq -s, 302061100 302061299))"
+          miss "3D: Codetabelle" "gwr_kode?select=merkmal,code,text"
+          cat "$GITHUB_STEP_SUMMARY"
+
+      - name: Statistik der Datenbank
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
+          psql "$DB" -X -q -v ON_ERROR_STOP=0 >> "$GITHUB_STEP_SUMMARY" 2>&1 <<'SQL'
+          \pset footer off
+          \echo '### Datenbank'
+          \echo '```'
+          select (pg_database_size(current_database())/1024/1024)::int as datenbank_mb,
+                 round(100.0 * sum(heap_blks_hit) / nullif(sum(heap_blks_hit) + sum(heap_blks_read), 0), 1) as cache_treffer_prozent
+            from pg_statio_user_tables;
+          select count(*) filter (where state = 'active') as aktiv, count(*) as verbindungen from pg_stat_activity;
+          \echo
+          \echo 'Tabellen, die oft ganz gelesen werden (ohne Index):'
+          select relname as tabelle, n_live_tup as zeilen, seq_scan as ganz_gelesen, seq_tup_read as zeilen_gelesen, idx_scan as per_index
+            from pg_stat_user_tables where schemaname = 'public' order by seq_tup_read desc limit 12;
+          \echo '```'
+          \echo '### Teuerste Abfragen (pg_stat_statements)'
+          \echo '```'
+          select calls as aufrufe, round(total_exec_time::numeric / 1000, 1) as sekunden_gesamt,
+                 round(mean_exec_time::numeric, 1) as ms_je_aufruf, rows as zeilen,
+                 left(regexp_replace(query, '\s+', ' ', 'g'), 170) as abfrage
+            from extensions.pg_stat_statements
+            where dbid = (select oid from pg_database where datname = current_database())
+              and query !~* '^(begin|commit|set |show |select set_config|deallocate)'
+            order by total_exec_time desc limit 15;
+          \echo
+          \echo 'Je Aufruf am langsamsten (mindestens 5 Aufrufe):'
+          select calls as aufrufe, round(mean_exec_time::numeric, 1) as ms_je_aufruf, round(max_exec_time::numeric, 1) as ms_max,
+                 left(regexp_replace(query, '\s+', ' ', 'g'), 170) as abfrage
+            from extensions.pg_stat_statements
+            where dbid = (select oid from pg_database where datname = current_database()) and calls >= 5
+            order by mean_exec_time desc limit 12;
+          \echo '```'
+          SQL
+          cat "$GITHUB_STEP_SUMMARY"
