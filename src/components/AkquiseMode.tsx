@@ -19,7 +19,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { getMyPhone } from '@/hooks/use-eigentuemer-lookup';
 import { portalUrl } from '@/lib/portal';
 import { FENSTER, oeffne } from '@/lib/fenster';
-import { gehoertInDenAkquiseModus, nurNummerFehlt } from '@/lib/akquise-liste';
+import { gehoertInDenAkquiseModus, gehoertInMerklistenAbfrage, nurNummerFehlt } from '@/lib/akquise-liste';
+import { useQuery } from '@tanstack/react-query';
+import { useUrlWert } from '@/hooks/use-url-wert';
+import { merklisteParzellen, useMerklisten } from '@/components/Merklisten';
 
 interface OwnerEntry {
   raw: string;
@@ -51,6 +54,17 @@ export function AkquiseMode() {
   // wurde. Genau diese gehören aber hierher: hier wird die Nummer
   // gesucht.
   const { data: offeneNummern } = useOffeneNummern(200);
+  // Mit ?merkliste=<id> fragt der Modus die Eigentümer einer Merkliste
+  // ab (Julian, 3. November: "Eigentümer für die ganze Liste").
+  const [merkliste, setMerkliste] = useUrlWert('merkliste');
+  const { data: merklisten } = useMerklisten();
+  const { data: ausMerkliste } = useQuery({
+    // Unter "properties", damit es nach jedem Speichern frisch kommt
+    // (useUpdateProperty erneuert alles unter diesem Schlüssel).
+    queryKey: ['properties', 'merkliste', merkliste],
+    enabled: !!merkliste,
+    queryFn: () => merklisteParzellen(merkliste!),
+  });
   const updateProp = useUpdateProperty();
   const incrementPhone = useIncrementPhoneQuery();
   const { toast } = useToast();
@@ -127,14 +141,18 @@ export function AkquiseMode() {
     ...(queue || []).filter(
       p => !(offeneNummern || []).some(o => o.id === p.id)),
   ];
-  const items = zusammen
-    // Die Regel steht in src/lib/akquise-liste.ts und ist geprüft.
-    .filter(gehoertInDenAkquiseModus)
-    // Zone und Baujahr sind Vorauswahl-Filter. Auf ein Objekt, dessen
-    // Eigentümer schon dasteht, gehören sie nicht angewendet: die
-    // Entscheidung ist dort längst gefallen, es fehlt nur die Nummer.
-    .filter(p => nurNummerFehlt(p) || zoneFilter === 'Alle' || p.zone === zoneFilter)
-    .filter(p => nurNummerFehlt(p) || !baujahrMax || !p.baujahr || p.baujahr <= baujahrMax)
+  // Aus einer Merkliste: nur deren Parzellen, ohne Zone und Baujahr --
+  // die Auswahl hat man mit der Liste schon getroffen.
+  const items = (merkliste
+    ? (ausMerkliste ?? []).filter(gehoertInMerklistenAbfrage)
+    : zusammen
+      // Die Regel steht in src/lib/akquise-liste.ts und ist geprüft.
+      .filter(gehoertInDenAkquiseModus)
+      // Zone und Baujahr sind Vorauswahl-Filter. Auf ein Objekt, dessen
+      // Eigentümer schon dasteht, gehören sie nicht angewendet: die
+      // Entscheidung ist dort längst gefallen, es fehlt nur die Nummer.
+      .filter(p => nurNummerFehlt(p) || zoneFilter === 'Alle' || p.zone === zoneFilter)
+      .filter(p => nurNummerFehlt(p) || !baujahrMax || !p.baujahr || p.baujahr <= baujahrMax))
     .map(p => ({ ...p, _score: calculateDealScore(p) }))
     // Vorn steht, wo nur noch die Nummer fehlt: dort ist der nächste
     // Schritt klein und klar.
@@ -403,7 +421,36 @@ export function AkquiseMode() {
     );
   }
 
+  const listenName = merklisten?.find(l => l.id === merkliste)?.name ?? 'Merkliste';
+  // Woher die Parzellen kommen und wie viele noch offen sind -- sonst
+  // wüsste man im Modus nicht, dass nur die Liste abgearbeitet wird.
+  const merklistenKopf = merkliste ? (
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded border bg-card px-4 py-3">
+      <span className="min-w-0 text-sm">
+        <span className="text-muted-foreground">Eigentümer abfragen aus der Liste </span>
+        <span className="font-medium">{listenName}</span>
+        <span className="text-muted-foreground"> · {ausMerkliste ? `${items.length} offen von ${ausMerkliste.length}` : 'lädt …'}</span>
+      </span>
+      <button type="button" onClick={() => setMerkliste(null)} className="min-h-11 text-sm underline underline-offset-2">Ganze Warteschlange</button>
+    </div>
+  ) : null;
+
+  if (merkliste && !ausMerkliste) {
+    return <div className="mx-auto max-w-3xl space-y-6">{merklistenKopf}</div>;
+  }
+
   if (!current) {
+    if (merkliste) {
+      return (
+        <div className="mx-auto max-w-3xl space-y-6">
+          {merklistenKopf}
+          <Card className="border-none shadow-lg"><CardContent className="space-y-2 p-12 text-center">
+            <h3 className="text-xl font-bold">Alle Eigentümer dieser Liste sind abgefragt</h3>
+            <p className="text-muted-foreground">Oder die übrigen Parzellen sind als erledigt markiert.</p>
+          </CardContent></Card>
+        </div>
+      );
+    }
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Card className="border-none shadow-lg max-w-md w-full">
@@ -419,11 +466,11 @@ export function AkquiseMode() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      {/* Top bar */}
-      {/* List selector */}
-      <div className="max-w-xs">
+      {merklistenKopf}
+      {/* List selector -- nicht, solange eine Merkliste gewählt ist. */}
+      {!merkliste && <div className="max-w-xs">
         <ListSelector />
-      </div>
+      </div>}
 
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div className="flex items-center gap-3 flex-wrap">

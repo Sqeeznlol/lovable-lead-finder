@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Bookmark, FileSpreadsheet, FileText, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { FELD, KNOPF, KNOPF_HAUPT, Leer, LISTE, Seite } from '@/components/rahmen';
+import { FELD, KNOPF, KNOPF_HAUPT, Leer, LISTE, Reiter, Seite } from '@/components/rahmen';
+import { TrefferKarte } from '@/components/TrefferKarte';
 import { Auswahl, AuswahlSuche } from '@/components/Auswahl';
 import { useUrlSetzen, useUrlWert } from '@/hooks/use-url-wert';
 import { BILD } from '@/lib/luftbild';
@@ -38,6 +39,7 @@ export function GebaeudeSuche() {
 
 function Suche() {
   const setzen = useUrlSetzen();
+  const [ansicht] = useUrlWert('ansicht', 'liste');
   const [gemeinde] = useUrlWert('gemeinde'), [bjVon] = useUrlWert('bj_von'), [bjBis] = useUrlWert('bj_bis');
   const [ziMin] = useUrlWert('zi_min'), [ziMax] = useUrlWert('zi_max'), [wfMin] = useUrlWert('wf_min'), [artW] = useUrlWert('art');
   const werte = useMemo(() => ({ gemeinde, bj_von: bjVon, bj_bis: bjBis, zi_min: ziMin, zi_max: ziMax, wf_min: wfMin, art: artW }),
@@ -176,6 +178,8 @@ function Suche() {
                 <Bookmark className="h-4 w-4" /> {markiert.size ? `${n(markiert.size)} markierte als Liste` : `Alle ${n(data.length)} als Liste`}
               </button>
               {markiert.size > 0 && <span className="text-sm text-muted-foreground">{n(markiert.size)} von {n(data.length)} markiert</span>}
+              <span className="sm:ml-auto"><Reiter wahl={ansicht as 'liste' | 'karte'} setWahl={w => setzen({ ansicht: w === 'liste' ? null : w })}
+                optionen={[{ wert: 'liste', titel: 'Liste' }, { wert: 'karte', titel: 'Karte' }]} /></span>
             </div>
             {pdf != null && (
               <div className="flex flex-wrap items-end gap-2 rounded border bg-card p-4">
@@ -194,12 +198,17 @@ function Suche() {
                 filter={filterJetzt}
                 onFertig={id => { setSpeichern(false); setMarkiert(new Set()); setzen({ liste: id }); }} />
             )}
+            {ansicht === 'karte' ? (
+              <TrefferKarte markiert={markiert} onMarkieren={umschalten}
+                treffer={data.map(t => ({ egid: t.egid, adresse: t.adresse, lat: t.lat, lon: t.lon, baujahr: t.baujahr, eigentuemer: eigner?.get(t.parzelle_id), heizung: heizung(t), zusatz: art(t) }))} />
+            ) : (
             <ul className={LISTE}>
               {data.map(t => (
                 <GebaeudeZeile key={t.egid} t={t} eigentuemer={eigner?.get(t.parzelle_id)} art={art(t)} heizung={heizung(t)}
                   markiert={markiert.has(t.egid)} onMarkieren={() => umschalten(t.egid)} onOeffnen={() => setzen({ parzelle: t.parzelle_id })} />
               ))}
             </ul>
+            )}
           </>
         )}
       {data && data.length >= GRENZE && <p className="text-sm text-muted-foreground">Angezeigt werden die {GRENZE} grössten. Filter enger setzen, um alle zu sehen.</p>}

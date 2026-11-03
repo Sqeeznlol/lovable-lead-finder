@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, FileSpreadsheet, Printer, Trash2 } from 'lucide-react';
+import { ArrowLeft, FileSpreadsheet, Printer, Trash2, UserSearch } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { TrefferKarte } from '@/components/TrefferKarte';
 import { supabase } from '@/integrations/supabase/client';
-import { FELD, KNOPF, KNOPF_HAUPT, Leer, LISTE, Seite } from '@/components/rahmen';
+import { FELD, KNOPF, KNOPF_HAUPT, Leer, LISTE, Reiter, Seite } from '@/components/rahmen';
 import { Auswahl } from '@/components/Auswahl';
 import { useToast } from '@/hooks/use-toast';
-import { useUrlSetzen } from '@/hooks/use-url-wert';
+import { useUrlSetzen, useUrlWert } from '@/hooks/use-url-wert';
 import { BILD } from '@/lib/luftbild';
 import { useGwrKodes } from '@/lib/parzelle-gebaeude';
 import { HEIZ_GRUPPEN, heizGruppe } from '@/lib/karte3d';
@@ -25,6 +27,8 @@ export interface Treffer {
   parzelle_id: string; adresse: string | null; gemeinde: string | null; egrid: string; egid: number; klasse: number | null;
   baujahr: number | null; zimmer: number | null; wohnflaeche: number | null; wohnungen: number | null; geschosse: number | null;
   heizung_energie: number | null;
+  /** Punkt in der Parzelle (WGS84), ab Migration merkliste_stand_karte. */
+  lat?: number | null; lon?: number | null;
 }
 export type Filter = Record<string, string | null>;
 interface Liste { id: string; name: string; erstellt_am: string; filter: Filter; merkliste_eintrag: { count: number }[] }
@@ -60,13 +64,32 @@ export function useMerklisten() {
   });
 }
 
+/**
+ * Die Parzellen einer Merkliste, ganz (alle Spalten), für den
+ * Akquise-Modus. In Paketen: 500 Kennungen in einer Adresse wären zu lang.
+ */
+export async function merklisteParzellen(liste: string) {
+  const e = await db.from('merkliste_eintrag').select('parzelle_id').eq('liste_id', liste);
+  if (e.error) throw new Error(e.error.message);
+  const ids = [...new Set((e.data as { parzelle_id: string | null }[]).map(x => x.parzelle_id).filter(Boolean) as string[])];
+  const pakete: string[][] = [];
+  for (let i = 0; i < ids.length; i += 150) pakete.push(ids.slice(i, i + 150));
+  const r = await Promise.all(pakete.map(pk => supabase.from('properties').select('*').in('id', pk)));
+  const f = r.find(x => x.error);
+  if (f?.error) throw new Error(f.error.message);
+  return r.flatMap(x => x.data ?? []);
+}
+
 /** Eine Zeile mit Häkchen, wie in der Suche und in der Liste. */
-export function GebaeudeZeile({ t, eigentuemer, markiert, onMarkieren, onOeffnen, art, heizung }: {
+export function GebaeudeZeile({ t, eigentuemer, markiert, onMarkieren, onOeffnen, art, heizung, unten }: {
   t: Treffer; eigentuemer: string | null | undefined; markiert?: boolean; onMarkieren?: () => void; onOeffnen: () => void;
   art: string | null; heizung: string | null;
+  /** Unter der Zeile, z.B. Stand und Notiz in der Merkliste. */
+  unten?: ReactNode;
 }) {
   return (
-    <li className={`flex items-stretch ${markiert ? 'bg-accent/[0.06]' : ''}`}>
+    <li className={markiert ? 'bg-accent/[0.06]' : ''}>
+    <div className="flex items-stretch">
       {onMarkieren && (
         // Eigenes Feld links, 44 px breit: ein Tipp aufs Häkchen markiert,
         // ein Tipp auf die Zeile öffnet die Parzelle -- nicht beides.
@@ -91,6 +114,8 @@ export function GebaeudeZeile({ t, eigentuemer, markiert, onMarkieren, onOeffnen
           <span><span className="block text-[11px] uppercase tracking-wide text-muted-foreground">Whg.</span>{n(t.wohnungen)}</span>
         </span>
       </button>
+    </div>
+    {unten && <div className={`pb-4 pr-5 ${onMarkieren ? 'pl-14' : 'pl-5'}`}>{unten}</div>}
     </li>
   );
 }
@@ -184,7 +209,11 @@ export function MerklistenSpalte({ aktiv }: { aktiv?: string | null }) {
   );
 }
 
-export type Eintrag = Treffer & { eigentuemer: string | null };
+export type Eintrag = Treffer & {
+  eigentuemer: string | null;
+  // Ab Migration merkliste_stand_karte; davor fehlen sie (= offen).
+  stand?: string | null; notiz?: string | null; stand_am?: string | null; telefon_bekannt?: boolean | null; parzelle_status?: string | null;
+};
 
 export function kennzahlenVon(d: Eintrag[]) {
   const bj = d.map(t => t.baujahr).filter((x): x is number => x != null);
@@ -193,6 +222,7 @@ export function kennzahlenVon(d: Eintrag[]) {
     baujahr: bj.length ? Math.round(bj.reduce((a, b) => a + b, 0) / bj.length) : null,
     fossil: d.filter(t => t.heizung_energie === 7520 || t.heizung_energie === 7530).length,
     eigner: d.filter(t => t.eigentuemer).length,
+    angesprochen: d.filter(t => t.stand && t.stand !== 'offen').length,
   };
 }
 
@@ -209,13 +239,48 @@ export function pdfDrucken(name: string) {
   window.print();
 }
 
-/** Eine gespeicherte Liste: heutige Werte, Excel, PDF, Einträge entfernen. */
+/**
+ * Wie weit man bei einem Gebäude der Liste ist (Spalte stand in
+ * merkliste_eintrag). Eigene Werte, nicht properties.status -- jener
+ * steuert Akquise-Modus und Pipedrive-Export.
+ */
+export const STAENDE = [
+  { wert: 'offen', titel: 'Offen' },
+  { wert: 'brief', titel: 'Brief geschickt' },
+  { wert: 'angerufen', titel: 'Angerufen' },
+  { wert: 'interesse', titel: 'Interesse' },
+  { wert: 'termin', titel: 'Termin' },
+  { wert: 'kein_interesse', titel: 'Kein Interesse' },
+] as const;
+export const standTitel = (s: string | null | undefined) => STAENDE.find(x => x.wert === (s ?? 'offen'))?.titel ?? 'Offen';
+
+/** Stand und Notiz unter einer Zeile der Liste; speichert sofort bzw. beim Verlassen des Felds. */
+function StandUndNotiz({ t, onSpeichern }: { t: Eintrag; onSpeichern: (w: { stand?: string; notiz?: string | null }) => Promise<boolean> }) {
+  const [notiz, setNotiz] = useState(t.notiz ?? '');
+  useEffect(() => { setNotiz(t.notiz ?? ''); }, [t.notiz]);
+  const notizSichern = () => { if ((t.notiz ?? '') !== notiz.trim()) void onSpeichern({ notiz: notiz.trim() || null }); };
+  return (
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <Auswahl label={`Stand ${t.adresse ?? t.egid}`} klein wert={t.stand ?? 'offen'} setWert={w => void onSpeichern({ stand: w })}
+        className="w-full sm:w-[190px]" optionen={STAENDE.map(x => ({ wert: x.wert, titel: x.titel }))} />
+      <input className={`${FELD} h-10 w-full flex-1 text-sm`} value={notiz} maxLength={2000} placeholder="Notiz, z.B. Rückruf am Montag"
+             aria-label={`Notiz ${t.adresse ?? t.egid}`} onChange={e => setNotiz(e.target.value)} onBlur={notizSichern}
+             onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />
+      {t.stand_am && <span className="shrink-0 text-xs text-muted-foreground">{new Date(t.stand_am).toLocaleDateString('de-CH')}</span>}
+    </div>
+  );
+}
+
+/** Eine gespeicherte Liste: heutige Werte, Stand je Gebäude, Karte, Excel, PDF. */
 export function MerklisteAnsicht({ id }: { id: string }) {
   const setzen = useUrlSetzen();
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const { toast } = useToast();
   const { data: kodes } = useGwrKodes();
   const { data: listen } = useMerklisten();
+  const [ansicht] = useUrlWert('ansicht', 'liste');
+  const [standFilter] = useUrlWert('stand');
   const liste = listen?.find(l => l.id === id);
   const { data, error } = useQuery({
     queryKey: ['merkliste', id],
@@ -230,10 +295,28 @@ export function MerklisteAnsicht({ id }: { id: string }) {
   const heizung = (t: Treffer) => (t.heizung_energie == null ? null : kodes?.get(`GENH:${t.heizung_energie}`) ?? `Code ${t.heizung_energie}`);
   const art = (t: Treffer) => (t.klasse == null ? null : kodes?.get(`GKLAS:${t.klasse}`) ?? null);
   const kennzahlen = useMemo(() => kennzahlenVon(data ?? []), [data]);
+  const sichtbar = useMemo(() => (data ?? []).filter(t => !standFilter || (t.stand ?? 'offen') === standFilter), [data, standFilter]);
+  const zaehler = useMemo(() => new Map(STAENDE.map(x => [x.wert, (data ?? []).filter(t => (t.stand ?? 'offen') === x.wert).length])), [data]);
+  // Was der Akquise-Modus noch abfragen kann: ohne Eigentümer oder ohne Nummer.
+  const abzufragen = (data ?? []).filter(t => !t.eigentuemer || t.telefon_bekannt === false).length;
 
+  // Sofort im Bildschirm, dann in die Datenbank; geht es nicht, kommt der
+  // alte Stand zurück und eine Meldung.
+  const eintragSpeichern = async (egid: number, w: { stand?: string; notiz?: string | null }) => {
+    const alt = qc.getQueryData<Eintrag[]>(['merkliste', id]);
+    const aenderung = { ...w, ...(w.stand ? { stand_am: new Date().toISOString() } : {}) };
+    qc.setQueryData<Eintrag[]>(['merkliste', id], d => d?.map(t => (t.egid === egid ? { ...t, ...aenderung } : t)));
+    const r = await db.from('merkliste_eintrag').update(aenderung).eq('liste_id', id).eq('egid', egid);
+    if (r.error) {
+      qc.setQueryData(['merkliste', id], alt);
+      toast({ title: 'Nicht gespeichert', description: /stand|notiz|column/i.test(r.error.message) ? 'Stand und Notiz brauchen die Migration merkliste_stand_karte.' : r.error.message, variant: 'destructive' });
+      return false;
+    }
+    return true;
+  };
   const drucken = () => pdfDrucken(liste?.name ?? 'Merkliste');
   const exportieren = () => data && downloadXlsx(`${(liste?.name ?? 'merkliste').replace(/[^\wäöüÄÖÜ-]+/g, '-')}-${exportTimestamp()}.xlsx`, 'Gebäude', data.map(t => ({
-    Adresse: t.adresse, Gemeinde: t.gemeinde, Eigentümer: t.eigentuemer ?? '', EGRID: t.egrid, EGID: t.egid, Gebäudeart: art(t), Baujahr: t.baujahr,
+    Adresse: t.adresse, Gemeinde: t.gemeinde, Eigentümer: t.eigentuemer ?? '', Stand: standTitel(t.stand), Notiz: t.notiz ?? '', EGRID: t.egrid, EGID: t.egid, Gebäudeart: art(t), Baujahr: t.baujahr,
     Zimmer: t.zimmer, 'Wohnfläche m²': t.wohnflaeche, Wohnungen: t.wohnungen, Geschosse: t.geschosse, Heizung: heizung(t),
   })));
   const entfernen = async () => {
@@ -251,7 +334,7 @@ export function MerklisteAnsicht({ id }: { id: string }) {
     setzen({ liste: null });
   };
   const umschalten = (egid: number) => setMarkiert(m => { const x = new Set(m); if (x.has(egid)) x.delete(egid); else x.add(egid); return x; });
-  const alle = !!data?.length && markiert.size === data.length;
+  const alle = !!sichtbar.length && sichtbar.every(t => markiert.has(t.egid));
 
   // Nach dem Speichern stand man sonst mitten auf der Seite, wo vorher
   // die Treffer waren (iPhone, 3. November) -- die Liste beginnt oben.
@@ -267,20 +350,34 @@ export function MerklisteAnsicht({ id }: { id: string }) {
           unter={liste ? filterText(liste.filter) || 'Aus der Gebäudesuche.' : undefined}
           kennzahlen={data ? [
             { titel: 'Gebäude', wert: n(kennzahlen.gebaeude) },
-            // "um": eine reine Zahl bekäme in der Leiste ein Tausender-Apostroph (1'947).
-            { titel: 'Baujahr im Schnitt', wert: kennzahlen.baujahr ? `um ${kennzahlen.baujahr}` : '–' },
-            { titel: 'Öl oder Gas', wert: n(kennzahlen.fossil) },
             { titel: 'Eigentümer bekannt', wert: n(kennzahlen.eigner) },
+            { titel: 'Angesprochen', wert: n(kennzahlen.angesprochen) },
+            { titel: 'Öl oder Gas', wert: n(kennzahlen.fossil) },
           ] : undefined}
           aktionen={<>
             <button type="button" onClick={drucken} disabled={!data?.length} className={`${KNOPF_HAUPT} disabled:opacity-50`}><Printer className="h-4 w-4" /> Als PDF</button>
             <button type="button" onClick={exportieren} disabled={!data?.length} className={`${KNOPF} disabled:opacity-50`}><FileSpreadsheet className="h-4 w-4" /> Als Excel</button>
           </>}
           seite={<MerklistenSpalte aktiv={id} />}>
+          {/* Der nächste Schritt mit der Liste: die fehlenden Eigentümer
+              im Akquise-Modus abfragen, nur diese Parzellen. */}
+          {!!data?.length && abzufragen > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded border bg-card p-4">
+              <p className="min-w-0 text-sm"><span className="font-medium">{n(abzufragen)} von {n(data.length)}</span>
+                <span className="text-muted-foreground"> ohne Eigentümer oder Nummer. Im Akquise-Modus nacheinander abfragen, höchstens 5 je Telefon und Tag.</span></p>
+              <button type="button" onClick={() => navigate(`/akquise?merkliste=${id}`)} className={KNOPF_HAUPT}><UserSearch className="h-4 w-4" /> Eigentümer abfragen</button>
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={() => setzen({ liste: null })} className={KNOPF}><ArrowLeft className="h-4 w-4" /> Zur Suche</button>
+            <button type="button" onClick={() => setzen({ liste: null, ansicht: null, stand: null })} className={KNOPF}><ArrowLeft className="h-4 w-4" /> Zur Suche</button>
+            <Reiter wahl={ansicht as 'liste' | 'karte'} setWahl={w => setzen({ ansicht: w === 'liste' ? null : w })}
+              optionen={[{ wert: 'liste', titel: 'Liste' }, { wert: 'karte', titel: 'Karte' }]} />
             {!!data?.length && (
-              <button type="button" onClick={() => setMarkiert(alle ? new Set() : new Set(data.map(t => t.egid)))} className={KNOPF}>
+              <Auswahl label="Nach Stand" wert={standFilter ?? ''} setWert={w => setzen({ stand: w || null })} className="min-w-[180px]"
+                optionen={[{ wert: '', titel: `Alle Stände (${n(data.length)})` }, ...STAENDE.filter(x => zaehler.get(x.wert)).map(x => ({ wert: x.wert, titel: `${x.titel} (${n(zaehler.get(x.wert))})` }))]} />
+            )}
+            {!!sichtbar.length && (
+              <button type="button" onClick={() => setMarkiert(alle ? new Set() : new Set(sichtbar.map(t => t.egid)))} className={KNOPF}>
                 {alle ? 'Keine markieren' : 'Alle markieren'}
               </button>
             )}
@@ -290,17 +387,23 @@ export function MerklisteAnsicht({ id }: { id: string }) {
           {error ? <Leer titel="Die Liste ging nicht auf.">{error instanceof Error ? error.message : String(error)}</Leer>
             : !data ? <Leer titel="Lädt …" />
             : !data.length ? <Leer titel="Die Liste ist leer." />
+            : ansicht === 'karte' ? (
+              <TrefferKarte markiert={markiert} onMarkieren={umschalten}
+                treffer={sichtbar.map(t => ({ egid: t.egid, adresse: t.adresse, lat: t.lat, lon: t.lon, baujahr: t.baujahr, eigentuemer: t.eigentuemer, heizung: heizung(t), zusatz: standTitel(t.stand) }))} />
+            )
+            : !sichtbar.length ? <Leer titel="Kein Gebäude mit diesem Stand." />
             : (
               <ul className={LISTE}>
-                {data.map(t => (
+                {sichtbar.map(t => (
                   <GebaeudeZeile key={t.egid} t={t} eigentuemer={t.eigentuemer} art={art(t)} heizung={heizung(t)}
-                    markiert={markiert.has(t.egid)} onMarkieren={() => umschalten(t.egid)} onOeffnen={() => setzen({ parzelle: t.parzelle_id })} />
+                    markiert={markiert.has(t.egid)} onMarkieren={() => umschalten(t.egid)} onOeffnen={() => setzen({ parzelle: t.parzelle_id })}
+                    unten={<StandUndNotiz t={t} onSpeichern={w => eintragSpeichern(t.egid, w)} />} />
                 ))}
               </ul>
             )}
         </Seite>
       </div>
-      {liste && data && <GebaeudeDruck name={liste.name} ueber="Merkliste" zeilen={data} art={art} heizung={heizung}
+      {liste && data && <GebaeudeDruck name={liste.name} ueber="Merkliste" zeilen={data} art={art} heizung={heizung} mitStand
         unterzeile={[filterText(liste.filter), `gespeichert am ${datum(liste.erstellt_am)}`].filter(Boolean).join(' · ')} />}
     </>
   );
@@ -318,8 +421,8 @@ export function MerklisteAnsicht({ id }: { id: string }) {
  */
 const EXAKT = { WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' } as const;
 
-export function GebaeudeDruck({ name, ueber, unterzeile, zeilen, art, heizung }: {
-  name: string; ueber: string; unterzeile: string; zeilen: Eintrag[];
+export function GebaeudeDruck({ name, ueber, unterzeile, zeilen, art, heizung, mitStand = false }: {
+  name: string; ueber: string; unterzeile: string; zeilen: Eintrag[]; mitStand?: boolean;
   art: (t: Treffer) => string | null; heizung: (t: Treffer) => string | null;
 }) {
   const kennzahlen = kennzahlenVon(zeilen);
@@ -410,7 +513,10 @@ export function GebaeudeDruck({ name, ueber, unterzeile, zeilen, art, heizung }:
                 <td className="py-2 pr-3"><span className="font-medium">{t.adresse ?? `EGRID ${t.egrid}`}</span><br /><span className="text-[#646B78]">{[t.gemeinde, art(t)].filter(Boolean).join(' · ')}</span>
                   {/* Wie im Excel: die Nummern, mit denen man die Parzelle im Grundbuch und im Register findet. */}
                   <br /><span className="text-[8px] tracking-wide text-[#9A9FA8]">EGRID {t.egrid} · EGID {t.egid}</span></td>
-                <td className="py-2 pr-3">{t.eigentuemer ?? <span className="text-[#9A9FA8]">noch offen</span>}</td>
+                <td className="py-2 pr-3">{t.eigentuemer ?? <span className="text-[#9A9FA8]">noch offen</span>}
+                  {/* Aus der Merkliste: wie weit man ist, und die Notiz. */}
+                  {mitStand && <span className="mt-0.5 block text-[8.5px] text-[#646B78]"><span className="font-medium text-[#111]">{standTitel(t.stand)}</span>{t.notiz ? ` · ${t.notiz}` : ''}</span>}
+                </td>
                 <td className="py-2 pr-3 text-right tabular-nums">{t.baujahr ?? '–'}</td>
                 <td className="py-2 pr-3 text-right tabular-nums">{n(t.zimmer)}</td>
                 <td className="whitespace-nowrap py-2 pr-3 text-right tabular-nums">{n(t.wohnflaeche, ' m²')}</td>

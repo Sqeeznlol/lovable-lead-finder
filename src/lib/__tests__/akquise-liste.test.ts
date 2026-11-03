@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { gehoertInDenAkquiseModus, nurNummerFehlt } from '../akquise-liste';
+import { gehoertInDenAkquiseModus, gehoertInMerklistenAbfrage, nurNummerFehlt } from '../akquise-liste';
 
 describe('gehoertInDenAkquiseModus', () => {
   it('nimmt auf, wo der Eigentümer feststeht und die Nummer fehlt', () => {
@@ -51,5 +51,23 @@ describe('nurNummerFehlt', () => {
     expect(nurNummerFehlt({ owner_name: 'A. Meier' })).toBe(true);
     expect(nurNummerFehlt({ owner_name: 'A. Meier', owner_phone: '+41…' })).toBe(false);
     expect(nurNummerFehlt({})).toBe(false);
+  });
+});
+
+describe('gehoertInMerklistenAbfrage', () => {
+  // Wer eine Liste speichert, will genau diese Parzellen abfragen --
+  // auch wenn eine davon "Vorausgewählt" heisst.
+  it('nimmt eine Parzelle ohne Eigentümer, gleich welcher Status', () => {
+    expect(gehoertInMerklistenAbfrage({ status: 'Vorausgewählt', owner_name: null, is_queried: false })).toBe(true);
+    expect(gehoertInMerklistenAbfrage({ status: 'Neu', owner_name: '', is_queried: false })).toBe(true);
+  });
+  it('nimmt eine mit Eigentümer, aber ohne Nummer', () => {
+    expect(gehoertInMerklistenAbfrage({ status: 'Eigentümer ermittelt', owner_name: 'Muster AG', owner_phone: null, is_queried: true })).toBe(true);
+  });
+  it('lässt aus, was fertig oder erledigt ist', () => {
+    expect(gehoertInMerklistenAbfrage({ owner_name: 'Muster AG', owner_phone: '044 000 00 00', is_queried: true })).toBe(false);
+    expect(gehoertInMerklistenAbfrage({ status: 'Kein Interesse', owner_name: null, is_queried: false })).toBe(false);
+    // Abgefragt, aber kein Eigentümer gefunden: nicht nochmals eine Abfrage verbrauchen.
+    expect(gehoertInMerklistenAbfrage({ owner_name: null, is_queried: true })).toBe(false);
   });
 });

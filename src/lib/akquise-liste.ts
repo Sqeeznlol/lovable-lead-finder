@@ -57,3 +57,17 @@ export function nurNummerFehlt(p: ListenObjekt): boolean {
   return !!String(p.owner_name ?? '').trim()
     && !String(p.owner_phone ?? '').trim();
 }
+
+/**
+ * Was aus einer Merkliste noch abzufragen ist: ohne Eigentümer, oder
+ * mit Eigentümer, aber ohne Nummer. Anders als oben zählt der Status
+ * nicht -- wer eine Liste gespeichert hat, will genau diese Parzellen,
+ * auch wenn eine davon schon "Vorausgewählt" heisst. Nur was
+ * ausdrücklich erledigt ist, fällt weg.
+ */
+export function gehoertInMerklistenAbfrage(p: ListenObjekt): boolean {
+  if (p.is_queried && String(p.owner_phone ?? '').trim()) return false;
+  if (['Exportiert', 'Archiviert', 'Nicht interessant', 'Kein Interesse', 'Ausgeblendet'].includes(String(p.status ?? ''))) return false;
+  if (!String(p.owner_name ?? '').trim()) return !p.is_queried;
+  return !String(p.owner_phone ?? '').trim();
+}
