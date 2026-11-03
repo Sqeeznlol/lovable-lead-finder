@@ -19,6 +19,7 @@ import { KNOPF, KNOPF_HAUPT, Marke } from '@/components/rahmen';
 import { zoneKurzform } from '@/lib/potential';
 import { supabase } from '@/integrations/supabase/client';
 import { BaugesucheParzelle } from '@/components/BaugesucheParzelle';
+import { heizungBeschreiben, useGwrKodes, useParzellenGebaeude } from '@/lib/parzelle-gebaeude';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Tables } from '@/integrations/supabase/types';
@@ -56,6 +57,11 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
   const navigate = useNavigate();
   // Ohne Treffer drehte das Rad für immer (Prüfung der Abläufe).
   const [fehlt, setFehlt] = useState(false);
+  // Die Gebäude der Parzelle aus dem Register (Ansicht parzelle_gebaeude);
+  // die alten Felder baujahr, geschosse, wohnungen bleiben Rückfall.
+  const { data: register } = useParzellenGebaeude([data?.egrid]);
+  const { data: kodes } = useGwrKodes();
+  const reg = data?.egrid ? register?.get(data.egrid) : undefined;
 
   useEffect(() => {
     if (!id) { setData(null); return; }
@@ -200,9 +206,14 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
               {/* Merkmal-Raster mit kleinen Grossbuchstaben wie in der Vorlage. */}
               <dl className="grid grid-cols-2 gap-x-6 gap-y-4 border-t pt-5 sm:grid-cols-3">
                 {([
-                  ['Zone', data.zone], ['Kategorie', data.kategorie], ['Baujahr', data.baujahr],
+                  ['Zone', data.zone], ['Kategorie', data.kategorie],
+                  ['Baujahr', reg?.haupt_baujahr ?? data.baujahr],
                   ['Grundstück', zahl(data.area, ' m²')], ['Gebäudefläche', zahl(data.gebaeudeflaeche, ' m²')], ['HNF geschätzt', zahl(data.hnf_schaetzung, ' m²')],
-                  ['Reserve HNF', data.hnf_delta && data.hnf_delta > 0 ? zahl(data.hnf_delta, ' m²') : '–'], ['Geschosse', data.geschosse], ['Wohnungen', data.wohnungen],
+                  ['Reserve HNF', data.hnf_delta && data.hnf_delta > 0 ? zahl(data.hnf_delta, ' m²') : '–'],
+                  ['Geschosse', reg?.geschosse_max ?? data.geschosse], ['Wohnungen', reg?.wohnungen ?? data.wohnungen],
+                  ['Gebäude', reg ? (reg.gebaeude === 1 ? '1' : `${reg.gebaeude}${reg.baujahr_aeltestes && reg.baujahr_juengstes && reg.baujahr_aeltestes !== reg.baujahr_juengstes ? `, ${reg.baujahr_aeltestes}–${reg.baujahr_juengstes}` : ''}`) : null],
+                  ['Energiebezugsfläche', reg?.energieflaeche ? zahl(reg.energieflaeche, ' m²') : null],
+                  ['Heizung', heizungBeschreiben(reg, kodes)],
                 ] as [string, unknown][]).map(([t, v]) => (
                   <div key={t} className="min-w-0">
                     <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">{t}</dt>

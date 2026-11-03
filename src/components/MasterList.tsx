@@ -12,6 +12,7 @@ import { Gesamtliste } from './Gesamtliste';
 import { beurteile, EMPFEHLUNG_LABEL, type Empfehlung } from '@/lib/akquise';
 import { LAGE_LABEL } from '@/lib/gemeinden-zh';
 import { FENSTER } from '@/lib/fenster';
+import { heizungBeschreiben, heizungKurz, useGwrKodes, useParzellenGebaeude } from '@/lib/parzelle-gebaeude';
 
 const m2 = (v: number | null | undefined) =>
   v == null ? '—' : `${Math.round(Number(v)).toLocaleString('de-CH')} m²`;
@@ -74,6 +75,10 @@ export function MasterList() {
   // vermischt in derselben Liste.
   const { current } = useCanton();
   const { data, isLoading } = useMasterProperties({ ...filters, kanton: current });
+  // Baujahr und Heizung aus dem Gebäuderegister, je Parzelle der Seite.
+  // Das alte Feld baujahr bleibt Rückfall für Parzellen ohne Eintrag.
+  const { data: register } = useParzellenGebaeude((data?.rows ?? []).map(p => p.egrid));
+  const { data: kodes } = useGwrKodes();
   const total = data?.total ?? 0;
   const totalPages = Math.ceil(total / (filters.pageSize ?? 50));
 
@@ -185,18 +190,19 @@ export function MasterList() {
                     <th className="whitespace-nowrap p-3 text-right font-medium">Marge&nbsp;Mio</th>
                     <th className="whitespace-nowrap p-3 text-right font-medium">Bebaubar</th>
                     <th className="whitespace-nowrap p-3 text-right font-medium">Bj.</th>
+                    <th className="whitespace-nowrap p-3 text-left font-medium">Heizung</th>
                     <th className="p-3 text-left font-medium">Vorwahl</th>
                     <th className="p-3 font-medium" />
                   </tr>
                 </thead>
                 <tbody>
                   {isLoading && (
-                    <tr><td colSpan={10} className="text-center p-12 text-muted-foreground">
+                    <tr><td colSpan={11} className="text-center p-12 text-muted-foreground">
                       <Loader2 className="h-5 w-5 animate-spin inline" />
                     </td></tr>
                   )}
                   {!isLoading && data?.rows.length === 0 && (
-                    <tr><td colSpan={10} className="text-center p-12 text-muted-foreground">
+                    <tr><td colSpan={11} className="text-center p-12 text-muted-foreground">
                       Keine Datensätze gefunden.
                     </td></tr>
                   )}
@@ -272,7 +278,11 @@ export function MasterList() {
                           : mio(p.marge_chf)}
                       </td>
                       <td className="whitespace-nowrap p-3 text-right tabular-nums text-muted-foreground">{m2(p.bebaubar_m2 ?? p.area)}</td>
-                      <td className="whitespace-nowrap p-3 text-right tabular-nums">{p.baujahr || '—'}</td>
+                      <td className="whitespace-nowrap p-3 text-right tabular-nums">{register?.get(p.egrid ?? '')?.haupt_baujahr || p.baujahr || '—'}</td>
+                      <td className="whitespace-nowrap p-3 text-left text-muted-foreground"
+                          title={heizungBeschreiben(register?.get(p.egrid ?? ''), kodes) ?? 'Kein Eintrag im Gebäuderegister'}>
+                        {heizungKurz(register?.get(p.egrid ?? ''), kodes) ?? '—'}
+                      </td>
                       <td className="p-3">
                         <Badge
                           variant="outline"
