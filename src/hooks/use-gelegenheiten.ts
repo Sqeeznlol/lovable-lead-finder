@@ -12,7 +12,7 @@ export const ZUSTAENDE: [Zustand, string][] = [
 ];
 export const ANLAESSE: Record<string, string> = {
   baugesuch: 'Baugesuch', arrondierung: 'Arrondierung', ausnuetzungsreserve: 'Ausnützungsreserve',
-  zonenaenderung: 'Zonenänderung', investorentreffer: 'Investorentreffer', manuell: 'Manuell',
+  zonenaenderung: 'Zonenänderung', investorentreffer: 'Investorentreffer', vermittlung: 'Maklermandat', verkauf: 'Verkauf', manuell: 'Manuell',
 };
 
 export interface Parz { id: string; address: string | null; owner_name: string | null; area: number | null; gemeinde: string | null; egrid: string | null }

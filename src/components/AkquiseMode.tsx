@@ -23,6 +23,7 @@ import { gehoertInDenAkquiseModus, gehoertInMerklistenAbfrage, nurNummerFehlt } 
 import { useQuery } from '@tanstack/react-query';
 import { useUrlWert } from '@/hooks/use-url-wert';
 import { merklisteParzellen, useMerklisten } from '@/components/Merklisten';
+import { gelegenheitFortschritt, mandatLesen, mandatParzellen } from '@/lib/mandat';
 
 interface OwnerEntry {
   raw: string;
@@ -56,14 +57,22 @@ export function AkquiseMode() {
   const { data: offeneNummern } = useOffeneNummern(200);
   // Mit ?merkliste=<id> fragt der Modus die Eigentümer einer Merkliste
   // ab (Julian, 3. November: "Eigentümer für die ganze Liste").
-  const [merkliste, setMerkliste] = useUrlWert('merkliste');
+  const [merklisteWert, setMerklisteWert] = useUrlWert('merkliste');
+  // Mit ?mandant=<id> die offenen Gelegenheiten eines Kunden -- mit
+  // seiner Anweisung im Kopf (Tims Abschnitt 5: project-specific
+  // instructions). Beides führt dieselbe Schiene: eine Liste von
+  // Parzellen statt der ganzen Warteschlange.
+  const [mandantWert, setMandantWert] = useUrlWert('mandant');
+  const merkliste = merklisteWert ?? (mandantWert ? `mandant:${mandantWert}` : null);
+  const setMerkliste = (w: string | null) => { setMerklisteWert(w); if (!w) setMandantWert(null); };
   const { data: merklisten } = useMerklisten();
+  const { data: mandat } = useQuery({ queryKey: ['mandat', mandantWert], enabled: !!mandantWert, queryFn: () => mandatLesen(mandantWert!) });
   const { data: ausMerkliste } = useQuery({
     // Unter "properties", damit es nach jedem Speichern frisch kommt
     // (useUpdateProperty erneuert alles unter diesem Schlüssel).
     queryKey: ['properties', 'merkliste', merkliste],
     enabled: !!merkliste,
-    queryFn: () => merklisteParzellen(merkliste!),
+    queryFn: () => (mandantWert ? mandatParzellen(mandantWert) : merklisteParzellen(merklisteWert!)),
   });
   const updateProp = useUpdateProperty();
   const incrementPhone = useIncrementPhoneQuery();
@@ -378,6 +387,11 @@ export function AkquiseMode() {
           ? (hasAnyPhone ? '✅ Mit Telefon gespeichert' : '✅ Eigentümer gespeichert')
           : '✅ Kein Ergebnis – weiter',
       });
+      // Für einen Kunden: das Ergebnis in seine Gelegenheiten, damit
+      // der Bericht es zeigt (Tims Abschnitt 5, Schritt 6).
+      if (mandantWert) {
+        void gelegenheitFortschritt(mandantWert, current.id, hasAnyOwner ? (hasAnyPhone ? 'Eigentümer und Telefon ermittelt' : 'Eigentümer ermittelt') : 'Abfrage ohne Ergebnis');
+      }
       moveToNext();
     } catch (err) {
       toast({ title: 'Speichern fehlgeschlagen', description: (err as Error)?.message || 'Unbekannter Fehler', variant: 'destructive' });
@@ -421,17 +435,23 @@ export function AkquiseMode() {
     );
   }
 
-  const listenName = merklisten?.find(l => l.id === merkliste)?.name ?? 'Merkliste';
+  const listenName = mandantWert ? (mandat?.name ?? 'Kunde') : merklisten?.find(l => l.id === merkliste)?.name ?? 'Merkliste';
   // Woher die Parzellen kommen und wie viele noch offen sind -- sonst
   // wüsste man im Modus nicht, dass nur die Liste abgearbeitet wird.
   const merklistenKopf = merkliste ? (
     <div className="flex flex-wrap items-center justify-between gap-2 rounded border bg-card px-4 py-3">
       <span className="min-w-0 text-sm">
-        <span className="text-muted-foreground">Eigentümer abfragen aus der Liste </span>
+        <span className="text-muted-foreground">{mandantWert ? 'Anrufe für den Kunden ' : 'Eigentümer abfragen aus der Liste '}</span>
         <span className="font-medium">{listenName}</span>
         <span className="text-muted-foreground"> · {ausMerkliste ? `${items.length} offen von ${ausMerkliste.length}` : 'lädt …'}</span>
       </span>
       <button type="button" onClick={() => setMerkliste(null)} className="min-h-11 text-sm underline underline-offset-2">Ganze Warteschlange</button>
+      {/* Die Anweisung des Kunden: was man sagt, in wessen Namen, was nicht. */}
+      {mandantWert && (
+        <p className="basis-full whitespace-pre-line rounded-[3px] border-l-2 border-accent bg-secondary/60 px-3 py-2 text-sm">
+          {mandat?.anweisung?.trim() ? mandat.anweisung : <span className="text-muted-foreground">Keine Anweisung hinterlegt -- in den Gelegenheiten beim Kunden eintragen.</span>}
+        </p>
+      )}
     </div>
   ) : null;
 

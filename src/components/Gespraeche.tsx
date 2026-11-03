@@ -90,6 +90,17 @@ export function Gespraeche({ parzelleId, ownerName }: { parzelleId: string; owne
         wiedervorlage_am: f.wiedervorlage || null, notiz: f.notiz.trim() || null,
       });
       if (r.error) throw r.error;
+      // Abschnitt 7: "lieber mit Makler" und "will verkaufen" werden eine
+      // Gelegenheit mit eigenem Anlass, nicht nur eine Kategorie in der
+      // Liste. Je Parzelle und Anlass eine offene; scheitert es (Migration
+      // 20261103270000 fehlt), bleibt das Gespräch trotzdem gespeichert.
+      if (f.erreicht && (f.grund === 'makler' || f.verkaufsabsicht === 'ja')) {
+        const anlass = f.verkaufsabsicht === 'ja' ? 'verkauf' : 'vermittlung';
+        const grund = [f.verkaufsabsicht === 'ja' ? 'Will verkaufen' : 'Möchte lieber mit einem Makler', f.preis ? `Preisvorstellung ${f.preis}` : null, f.notiz.trim() || null]
+          .filter(Boolean).join(' · ') + ` (Gespräch ${new Date().toLocaleDateString('de-CH')})`;
+        const g = await db().rpc('gelegenheit_aus_gespraech', { p_parzelle: parzelleId, p_anlass: anlass, p_begruendung: grund });
+        if (!g.error) await qc.invalidateQueries({ queryKey: ['gelegenheiten'] });
+      }
       if (f.kauftSelbst) {
         if (!akteurId) throw new Error('Ohne Eigentümernamen lässt sich kein Suchprofil anlegen.');
         const liste = (s: string) => s.split(/[,;]/).map(x => x.trim()).filter(Boolean);

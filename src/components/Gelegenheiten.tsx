@@ -3,7 +3,10 @@ import { useToast } from '@/hooks/use-toast';
 import { ObjektLink } from '@/components/ObjektLink';
 import { Auswahl } from '@/components/Auswahl';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, Printer, Target } from 'lucide-react';
+import { Loader2, Phone, Printer, Target } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { mandatLesen } from '@/lib/mandat';
 import { Abschnitt, FELD, KNOPF, KNOPF_HAUPT, Leer, LISTE, Marke, Reiter, Seite, Strichbalken } from '@/components/rahmen';
 import { BILD } from '@/lib/luftbild';
 import { supabase } from '@/integrations/supabase/client';
@@ -112,7 +115,8 @@ export function Gelegenheiten() {
       kennzahlen={data ? ([['erkannt', 'rosa', 'ungeprüft'], ['gemeldet', 'violett', 'beim Kunden'], ['in bearbeitung', 'lila', 'läuft'], ['abgeschlossen', 'minze', 'erreicht']] as [Zustand, 'rosa' | 'violett' | 'lila' | 'minze', string][])
         .map(([z, art, wort]) => ({ titel: ZUSTAENDE.find(x => x[0] === z)![1], wert: String(zahl(z)), marke: <Marke art={art}>{wort}</Marke>, onClick: () => setZustand(z) })) : undefined}
       aktionen={mandant && mandant !== 'ohne' ? <button type="button" onClick={() => setBericht(mandant)} className={KNOPF_HAUPT}><Printer className="h-4 w-4" /> Portfolio-Bericht</button> : undefined}
-      seite={
+      seite={<>
+        {mandant && mandant !== 'ohne' && <Anrufer mandantId={mandant} offen={liste.filter(g => !['abgeschlossen', 'verworfen'].includes(g.zustand)).length} />}
         <Abschnitt titel="Arrondierung" unter="Nachbarn je Portfolio beim Bund prüfen" symbol={Target} kachel="akzent"
                    hinweis="Darf beliebig oft laufen; Doppeltes wird nicht angelegt.">
           {!portfolios?.length ? <Leer titel="Kein Portfolio erfasst." /> : (
@@ -131,7 +135,7 @@ export function Gelegenheiten() {
             </ul>
           )}
         </Abschnitt>
-      }>
+      </>}>
       <div className="flex flex-wrap items-center gap-2">
         <Reiter<string> wahl={zustand} setWahl={w => setZustand(w as typeof zustand)}
           optionen={([['offen', 'Offen'], ...ZUSTAENDE, ['alle', 'Alle']] as [string, string][])
@@ -224,5 +228,33 @@ export function Gelegenheiten() {
         </ul>
       )}
     </Seite>
+  );
+}
+
+/**
+ * Der Anrufer-Ablauf je Kunde (Tims Abschnitt 5, Schritt 5): die
+ * Anweisung, die der Akquise-Modus den Anrufern zeigt, und der Sprung
+ * dorthin -- er arbeitet dann nur die offenen Gelegenheiten dieses
+ * Kunden ab und schreibt das Ergebnis zurück.
+ */
+function Anrufer({ mandantId, offen }: { mandantId: string; offen: number }) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  const { data: m } = useQuery({ queryKey: ['mandat', mandantId], queryFn: () => mandatLesen(mandantId) });
+  const speichern = async (text: string) => {
+    const r = await db().from('mandant').update({ anweisung: text.trim() || null }).eq('id', mandantId);
+    if (r.error) toast({ title: 'Anweisung nicht gespeichert', description: /anweisung/i.test(r.error.message) ? 'Braucht die Migration 20261103270000.' : r.error.message, variant: 'destructive' });
+    else await qc.invalidateQueries({ queryKey: ['mandat', mandantId] });
+  };
+  return (
+    <Abschnitt titel="Anrufer" unter="Anweisung an die Anrufer für diesen Kunden" symbol={Phone} kachel="schwarz">
+      <textarea key={m?.anweisung ?? ''} defaultValue={m?.anweisung ?? ''} rows={4} placeholder="z.B. Im Namen der Anlagestiftung anfragen; nur Verkauf, keine Vermietung; Preis nicht nennen."
+                onBlur={e => e.target.value !== (m?.anweisung ?? '') && void speichern(e.target.value)}
+                className="w-full rounded-[3px] border border-input bg-card p-3 text-sm placeholder:text-muted-foreground focus:border-foreground focus:outline-none" />
+      <button type="button" onClick={() => navigate(`/akquise?mandant=${mandantId}`)} disabled={!offen} className={`${KNOPF_HAUPT} w-full disabled:opacity-50`}>
+        <Phone className="h-4 w-4" /> {offen ? `${offen} offene Gelegenheiten anrufen` : 'Nichts offen'}
+      </button>
+    </Abschnitt>
   );
 }
