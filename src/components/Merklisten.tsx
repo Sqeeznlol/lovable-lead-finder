@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useUrlSetzen } from '@/hooks/use-url-wert';
 import { BILD } from '@/lib/luftbild';
 import { useGwrKodes } from '@/lib/parzelle-gebaeude';
-import { heizGruppe } from '@/lib/karte3d';
+import { HEIZ_GRUPPEN, heizGruppe } from '@/lib/karte3d';
 import { downloadXlsx, exportTimestamp } from '@/lib/export-utils';
 
 /**
@@ -301,61 +301,119 @@ export function MerklisteAnsicht({ id }: { id: string }) {
 
 /**
  * Das PDF: auf dem Bildschirm unsichtbar, beim Drucken das Einzige
- * (Regel .bericht-druck in index.css). Gestaltet wie die Seite: Name
- * gross, feine Linien, die Zahlen als Leiste, dann die Gebäude.
+ * (Regel .bericht-druck in index.css). Aufgebaut wie jede Seite
+ * (DESIGN.md): Luftbild-Bühne mit dem Namen der Liste, Kennzahlenleiste,
+ * eine Tafel mit Grafik (Heizungen), dann die Gebäude.
+ *
+ * print-color-adjust: exact, weil der Browser sonst Verläufe und
+ * Farbflächen weglässt, solange "Hintergrundgrafiken" aus ist -- und
+ * das ist die Voreinstellung.
  */
+const EXAKT = { WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' } as const;
+
 function MerklisteDruck({ name, filter, gespeichert, zeilen, kennzahlen, art, heizung }: {
   name: string; filter: Filter; gespeichert: string; zeilen: Eintrag[];
   kennzahlen: { gebaeude: number; baujahr: number | null; fossil: number; eigner: number };
   art: (t: Treffer) => string | null; heizung: (t: Treffer) => string | null;
 }) {
-  const zahlen: [string, string][] = [
+  const zahlen: [string, string, string?][] = [
     ['Gebäude', n(kennzahlen.gebaeude)],
-    ['Baujahr im Schnitt', kennzahlen.baujahr ? `um ${kennzahlen.baujahr}` : '–'],
-    ['Öl oder Gas', n(kennzahlen.fossil)],
+    ['Baujahr im Schnitt', kennzahlen.baujahr ? String(kennzahlen.baujahr) : '–'],
+    ['Öl oder Gas', n(kennzahlen.fossil), kennzahlen.gebaeude ? `${Math.round((100 * kennzahlen.fossil) / kennzahlen.gebaeude)} %` : undefined],
     ['Eigentümer bekannt', n(kennzahlen.eigner)],
   ];
+  // Heizungen nach Gruppe, grösste zuerst -- der Balken zeigt auf einen
+  // Blick, wo Ersatz ansteht.
+  const mix = HEIZ_GRUPPEN.map(g => ({ ...g, zahl: zeilen.filter(t => heizGruppe(heizung(t))?.titel === g.titel).length }))
+    .filter(g => g.zahl > 0).sort((a, b) => b.zahl - a.zahl);
+  const ohne = zeilen.length - mix.reduce((a, g) => a + g.zahl, 0);
+  const heute = new Date().toLocaleDateString('de-CH', { day: 'numeric', month: 'long', year: 'numeric' });
   return (
-    <div className="bericht-druck hidden bg-white text-[#111] print:block">
-      <div className="flex items-baseline justify-between border-b border-[#111] pb-2 text-[10px] uppercase tracking-[0.14em] text-[#555]">
-        <span>Bauraum · Merkliste</span>
-        <span>{new Date().toLocaleDateString('de-CH', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+    <div className="bericht-druck hidden bg-white font-sans text-[#111] print:block" style={EXAKT}>
+      {/* Bühne */}
+      <div className="relative h-[190px] overflow-hidden rounded-[3px] bg-[#F4F4F5]" style={EXAKT}>
+        <img src={BILD.gebaeudesuche} alt="" loading="eager" className="absolute inset-y-0 right-0 h-full w-[70%] object-cover" />
+        <div className="absolute inset-0" style={{ ...EXAKT, background: 'linear-gradient(90deg, #F4F4F5 0%, #F4F4F5 32%, rgba(244,244,245,0.85) 55%, rgba(244,244,245,0) 100%)' }} />
+        <div className="relative flex h-full flex-col justify-between p-6">
+          <div className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.16em] text-[#646B78]">
+            <span className="inline-block h-2 w-2 rounded-[1px] bg-[#3D45F5]" style={EXAKT} />
+            Bauraum · Merkliste
+          </div>
+          <div>
+            <h1 className="max-w-[70%] text-[34px] font-normal leading-[1.05] tracking-tight">{name}</h1>
+            <p className="mt-2 max-w-[70%] text-[11px] text-[#646B78]">{[filterText(filter), `gespeichert am ${datum(gespeichert)}`, `Stand ${heute}`].filter(Boolean).join(' · ')}</p>
+          </div>
+        </div>
+        <span className="absolute bottom-1.5 right-2.5 text-[7px] text-[#646B78]">Luftbild © swisstopo</span>
       </div>
-      <h1 className="mt-6 text-[30px] leading-[1.1] tracking-tight">{name}</h1>
-      <p className="mt-1 text-[12px] text-[#555]">{[filterText(filter), `gespeichert am ${datum(gespeichert)}`].filter(Boolean).join(' · ')}</p>
-      <div className="mt-5 grid grid-cols-4 border border-[#ddd]">
-        {zahlen.map(([t, w], i) => (
-          <div key={t} className={`px-3 py-2.5 ${i ? 'border-l border-[#ddd]' : ''}`}>
-            <p className="text-[9px] uppercase tracking-[0.1em] text-[#777]">{t}</p>
-            <p className="mt-1 text-[20px] leading-none tabular-nums">{w}</p>
+
+      {/* Kennzahlenleiste */}
+      <div className="mt-4 grid grid-cols-4 rounded-[3px] border border-[#E4E4E7]">
+        {zahlen.map(([t, w, marke], i) => (
+          <div key={t} className={`px-4 py-3 ${i ? 'border-l border-[#E4E4E7]' : ''}`}>
+            <p className="text-[9.5px] text-[#646B78]">{t}</p>
+            <p className="mt-1.5 flex items-baseline gap-1.5">
+              <span className="text-[24px] leading-none tracking-tight tabular-nums">{w}</span>
+              {marke && <span className="rounded-[2px] bg-[#FDEBDF] px-1.5 py-0.5 text-[8.5px] font-medium text-[#C4520F]" style={EXAKT}>{marke}</span>}
+            </p>
           </div>
         ))}
       </div>
-      <table className="mt-6 w-full border-collapse text-[10px] leading-snug">
+
+      {/* Tafel mit Grafik: Heizungen */}
+      {mix.length > 0 && (
+        <div className="mt-4 rounded-[3px] border border-[#E4E4E7] px-4 py-3">
+          <p className="text-[10.5px] font-medium">Heizungen</p>
+          <div className="mt-2 flex h-2.5 overflow-hidden rounded-[2px] bg-[#F4F4F5]" style={EXAKT}>
+            {mix.map(g => <span key={g.titel} style={{ ...EXAKT, width: `${(100 * g.zahl) / zeilen.length}%`, background: g.farbe }} />)}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[9.5px] text-[#646B78]">
+            {mix.map(g => (
+              <span key={g.titel} className="flex items-center gap-1.5">
+                <span className="inline-block h-2 w-2 rounded-full" style={{ ...EXAKT, background: g.farbe }} />
+                <span className="text-[#111]">{g.titel}</span> {n(g.zahl)}
+              </span>
+            ))}
+            {ohne > 0 && <span>ohne Angabe {n(ohne)}</span>}
+          </div>
+        </div>
+      )}
+
+      {/* Die Gebäude */}
+      <table className="mt-5 w-full border-collapse text-[9.5px] leading-snug">
         <thead>
-          <tr className="border-b border-[#111] text-left text-[8.5px] uppercase tracking-[0.1em] text-[#555]">
-            <th className="py-1.5 pr-2 font-medium">Adresse</th>
-            <th className="py-1.5 pr-2 font-medium">Eigentümer</th>
-            <th className="py-1.5 pr-2 text-right font-medium">Baujahr</th>
-            <th className="py-1.5 pr-2 text-right font-medium">Zimmer</th>
-            <th className="py-1.5 pr-2 text-right font-medium">Fläche</th>
-            <th className="py-1.5 font-medium">Heizung</th>
+          <tr className="border-b border-[#111] text-left text-[8.5px] text-[#646B78]">
+            <th className="w-6 py-1.5 pr-2 font-normal tabular-nums">#</th>
+            <th className="py-1.5 pr-3 font-normal">Adresse</th>
+            <th className="py-1.5 pr-3 font-normal">Eigentümer</th>
+            <th className="py-1.5 pr-3 text-right font-normal">Baujahr</th>
+            <th className="py-1.5 pr-3 text-right font-normal">Zimmer</th>
+            <th className="py-1.5 pr-3 text-right font-normal">Fläche</th>
+            <th className="py-1.5 pr-3 text-right font-normal">Whg.</th>
+            <th className="py-1.5 font-normal">Heizung</th>
           </tr>
         </thead>
         <tbody>
-          {zeilen.map(t => (
-            <tr key={t.egid} className="break-inside-avoid border-b border-[#e5e5e5] align-top">
-              <td className="py-1.5 pr-2"><span className="font-medium">{t.adresse ?? `EGRID ${t.egrid}`}</span><br /><span className="text-[#777]">{[t.gemeinde, art(t)].filter(Boolean).join(' · ')}</span></td>
-              <td className="py-1.5 pr-2">{t.eigentuemer ?? <span className="text-[#999]">offen</span>}</td>
-              <td className="py-1.5 pr-2 text-right tabular-nums">{t.baujahr ?? '–'}</td>
-              <td className="py-1.5 pr-2 text-right tabular-nums">{n(t.zimmer)}</td>
-              <td className="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums">{n(t.wohnflaeche, ' m²')}</td>
-              <td className="py-1.5">{heizGruppe(heizung(t))?.titel ?? '–'}</td>
-            </tr>
-          ))}
+          {zeilen.map((t, i) => {
+            const g = heizGruppe(heizung(t));
+            return (
+              <tr key={t.egid} className="break-inside-avoid border-b border-[#ECECEE] align-top">
+                <td className="py-2 pr-2 text-[#9A9FA8] tabular-nums">{i + 1}</td>
+                <td className="py-2 pr-3"><span className="font-medium">{t.adresse ?? `EGRID ${t.egrid}`}</span><br /><span className="text-[#646B78]">{[t.gemeinde, art(t)].filter(Boolean).join(' · ')}</span></td>
+                <td className="py-2 pr-3">{t.eigentuemer ?? <span className="text-[#9A9FA8]">noch offen</span>}</td>
+                <td className="py-2 pr-3 text-right tabular-nums">{t.baujahr ?? '–'}</td>
+                <td className="py-2 pr-3 text-right tabular-nums">{n(t.zimmer)}</td>
+                <td className="whitespace-nowrap py-2 pr-3 text-right tabular-nums">{n(t.wohnflaeche, ' m²')}</td>
+                <td className="py-2 pr-3 text-right tabular-nums">{n(t.wohnungen)}</td>
+                <td className="whitespace-nowrap py-2">
+                  {g ? <span className="flex items-center gap-1.5"><span className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ ...EXAKT, background: g.farbe }} />{g.titel}</span> : '–'}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
-      <p className="mt-4 text-[8.5px] text-[#777]">Quelle: Gebäude- und Wohnungsregister (GWR), eigener Bestand. Zimmer und Fläche sind die Summe aller Wohnungen eines Gebäudes.</p>
+      <p className="mt-4 text-[8px] text-[#9A9FA8]">Quelle: Gebäude- und Wohnungsregister (GWR), eigener Bestand. Zimmer und Fläche sind die Summe aller Wohnungen eines Gebäudes.</p>
     </div>
   );
 }
