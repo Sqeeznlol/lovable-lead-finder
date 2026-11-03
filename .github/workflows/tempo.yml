@@ -123,6 +123,18 @@ jobs:
               and query !~* '^(vacuum|copy|create|insert|update|delete|do |analyze)'
             order by shared_blks_read desc limit 12;
           \echo
+          \echo 'Gebäude je Parzelle (Kanton Zürich), nur Zählungen:'
+          select count(*) as parzellen_zh,
+                 count(*) filter (where p.egrid is not null) as mit_egrid,
+                 count(*) filter (where exists (select 1 from public.gebaeude g where g.egrid = p.egrid)) as mit_gebaeude_im_register
+            from public.properties p where p.kanton = 'ZH';
+          select count(*) as gebaeude, count(egrid) as mit_egrid, count(distinct egrid) as verschiedene_parzellen,
+                 count(heizung_energie) as mit_heizung, count(baujahr) as mit_baujahr from public.gebaeude;
+          select count(*) as gebaeude_deren_parzelle_fehlt from public.gebaeude g
+            where g.egrid is not null and not exists (select 1 from public.properties p where p.egrid = g.egrid);
+          select (select count(*) from public.gwr_kode) as kodes, (select count(*) from public.gwr_kode where merkmal = 'GENH') as kodes_genh,
+                 (select count(*) from public.gwr_kode where merkmal = 'GWAERZH') as kodes_gwaerzh;
+          \echo
           \echo 'Grösste Tabellen und Indizes:'
           select c.relname as name, c.relkind as art, pg_size_pretty(pg_relation_size(c.oid)) as groesse
             from pg_class c join pg_namespace n on n.oid = c.relnamespace
