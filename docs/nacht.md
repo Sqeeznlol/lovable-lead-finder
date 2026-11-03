@@ -17,6 +17,20 @@ GitHub-App: Aktionen → Migrationen → Workflow ausführen, Branch `main`,
 |---|---|
 | `20261103190000_merkliste_stand_karte` | Stand und Notiz je Gebäude in Merklisten, Lage der Gebäude für die Karten (Spalten `gebaeude.e/n`) |
 | `20261103200000_gelegenheiten_potenzial` | Entwicklungspotenzial in Kundenportfolios als Gelegenheit (Punkt 1) |
+| `20261103210000_portfolio_bericht` | Die Abfrage für den Portfolio-Bericht (Punkt 2, 12) |
+| `20261103220000_investor_abgleich` | Gemerkte Treffer je Investorprofil, Off-Market-Mandat (Punkt 3) |
+| `20261103230000_kennzahlen` | Ausgangswerte und Ziele der Kennzahlen, Stand der Daten (Punkt 5, 21) |
+| `20261103240000_gemeinde_schreibweise` | 179 Parzellen "X ZH" auf eine Schreibweise, Gemeindeliste neu (Punkt 6) -- die einzige, die bestehende Daten ändert |
+| `20261103250000_eigentuemer_akteure` | Eigentümer als Akteure mit allen Parzellen (Punkt 9) |
+| `20261103260000_reaktivierung_ereignis` | "Wieder ansprechen" nach einem Baugesuch (Punkt 11) |
+| `20261103270000_anrufer_anweisung` | Anweisung an die Anrufer je Kunde; Maklermandat und Verkauf als Anlass (Punkt 13, 19) |
+| `20261103280000_parzellen_kacheln` | Vektorkacheln für die Karte, Server-Teil (Punkt 14) |
+
+Alle laufen in einem Durchgang (Text `202611032` trifft die neun ab
+200000; `20261103190000` separat). Jede ist lokal in einer
+Testdatenbank mit PostGIS durchgespielt. Bis sie eingespielt sind,
+sagen die betroffenen Seiten, welche Migration fehlt, und zeigen den
+Rest.
 
 Danach den Ablauf **Gebäude** mit "schreiben" starten: Er lädt das
 Register neu, diesmal mit der Lage jedes Gebäudes. Erst danach zeigen
@@ -181,4 +195,128 @@ eine Gelegenheit; ein "ja" und ein Gesuch vor dem Gespräch nicht).
 
 Braucht: Migration `20261103260000`. Gemessen: heute 0 Gespräche im
 System -- die Funktion wartet auf die ersten.
+
+## 13. Anrufer-Ablauf je Projekt -- gebaut
+
+Gelegenheiten → Kunde wählen → rechts "Anrufer": die Anweisung an die
+Anrufer für diesen Kunden (was man sagt, in wessen Namen, was nicht),
+und der Knopf "N offene Gelegenheiten anrufen". Er öffnet den
+Akquise-Modus nur mit den Parzellen der offenen Gelegenheiten dieses
+Kunden (Kandidaten eines Mandats, Nachbarn einer Arrondierung, Auslöser
+eines Baugesuchs -- nie die eigenen Parzellen des Kunden), mit der
+Anweisung oben. Was der Anrufer speichert, fliesst zurück: die
+Gelegenheit geht auf "in Bearbeitung", im Ergebnis steht "3.11.2026:
+Eigentümer ermittelt" -- und damit im Portfolio-Bericht.
+
+Geprüft im Browser (Desktop, iPhone): Anweisung speichern, Sprung in
+den Modus, Eigentümer speichern, Gelegenheit nachgeführt.
+
+Braucht: Migration `20261103270000`.
+
+## 19. Maklermandat und Verkauf als eigene Gelegenheit -- gebaut
+
+Sagt jemand im Gespräch "lieber mit Makler", entsteht eine Gelegenheit
+"Maklermandat anbieten: …" (Anlass Maklermandat); sagt er "will
+verkaufen", eine "Verkaufsbereit: …" (Anlass Verkauf, Priorität 12).
+Je Parzelle und Anlass eine offene; beide laufen wie jede Gelegenheit
+mit Zustand, Zuständigkeit und Ergebnis, statt nur als Kategorie in
+der Reaktivierungsliste zu stehen. Dieselbe Migration wie Punkt 13.
+
+## 4. und 15. Quellen für Entscheide, Zonenänderungen, Marktereignisse -- geprüft, soweit erreichbar
+
+Nachgesehen mit dem eigenen Ablauf (Auswerten → baugesuche, 4. November,
+3.04 Uhr aktualisiert): Der Zürcher Datensatz "Baugesuche im Kanton
+Zürich" hat 41 Spalten -- Publikation, Einsprachefrist, Ablauf,
+Gemeinde, Bauherrschaft, Projektverfasser, Beschreibung, Adresse,
+Kataster, **Bauzone** (`districtCadastre_relation_buildingZone`) --
+aber **kein Feld für den Entscheid**. Bewilligt oder abgelehnt gibt
+diese Quelle nicht her; täglich kommen nur eingereichte Gesuche. Der
+Datensatz verweist auf die "Dokumentation Amtsblattportal API"
+(amtsblattportal.ch/docs/api) als zweiten Weg -- dort erscheinen
+Bauentscheide als eigene Publikationsart, soweit die Gemeinde sie
+publiziert. Das ist der nächste Schritt, wenn ihr "bewilligt" wollt:
+eine Anbindung des Amtsblattportals, Gesuch und Entscheid über die
+Publikationsnummer verbunden.
+
+Zonenänderungen und Handänderungen konnte ich von hier nicht prüfen:
+opendata.swiss und maps.zh.ch sind aus dieser Sitzung nicht erreichbar
+(DNS), und die Runner bei GitHub benutze ich nur für unsere eigenen
+Quellen. Offen für euch: ob der Kanton die öffentlichen Planauflagen
+(Nutzungsplanung) maschinenlesbar anbietet, und ob das Amtsblattportal
+Handänderungen führt (im Kanton Zürich werden sie nicht publiziert;
+Grundbuchämter geben sie nicht als Datensatz heraus -- das ist mein
+Wissensstand, nicht nachgesehen).
+
+## 12. Kundenzugang -- gebaut, auf dem bestehenden Portal
+
+Das Kundenportal gibt es seit dem 1. November unter /fonds (für
+Fondsleitungen, eigene Anmeldung, eigenes Team, nur eigene Daten).
+Neu darin der Bereich **Bericht**: derselbe Portfolio-Bericht wie in
+Bauraum, mit Gelegenheiten, Stand und Ergebnis -- online und als PDF.
+Ein institutioneller Kunde (Helvetica, SFP, Swisscanto) bekommt damit
+ein Team mit Art "fonds", ein Konto darin, und sieht Karte, Potenziale,
+Baugesuche, Gespräche, Suchprofile, Kalender und seinen Bericht.
+Geprüft im Browser (Desktop, iPhone).
+
+## 16. und 17. Lernende Priorisierung, beide Seiten -- Messung gebaut
+
+Lernen kann nur, was gemessen ist: Auswertung → "Erfolg je Anlass"
+zählt je Anlass, wie viele Gelegenheiten abgeschlossen oder verworfen
+wurden, mit Quote. Heute: 453 Gelegenheiten, 1 geprüft, 0 entschieden
+-- es gibt noch nichts zu lernen. Sobald Entscheide da sind, lässt sich
+die Quote je Anlass und Gemeinde in die Priorität einrechnen; das habe
+ich bewusst nicht vorweggenommen.
+
+Beide Seiten: Bei einer Gelegenheit "Verkaufsbereit" oder
+"Maklermandat" stehen die Investoren, deren Suchprofil Lage und
+Objektart nennt (dieselben Regeln wie der Abgleich in der Datenbank,
+nur umgekehrt).
+
+## 14. Karte für die ganze Schweiz -- Server-Teil gebaut, Browser noch nicht
+
+`parzellen_kachel(z, x, y)` liefert die Parzellen eines Kartenfelds als
+Mapbox Vector Tile (PostGIS, ST_AsMVT), lokal geprüft (227 Bytes mit
+Parzelle, 0 daneben, unter Zoom 13 leer). Der Browser bleibt vorerst
+beim bisherigen Weg (GeoJSON je Ausschnitt): Zürcher Parzellen haben
+im Bestand keinen Umriss, eine Kachel wäre dort leer. Sobald die
+Zürcher Umrisse da sind (Aufgabe 27, Amtliche Vermessung), lohnt sich
+die Umstellung der Karte auf die Kacheln -- und erst dann trägt sie
+26 Kantone. Braucht: Migration `20261103280000` (schadet vorher nicht).
+
+## 7. Tempo -- gemessen, Entscheidung bei dir
+
+Indizes, die nie benutzt werden: die grössten sind 5 MB
+(verschnitt_tg_egrid_idx), 3 MB, 3 MB -- zusammen unter 15 MB.
+Löschen bringt nichts. Die Datenbank ist 950 MB von 1'107 MB, die
+Tabelle properties allein 454 MB; der Cache trifft 72 %. Das ist die
+Ursache für "lädt langsam", und sie lässt sich nur mit einem grösseren
+Supabase-Tarif beheben. Das kostet Geld, darum deine Entscheidung.
+
+## 10. Bezug der Eigentümerdaten -- Beschaffungsfrage
+
+Gemessen: 114 von 532'131 Parzellen haben einen Eigentümer (0.02 %),
+nach zwei Monaten Abfragen über die Portale mit SMS. Tims Produkte
+(Monitor, Arrondierung) brauchen die Eigentümer der Nachbarn sofort,
+nicht in Wochen. Zu klären, je Kanton: Gibt es einen lizenzierten
+Bezug (z.B. über die Grundbuchämter, Terravis oder einen Datenhändler),
+was kostet er je Abfrage oder je Jahr, und erlaubt die Lizenz
+Speichern und Weitergabe an Kunden? Das ist keine Programmierarbeit.
+Bis dahin: Eigentümer portfolioweise nachfüllen, wie heute.
+
+## 18, 20, 22 bis 26 -- bewusst nicht gebaut
+
+- **18 Bewertung:** Eine Online-Bewertung braucht Preise, die der
+  Bestand nicht führt. Ohne Transaktionsdaten wäre jede Zahl geraten.
+- **20 Landingpages unter eigenen Marken:** Marken und Texte sind
+  deine Entscheidung; die Seiten /bewertung, /potenzial, /investor
+  stehen und nehmen Anfragen entgegen.
+- **22 Firmen und Strategien:** Teams mit eigenen Rechten gibt es; ein
+  Feld "Strategie" je Team lässt sich in einer Stunde ergänzen, wenn
+  klar ist, was drin stehen soll.
+- **23 weitere Kantone:** je Kanton Lizenz, Vermessung, Register,
+  Portal -- erst, wenn Zürich vollständig ist.
+- **24 KI-Assistent:** braucht einen API-Schlüssel (Kosten) -- deine
+  Entscheidung.
+- **25 Szenarien, 26 Daten verkaufen:** Ideen über Tims Brief hinaus;
+  nichts davon ist heute gefragt.
 
