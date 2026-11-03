@@ -11,7 +11,7 @@ Alles unten ist gebaut, getestet und live. Was eine Änderung an der
 Datenbank braucht, liegt als Migration bereit -- die Sicherheitsprüfung
 lässt mich die Produktionsdatenbank nicht selbst ändern. In der
 GitHub-App: Aktionen → Migrationen → Workflow ausführen, Branch `main`,
-"einspielen", Text `202611032` -- und einmal `20261103190000` (siehe Tabelle):
+"einspielen", Text `20261103` -- ein Durchgang für alle zehn (siehe Tabelle):
 
 | Migration | Was sie tut |
 |---|---|
@@ -26,11 +26,16 @@ GitHub-App: Aktionen → Migrationen → Workflow ausführen, Branch `main`,
 | `20261103270000_anrufer_anweisung` | Anweisung an die Anrufer je Kunde; Maklermandat und Verkauf als Anlass (Punkt 13, 19) |
 | `20261103280000_parzellen_kacheln` | Vektorkacheln für die Karte, Server-Teil (Punkt 14) |
 
-Alle laufen in einem Durchgang (Text `202611032` trifft die neun ab
-200000; `20261103190000` separat). Jede ist lokal in einer
-Testdatenbank mit PostGIS durchgespielt. Bis sie eingespielt sind,
-sagen die betroffenen Seiten, welche Migration fehlt, und zeigen den
-Rest.
+Der Ablauf nimmt mit Text `20261103` alle zehn in der Reihenfolge der
+Namen und überspringt die zwei vom Abend (170000, 180000), die schon
+drin sind -- nachgelesen im Ablauf: was als "bereits eingespielt"
+verbucht ist, läuft nicht noch einmal. Jede ist lokal in einer
+Testdatenbank mit PostGIS durchgespielt; keine der neun ab 200000
+greift auf etwas aus 190000 zu. Bis sie eingespielt sind, sagen die
+betroffenen Seiten, welche Migration fehlt, und zeigen den Rest. Der
+tägliche Lauf Baugesuche (5.23 Uhr) ruft die neuen Funktionen schon
+auf und übergeht sie, solange ihre Migration fehlt -- er bleibt grün
+(lokal geprüft: psql läuft weiter, Rückgabe 0).
 
 Danach den Ablauf **Gebäude** mit "schreiben" starten: Er lädt das
 Register neu, diesmal mit der Lage jedes Gebäudes. Erst danach zeigen
@@ -302,6 +307,40 @@ Bezug (z.B. über die Grundbuchämter, Terravis oder einen Datenhändler),
 was kostet er je Abfrage oder je Jahr, und erlaubt die Lizenz
 Speichern und Weitergabe an Kunden? Das ist keine Programmierarbeit.
 Bis dahin: Eigentümer portfolioweise nachfüllen, wie heute.
+
+## Die 3D-Karte -- geprüft: die Häuser stehen richtig
+
+Du wolltest wissen, ob die Häuser auch von der 3D-Seite her logisch
+sind. Drei Orte, je drei Blickwinkel (schräg von Süden aus 260 m,
+senkrecht aus 420 m, nah von Westen aus 120 m), mit Gelände, Luftbild
+und Gebäuden vom Bund und den Zonen vom Kanton -- gerendert ohne
+Grafikkarte, darum zwei bis sechs Minuten je Ort:
+
+- **Kloten, Bahnhofstrasse** (flach, 816 Gebäude im Bild): jedes Haus
+  steht auf dem Boden, Sattel-, Walm- und Flachdächer wie im Luftbild,
+  die Zonen liegen auf dem Boden und nicht auf den Häusern, ihre
+  Grenzen folgen den Parzellen.
+- **Küsnacht, Seestrasse** (Hang, Tobel, See; 1'209 Gebäude): am Hang
+  sitzen die Häuser auf dem Gelände, keines schwebt, keines steckt im
+  Boden; das Küsnachter Tobel ist als Wald und Gewässer da, die
+  Kernzone am Dorfbach, öffentliche Bauten und Freihaltezone wie im
+  Zonenplan. Einzelne Häuser stehen über dem blauen Gewässerband --
+  das Band ist die Zone aus dem Zonenplan, das Haus kommt vom Bund; ob
+  der Bach dort offen oder eingedolt ist, habe ich nicht nachgesehen.
+- **Zürich, Niederdorf** (eng, alt; 1'385 Gebäude): Limmat, Lindenhof
+  (im Grundplan beschriftet, als Hügel erkennbar), die Doppeltürme des
+  Grossmünsters, ein Kirchturm im Norden, die Bauten am Wasser, die
+  Brücken, die enge Dachlandschaft mit Gauben -- alles an seinem Platz.
+
+Gefunden und behoben: In der Zonenlegende fehlten Gewässer und Wald,
+obwohl beide auf der Karte eingefärbt sind (Commit 2b63c91, live).
+Nicht behoben, weil kein Fehler der Karte: ohne Grafikkarte dauert ein
+Bild Minuten; auf deinem Mac und iPhone rechnet die Grafikkarte. Was
+ich von hier nicht prüfen konnte: die Färbungen Heizung, Baujahr, Höhe
+und Reserve brauchen die Gebäudetabelle aus Supabase, und die ist aus
+dieser Umgebung nicht erreichbar. Die neun Bilder liegen nicht im
+Repository (je 0.5 bis 1 MB); vier davon habe ich dir in die
+Unterhaltung gelegt.
 
 ## 18, 20, 22 bis 26 -- bewusst nicht gebaut
 
