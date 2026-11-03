@@ -1,0 +1,97 @@
+name: Gebäude
+
+# Füllt die Tabelle `gebaeude` (Migration 20261103120000_gebaeude.sql)
+# aus dem öffentlichen Gebäuderegister des BFS: jedes bestehende
+# Zürcher Gebäude mit Heizung, Energiequelle, Baujahr, Geschossen und
+# Fläche -- für die 3D-Karte, die jedes Haus danach einfärbt.
+#
+# Ersetzt den Inhalt ganz (das Register ist der Stand), in einer
+# Transaktion: bricht etwas ab, bleibt der alte Stand stehen.
+# Vor dem Schreiben wird die Grösse der Datenbank geprüft (bei 1107 MB
+# wird sie schreibgeschützt).
+#
+# Ausgegeben werden nur Zählungen -- das Protokoll ist öffentlich.
+
+on:
+  workflow_dispatch:
+    inputs:
+      schritt:
+        description: 'probe = nur zählen, schreiben = Tabelle füllen'
+        required: true
+        default: 'probe'
+        type: choice
+        options: [probe, schreiben]
+      grenze_mb:
+        description: 'Nicht schreiben, wenn die Datenbank grösser ist (MB)'
+        required: false
+        default: '1060'
+
+jobs:
+  gebaeude:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Werkzeuge
+        run: sudo apt-get install -y -qq postgresql-client unzip >/dev/null
+
+      - name: Gebäuderegister holen
+        run: |
+          set -euo pipefail
+          curl -sSL --retry 4 -o /tmp/gwr.zip "https://public.madd.bfs.admin.ch/zh.zip"
+          mkdir -p /tmp/gwr && unzip -o -q /tmp/gwr.zip -d /tmp/gwr
+          {
+            echo "### Gebäuderegister Kanton Zürich"
+            echo '```'
+            python3 tools/gwr_gebaeude.py /tmp/gwr /tmp/gebaeude.csv /tmp/kode.csv
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          rm -rf /tmp/gwr /tmp/gwr.zip
+
+      - name: Schreiben
+        if: inputs.schritt == 'schreiben'
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+          GRENZE_MB: ${{ inputs.grenze_mb }}
+        run: |
+          set -euo pipefail
+          [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
+          case "${GRENZE_MB:-}" in ''|*[!0-9]*) GRENZE_MB=1060 ;; esac
+          psql "$DB" -X -q -v ON_ERROR_STOP=1 -v grenze="$GRENZE_MB" >> "$GITHUB_STEP_SUMMARY" 2>&1 <<'SQL'
+          set statement_timeout = '15min';
+          select (pg_database_size(current_database())/1024/1024)::int as mb \gset
+          select :mb >= :grenze as voll \gset
+          \if :voll
+            \echo 'ABBRUCH: Datenbank bei' :mb 'MB, Grenze' :grenze 'MB.'
+            \quit
+          \endif
+          \echo '### Schreiben'
+          \echo '```'
+          \echo 'Datenbank vorher:' :mb 'MB'
+          begin;
+          create temp table g (egid bigint, egrid text, baujahr smallint, geschosse smallint, wohnungen smallint,
+            grundflaeche integer, energieflaeche integer, volumen integer, kategorie smallint, klasse smallint,
+            heizung smallint, heizung_energie smallint, warmwasser_energie smallint, heizung_seit date) on commit drop;
+          create temp table k (merkmal text, code integer, text text) on commit drop;
+          \copy g from '/tmp/gebaeude.csv' with (format csv)
+          \copy k from '/tmp/kode.csv' with (format csv)
+          truncate public.gebaeude;
+          insert into public.gebaeude (egid, egrid, baujahr, geschosse, wohnungen, grundflaeche, energieflaeche,
+            volumen, kategorie, klasse, heizung, heizung_energie, warmwasser_energie, heizung_seit)
+          select distinct on (egid) egid, nullif(egrid, ''), baujahr, geschosse, wohnungen, grundflaeche, energieflaeche,
+            volumen, kategorie, klasse, heizung, heizung_energie, warmwasser_energie, heizung_seit from g order by egid;
+          truncate public.gwr_kode;
+          insert into public.gwr_kode select distinct on (merkmal, code) merkmal, code, text from k order by merkmal, code;
+          commit;
+          vacuum analyze public.gebaeude;
+          vacuum analyze public.gwr_kode;
+          select count(*) as gebaeude, count(heizung_energie) as mit_heizung, count(baujahr) as mit_baujahr from public.gebaeude;
+          select g.heizung_energie as code, coalesce(k.text, '?') as energiequelle, count(*) as gebaeude
+            from public.gebaeude g left join public.gwr_kode k on k.merkmal = 'GENH' and k.code = g.heizung_energie
+            group by 1, 2 order by 3 desc limit 15;
+          select pg_size_pretty(pg_total_relation_size('public.gebaeude')) as tabelle,
+                 (pg_database_size(current_database())/1024/1024)::int as datenbank_mb;
+          \echo '```'
+          SQL
+          cat "$GITHUB_STEP_SUMMARY"
