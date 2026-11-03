@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeftRight, Building2, CalendarDays, Download, X, Gauge, HardHat, Map as KarteSymbol, MessageSquare, MoreHorizontal, Search, Loader2, LogOut, Map as Karte, Orbit, Sparkles, Upload } from 'lucide-react';
+import { ArrowLeftRight, Building2, CalendarDays, Download, FileText, X, Gauge, HardHat, Map as KarteSymbol, MessageSquare, MoreHorizontal, Search, Loader2, LogOut, Map as Karte, Orbit, Sparkles, Upload } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/use-auth';
 import { useUrlWert } from '@/hooks/use-url-wert';
@@ -10,7 +10,7 @@ import { Abschnitt, AUF, KNOPF, KNOPF_HAUPT, KNOPF_LEISE, Kennzahlen, Leer, LIST
 import { Universum } from '@/components/fonds/Universum';
 import { FondsImport } from '@/components/fonds/FondsImport';
 import { ImmoKalender } from '@/components/ImmoKalender';
-import { FondsBaugesuche, FondsGespraeche, FondsKalender, FondsKarte, FondsPotenziale, FondsSuchprofile, type BereichProps } from '@/components/fonds/FondsBereiche';
+import { FondsBaugesuche, FondsBericht, FondsGespraeche, FondsKalender, FondsKarte, FondsPotenziale, FondsSuchprofile, type BereichProps } from '@/components/fonds/FondsBereiche';
 import { baugesucheLaden, faellig, fondsTeam, notizenLaden } from '@/lib/fonds-werkzeuge';
 import type { ComponentType } from 'react';
 import { fondsFarbe, POTENZIAL, potenzialeAlsCsv, universumLaden, verorten, type PotenzialArt } from '@/lib/fonds';
@@ -39,6 +39,8 @@ const BEREICHE: { id: string; titel: string; symbol: ComponentType<{ className?:
   { id: 'gespraeche', titel: 'Gespräche', symbol: MessageSquare, inhalt: FondsGespraeche },
   { id: 'suchprofile', titel: 'Suchprofile', symbol: Search, inhalt: FondsSuchprofile },
   { id: 'kalender', titel: 'Immo-Kalender', symbol: CalendarDays, inhalt: FondsKalender },
+  // Der Bericht des Kunden, online und als PDF (Punkt 12 der Nacht vom 3. November).
+  { id: 'bericht', titel: 'Bericht', symbol: FileText, inhalt: FondsBericht },
 ];
 
 export function FondsOberflaeche() {

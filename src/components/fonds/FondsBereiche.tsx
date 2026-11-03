@@ -1,3 +1,4 @@
+import { PortfolioBericht } from '@/components/PortfolioBericht';
 import { lazy, Suspense, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarDays, Check, HardHat, MessageSquare, Search, Sparkles, Trash2 } from 'lucide-react';
@@ -440,3 +441,15 @@ export function FondsKalender(_: BereichProps) {
 }
 
 export const BEREICH_SYMBOL = { potenziale: Sparkles, baugesuche: HardHat, gespraeche: MessageSquare, suchprofile: Search, kalender: CalendarDays };
+
+// =========================================================== Bericht
+/**
+ * Der Portfolio-Bericht für den Kunden selbst (Tims Abschnitt 15:
+ * "show clients detected opportunities, running activities and actual
+ * results"). Dieselbe Abfrage und dasselbe Blatt wie in Bauraum; sehen
+ * darf es nur, wer zum Team des Kunden gehört (darf_mandant).
+ */
+export function FondsBericht({ data, gehe }: BereichProps) {
+  if (!data.mandant) return <Leer titel="Keine Fondsleitung zugeordnet." />;
+  return <PortfolioBericht mandantId={data.mandant} onZurueck={() => gehe('uebersicht')} />;
+}

@@ -88,6 +88,57 @@ export function useKennzahlenTim() {
   });
 }
 
+const ANLASS_TITEL: Record<string, string> = {
+  baugesuch: 'Baugesuch', arrondierung: 'Arrondierung', ausnuetzungsreserve: 'Ausnützungsreserve', zonenaenderung: 'Zonenänderung',
+  investorentreffer: 'Investorentreffer', vermittlung: 'Maklermandat', verkauf: 'Verkauf', manuell: 'Manuell',
+};
+
+/**
+ * Erfolg je Anlass: wie viele Gelegenheiten jeder Art abgeschlossen oder
+ * verworfen wurden. Das ist die Messung, aus der eine Priorisierung
+ * später lernen kann (Tims Abschnitt 13: "for future scoring") --
+ * heute zeigt sie vor allem, dass noch kaum eine abgeschlossen ist.
+ */
+function ErfolgJeAnlass() {
+  const { data } = useQuery({
+    queryKey: ['erfolg-je-anlass'],
+    staleTime: 60 * 1000,
+    queryFn: async (): Promise<{ anlass: string; alle: number; offen: number; abgeschlossen: number; verworfen: number }[]> => {
+      const r = await db().from('gelegenheit').select('anlass, zustand').limit(5000);
+      if (r.error) return [];
+      const m = new Map<string, { anlass: string; alle: number; offen: number; abgeschlossen: number; verworfen: number }>();
+      for (const g of (r.data ?? []) as { anlass: string; zustand: string }[]) {
+        const z = m.get(g.anlass) ?? { anlass: g.anlass, alle: 0, offen: 0, abgeschlossen: 0, verworfen: 0 };
+        z.alle++;
+        if (g.zustand === 'abgeschlossen') z.abgeschlossen++; else if (g.zustand === 'verworfen') z.verworfen++; else z.offen++;
+        m.set(g.anlass, z);
+      }
+      return [...m.values()].sort((a, b) => b.alle - a.alle);
+    },
+  });
+  if (!data?.length) return null;
+  const quote = (z: { abgeschlossen: number; verworfen: number }) => (z.abgeschlossen + z.verworfen ? `${Math.round((100 * z.abgeschlossen) / (z.abgeschlossen + z.verworfen))} %` : '–');
+  return (
+    <div className="space-y-2">
+      <h3 className="text-sm font-medium">Erfolg je Anlass</h3>
+      <p className="text-xs text-muted-foreground">Abgeschlossen im Verhältnis zu abgeschlossen und verworfen. Daraus lernt die Priorisierung, sobald genug entschieden ist.</p>
+      <div className="overflow-x-auto rounded border bg-card">
+        <table className="w-full min-w-[520px] text-sm">
+          <thead className="text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+            <tr><th className="px-4 py-2 font-medium">Anlass</th><th className="px-4 py-2 text-right font-medium">Alle</th><th className="px-4 py-2 text-right font-medium">Offen</th><th className="px-4 py-2 text-right font-medium">Abgeschlossen</th><th className="px-4 py-2 text-right font-medium">Verworfen</th><th className="px-4 py-2 text-right font-medium">Quote</th></tr>
+          </thead>
+          <tbody className="divide-y">
+            {data.map(z => (
+              <tr key={z.anlass}><td className="px-4 py-2">{ANLASS_TITEL[z.anlass] ?? z.anlass}</td><td className="px-4 py-2 text-right tabular-nums">{z.alle}</td><td className="px-4 py-2 text-right tabular-nums">{z.offen}</td>
+                <td className="px-4 py-2 text-right tabular-nums">{z.abgeschlossen}</td><td className="px-4 py-2 text-right tabular-nums">{z.verworfen}</td><td className="px-4 py-2 text-right tabular-nums">{quote(z)}</td></tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export function KennzahlenTim() {
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -182,6 +233,7 @@ export function KennzahlenTim() {
           </table>
         </div>
       )}
+      <ErfolgJeAnlass />
       {s && (
         <div className="space-y-2">
           <h3 className="text-sm font-medium">Stand der Daten je Quelle</h3>

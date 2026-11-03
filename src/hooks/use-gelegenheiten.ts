@@ -15,7 +15,7 @@ export const ANLAESSE: Record<string, string> = {
   zonenaenderung: 'Zonenänderung', investorentreffer: 'Investorentreffer', vermittlung: 'Maklermandat', verkauf: 'Verkauf', manuell: 'Manuell',
 };
 
-export interface Parz { id: string; address: string | null; owner_name: string | null; area: number | null; gemeinde: string | null; egrid: string | null }
+export interface Parz { id: string; address: string | null; owner_name: string | null; area: number | null; gemeinde: string | null; egrid: string | null; kategorie?: string | null }
 export interface Gel {
   id: string; anlass: string; zustand: Zustand; titel: string; begruendung: string | null; zustaendig: string | null;
   erkannt_am: string; gemeldet_am: string | null; abgeschlossen_am: string | null; ergebnis: string | null;
@@ -35,7 +35,7 @@ export function useGelegenheiten(aktiv = true) {
     queryFn: async (): Promise<Gel[]> => {
       const r = await db().from('gelegenheit')
         .select('*, mandant:mandant_id(id, akteur:akteur_id(name)), '
-          + 'gelegenheit_parzelle(rolle, parzelle:parzelle_id(id, address, owner_name, area, gemeinde, egrid))')
+          + 'gelegenheit_parzelle(rolle, parzelle:parzelle_id(id, address, owner_name, area, gemeinde, egrid, kategorie))')
         .order('prioritaet', { ascending: false, nullsFirst: false })
         .order('erkannt_am', { ascending: false })
         // 500 reichten nicht mehr: am 1. November kamen 127 ohne Kunde

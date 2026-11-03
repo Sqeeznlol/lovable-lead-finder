@@ -14,6 +14,7 @@ import { portfolioParzellen, usePortfolioListe } from '@/hooks/use-portfolio';
 import { arrondierungErkennen } from '@/lib/arrondierung';
 import { ANLAESSE, ZUSTAENDE, useGelegenheiten, type Gel, type Parz, type Zustand } from '@/hooks/use-gelegenheiten';
 import { PortfolioBericht } from '@/components/PortfolioBericht';
+import { PassendeInvestoren } from '@/components/PassendeInvestoren';
 import { useSchliessen, useUrlWert } from '@/hooks/use-url-wert';
 
 /**
@@ -217,6 +218,8 @@ export function Gelegenheiten() {
                         </ul>
                       </div>
                     )}
+                    {/* Verkaufsbereit: die andere Seite des Geschäfts gleich dazu (Tims Abschnitt 6). */}
+                    {(g.anlass === 'verkauf' || g.anlass === 'vermittlung') && ausl[0] && <PassendeInvestoren gemeinde={ausl[0].gemeinde} kategorie={ausl[0].kategorie ?? null} />}
                     {!!g.fremde_nachbarn?.length && (
                       <p className="text-xs text-muted-foreground">Ausserhalb des Bestands: {g.fremde_nachbarn.map(n => n.nummer || n.egrid).join(', ')}</p>
                     )}
