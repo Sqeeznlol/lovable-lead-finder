@@ -9,6 +9,7 @@ import { grundbuchUrl, verkauftNie, ARCHIV_STATUS } from '@/lib/grundbuch';
 import { Objektansicht } from '@/components/Objektansicht';
 import { Gespraeche } from '@/components/Gespraeche';
 import { Nachbarn } from '@/components/Nachbarn';
+import { WeitereParzellen } from '@/components/WeitereParzellen';
 import { protokolliere } from '@/lib/protokoll';
 import { AuskunftEinfuegen } from '@/components/AuskunftEinfuegen';
 import { weiterverarbeiten } from '@/hooks/use-eigentuemer-lookup';
@@ -287,6 +288,7 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
                 </div>
                 {!extensionAvailable && <p className="text-xs text-muted-foreground">Mit der Chrome-Erweiterung wird automatisch gespeichert.</p>}
               </div>
+              <WeitereParzellen parzelleId={data.id} />
 
               <Feld titel="Name"><Input value={data.owner_name || ''} onChange={e => update({ owner_name: e.target.value || null })} /></Feld>
               <Feld titel="Telefon"><Input value={data.owner_phone || ''} onChange={e => update({ owner_phone: e.target.value || null })} /></Feld>

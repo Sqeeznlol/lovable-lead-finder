@@ -58,6 +58,21 @@ function Reaktivierung() {
     },
   });
 
+  // Ereignis seit dem Gespräch (Tims Abschnitt 7: "contact again on a
+  // trigger rather than on a date"): die Gelegenheiten "Wieder
+  // ansprechen" aus gelegenheiten_reaktivierung, je Parzelle.
+  const { data: ereignisse } = useQuery({
+    queryKey: ['reaktivierung-ereignisse'],
+    queryFn: async (): Promise<Map<string, { id: string; begruendung: string | null }>> => {
+      const r = await db().from('gelegenheit').select('id, begruendung, gelegenheit_parzelle(parzelle_id)')
+        .like('titel', 'Wieder ansprechen:%').in('zustand', ['erkannt', 'geprueft', 'gemeldet', 'in bearbeitung']).limit(500);
+      if (r.error) return new Map();
+      const m = new Map<string, { id: string; begruendung: string | null }>();
+      for (const g of (r.data ?? []) as { id: string; begruendung: string | null; gelegenheit_parzelle: { parzelle_id: string }[] }[])
+        for (const x of g.gelegenheit_parzelle ?? []) m.set(x.parzelle_id, { id: g.id, begruendung: g.begruendung });
+      return m;
+    },
+  });
   const mitKat = useMemo(() => (data ?? []).map(a => ({ a, k: kategorie(a) })), [data]);
   const faellig = (a: AnrufZeile) => !!a.wiedervorlage_am && a.wiedervorlage_am <= heute();
   const liste = mitKat
@@ -97,7 +112,9 @@ function Reaktivierung() {
                 </span>
               </span>
               <span className="text-right text-xs">
-                <span className="block font-medium">{KATEGORIEN[k].schritt}</span>
+                {ereignisse?.get(a.parzelle_id ?? '') ? (
+                  <a href={`/gelegenheiten?gelegenheit=${ereignisse.get(a.parzelle_id ?? '')!.id}`} className="block font-medium text-[#C4520F] underline-offset-2 hover:underline">Baugesuch seit dem Gespräch: jetzt anrufen</a>
+                ) : <span className="block font-medium">{KATEGORIEN[k].schritt}</span>}
                 {a.wiedervorlage_am && (
                   <span className={`block ${faellig(a) ? 'font-medium text-red-600' : 'text-muted-foreground'}`}>wieder am {datum(a.wiedervorlage_am)}</span>
                 )}

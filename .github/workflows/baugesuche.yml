@@ -72,6 +72,10 @@ jobs:
           select * from public.gelegenheiten_potenzial(200, true);
           \echo '### Investorprofile abgleichen (Migration 20261103220000)'
           select * from public.investor_abgleich(true);
+          \echo '### Eigentümer als Akteure verdichten (Migration 20261103250000)'
+          select * from public.eigentuemer_verdichten(true);
+          \echo '### Wieder ansprechen: Baugesuch nach einem Nein (Migration 20261103260000)'
+          select * from public.gelegenheiten_reaktivierung(:'TAGE'::int, true);
           \echo '### Nachher'
           select count(*) as gesuche, count(egrid) as mit_egrid, count(parzelle_id) as im_bestand,
                  count(*) filter (where egrid is not null and parzelle_id is null) as egrid_ohne_parzelle,
@@ -137,6 +141,10 @@ jobs:
           select * from public.gelegenheiten_potenzial(200, true);
           \echo '### Investorprofile abgleichen'
           select * from public.investor_abgleich(true);
+          \echo '### Eigentümer als Akteure verdichten'
+          select * from public.eigentuemer_verdichten(true);
+          \echo '### Wieder ansprechen: Baugesuch nach einem Nein'
+          select * from public.gelegenheiten_reaktivierung(greatest(:'TAGE'::int, 30), true);
           \echo '### Bestand der Tabelle'
           select count(*) as gesuche, count(egrid) as mit_egrid, count(parzelle_id) as im_bestand,
                  count(publikation_nr) as mit_publikation,

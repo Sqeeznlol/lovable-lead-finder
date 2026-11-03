@@ -88,3 +88,97 @@ sagt das bei jedem Treffer.
 
 Braucht: Migration `20261103220000`.
 
+## 5. und 21. Kennzahlen nach Tim, Stand der Daten -- gebaut
+
+Auswertung → "Kennzahlen nach Tims Abschnitt 8": seine Tabelle mit
+denselben Zeilen (Datenqualität, Portfolioabdeckung, Baugesuch-Alarme,
+Arrondierung, Akquise, Effizienz, Investoren, Datenaktualität),
+gezählt statt geschätzt. "Ausgangswerte festhalten" schreibt die
+heutigen Werte einmal mit Datum, das Ziel tragt ihr je Zeile ein;
+danach steht bei jeder Zahl die Veränderung seit dem Ausgangswert und
+"erreicht", wenn das Ziel steht. Die Researchzeit je Lead steht als
+"nicht messbar" da -- Zeiten werden nirgends erfasst.
+
+Darunter der Stand jeder Quelle (Register, Baugesuche, Nachbarschaften,
+Lage, Annahmen der Potenzialrechnung) mit Alter und "veraltet", wenn
+die erwartete Frist vorbei ist.
+
+Gemessen heute: Eigentümer bekannt bei 114 von 532'131 Parzellen
+(0.02 %), 36 mit Telefon; 28 überwachte Parzellen bei 2 echten Kunden;
+453 Gelegenheiten, davon 1 geprüft, keine abgeschlossen; 0 Gespräche,
+0 Suchprofile. Das sind die Ausgangswerte -- sie sagen vor allem, dass
+die Plattform bisher gebaut, aber kaum benutzt wurde.
+
+Braucht: Migration `20261103230000`. Offen für dich: Das Gebäuderegister
+monatlich automatisch neu laden (Ablauf "Gebäude" mit Zeitplan) hat die
+Sicherheitsprüfung abgelehnt, weil ein Zeitplan selbständig in die
+Produktion schriebe. Wenn du das willst: in `.github/workflows/gebaeude.yml`
+unter `on:` einen `schedule`-Eintrag und beim Schritt "Schreiben"
+`|| github.event_name == 'schedule'` -- oder einmal im Monat von Hand.
+
+## 6. Datenqualität -- gebaut, Rest gemessen
+
+- **Gemeinden in zwei Schreibweisen:** gemessen sind es 179 Parzellen
+  mit "X ZH" (nicht 2'300 -- diese Zahl stammte aus der veralteten
+  Gemeindeliste). Die Migration `20261103240000` schreibt sie auf die
+  Schreibweise der übrigen ("Küsnacht (ZH)", "Pfäffikon") und rechnet
+  die Gemeindeliste neu. Lokal geprüft: beide Fälle, Thurgau bleibt
+  getrennt.
+- **Aadorf als Zürich:** im Bestand gibt es das nicht mehr (alle 2'441
+  Aadorfer Parzellen stehen im Thurgau); die 12 standen nur noch in der
+  veralteten Gemeindeliste. Dieselbe Migration behebt das.
+- **997 Gebäude ohne Parzelle im Bestand:** nicht behoben. Es sind
+  Register-Gebäude, deren Parzelle im Bestand fehlt; nachladen heisst
+  Amtliche Vermessung holen (Ablauf "Zürcher Parzellen"), und das
+  gehört zu Aufgabe 27, die seit dem 2. November offen ist.
+
+## 8. Sicherheit -- gemessen: dicht
+
+Nachgesehen auf dem Server (Ablauf Auswerten → regeln): Ohne Anmeldung
+darf der öffentliche Schlüssel genau eines -- eine Anfrage einreichen
+(/bewertung, /potenzial, /investor). Alle 15 geprüften Tabellen
+antworten ohne Anmeldung mit 401. Die Migration `anon_dicht` vom
+1. November ist eingespielt und wirkt; der Satz in `docs/plattform.md`,
+die Datenbank lasse anonymes Lesen zu, ist seit dem 1. November
+überholt. Sechs Tabellen ohne Zeilenschutz (gwr_eingang, gwr_gebaeude,
+gwr_kodes, schema_migrationen, verschnitt_tg, zonentypen) enthalten
+nur Registerdaten und Zonen, keine Personen -- und ohne Anmeldung sind
+auch sie gesperrt.
+
+Nicht nachgesehen (geht von hier nicht): ob die Edge Functions
+(tel-search, pipedrive-push, sms-confirmation) auf dem Server die
+Anmeldung prüfen. Supabase tut das in der Voreinstellung; wer eine
+Funktion mit `--no-verify-jwt` ausgerollt hat, hat sie geöffnet. Das
+steht in Supabase → Edge Functions → Details.
+
+## 9. Eigentümer als Akteure -- gebaut
+
+`eigentuemer_verdichten` macht aus dem Text in der Parzellenzeile
+(owner_name, owner_name_2) Akteure mit Art (Person, Firma, Institution,
+Erbengemeinschaft -- aus dem Namen) und Eigentum-Beziehungen mit Quelle
+"bestand"; "Müller" und "Mueller" werden einer, "Swisscanto" steht
+einmal da. Läuft täglich; was aus einem Auszug oder Gespräch schon da
+ist, bleibt. Im Objektfenster steht neu "… gehört auch · N Parzellen"
+mit den übrigen Parzellen desselben Eigentümers; die Eigentümersuche
+findet über den Akteur alle, nicht nur dieselbe Schreibweise.
+
+Geprüft: lokal mit sieben Parzellen (Doppel in Gross/klein und
+Umlaut werden einer, "unbekannt" fällt weg, zweiter Lauf legt nichts
+an); im Browser auf Desktop und iPhone.
+
+Braucht: Migration `20261103250000`.
+
+## 11. Reaktivierung über Ereignisse -- gebaut
+
+Wer im Gespräch "nein", "später" oder "nur zum richtigen Preis" gesagt
+hat, bekommt eine Gelegenheit "Wieder ansprechen: …", sobald nach dem
+Gespräch ein Baugesuch auf seiner Parzelle oder nebenan publiziert
+wird (`gelegenheiten_reaktivierung`, täglich). In der Auswertung →
+Reaktivierung steht bei so einem Objekt "Baugesuch seit dem Gespräch:
+jetzt anrufen" mit Link zur Gelegenheit, statt des nächsten Schritts
+nach Datum. Geprüft lokal (nur das "nein" mit Gesuch danach ergibt
+eine Gelegenheit; ein "ja" und ein Gesuch vor dem Gespräch nicht).
+
+Braucht: Migration `20261103260000`. Gemessen: heute 0 Gespräche im
+System -- die Funktion wartet auf die ersten.
+
