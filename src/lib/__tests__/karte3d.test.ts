@@ -122,3 +122,27 @@ describe('inZuerich', () => {
     expect(inZuerich(47.56, 7.59)).toBe(false);    // Basel
   });
 });
+
+describe('ortLesen', () => {
+  // Antworten der Bundessuche, am 3. November abgefragt.
+  it('liest Adresse und Gebäudenummer', async () => {
+    const { ortLesen } = await import('@/lib/karte3d');
+    const o = ortLesen({ origin: 'address', label: 'Freilagerstrasse 99 <b>8047 Zürich</b>', featureId: '302061147_0', lat: 47.38003921508789, lon: 8.487403869628906 });
+    expect(o).toMatchObject({ art: 'adresse', titel: 'Freilagerstrasse 99', unter: '8047 Zürich', egid: 302061147, egrid: null });
+  });
+  it('lässt das # einer Adresse ohne Hausnummer weg', async () => {
+    const { ortLesen } = await import('@/lib/karte3d');
+    expect(ortLesen({ origin: 'address', label: 'Badenerstrasse # <b>5445 Eggenwil</b>', featureId: '', lat: 47.37, lon: 8.34 })?.titel).toBe('Badenerstrasse');
+  });
+  it('liest Parzellennummer und EGRID', async () => {
+    const { ortLesen } = await import('@/lib/karte3d');
+    const o = ortLesen({ origin: 'parcel', label: '<b>Zurigo                                            </b> AR6739 (CH 7399 7891 7069)', detail: 'ar6739 zurigo                                             261 ch739978917069', featureId: null, lat: 47.380435943603516, lon: 8.488940238952637 });
+    expect(o).toMatchObject({ art: 'parzelle', titel: 'Parzelle AR6739', egrid: 'CH739978917069', egid: null });
+  });
+  it('nimmt PLZ weit, unbekannte Herkunft gar nicht', async () => {
+    const { ortLesen } = await import('@/lib/karte3d');
+    expect(ortLesen({ origin: 'zipcode', label: '<b>8047 - Zürich</b>', lat: 47.37, lon: 8.48 })).toMatchObject({ art: 'plz', titel: '8047 Zürich', abstand: 1600 });
+    expect(ortLesen({ origin: 'sonstwas', label: 'x', lat: 1, lon: 1 })).toBeNull();
+    expect(ortLesen({ origin: 'address', label: 'x', lat: 'nix', lon: 1 })).toBeNull();
+  });
+});

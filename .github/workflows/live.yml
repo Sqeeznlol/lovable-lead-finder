@@ -94,6 +94,22 @@ jobs:
               cache=$(curl -s -D - -o /dev/null "$adresse$js" | grep -i '^cache-control:' | tr -d '\r')
               echo "- Bündel: $cache" >> "$GITHUB_STEP_SUMMARY"
               echo "$cache" | grep -q immutable || fehler=1
+              # 3D-Karte: Ohne die Worker von Cesium zeichnet sie weder
+              # Gelände noch Häuser, die Fläche bleibt leer (Julian,
+              # 3. November). Der Pfad steht im Teil der 3D-Karte, den der
+              # Teil der Hauptseite nachlädt.
+              haupt=$(grep -oE 'assets/Index-[A-Za-z0-9_-]+\.js' /tmp/buendel.js | head -1)
+              teil=$(curl -s "$adresse/$haupt" | grep -oE 'assets/Karte3D-[A-Za-z0-9_-]+\.js' | head -1)
+              cesium=$(curl -s "$adresse/$teil" | grep -oE 'assets/cesium-[0-9][0-9.]*[0-9]' | head -1)
+              if [ -z "$cesium" ]; then
+                echo "- 3D-Karte: Pfad der Cesium-Dateien nicht gefunden" >> "$GITHUB_STEP_SUMMARY"; fehler=1
+              fi
+              for d in "/$cesium/Workers/decodeDraco.js" "/$cesium/Workers/createVerticesFromQuantizedTerrainMesh.js" \
+                       "/$cesium/ThirdParty/draco_decoder.wasm" "/3d/zh/tileset.json"; do
+                r=$(curl -s -o /dev/null -w '%{http_code} %{content_type}' "$adresse$d")
+                echo "- $d: $r" >> "$GITHUB_STEP_SUMMARY"
+                case "$r" in 200\ *javascript*|200\ *wasm*|200\ *json*) ;; *) fehler=1;; esac
+              done
               cat "$GITHUB_STEP_SUMMARY"
               exit $fehler
             fi

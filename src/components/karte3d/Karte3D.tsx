@@ -13,10 +13,11 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { umrissVomBund } from '@/hooks/use-portfolio';
 import { parallel } from '@/lib/parallel';
+import { Suche3D } from '@/components/karte3d/Suche3D';
 import { useUrlSetzen } from '@/hooks/use-url-wert';
 import {
   BAUJAHR_STUFEN, baujahrFarbe, GEBAEUDE_URL, GEBAEUDE_ZH_URL, gebaeudeLaden, inZuerich, GELAENDE_URL, HEIZ_GRUPPEN, heizGruppe, HOEHE_STUFEN,
-  dachSpanne, gebaeudeBeimBund, hoeheFarbe, punktImRing, kodesLaden, LUFTBILD_URL, MODELL_URL, ZONEN_LEGENDE, zonenArt, zonenUm, type Gebaeude,
+  dachSpanne, gebaeudeBeimBund, hoeheFarbe, punktImRing, type Ort, kodesLaden, LUFTBILD_URL, MODELL_URL, ZONEN_LEGENDE, zonenArt, zonenUm, type Gebaeude,
 } from '@/lib/karte3d';
 
 declare const __CESIUM_BASIS__: string;
@@ -33,6 +34,8 @@ const FAERBUNGEN: { wert: Faerbung; titel: string }[] = [
   { wert: 'hoehe', titel: 'Höhe' }, { wert: 'reserve', titel: 'Reserve' },
 ];
 const WEISS = Color.fromCssColorString('#F4F2EE');
+const KEINE: Markierung[] = [];
+const BLAU = '#3D45F5';
 /**
  * Die Kacheln des Bundes gibt es nur über der Schweiz; ausserhalb antwortet
  * der Dienst mit 400 (nachgesehen am 3. November: 6/33/21 liegt nördlich
@@ -74,9 +77,11 @@ interface Auswahl {
  * `markiert` färbt die Häuser bestimmter Parzellen (eigenes Objekt,
  * Fonds) und zieht ihren Umriss am Boden nach.
  */
-export function Karte3D({ ziel, markiert = [], legende, faerbungen = FAERBUNGEN.map(f => f.wert), start = 'modell', intern = true, hoehe = 'h-full' }: {
+export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende, faerbungen = FAERBUNGEN.map(f => f.wert), start = 'modell', intern = true, hoehe = 'h-full', onOrt }: {
   ziel: { lat: number; lon: number; abstand?: number } | null;
   markiert?: Markierung[];
+  /** Ein Ort aus der Suche wurde gewählt -- z.B. um ihn in die Adresse zu schreiben. */
+  onOrt?: (o: Ort) => void;
   /** Was die Farben der markierten Häuser bedeuten (z.B. Fonds 1, Fonds 2). */
   legende?: { titel: string; farbe: string }[];
   faerbungen?: Faerbung[];
@@ -85,6 +90,14 @@ export function Karte3D({ ziel, markiert = [], legende, faerbungen = FAERBUNGEN.
   intern?: boolean;
   hoehe?: string;
 }) {
+  // Ein Treffer der Suche geht dem Ziel von aussen vor, bis dieses wechselt.
+  const [sprung, setSprung] = useState<Ort | null>(null);
+  useEffect(() => {
+    if (sprung && zielVon && (Math.abs(zielVon.lat - sprung.lat) > 1e-5 || Math.abs(zielVon.lon - sprung.lon) > 1e-5)) setSprung(null);
+  }, [zielVon?.lat, zielVon?.lon]); // eslint-disable-line react-hooks/exhaustive-deps
+  const ziel = useMemo(() => (sprung ? { lat: sprung.lat, lon: sprung.lon, abstand: sprung.abstand } : zielVon), [sprung, zielVon]);
+  const markiert = useMemo(() => (sprung?.egrid && !markiertVon.some(m => m.egrid === sprung.egrid)
+    ? [...markiertVon, { egrid: sprung.egrid, farbe: BLAU, titel: sprung.titel }] : markiertVon), [sprung, markiertVon]);
   const box = useRef<HTMLDivElement>(null);
   const viewer = useRef<Viewer | null>(null);
   const tiles = useRef<Cesium3DTileset | null>(null);
@@ -109,6 +122,7 @@ export function Karte3D({ ziel, markiert = [], legende, faerbungen = FAERBUNGEN.
   const [zonenLaden, setZonenLaden] = useState(false);
   const [auswahl, setAuswahl] = useState<Auswahl | null>(null);
   const [legendeZu, setLegendeZu] = useState(false);
+  const [stumm, setStumm] = useState<string | null>(null);
   const [geladen, setGeladen] = useState(0);
   const setzen = useUrlSetzen();
   const { data: kodes } = useQuery({ queryKey: ['gwr-kodes'], queryFn: kodesLaden, staleTime: 24 * 3600 * 1000 });
@@ -203,6 +217,37 @@ export function Karte3D({ ziel, markiert = [], legende, faerbungen = FAERBUNGEN.
     }));
     kataster.current.alpha = 0.45;
     v.scene.requestRender();
+  }, [bereit]);
+
+  // ----------------------------------------------------- Selbstprüfung
+  // Julian sah am 3. November eine leere Fläche: geladen, aber nichts
+  // gezeichnet -- im Testbrowser lief es. Ohne die Worker von Cesium wird
+  // keine Hauskachel fertig und das Gelände nie vollständig. Ist nach 30
+  // Sekunden beides so, sagt die Karte das und nennt, was sie vorfindet.
+  // Gezählt werden fertig entpackte Hauskacheln aus der Statistik von
+  // Cesium (intern, aber die Fassung ist festgehalten; fehlt sie, bleibt
+  // der Hinweis aus). Beides im Test nachgesehen: tileLoad feuert schon
+  // vor dem Entpacken, und die Liste der gezeichneten Geländekacheln war
+  // leer, obwohl Gelände und Häuser zu sehen waren.
+  // Zwei Stufen, weil ein langsames Gerät nicht als kaputt gelten soll
+  // (der Testbrowser ohne Grafikkarte hatte nach 37 s noch keine Kachel
+  // fertig, mit 26 geladenen Workern): nach 30 s nur, wenn gar kein Worker
+  // geladen ist; nach 90 s, wenn trotz Workern nichts fertig wurde.
+  useEffect(() => {
+    if (!bereit) return;
+    const pruefen = (stufe: 1 | 2) => {
+      const v = viewer.current;
+      if (!v || v.isDestroyed()) return;
+      const fertig = (tiles.current as unknown as { _statistics?: { numberOfTilesWithContentReady?: number } } | null)
+        ?._statistics?.numberOfTilesWithContentReady ?? 1;
+      if (fertig > 0 || v.scene.globe.tilesLoaded) return;
+      const worker = performance.getEntriesByType('resource').filter(e => e.name.includes('/Workers/')).length;
+      if (stufe === 1 && worker > 0) return;
+      setStumm(`WebGL ${(v.scene as unknown as { context?: { webgl2?: boolean } }).context?.webgl2 ? '2' : '1'} · Rechenhilfen geladen: ${worker} · ${navigator.userAgent.match(/(Version\/[\d.]+ Safari|Chrome\/[\d.]+|Firefox\/[\d.]+|Edg\/[\d.]+)/)?.[0] ?? 'Browser unbekannt'}`);
+    };
+    const t1 = window.setTimeout(() => pruefen(1), 30000);
+    const t2 = window.setTimeout(() => pruefen(2), 90000);
+    return () => { window.clearTimeout(t1); window.clearTimeout(t2); };
   }, [bereit]);
 
   // ------------------------------------------------- Quelle der Gebäude
@@ -375,7 +420,7 @@ export function Karte3D({ ziel, markiert = [], legende, faerbungen = FAERBUNGEN.
 
   function farbe(f: Cesium3DTileFeature): Color {
     const egid = Number(f.getProperty('EGID')) || null;
-    if (egid != null && egid === gewaehlt.current) return Color.fromCssColorString('#3D45F5');
+    if (egid != null && egid === gewaehlt.current) return Color.fromCssColorString(BLAU);
     const geb = egid != null ? daten.current.get(egid) : undefined;
     const mark = geb?.egrid ? markierteFarbe.current.get(geb.egrid) : undefined;
     if (mark) return mark;
@@ -440,18 +485,17 @@ export function Karte3D({ ziel, markiert = [], legende, faerbungen = FAERBUNGEN.
 
   async function waehlen(objekt: unknown) {
     if (!(objekt instanceof Cesium3DTileFeature)) { gewaehlt.current = null; setAuswahl(null); tiles.current?.makeStyleDirty(); viewer.current?.scene.requestRender(); return; }
-    const f = objekt;
-    const zahl = (k: string) => { const x = Number(f.getProperty(k)); return Number.isFinite(x) && x !== 0 ? x : null; };
-    const egid = zahl('EGID');
+    const a = ausKachel(objekt);
+    const egid = a.egid;
     gewaehlt.current = egid;
     tiles.current?.makeStyleDirty();
     viewer.current?.scene.requestRender();
-    const a: Auswahl = {
-      egid, hoehe: zahl('GESAMTHOEHE'), dachMin: zahl('DACH_MIN'), dachMax: zahl('DACH_MAX'), gelaende: zahl('GELAENDEPUNKT'),
-      objektart: String(f.getProperty('OBJEKTART') ?? '').replace(/Gebaeude/g, 'Gebäude') || null,
-    };
     setAuswahl(a);
-    if (!egid) return;
+    if (egid) await einzelheiten(egid);
+  }
+
+  /** Register, Adresse und unser Objekt zu einem Haus nachladen. */
+  async function einzelheiten(egid: number) {
     // Zuerst der Bund (tagesaktuell, mit Adresse), sonst unsere Tabelle.
     const bereits = daten.current.get(egid);
     const [bund, eigen] = await Promise.all([
@@ -467,6 +511,60 @@ export function Karte3D({ ziel, markiert = [], legende, faerbungen = FAERBUNGEN.
     }
     setAuswahl(x => (x && x.egid === egid ? { ...x, geb, parzelleId, adresse } : x));
   }
+
+  /** Was die Kachel des Bundes über ein Haus weiss. */
+  function ausKachel(f: Cesium3DTileFeature): Auswahl {
+    const zahl = (k: string) => { const x = Number(f.getProperty(k)); return Number.isFinite(x) && x !== 0 ? x : null; };
+    return {
+      egid: zahl('EGID'), hoehe: zahl('GESAMTHOEHE'), dachMin: zahl('DACH_MIN'), dachMax: zahl('DACH_MAX'), gelaende: zahl('GELAENDEPUNKT'),
+      objektart: String(f.getProperty('OBJEKTART') ?? '').replace(/Gebaeude/g, 'Gebäude') || null,
+    };
+  }
+
+  /** Das Haus mit dieser EGID in den geladenen Kacheln suchen. */
+  function findeHaus(egid: number): Cesium3DTileFeature | null {
+    const ts = tiles.current;
+    if (!ts) return null;
+    const stapel: Cesium3DTile[] = [ts.root];
+    while (stapel.length) {
+      const t = stapel.pop()!;
+      const c = t.content;
+      for (let i = 0; i < (c?.featuresLength ?? 0); i++) {
+        const f = c.getFeature(i);
+        if (Number(f.getProperty('EGID')) === egid) return f;
+      }
+      stapel.push(...t.children);
+    }
+    return null;
+  }
+
+  // Eine gesuchte Adresse: die Tafel sofort mit dem Register öffnen, Höhe
+  // und Dach nachtragen, sobald die Kachel des Hauses da ist (bis 30 s).
+  useEffect(() => {
+    const egid = sprung?.egid;
+    if (!egid || !bereit) return;
+    gewaehlt.current = egid;
+    tiles.current?.makeStyleDirty();
+    setAuswahl({ egid, hoehe: null, dachMin: null, dachMax: null, gelaende: null, objektart: null });
+    void einzelheiten(egid);
+    let n = 0;
+    const t = window.setInterval(() => {
+      const f = findeHaus(egid);
+      if (f) {
+        window.clearInterval(t);
+        setAuswahl(x => (x && x.egid === egid ? { ...x, ...ausKachel(f) } : x));
+        viewer.current?.scene.requestRender();
+      } else if (++n >= 30) window.clearInterval(t);
+    }, 1000);
+    return () => window.clearInterval(t);
+  }, [sprung, bereit]);  
+
+  const ortWaehlen = (o: Ort) => {
+    gewaehlt.current = null;
+    setAuswahl(null);
+    setSprung(o);
+    onOrt?.(o);
+  };
 
   const zoom = (faktor: number) => {
     const v = viewer.current; if (!v) return;
@@ -490,14 +588,17 @@ export function Karte3D({ ziel, markiert = [], legende, faerbungen = FAERBUNGEN.
     <div className={`relative isolate overflow-hidden bg-[#DCE6EF] ${hoehe}`}>
       <div ref={box} className="absolute inset-0 [&_.cesium-viewer-bottom]:hidden [&_.cesium-widget-credits]:hidden" />
 
-      {/* Färbung: eine Reihe Chips, auf dem Handy wischbar. */}
-      <div className="absolute left-3 right-16 top-3 z-10 flex gap-1.5 overflow-x-auto no-scrollbar">
+      {/* Oben die Suche, darunter die Färbung als Chips (auf dem Handy wischbar). */}
+      <div className="absolute left-3 right-16 top-3 z-20 flex flex-col items-start gap-2">
+      <Suche3D onWahl={ortWaehlen} />
+      <div className="flex max-w-full gap-1.5 overflow-x-auto no-scrollbar">
         {FAERBUNGEN.filter(f => faerbungen.includes(f.wert) && (intern || f.wert !== 'reserve')).map(f => (
           <button key={f.wert} type="button" className={chip(faerbung === f.wert)} onClick={() => setFaerbung(f.wert)} aria-pressed={faerbung === f.wert}>{f.titel}</button>
         ))}
         <button type="button" className={chip(zonen)} onClick={() => setZonen(z => !z)} aria-pressed={zonen}>
           {zonenLaden ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}Zonen
         </button>
+      </div>
       </div>
 
       <div className="absolute right-3 top-3 z-10 flex flex-col gap-1.5">
@@ -559,6 +660,15 @@ export function Karte3D({ ziel, markiert = [], legende, faerbungen = FAERBUNGEN.
       {!bereit && !fehler && (
         <div className="absolute inset-0 z-30 grid place-items-center bg-[#DCE6EF]/70 text-sm text-[#333]">
           <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> 3D-Modell wird geladen …</span>
+        </div>
+      )}
+      {stumm && !fehler && (
+        <div className="absolute inset-x-3 top-1/3 z-30 mx-auto max-w-[420px] rounded-[3px] bg-white p-4 text-center text-sm text-[#111] shadow-[0_8px_24px_rgba(0,0,0,0.18)]">
+          <p className="font-semibold">Die 3D-Karte hat noch nichts gezeichnet.</p>
+          <p className="mt-1 text-[#555]">Neu laden hilft meistens. Bleibt sie leer, bitte diese Zeile weitergeben:</p>
+          <p className="mt-2 break-words font-mono text-[11px] text-[#555]">{stumm}</p>
+          <button type="button" onClick={() => window.location.reload()}
+                  className="mt-3 inline-flex h-11 items-center justify-center rounded-[3px] bg-[#111] px-4 text-sm font-medium text-white">Neu laden</button>
         </div>
       )}
       {fehler && (

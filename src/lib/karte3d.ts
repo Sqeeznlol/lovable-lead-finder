@@ -132,6 +132,60 @@ export async function gebaeudeBeimBund(egid: number, signal?: AbortSignal): Prom
   };
 }
 
+// ---------------------------------------------------------------- Suche
+/**
+ * Ein Treffer der Ortssuche: Adresse (mit Gebäude), Parzelle (mit EGRID),
+ * PLZ oder Gemeinde. Felder der Bundessuche am 3. November nachgesehen:
+ * Adressen tragen in featureId "<EGID>_<Eingang>", Parzellen die EGRID
+ * kleingeschrieben am Ende von detail ("ar6739 zurigo 261 ch739978917069").
+ */
+export interface Ort {
+  art: 'adresse' | 'parzelle' | 'plz' | 'gemeinde';
+  titel: string; unter: string; lat: number; lon: number;
+  egid: number | null; egrid: string | null;
+  /** Wie weit die Kamera weg bleibt: ein Haus nah, eine Gemeinde weit. */
+  abstand: number;
+}
+const SUCHE_URL = 'https://api3.geo.admin.ch/rest/services/ech/SearchServer';
+const ohneTags = (x: unknown) => String(x ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+
+export function ortLesen(a: Record<string, unknown>): Ort | null {
+  const lat = Number(a.lat), lon = Number(a.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  const label = ohneTags(a.label);
+  switch (a.origin) {
+    case 'address': {
+      const egid = Number(String(a.featureId ?? '').split('_')[0]);
+      // "Freilagerstrasse 99 <b>8047 Zürich</b>": Strasse vorne, Ort fett.
+      const fett = String(a.label ?? '').match(/<b>(.*?)<\/b>/)?.[1]?.trim() ?? '';
+      // Ohne Hausnummer schreibt der Bund "Badenerstrasse #".
+      const strasse = ohneTags(String(a.label ?? '').replace(/<b>.*?<\/b>/, '')).replace(/\s*#$/, '');
+      return { art: 'adresse', titel: strasse || label, unter: fett, lat, lon, egid: Number.isFinite(egid) && egid > 0 ? egid : null, egrid: null, abstand: 360 };
+    }
+    case 'parcel': {
+      const egrid = String(a.detail ?? '').match(/\b(ch\d{12})\b/i)?.[1]?.toUpperCase() ?? null;
+      const nummer = label.replace(/\(.*\)/, '').trim().split(' ').pop() ?? label;
+      return { art: 'parzelle', titel: `Parzelle ${nummer}`, unter: egrid ? `EGRID ${egrid}` : label, lat, lon, egid: null, egrid, abstand: 420 };
+    }
+    case 'zipcode':
+      return { art: 'plz', titel: label.replace(/\s*-\s*/, ' '), unter: 'Postleitzahl', lat, lon, egid: null, egrid: null, abstand: 1600 };
+    case 'gg25':
+      return { art: 'gemeinde', titel: label, unter: 'Gemeinde', lat, lon, egid: null, egrid: null, abstand: 2200 };
+    default:
+      return null;
+  }
+}
+
+/** Adressen, Strassen, Parzellennummern, PLZ und Gemeinden beim Bund. */
+export async function ortSuchen(text: string, signal?: AbortSignal): Promise<Ort[]> {
+  const p = new URLSearchParams({ type: 'locations', origins: 'address,parcel,zipcode,gg25', limit: '8', lang: 'de', searchText: text });
+  const r = await fetch(`${SUCHE_URL}?${p}`, { signal });
+  if (!r.ok) return [];
+  const j = await r.json();
+  return ((j?.results ?? []) as { attrs?: Record<string, unknown> }[])
+    .map(x => (x.attrs ? ortLesen(x.attrs) : null)).filter((x): x is Ort => !!x);
+}
+
 /** Die amtlichen Texte der Codes (Tabelle gwr_kode). Leer, solange das Register nicht geladen ist. */
 export async function kodesLaden(): Promise<Map<string, string>> {
   const r = await db().from('gwr_kode').select('merkmal, code, text');

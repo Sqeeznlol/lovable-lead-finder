@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Map as Karte2D } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { useUrlWert } from '@/hooks/use-url-wert';
+import { useUrlSetzen, useUrlWert } from '@/hooks/use-url-wert';
 import { Karte3D } from '@/components/karte3d/Karte3D';
 import { parzelleMitte } from '@/lib/karte3d';
 
@@ -20,6 +20,7 @@ export function Karte3DSeite({ onSchliessen }: { onSchliessen?: () => void }) {
   const [objekt] = useUrlWert('objekt');
   const [latW] = useUrlWert('lat');
   const [lonW] = useUrlWert('lon');
+  const setzen = useUrlSetzen();
   const { data: p } = useQuery({
     queryKey: ['karte3d-objekt', objekt],
     enabled: !!objekt,
@@ -53,7 +54,9 @@ export function Karte3DSeite({ onSchliessen }: { onSchliessen?: () => void }) {
                 className="inline-flex h-11 items-center gap-2 rounded-[3px] border bg-card px-3 text-sm hover:bg-secondary"><Karte2D className="h-4 w-4" /> 2D</button>
       </div>
       <div className="min-h-0 flex-1">
-        <Karte3D ziel={ziel} markiert={markiert} start="modell" />
+        {/* Ein gesuchter Ort kommt in die Adresse: Neu laden und Teilen zeigen dieselbe Stelle. */}
+        <Karte3D ziel={ziel} markiert={markiert} start="modell"
+          onOrt={o => setzen({ lat: o.lat.toFixed(6), lon: o.lon.toFixed(6), objekt: null })} />
       </div>
     </div>
   );
