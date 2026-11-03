@@ -6,7 +6,7 @@ import { BILD } from '@/lib/luftbild';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { KATEGORIEN, kategorie, type Absicht, type Kategorie } from '@/lib/gespraech';
-import { passendeObjekte } from '@/lib/investor';
+import { Investoren } from '@/components/Investoren';
 import { useUrlWert } from '@/hooks/use-url-wert';
 
 /**
@@ -104,74 +104,6 @@ function Reaktivierung() {
           ))}
         </ul>
       )}
-    </section>
-  );
-}
-
-interface Profil {
-  id: string; lagen: string[] | null; objekttypen: string[] | null; budget_min_chf: number | null; budget_max_chf: number | null;
-  rendite_min_pct: number | null; horizont: string | null; kriterien: string | null; erfasst_am: string;
-  akteur: { name: string } | null;
-}
-
-function Investoren() {
-  const [offen, setOffen] = useUrlWert('investor');
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['investorprofile'],
-    queryFn: async (): Promise<Profil[]> => {
-      const r = await db().from('investorprofil').select('*, akteur:akteur_id(name)').eq('aktiv', true).order('erfasst_am', { ascending: false });
-      if (r.error) throw r.error;
-      return r.data ?? [];
-    },
-  });
-  const profil = data?.find(p => p.id === offen) ?? null;
-  const { data: treffer, isLoading: sucht } = useQuery({
-    queryKey: ['investor-treffer', offen],
-    enabled: !!profil,
-    queryFn: () => passendeObjekte(profil!),
-  });
-  const chf = (n: number | null) => (n ? `${(n / 1e6).toLocaleString('de-CH', { maximumFractionDigits: 1 })} Mio.` : null);
-
-  return (
-    <section className="space-y-3">
-      <h2 className="text-xl">Investoren</h2>
-      <p className="text-sm text-muted-foreground">Suchprofile aus den Gesprächen, mit den passenden Objekten aus dem Bestand.</p>
-      {isLoading && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> wird geladen …</p>}
-      {error && <p className="text-sm text-destructive">Suchprofile nicht lesbar.</p>}
-      {data && data.length === 0 && <p className="text-sm text-muted-foreground">Noch kein Suchprofil. Es entsteht im Gespräch: "Kauft selbst".</p>}
-      <ul className="space-y-2">
-        {data?.map(p => (
-          <li key={p.id} className="rounded-xl border">
-            <button type="button" onClick={() => setOffen(offen === p.id ? null : p.id)} className="w-full p-4 text-left">
-              <span className="block font-medium">{p.akteur?.name ?? 'Unbekannt'}</span>
-              <span className="block text-sm text-muted-foreground">
-                {[p.lagen?.join(', '), p.objekttypen?.join(', '),
-                  p.budget_min_chf || p.budget_max_chf ? `${chf(p.budget_min_chf) ?? '…'} bis ${chf(p.budget_max_chf) ?? '…'}` : null,
-                  p.rendite_min_pct ? `ab ${p.rendite_min_pct} %` : null, p.horizont].filter(Boolean).join(' · ') || 'ohne Angaben'}
-              </span>
-            </button>
-            {offen === p.id && (
-              <div className="border-t p-4 text-sm">
-                {sucht && <p className="text-muted-foreground">Suche passende Objekte …</p>}
-                {treffer && treffer.objekte.length === 0 && <p className="text-muted-foreground">{treffer.hinweis ?? 'Kein passendes Objekt im Bestand.'}</p>}
-                {treffer && treffer.objekte.length > 0 && (
-                  <>
-                    <p className="mb-2 text-xs text-muted-foreground">{treffer.hinweis}</p>
-                    <ul className="divide-y rounded-lg border">
-                      {treffer.objekte.map(o => (
-                        <li key={o.id} className="flex justify-between gap-3 px-3 py-2">
-                          <ObjektLink id={o.id} className="truncate">{o.address ?? 'Objekt'} · {o.gemeinde}</ObjektLink>
-                          <span className="shrink-0 text-xs text-muted-foreground">{[o.kategorie, o.area ? `${Math.round(o.area).toLocaleString('de-CH')} m²` : null].filter(Boolean).join(' · ')}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </>
-                )}
-              </div>
-            )}
-          </li>
-        ))}
-      </ul>
     </section>
   );
 }

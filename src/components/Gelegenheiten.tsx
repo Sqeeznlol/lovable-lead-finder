@@ -159,6 +159,8 @@ export function Gelegenheiten() {
             // Parzelle des Kunden bisher nicht -- nur 'ausloeser' zählte.
             const ausl = (g.gelegenheit_parzelle ?? []).filter(x => x.rolle === 'ausloeser' || x.rolle === 'im portfolio').map(x => x.parzelle).filter(Boolean) as Parz[];
             const nachb = (g.gelegenheit_parzelle ?? []).filter(x => x.rolle === 'nachbar').map(x => x.parzelle).filter(Boolean) as Parz[];
+            // Off-Market-Mandat: die Parzelle ist Kandidat für den Investor, nicht sein Eigentum.
+            const kand = (g.gelegenheit_parzelle ?? []).filter(x => x.rolle === 'kandidat').map(x => x.parzelle).filter(Boolean) as Parz[];
             return (
               <li key={g.id}>
                 <button type="button" onClick={() => setOffen(auf ? null : g.id)} aria-expanded={auf}
@@ -194,6 +196,10 @@ export function Gelegenheiten() {
                     {ausl.length > 0 && (
                       <div className="text-sm"><p className="text-[11px] uppercase tracking-wide text-muted-foreground">Parzelle des Kunden</p>
                         {ausl.map(p => <p key={p.id}><ObjektLink id={p.id} className="min-h-11 font-medium">{p.address ?? p.egrid}{p.gemeinde ? ` · ${p.gemeinde}` : ''}</ObjektLink></p>)}</div>
+                    )}
+                    {kand.length > 0 && (
+                      <div className="text-sm"><p className="text-[11px] uppercase tracking-wide text-muted-foreground">Kandidat für den Investor</p>
+                        {kand.map(p => <p key={p.id}><ObjektLink id={p.id} className="min-h-11 font-medium">{p.address ?? p.egrid}{p.gemeinde ? ` · ${p.gemeinde}` : ''}</ObjektLink>{p.owner_name ? <span className="text-muted-foreground"> · {p.owner_name}</span> : <span className="text-muted-foreground"> · Eigentümer noch nicht abgefragt</span>}</p>)}</div>
                     )}
                     {nachb.length > 0 && (
                       <div className="space-y-1.5 text-sm"><p className="text-[11px] uppercase tracking-wide text-muted-foreground">Nachbarn im Bestand</p>

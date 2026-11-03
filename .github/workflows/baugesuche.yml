@@ -70,6 +70,8 @@ jobs:
           select * from public.gelegenheiten_nachbar_baut(:'TAGE'::int, 200, true, true);
           \echo '### Entwicklungspotenzial in Kundenportfolios (docs/potenzial-regeln.md)'
           select * from public.gelegenheiten_potenzial(200, true);
+          \echo '### Investorprofile abgleichen (Migration 20261103220000)'
+          select * from public.investor_abgleich(true);
           \echo '### Nachher'
           select count(*) as gesuche, count(egrid) as mit_egrid, count(parzelle_id) as im_bestand,
                  count(*) filter (where egrid is not null and parzelle_id is null) as egrid_ohne_parzelle,
@@ -133,6 +135,8 @@ jobs:
           -- nicht an Baugesuchen, aber an derselben Uhrzeit.
           \echo '### Entwicklungspotenzial in Kundenportfolios'
           select * from public.gelegenheiten_potenzial(200, true);
+          \echo '### Investorprofile abgleichen'
+          select * from public.investor_abgleich(true);
           \echo '### Bestand der Tabelle'
           select count(*) as gesuche, count(egrid) as mit_egrid, count(parzelle_id) as im_bestand,
                  count(publikation_nr) as mit_publikation,

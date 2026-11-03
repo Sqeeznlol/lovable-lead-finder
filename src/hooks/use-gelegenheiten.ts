@@ -55,7 +55,7 @@ export function useGelegenheiten(aktiv = true) {
  * Hinfliegen -- nur in einer anderen Farbe.
  */
 export function alsKartengruppen(gel: Gel[]): import('@/hooks/use-portfolio').Portfolio[] {
-  const ROLLE: Record<string, string> = { ausloeser: 'Auslöser', nachbar: 'Nachbar', 'im portfolio': 'Im Portfolio' };
+  const ROLLE: Record<string, string> = { ausloeser: 'Auslöser', nachbar: 'Nachbar', 'im portfolio': 'Im Portfolio', kandidat: 'Kandidat' };
   return gel
     .filter(g => g.zustand !== 'abgeschlossen' && g.zustand !== 'verworfen')
     .map(g => ({
