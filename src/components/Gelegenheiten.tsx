@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { portfolioParzellen, usePortfolioListe } from '@/hooks/use-portfolio';
 import { arrondierungErkennen } from '@/lib/arrondierung';
 import { ANLAESSE, ZUSTAENDE, useGelegenheiten, type Gel, type Parz, type Zustand } from '@/hooks/use-gelegenheiten';
+import { PortfolioBericht } from '@/components/PortfolioBericht';
 import { useSchliessen, useUrlWert } from '@/hooks/use-url-wert';
 
 /**
@@ -93,7 +94,7 @@ export function Gelegenheiten() {
     }
   };
 
-  if (bericht) return <Bericht mandantId={bericht} gelegenheiten={data ?? []} onZurueck={berichtZu} />;
+  if (bericht) return <PortfolioBericht mandantId={bericht} onZurueck={berichtZu} />;
 
   const zahl = (z: Zustand) => (data ?? []).filter(g => g.zustand === z && passtKunde(g)).length;
 
@@ -110,7 +111,7 @@ export function Gelegenheiten() {
       unter="Was das System erkannt hat, wer daran arbeitet und was daraus wurde."
       kennzahlen={data ? ([['erkannt', 'rosa', 'ungeprüft'], ['gemeldet', 'violett', 'beim Kunden'], ['in bearbeitung', 'lila', 'läuft'], ['abgeschlossen', 'minze', 'erreicht']] as [Zustand, 'rosa' | 'violett' | 'lila' | 'minze', string][])
         .map(([z, art, wort]) => ({ titel: ZUSTAENDE.find(x => x[0] === z)![1], wert: String(zahl(z)), marke: <Marke art={art}>{wort}</Marke>, onClick: () => setZustand(z) })) : undefined}
-      aktionen={mandant && mandant !== 'ohne' ? <button type="button" onClick={() => setBericht(mandant)} className={KNOPF_HAUPT}><Printer className="h-4 w-4" /> Kundenbericht</button> : undefined}
+      aktionen={mandant && mandant !== 'ohne' ? <button type="button" onClick={() => setBericht(mandant)} className={KNOPF_HAUPT}><Printer className="h-4 w-4" /> Portfolio-Bericht</button> : undefined}
       seite={
         <Abschnitt titel="Arrondierung" unter="Nachbarn je Portfolio beim Bund prüfen" symbol={Target} kachel="akzent"
                    hinweis="Darf beliebig oft laufen; Doppeltes wird nicht angelegt.">
@@ -217,47 +218,5 @@ export function Gelegenheiten() {
         </ul>
       )}
     </Seite>
-  );
-}
-
-/**
- * Der Bericht an einen Kunden: was erkannt, gemeldet, bearbeitet und
- * erreicht wurde. Zum Drucken oder als PDF speichern -- der Browser
- * kann beides, und ein Bericht ist etwas, das man weitergibt.
- */
-function Bericht({ mandantId, gelegenheiten, onZurueck }: { mandantId: string; gelegenheiten: Gel[]; onZurueck: () => void }) {
-  const eigene = gelegenheiten.filter(g => g.mandant?.id === mandantId);
-  const name = eigene[0]?.mandant?.akteur?.name ?? 'Kunde';
-  const zahl = (z: Zustand) => eigene.filter(g => g.zustand === z).length;
-  return (
-    <div className="bericht-druck mx-auto max-w-3xl space-y-6 bg-white p-6 text-slate-900 print:p-0">
-      <div className="flex items-center justify-between gap-2 print:hidden">
-        <button type="button" onClick={onZurueck} className="h-10 rounded-lg border px-3 text-sm">Zurück</button>
-        <button type="button" onClick={() => window.print()} className="flex h-10 items-center gap-1.5 rounded-lg bg-slate-900 px-4 text-sm font-medium text-white">
-          <Printer className="h-4 w-4" /> Drucken / PDF
-        </button>
-      </div>
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wider text-slate-500">Bericht · {new Date().toLocaleDateString('de-CH')}</p>
-        <h1 className="text-2xl">{name}</h1>
-      </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {([['erkannt', 'Erkannt'], ['gemeldet', 'Gemeldet'], ['in bearbeitung', 'In Bearbeitung'], ['abgeschlossen', 'Abgeschlossen']] as [Zustand, string][]).map(([z, t]) => (
-          <div key={z} className="rounded-lg border p-3"><p className="text-xs text-slate-500">{t}</p><p className="text-2xl font-semibold tabular-nums">{zahl(z)}</p></div>
-        ))}
-      </div>
-      <table className="w-full text-sm">
-        <thead className="text-left text-xs text-slate-500"><tr><th className="pb-2 pr-3 font-medium">Gelegenheit</th><th className="pb-2 pr-3 font-medium">Stand</th><th className="pb-2 font-medium">Ergebnis</th></tr></thead>
-        <tbody className="divide-y">
-          {eigene.map(g => (
-            <tr key={g.id} className="align-top">
-              <td className="py-2 pr-3"><span className="font-medium">{g.titel}</span><br /><span className="text-xs text-slate-500">{g.begruendung}</span></td>
-              <td className="py-2 pr-3 whitespace-nowrap">{ZUSTAENDE.find(x => x[0] === g.zustand)?.[1]}</td>
-              <td className="py-2">{g.ergebnis ?? '–'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
   );
 }
