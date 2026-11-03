@@ -275,6 +275,9 @@ input, textarea, select {
     background: white;
   }
   @page { margin: 1.5cm; }
+  /* Mit "Hintergrundgrafiken drucken" kam sonst das Grau der Seite unter
+     der Merkliste mit (gemessen am PDF vom 3. November). */
+  html, body { background: white !important; }
   .brief-druck {
     position: absolute;
     inset: 0;

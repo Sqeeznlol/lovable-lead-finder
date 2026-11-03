@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { FileSpreadsheet, Search } from 'lucide-react';
+import { Bookmark, FileSpreadsheet, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { FELD, KNOPF, KNOPF_HAUPT, Leer, LISTE, Seite } from '@/components/rahmen';
 import { Auswahl, AuswahlSuche } from '@/components/Auswahl';
@@ -10,6 +10,7 @@ import { useGwrKodes } from '@/lib/parzelle-gebaeude';
 import { heizGruppe } from '@/lib/karte3d';
 import { downloadXlsx, exportTimestamp } from '@/lib/export-utils';
 import { useGemeindeStats } from '@/hooks/use-master';
+import { GebaeudeZeile, MerklisteAnsicht, MerklistenSpalte, Speichern, n, type Treffer } from '@/components/Merklisten';
 
 /**
  * Suche im eigenen Bestand nach Gebäuden: Gemeinde, Baujahr, Zimmer,
@@ -24,17 +25,17 @@ import { useGemeindeStats } from '@/hooks/use-master';
  * Jeder Filter steht in der Adresse: Neu laden und Teilen zeigen dieselbe
  * Suche, "Zurück" führt zur vorigen.
  */
-interface Treffer {
-  parzelle_id: string; adresse: string | null; gemeinde: string | null; egrid: string; egid: number; klasse: number | null;
-  baujahr: number | null; zimmer: number | null; wohnflaeche: number | null; wohnungen: number | null; geschosse: number | null;
-  heizung_energie: number | null;
-}
 const FELDER = ['gemeinde', 'bj_von', 'bj_bis', 'zi_min', 'zi_max', 'wf_min', 'art'] as const;
 const GRENZE = 500;
 const zahl = (s: string | null) => { const n = Number(s); return s && Number.isFinite(n) ? Math.round(n) : null; };
-const n = (x: number | null | undefined, e = '') => (x == null ? '–' : `${x.toLocaleString('de-CH')}${e}`);
 
+/** Mit `liste` in der Adresse eine gespeicherte Merkliste, sonst die Suche. */
 export function GebaeudeSuche() {
+  const [liste] = useUrlWert('liste');
+  return liste ? <MerklisteAnsicht id={liste} /> : <Suche />;
+}
+
+function Suche() {
   const setzen = useUrlSetzen();
   const [gemeinde] = useUrlWert('gemeinde'), [bjVon] = useUrlWert('bj_von'), [bjBis] = useUrlWert('bj_bis');
   const [ziMin] = useUrlWert('zi_min'), [ziMax] = useUrlWert('zi_max'), [wfMin] = useUrlWert('wf_min'), [artW] = useUrlWert('art');
@@ -60,6 +61,11 @@ export function GebaeudeSuche() {
     .map(([k, t]) => ({ wert: k.slice(6), titel: t }))
     .sort((a, b) => a.wert.localeCompare(b.wert)), [kodes]);
   const gesetzt = FELDER.some(f => werte[f]);
+  // Markiert wird je Gebäude; eine neue Suche beginnt ohne Häkchen.
+  const [markiert, setMarkiert] = useState<Set<number>>(new Set());
+  const [speichern, setSpeichern] = useState(false);
+  useEffect(() => { setMarkiert(new Set()); setSpeichern(false); }, [werte]);
+  const umschalten = (egid: number) => setMarkiert(m => { const x = new Set(m); if (x.has(egid)) x.delete(egid); else x.add(egid); return x; });
 
   const { data, isFetching, error } = useQuery({
     queryKey: ['gebaeude-suche', werte, gemeindeName(werte.gemeinde)],
@@ -97,6 +103,7 @@ export function GebaeudeSuche() {
   });
   const heizung = (t: Treffer) => (t.heizung_energie == null ? null : kodes?.get(`GENH:${t.heizung_energie}`) ?? `Code ${t.heizung_energie}`);
   const art = (t: Treffer) => (t.klasse == null ? null : kodes?.get(`GKLAS:${t.klasse}`) ?? null);
+  const alleMarkiert = !!data?.length && markiert.size === data.length;
   const suchen = () => setzen(Object.fromEntries(FELDER.map(f => [f, entwurf[f]?.trim() || null])));
   const leeren = () => { setEntwurf(Object.fromEntries(FELDER.map(f => [f, null])) as typeof werte); setzen(Object.fromEntries(FELDER.map(f => [f, null]))); };
   const exportieren = () => data && downloadXlsx(`gebaeudesuche-${exportTimestamp()}.xlsx`, 'Gebäude', data.map(t => ({
@@ -115,6 +122,7 @@ export function GebaeudeSuche() {
     <Seite bild={BILD.gebaeudesuche} ueber="Gebäudesuche · aus dem Gebäuderegister"
       titel={!gesetzt ? 'Gebäude im Bestand finden' : data ? `${n(data.length)}${data.length >= GRENZE ? '+' : ''} Gebäude gefunden` : 'Suche läuft …'}
       unter="Nach Gemeinde, Baujahr, Zimmern, Wohnfläche und Gebäudeart. Zimmer und Fläche sind die Summe aller Wohnungen eines Gebäudes."
+      seite={<MerklistenSpalte />}
       aktionen={data?.length ? <button type="button" onClick={exportieren} className={KNOPF}><FileSpreadsheet className="h-4 w-4" /> Als Excel</button> : undefined}>
       <div className="space-y-3 rounded border bg-card p-4">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
@@ -143,28 +151,28 @@ export function GebaeudeSuche() {
         : isFetching && !data ? <Leer titel="Suche läuft …" />
         : !data?.length ? <Leer titel="Kein Gebäude passt auf diese Filter." />
         : (
-          <ul className={LISTE}>
-            {data.map(t => (
-              <li key={t.egid}>
-                <button type="button" onClick={() => setzen({ parzelle: t.parzelle_id })}
-                        className="grid w-full grid-cols-1 gap-2 px-5 py-4 text-left hover:bg-secondary/60 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-                  <span className="min-w-0">
-                    <span className="block truncate font-medium">{t.adresse ?? `EGRID ${t.egrid}`}</span>
-                    <span className="block truncate text-sm text-muted-foreground">
-                      {[t.gemeinde, art(t), heizGruppe(heizung(t))?.titel].filter(Boolean).join(' · ')}
-                    </span>
-                    <span className="block truncate text-sm">{eigner?.get(t.parzelle_id) ?? <span className="text-muted-foreground">Eigentümer noch nicht abgefragt</span>}</span>
-                  </span>
-                  <span className="grid grid-cols-4 gap-4 text-sm tabular-nums sm:text-right">
-                    <span><span className="block text-[11px] uppercase tracking-wide text-muted-foreground">Baujahr</span>{t.baujahr ?? '–'}</span>
-                    <span><span className="block text-[11px] uppercase tracking-wide text-muted-foreground">Zimmer</span>{n(t.zimmer)}</span>
-                    <span><span className="block text-[11px] uppercase tracking-wide text-muted-foreground">Fläche</span>{n(t.wohnflaeche, ' m²')}</span>
-                    <span><span className="block text-[11px] uppercase tracking-wide text-muted-foreground">Whg.</span>{n(t.wohnungen)}</span>
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" onClick={() => setMarkiert(alleMarkiert ? new Set() : new Set(data.map(t => t.egid)))} className={KNOPF}>
+                {alleMarkiert ? 'Keine markieren' : 'Alle markieren'}
+              </button>
+              <button type="button" onClick={() => setSpeichern(x => !x)} className={KNOPF_HAUPT}>
+                <Bookmark className="h-4 w-4" /> {markiert.size ? `${n(markiert.size)} markierte als Liste` : `Alle ${n(data.length)} als Liste`}
+              </button>
+              {markiert.size > 0 && <span className="text-sm text-muted-foreground">{n(markiert.size)} von {n(data.length)} markiert</span>}
+            </div>
+            {speichern && (
+              <Speichern treffer={markiert.size ? data.filter(t => markiert.has(t.egid)) : data}
+                filter={{ ...werte, gemeinde: gemeindeName(werte.gemeinde), art_titel: werte.art ? arten.find(a => a.wert === werte.art)?.titel ?? null : null }}
+                onFertig={id => { setSpeichern(false); setMarkiert(new Set()); setzen({ liste: id }); }} />
+            )}
+            <ul className={LISTE}>
+              {data.map(t => (
+                <GebaeudeZeile key={t.egid} t={t} eigentuemer={eigner?.get(t.parzelle_id)} art={art(t)} heizung={heizung(t)}
+                  markiert={markiert.has(t.egid)} onMarkieren={() => umschalten(t.egid)} onOeffnen={() => setzen({ parzelle: t.parzelle_id })} />
+              ))}
+            </ul>
+          </>
         )}
       {data && data.length >= GRENZE && <p className="text-sm text-muted-foreground">Angezeigt werden die {GRENZE} grössten. Filter enger setzen, um alle zu sehen.</p>}
     </Seite>
