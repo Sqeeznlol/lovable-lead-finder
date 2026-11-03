@@ -43,7 +43,7 @@ export function Suche3D({ onWahl }: { onWahl: (o: Ort) => void }) {
         setOffen(true);
       } catch { if (!ab.signal.aborted) setErgebnis({ fuer: t, liste: [] }); }
       finally { if (!ab.signal.aborted) setLaeuft(false); }
-    }, 250);
+    }, 150);
     return () => { ab.abort(); window.clearTimeout(zeit); };
   }, [text]);
 

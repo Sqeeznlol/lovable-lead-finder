@@ -206,16 +206,22 @@ export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende,
 
   // ------------------------------------------- Parzellengrenzen (nah)
   // Als fertige Kacheln (WMTS) statt gezeichnet (WMS): der WMS-Dienst
-  // zeichnete jede Kachel neu, 87 Anfragen beim Öffnen. Und erst ab Stufe
-  // 16 -- ab 15 waren es 216 Kacheln bis zum Horizont, und von weiter weg
-  // sind Parzellengrenzen nur ein Grauschleier.
+  // zeichnete jede Kachel neu, 87 Anfragen beim Öffnen. Gezeigt nur nah,
+  // von weiter weg sind Parzellengrenzen ein Grauschleier.
+  //
+  // "Nur nah" über die Ebene (minimumTerrainLevel), NICHT über die
+  // Mindeststufe der Quelle: minimumLevel 16 liess Cesium für jede grobe
+  // Geländekachel alle Stufe-16-Kacheln darunter anlegen -- über der
+  // ganzen Schweiz Hunderttausende. Gemessen am 3. November: 40 von 40
+  // Sekunden Rechenzeit in Cesiums Kachel-Adressen, Tippen ins Suchfeld
+  // blieb hängen (Julian: "Text kommt nach").
   useEffect(() => {
     const v = viewer.current;
     if (!v || kataster.current) return;
-    kataster.current = v.imageryLayers.addImageryProvider(new UrlTemplateImageryProvider({
-      url: KATASTER_URL, rectangle: SCHWEIZ, minimumLevel: 16, maximumLevel: 19, credit: '© Kantone',
-    }));
-    kataster.current.alpha = 0.45;
+    kataster.current = new ImageryLayer(new UrlTemplateImageryProvider({
+      url: KATASTER_URL, rectangle: SCHWEIZ, maximumLevel: 19, credit: '© Kantone',
+    }), { minimumTerrainLevel: 15, alpha: 0.45 });
+    v.imageryLayers.add(kataster.current);
     v.scene.requestRender();
   }, [bereit]);
 
