@@ -7,6 +7,7 @@ import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { KATEGORIEN, kategorie, type Absicht, type Kategorie } from '@/lib/gespraech';
 import { Investoren } from '@/components/Investoren';
+import { KennzahlenTim } from '@/components/KennzahlenTim';
 import { useUrlWert } from '@/hooks/use-url-wert';
 
 /**
@@ -18,7 +19,8 @@ import { useUrlWert } from '@/hooks/use-url-wert';
  *   zuerst.
  * - Investoren (Abschnitt 6): jedes Suchprofil mit den passenden
  *   Objekten aus dem Bestand.
- * - Kennzahlen (Abschnitt 8): gezählt, nicht geschätzt.
+ * - Kennzahlen (Abschnitt 8): Tims Tabelle mit Ausgangswert, heute
+ *   und Ziel, dazu der Stand der Daten je Quelle (KennzahlenTim).
  */
 // Die erzeugten Typen kennen die Plattform-Tabellen noch nicht.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -140,34 +142,6 @@ function useKennzahlen() {
 
 const z = (n: number | null | undefined) => (n == null ? '–' : n.toLocaleString('de-CH'));
 
-function Kennzahlen() {
-  const { data, isLoading } = useKennzahlen();
-  const pct = (a: number | null | undefined, b: number | null | undefined) =>
-    a != null && b ? `${((a / b) * 100).toLocaleString('de-CH', { maximumFractionDigits: a / b < 0.01 ? 2 : 0 })} %` : '–';
-  const kacheln: [string, string, string][] = data ? [
-    ['Eigentümer bekannt', pct(data.mitEigner, data.objekte), `${z(data.mitEigner)} von rund ${z(data.objekte)} Objekten`],
-    ['Überwachte Parzellen', z(data.zugeordnet), `${z(data.portfolios)} Portfolios, ${z(data.positionen)} Positionen`],
-    ['Gelegenheiten', z(data.gel), `${z(data.gemeldet)} gemeldet, ${z(data.abgeschlossen)} abgeschlossen`],
-    ['Gespräche', z(data.anrufe), `${z(data.erreicht)} erreicht (${pct(data.erreicht, data.anrufe)})`],
-    ['Aktive Suchprofile', z(data.profile), 'Investoren aus Gesprächen'],
-  ] : [];
-  return (
-    <section className="space-y-3">
-      <h2 className="text-xl">Weitere Zahlen</h2>
-      {isLoading && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> wird gezählt …</p>}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {kacheln.map(([t, w, s]) => (
-          <div key={t} className="rounded-xl border p-4">
-            <p className="text-xs text-muted-foreground">{t}</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums">{w}</p>
-            <p className="text-xs text-muted-foreground">{s}</p>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 interface AnfrageZeile {
   id: string; art: 'bewertung' | 'potenzial' | 'investor'; name: string; email: string | null; telefon: string | null;
   adresse: string | null; angaben: Record<string, unknown>; nachricht: string | null; erstellt_am: string; bearbeitet: boolean;
@@ -266,7 +240,7 @@ export function Auswertung() {
       <Anfragen />
       <Reaktivierung />
       <Investoren />
-      <Kennzahlen />
+      <KennzahlenTim />
     </Seite>
   );
 }
