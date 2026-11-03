@@ -68,6 +68,8 @@ jobs:
           -- ohne Filter 315 -- dort ist zu viel Wärmepumpe dabei.
           \echo '### Nachbar baut (Gelegenheiten ohne Kunde)'
           select * from public.gelegenheiten_nachbar_baut(:'TAGE'::int, 200, true, true);
+          \echo '### Entwicklungspotenzial in Kundenportfolios (docs/potenzial-regeln.md)'
+          select * from public.gelegenheiten_potenzial(200, true);
           \echo '### Nachher'
           select count(*) as gesuche, count(egrid) as mit_egrid, count(parzelle_id) as im_bestand,
                  count(*) filter (where egrid is not null and parzelle_id is null) as egrid_ohne_parzelle,
@@ -126,6 +128,11 @@ jobs:
           select * from public.baugesuche_abgleichen(greatest(:'TAGE'::int, 30));
           \echo '### Nachbar baut (Gelegenheiten ohne Kunde)'
           select * from public.gelegenheiten_nachbar_baut(greatest(:'TAGE'::int, 30), 200, true, true);
+          -- Täglich auch die Reserven der Kundenportfolios (Migration
+          -- 20261103200000, Regeln in docs/potenzial-regeln.md). Hängt
+          -- nicht an Baugesuchen, aber an derselben Uhrzeit.
+          \echo '### Entwicklungspotenzial in Kundenportfolios'
+          select * from public.gelegenheiten_potenzial(200, true);
           \echo '### Bestand der Tabelle'
           select count(*) as gesuche, count(egrid) as mit_egrid, count(parzelle_id) as im_bestand,
                  count(publikation_nr) as mit_publikation,

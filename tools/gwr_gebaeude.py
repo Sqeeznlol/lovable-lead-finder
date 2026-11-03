@@ -13,7 +13,8 @@
 #   gebaeude.csv  egid, egrid, baujahr, geschosse, wohnungen, grundflaeche,
 #                 energieflaeche, volumen, kategorie, klasse, heizung,
 #                 heizung_energie, warmwasser_energie, heizung_seit,
-#                 zimmer, wohnflaeche (Summe der bestehenden Wohnungen)
+#                 zimmer, wohnflaeche (Summe der bestehenden Wohnungen),
+#                 e, n (Lage des Gebäudes, LV95)
 #   kode.csv      merkmal, code, text -- nur die Merkmale, die die Karte zeigt
 #
 # Nur bestehende Gebäude und solche im Bau (wie gwr_zh.py): ein
@@ -38,8 +39,12 @@ WOHNUNG_NOETIG = ['egid', 'wstat', 'wazim', 'warea']
 # Bestehende Wohnungen. Der Text zum Code steht im Protokoll (Merkmal
 # WSTAT); vor dem Schreiben dort nachsehen.
 WOHNUNG_ZAEHLT = {'3004'}
+# gkode/gkodn: Lage des Gebäudes in Landeskoordinaten (LV95). Zürcher
+# Parzellen haben im Bestand keinen Umriss (gemessen 3. November: 0 von
+# 394'917) -- der Punkt des Gebäudes ist darum die einzige Lage, die
+# die Karten der Gebäudesuche und der Merklisten haben.
 NOETIG = ['egid', 'egrid', 'gstat', 'gbauj', 'gastw', 'ganzwhg', 'garea', 'gebf', 'gvol',
-          'gkat', 'gklas', 'gwaerzh1', 'genh1', 'genw1', 'gwaerdath1']
+          'gkat', 'gklas', 'gwaerzh1', 'genh1', 'genw1', 'gwaerdath1', 'gkode', 'gkodn']
 
 
 def lesen(pfad):
@@ -56,6 +61,15 @@ def ganz(s):
         return str(int(float(s))) if s not in ('', None) else ''
     except ValueError:
         return ''
+
+
+def koordinate(s):
+    """LV95 als Zahl, oder leer. Nur was in der Schweiz liegt (E 2.48 bis 2.84 Mio, N 1.07 bis 1.30 Mio)."""
+    try:
+        v = float(s)
+    except (TypeError, ValueError):
+        return ''
+    return str(round(v, 1)) if 1_000_000 < v < 3_000_000 else ''
 
 
 def datum(s):
@@ -105,7 +119,7 @@ def main():
         z, f = wohnung.get(e, (0, 0))
         wohnung[e] = (z + int(ganz(w.get('wazim')) or 0), f + int(ganz(w.get('warea')) or 0))
 
-    n = n_alle = 0
+    n = n_alle = mit_lage = 0
     energie = Counter()
     with open(ziel, 'w', newline='') as f:
         w = csv.writer(f)
@@ -123,7 +137,10 @@ def main():
                 # 0 heisst: keine Angabe im Register -- leer lassen statt 0 zu behaupten.
                 (wohnung.get(ganz(g['egid']), (0, 0))[0] or ''),
                 (wohnung.get(ganz(g['egid']), (0, 0))[1] or ''),
+                koordinate(g.get('gkode')), koordinate(g.get('gkodn')),
             ])
+            if koordinate(g.get('gkode')) and koordinate(g.get('gkodn')):
+                mit_lage += 1
             n += 1
             energie[ganz(g.get('genh1')) or 'leer'] += 1
 
@@ -146,7 +163,7 @@ def main():
                 if m == 'WSTAT':
                     wstat_text[c] = (k.get('codtxtld') or '').strip()
 
-    print(f'Gebäude im Register: {n_alle}, bestehend oder im Bau: {n}, Codes: {kodes}')
+    print(f'Gebäude im Register: {n_alle}, bestehend oder im Bau: {n}, davon mit Lage: {mit_lage}, Codes: {kodes}')
     print(f'Merkmale in der Codetabelle: {", ".join(sorted(namen))}')
     print(f'Wohnungen je Status (WSTAT), gezählt wird {sorted(WOHNUNG_ZAEHLT)}:')
     for code, anzahl in wstat.most_common():

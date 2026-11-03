@@ -46,6 +46,7 @@ on:
           - potenzial-bund # Was der Bund an einem Punkt zu Bauzone und Parzelle liefert (fuer den Potenzialcheck)
           - anfrage-probe # Ob der oeffentliche Schluessel Anfragen einfuegen, aber nicht lesen kann (wird zurueckgerollt)
           - nachbar-baut # Wie viele Gelegenheiten 'Nachbar baut' je Schwelle entstünden (zählt nur)
+          - potenzial-gelegenheiten # Wie viele Gelegenheiten aus Reserven der Kundenportfolios je Schwelle entstünden (zählt nur)
           - demo         # Ob die Demo-Szenarien der Zentrale vollständig in der Datenbank stehen
           - ohne-egrid   # Wie die Zürcher Zeilen ohne EGRID aussehen (Gemeindenamen, Nummernformat, Herkunft)
           - indizes      # Welche Indizes auf properties wie gross sind und ob sie je benutzt werden
@@ -623,6 +624,23 @@ jobs:
               cross join (values (true), (false)) b(nur_bauvorhaben)
               cross join lateral public.gelegenheiten_nachbar_baut(t.tage, r.reserve, b.nur_bauvorhaben, false) x
               order by 1, 3 desc, 2;"
+
+          elif [ "$FRAGE" = "potenzial-gelegenheiten" ]; then
+            # Nur zaehlen (p_schreiben = false): je Mindestreserve, Demo-
+            # Kunden und echte getrennt (Namen bleiben weg).
+            frage "Entwicklungspotenzial: Kandidaten je Schwelle, alle Kunden" "
+              set local statement_timeout = '10min';
+              select r.reserve, x.kandidaten, x.reserve as r1_reserve, x.ersatzneubau as r2_ersatzneubau, x.gemeinsam as r3_gemeinsam
+              from (values (200), (300), (500), (1000)) r(reserve)
+              cross join lateral public.gelegenheiten_potenzial(r.reserve, false) x
+              order by 1;"
+            frage "Je Kunde (Demo gesondert), Schwelle 200" "
+              set local statement_timeout = '10min';
+              select case when a.name like '%(Demo)' then 'Demo' else 'echt' end as kunde, count(*) as kunden,
+                     sum(x.kandidaten) as kandidaten, sum(x.reserve) as r1, sum(x.ersatzneubau) as r2, sum(x.gemeinsam) as r3
+              from mandant m join akteur a on a.id = m.akteur_id
+              cross join lateral public.gelegenheiten_potenzial(200, false, m.id) x
+              group by 1 order by 1;"
 
           elif [ "$FRAGE" = "demo" ]; then
             # Nur erfundene Firmen (Demo) -- Namen duerfen hier stehen.

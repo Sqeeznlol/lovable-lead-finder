@@ -39,6 +39,9 @@ export function Gelegenheiten() {
   const zustand = zustandWert as Zustand | 'offen' | 'alle';
   const setZustand = (z: Zustand | 'offen' | 'alle') => setZustandWert(z);
   const [mandantWert, setMandantWert] = useUrlWert('kunde');
+  // Anlass: seit dem 4. November erkennt das System auch Reserven in
+  // Kundenportfolios (docs/potenzial-regeln.md); die will man für sich sehen.
+  const [anlass, setAnlass] = useUrlWert('anlass');
   const mandant = mandantWert ?? '';
   const setMandant = (m: string) => setMandantWert(m || null);
   const [offen, setOffen] = useUrlWert('gelegenheit');
@@ -47,8 +50,9 @@ export function Gelegenheiten() {
   const berichtZu = useSchliessen('bericht');
 
   // "ohne" zeigt die Gelegenheiten ohne Kunde ("Nachbar baut").
-  const passtKunde = (g: { mandant?: { id: string } | null }) =>
-    !mandant || (mandant === 'ohne' ? !g.mandant : g.mandant?.id === mandant);
+  const passtKunde = (g: { mandant?: { id: string } | null; anlass?: string }) =>
+    (!mandant || (mandant === 'ohne' ? !g.mandant : g.mandant?.id === mandant)) && (!anlass || g.anlass === anlass);
+  const anlaesse = useMemo(() => [...new Set((data ?? []).map(g => g.anlass))].sort(), [data]);
   const mandanten = useMemo(() => {
     const m = new Map<string, string>();
     (data ?? []).forEach(g => g.mandant && m.set(g.mandant.id, g.mandant.akteur?.name ?? 'Ohne Namen'));
@@ -135,6 +139,11 @@ export function Gelegenheiten() {
           { wert: '', titel: 'Alle Kunden' }, { wert: 'ohne', titel: 'Ohne Kunde (Nachbar baut)' },
           ...mandanten.map(([id, n]) => ({ wert: id, titel: n })),
         ]} />
+        {anlaesse.length > 1 && (
+          <Auswahl label="Anlass" wert={anlass ?? ''} setWert={w => setAnlass(w || null)} className="min-w-[200px]" optionen={[
+            { wert: '', titel: 'Alle Anlässe' }, ...anlaesse.map(a => ({ wert: a, titel: ANLAESSE[a] ?? a })),
+          ]} />
+        )}
       </div>
 
       {isLoading && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> wird geladen …</p>}
@@ -145,7 +154,9 @@ export function Gelegenheiten() {
         <ul className={LISTE}>
           {liste.map(g => {
             const auf = offen === g.id;
-            const ausl = (g.gelegenheit_parzelle ?? []).filter(x => x.rolle === 'ausloeser').map(x => x.parzelle).filter(Boolean) as Parz[];
+            // 'im portfolio' (Baugesuch im Portfolio, Reserve) zeigte die
+            // Parzelle des Kunden bisher nicht -- nur 'ausloeser' zählte.
+            const ausl = (g.gelegenheit_parzelle ?? []).filter(x => x.rolle === 'ausloeser' || x.rolle === 'im portfolio').map(x => x.parzelle).filter(Boolean) as Parz[];
             const nachb = (g.gelegenheit_parzelle ?? []).filter(x => x.rolle === 'nachbar').map(x => x.parzelle).filter(Boolean) as Parz[];
             return (
               <li key={g.id}>

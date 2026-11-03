@@ -7,13 +7,20 @@
 --    Export). Der Stand gehört zur Liste -- dasselbe Haus kann auf einer
 --    Liste "Brief geschickt" und auf einer anderen "offen" sein.
 --
--- 2. Lage: gebaeude_suchen und merkliste_gebaeude geben einen Punkt in
---    der Parzelle (WGS84) mit, für die Karte. ST_PointOnSurface statt
---    Schwerpunkt: der liegt bei einer L-förmigen Parzelle daneben.
---    Berechnet nur für die zurückgegebenen Zeilen (höchstens 1000).
+-- 2. Lage: gebaeude_suchen und merkliste_gebaeude geben einen Punkt
+--    (WGS84) mit, für die Karte. Zuerst die Lage des Gebäudes aus dem
+--    Register (gebaeude.e/n, LV95 -- Zürcher Parzellen haben im Bestand
+--    keinen Umriss, gemessen 3. November: 0 von 394'917), sonst ein
+--    Punkt in der Parzelle (ST_PointOnSurface statt Schwerpunkt: der
+--    liegt bei einer L-förmigen Parzelle daneben). Berechnet nur für
+--    die zurückgegebenen Zeilen (höchstens 1000).
 --
 -- Die Rückgabe beider Funktionen ändert sich; "create or replace" geht
 -- dann nicht, darum erst löschen.
+
+alter table public.gebaeude
+  add column if not exists e numeric,
+  add column if not exists n numeric;
 
 alter table public.merkliste_eintrag
   add column if not exists stand text not null default 'offen'
@@ -44,7 +51,10 @@ as $$
   from public.merkliste_eintrag e
   left join public.gebaeude g on g.egid = e.egid
   left join public.properties p on p.id = e.parzelle_id
-  left join lateral (select ST_Transform(ST_PointOnSurface(p.geometrie), 4326) as punkt) pt on p.geometrie is not null
+  left join lateral (select ST_Transform(
+      case when g.e is not null and g.n is not null then ST_SetSRID(ST_MakePoint(g.e, g.n), 2056)
+           else ST_PointOnSurface(p.geometrie) end, 4326) as punkt) pt
+    on (g.e is not null and g.n is not null) or p.geometrie is not null
   where e.liste_id = p_liste
   order by p.gemeinde nulls last, p.address nulls last, e.egid;
 $$;
@@ -97,7 +107,10 @@ as $$
          ST_Y(pt.punkt), ST_X(pt.punkt)
   from kand k
   join public.properties p on p.egrid = k.egrid
-  left join lateral (select ST_Transform(ST_PointOnSurface(p.geometrie), 4326) as punkt) pt on p.geometrie is not null
+  left join lateral (select ST_Transform(
+      case when k.e is not null and k.n is not null then ST_SetSRID(ST_MakePoint(k.e, k.n), 2056)
+           else ST_PointOnSurface(p.geometrie) end, 4326) as punkt) pt
+    on (k.e is not null and k.n is not null) or p.geometrie is not null
   order by k.wohnflaeche desc nulls last, k.egid;
 $$;
 revoke all on function public.gebaeude_suchen(text, int, int, int, int, int, int, int) from public, anon;
