@@ -10,6 +10,7 @@ import { useGwrKodes } from '@/lib/parzelle-gebaeude';
 import { heizGruppe } from '@/lib/karte3d';
 import { downloadXlsx, exportTimestamp } from '@/lib/export-utils';
 import { useGemeindeStats } from '@/hooks/use-master';
+import { gemeindeKanon, gemeindenEinmal } from '@/lib/gemeinden';
 import { GebaeudeZeile, MerklisteAnsicht, MerklistenSpalte, Speichern, n, type Treffer } from '@/components/Merklisten';
 
 /**
@@ -50,11 +51,14 @@ function Suche() {
   // "kloten" fand nichts, weil die Suche den Namen genau so braucht, wie er
   // im Bestand steht (Julian, 3. November). Darum hier auf den Namen aus
   // der Gemeindeliste abbilden: Gross/klein egal, "(ZH)" darf fehlen.
+  // Jede Gemeinde einmal: "Küsnacht ZH" und "Küsnacht (ZH)" sind im
+  // Bestand zwei Schreibweisen derselben Gemeinde (src/lib/gemeinden.ts).
+  const namen = useMemo(() => gemeindenEinmal((gemeinden?.gemeinden ?? []).map(g => g.gemeinde)), [gemeinden]);
   const gemeindeName = (eingabe: string | null) => {
     const e = eingabe?.trim().toLowerCase();
     if (!e) return null;
-    const liste = (gemeinden?.gemeinden ?? []).map(g => g.gemeinde);
-    return liste.find(g => g.toLowerCase() === e) ?? liste.find(g => g.toLowerCase().replace(/\s*\([a-z]{2}\)$/, '') === e) ?? eingabe!.trim();
+    const kanon = gemeindeKanon(eingabe!.trim(), new Set(namen));
+    return namen.find(g => g.toLowerCase() === kanon.toLowerCase()) ?? namen.find(g => g.toLowerCase().replace(/\s*\([a-z]{2}\)$/, '') === e) ?? kanon;
   };
   const arten = useMemo(() => [...(kodes?.entries() ?? [])]
     .filter(([k]) => k.startsWith('GKLAS:') && /^GKLAS:11/.test(k)) // Wohngebäude (11xx)
@@ -130,7 +134,7 @@ function Suche() {
             <span className="mb-1 block text-xs text-muted-foreground">Gemeinde</span>
             <AuswahlSuche label="Gemeinde" wert={gemeindeName(entwurf.gemeinde) ?? ''} leer="Alle Gemeinden" platzhalter="Gemeinde suchen …"
               setWert={w => setEntwurf(x => ({ ...x, gemeinde: w || null }))} className="w-full"
-              optionen={(gemeinden?.gemeinden ?? []).map(g => ({ wert: g.gemeinde, titel: g.gemeinde })).sort((a, b) => a.titel.localeCompare(b.titel, 'de-CH'))} />
+              optionen={namen.map(g => ({ wert: g, titel: g }))} />
           </div>
           {feld('bj_von', 'Baujahr ab', '1940')}
           {feld('bj_bis', 'Baujahr bis', '1960')}
