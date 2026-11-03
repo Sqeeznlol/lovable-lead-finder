@@ -26,6 +26,7 @@ const Baugesuche = lazy(() => import('@/components/Baugesuche').then(m => ({ def
 const Gelegenheiten = lazy(() => import('@/components/Gelegenheiten').then(m => ({ default: m.Gelegenheiten })));
 const Karte3DSeite = lazy(() => import('@/components/karte3d/Karte3DSeite').then(m => ({ default: m.Karte3DSeite })));
 const Kalender = lazy(() => import('@/components/Kalender').then(m => ({ default: m.Kalender })));
+const GebaeudeSuche = lazy(() => import('@/components/GebaeudeSuche').then(m => ({ default: m.GebaeudeSuche })));
 const Nachbarschaft = lazy(() => import('@/components/Nachbarschaft').then(m => ({ default: m.Nachbarschaft })));
 // Die Karte zieht Leaflet nach -- das gehoert nicht ins erste
 // Buendel, sondern wird geholt, wenn jemand den Reiter oeffnet.
@@ -54,7 +55,7 @@ import { useMidnightReset } from '@/hooks/use-phones';
 
 // Jeder Bereich ist eine Adresse: /zentrale, /baugesuche ... ("/" ist
 // das Cockpit). So führt "Zurück" im Browser in den vorigen Bereich.
-const TABS = ['cockpit', 'zentrale', 'baugesuche', 'pipedrive', 'nummern', 'karte', 'nachbarschaft', 'gelegenheiten', 'auswertung', 'kalender', 'karte3d', 'uebersicht', 'dashboard', 'master', 'vorauswahl', 'akquise', 'telsuche', 'properties', 'import', 'masterimport', 'phones', 'export', 'admin'] as const;
+const TABS = ['cockpit', 'zentrale', 'baugesuche', 'pipedrive', 'nummern', 'karte', 'nachbarschaft', 'gelegenheiten', 'auswertung', 'kalender', 'karte3d', 'gebaeudesuche', 'uebersicht', 'dashboard', 'master', 'vorauswahl', 'akquise', 'telsuche', 'properties', 'import', 'masterimport', 'phones', 'export', 'admin'] as const;
 type Tab = typeof TABS[number];
 const istTab = (x: string | undefined): x is Tab => !!x && (TABS as readonly string[]).includes(x);
 
@@ -96,6 +97,8 @@ const gruppen: { titel: string; eintraege: Eintrag[] }[] = [
   { titel: 'Akquise', eintraege: [
     { id: 'uebersicht', label: 'Übersicht', icon: LayoutDashboard },
     { id: 'master', label: 'Abfrage', icon: Database },
+    // Gebäude nach Baujahr, Zimmern, Wohnfläche aus dem Register.
+    { id: 'gebaeudesuche', label: 'Gebäudesuche', icon: Building2 },
     // Der Zwischenstand braucht einen eigenen Ort: Eigentümer da,
     // Nummer fehlt.
     { id: 'nummern', label: 'Nummern', icon: Phone },
@@ -283,6 +286,7 @@ export default function Index() {
             {active === 'nummern' && <Nummern />}
             {active === 'karte' && <Karte onSchliessen={() => gehe('cockpit')} />}
             {active === 'nachbarschaft' && <Nachbarschaft />}
+            {active === 'gebaeudesuche' && <GebaeudeSuche />}
             {active === 'gelegenheiten' && <Gelegenheiten />}
             {active === 'kalender' && <Kalender />}
             {active === 'karte3d' && <Karte3DSeite />}

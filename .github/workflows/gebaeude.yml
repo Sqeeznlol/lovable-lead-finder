@@ -72,21 +72,24 @@ jobs:
           begin;
           create temp table g (egid bigint, egrid text, baujahr smallint, geschosse smallint, wohnungen smallint,
             grundflaeche integer, energieflaeche integer, volumen integer, kategorie smallint, klasse smallint,
-            heizung smallint, heizung_energie smallint, warmwasser_energie smallint, heizung_seit date) on commit drop;
+            heizung smallint, heizung_energie smallint, warmwasser_energie smallint, heizung_seit date,
+            zimmer smallint, wohnflaeche integer) on commit drop;
           create temp table k (merkmal text, code integer, text text) on commit drop;
           \copy g from '/tmp/gebaeude.csv' with (format csv)
           \copy k from '/tmp/kode.csv' with (format csv)
           truncate public.gebaeude;
           insert into public.gebaeude (egid, egrid, baujahr, geschosse, wohnungen, grundflaeche, energieflaeche,
-            volumen, kategorie, klasse, heizung, heizung_energie, warmwasser_energie, heizung_seit)
+            volumen, kategorie, klasse, heizung, heizung_energie, warmwasser_energie, heizung_seit, zimmer, wohnflaeche)
           select distinct on (egid) egid, nullif(egrid, ''), baujahr, geschosse, wohnungen, grundflaeche, energieflaeche,
-            volumen, kategorie, klasse, heizung, heizung_energie, warmwasser_energie, heizung_seit from g order by egid;
+            volumen, kategorie, klasse, heizung, heizung_energie, warmwasser_energie, heizung_seit, zimmer, wohnflaeche
+            from g order by egid;
           truncate public.gwr_kode;
           insert into public.gwr_kode select distinct on (merkmal, code) merkmal, code, text from k order by merkmal, code;
           commit;
           vacuum analyze public.gebaeude;
           vacuum analyze public.gwr_kode;
-          select count(*) as gebaeude, count(heizung_energie) as mit_heizung, count(baujahr) as mit_baujahr from public.gebaeude;
+          select count(*) as gebaeude, count(heizung_energie) as mit_heizung, count(baujahr) as mit_baujahr,
+                 count(zimmer) as mit_zimmer, count(wohnflaeche) as mit_wohnflaeche from public.gebaeude;
           select g.heizung_energie as code, coalesce(k.text, '?') as energiequelle, count(*) as gebaeude
             from public.gebaeude g left join public.gwr_kode k on k.merkmal = 'GENH' and k.code = g.heizung_energie
             group by 1, 2 order by 3 desc limit 15;
