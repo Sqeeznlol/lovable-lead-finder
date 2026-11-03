@@ -74,6 +74,13 @@ jobs:
           miss "Masterliste: zählen" "properties?select=*&ausgeschlossen=eq.false" zaehlen
           # Wie use-portfolio.ts: alle Portfolios mit Positionen und Parzellen.
           miss "Portfolios mit Positionen" "portfolio?select=id,name,mandant:mandant_id(akteur:akteur_id(name)),portfolio_position(id,roh_adresse,parzelle:parzelle_id(id,address,egrid,plot_number,area,zone))&order=name"
+          miss "Portfolios, nur Name und Zahl" "portfolio?select=id,name,portfolio_position(count)&portfolio_position.parzelle_id=not.is.null&order=name"
+          # Form der Antwort (ohne Namen -- das Protokoll ist öffentlich):
+          # erwartet je Portfolio [{"count": n}].
+          curl -sS "$URL/rest/v1/portfolio?select=id,portfolio_position(count)&portfolio_position.parzelle_id=not.is.null" \
+            -H "apikey: $KEY" -H "Authorization: Bearer $TOKEN" \
+            | jq -c '{portfolios: length, parzellen_summe: (map(.portfolio_position[0].count) | add), form: (.[0].portfolio_position)}' \
+            | sed 's/^/Form: /' >> "$GITHUB_STEP_SUMMARY" || true
           miss "3D: Gebäude, 200 nach EGID" "gebaeude?select=egid,heizung_energie&egid=in.($(seq -s, 302061100 302061299))"
           miss "3D: Codetabelle" "gwr_kode?select=merkmal,code,text"
           cat "$GITHUB_STEP_SUMMARY"
