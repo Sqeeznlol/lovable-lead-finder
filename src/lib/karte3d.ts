@@ -59,9 +59,12 @@ export function zonenArt(code: string | null | undefined): ZonenArt {
   if (c.startsWith('C44')) return { titel: 'Wald', farbe: '#5E9B5B' };
   return { titel: 'Übrige Zone', farbe: '#C8C8C8' };
 }
+// Gewässer und Wald fehlten, obwohl sie eingefärbt werden: in Zürich war
+// die Limmat blau, und die Legende nannte nur "Öffentliche Bauten" (3D-
+// Prüfung, 4. November).
 export const ZONEN_LEGENDE: ZonenArt[] = [
   zonenArt('C1102'), zonenArt('C1104'), zonenArt('C1105'), zonenArt('C1306'), zonenArt('C1307'),
-  zonenArt('C1401'), zonenArt('C1202'), zonenArt('C1501'), zonenArt('C3102'),
+  zonenArt('C1401'), zonenArt('C1202'), zonenArt('C1501'), zonenArt('C3102'), zonenArt('C3201'), zonenArt('C4401'),
 ];
 
 /** Die Zonen um einen Punkt, als GeoJSON in WGS84. Nur Kanton Zürich. */
