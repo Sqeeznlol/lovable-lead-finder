@@ -39,7 +39,7 @@ export function KontoMenu({ aktiv, nurSymbol = false }: { aktiv?: string | null;
   return (
     <M.Root>
       <M.Trigger aria-label="Konto und Fondsleitungen"
-        className="group flex h-11 min-w-0 items-center gap-2 rounded-[3px] px-2 text-left outline-none hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-secondary">
+        className="group flex h-11 shrink-0 items-center gap-2 rounded-[3px] px-2 text-left outline-none hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-secondary">
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-foreground text-sm font-semibold uppercase text-background">{konto.slice(0, 1) || '?'}</span>
         {!nurSymbol && (
           <span className="hidden min-w-0 leading-tight lg:block">
@@ -47,7 +47,7 @@ export function KontoMenu({ aktiv, nurSymbol = false }: { aktiv?: string | null;
             <span className="block max-w-[180px] truncate text-xs text-muted-foreground">{user?.email}</span>
           </span>
         )}
-        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-150 group-data-[state=open]:rotate-180" />
+        <ChevronDown className="hidden h-4 w-4 shrink-0 text-muted-foreground lg:block transition-transform duration-150 group-data-[state=open]:rotate-180" />
       </M.Trigger>
       <M.Portal>
         <M.Content align="end" sideOffset={8} collisionPadding={12}

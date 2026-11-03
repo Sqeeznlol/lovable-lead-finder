@@ -250,13 +250,16 @@ export default function Index() {
               <span className="grid h-9 w-9 place-items-center rounded-[3px] bg-foreground text-background lg:hidden">
                 <Building2 className="h-5 w-5" />
               </span>
-              <span className="text-lg font-semibold lg:hidden">{titel}</span>
+              <span className="min-w-0 shrink truncate text-lg font-semibold lg:hidden">{titel}</span>
               <div className="relative hidden h-11 w-[380px] lg:block">
                 <div className="absolute inset-x-0 top-0 z-40"><Parzellensuche kanton={kantonJetzt} /></div>
               </div>
-              <div className="ml-auto flex items-center gap-3">
+              {/* min-w-0: ohne darf der Kasten nicht schmaler werden als die
+                  Kantone, das Wischen greift nie, und auf dem iPhone lag die
+                  Kopfzeile 190 px über dem Rand (gemessen 3. November). */}
+              <div className="ml-auto flex min-w-0 items-center gap-3">
                 {/* Der Kanton gilt nur für die Akquise. */}
-                {akquise && <div className="flex items-center gap-2 overflow-x-auto no-scrollbar"><CantonTabs /></div>}
+                {akquise && <div className="flex min-w-0 items-center gap-2 overflow-x-auto no-scrollbar"><CantonTabs /></div>}
                 <button type="button" onClick={neuesVorhaben}
                         className="hidden h-11 items-center gap-2 rounded-[3px] bg-accent px-4 text-[15px] font-medium text-accent-foreground transition-transform active:scale-[0.97] lg:inline-flex">
                   <Plus className="h-4 w-4" /> Neues Vorhaben

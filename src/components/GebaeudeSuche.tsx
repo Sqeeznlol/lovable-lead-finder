@@ -65,12 +65,28 @@ export function GebaeudeSuche() {
     },
   });
 
+  // Eigentümer, soweit schon abgefragt (properties.owner_name) -- für die
+  // Ansprache (Julian: "diese Eigentümer gehe ich an für Renovation oder
+  // Verkauf"). In Paketen, eine Adresse mit 500 Kennungen wäre zu lang.
+  const ids = useMemo(() => [...new Set((data ?? []).map(t => t.parzelle_id))], [data]);
+  const { data: eigner } = useQuery({
+    queryKey: ['gebaeude-suche-eigner', ids],
+    enabled: ids.length > 0,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const pakete: string[][] = [];
+      for (let i = 0; i < ids.length; i += 150) pakete.push(ids.slice(i, i + 150));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const r = await Promise.all(pakete.map(pk => (supabase as any).from('properties').select('id, owner_name').in('id', pk)));
+      return new Map(r.flatMap(x => (x.data ?? []) as { id: string; owner_name: string | null }[]).map(z => [z.id, z.owner_name]));
+    },
+  });
   const heizung = (t: Treffer) => (t.heizung_energie == null ? null : kodes?.get(`GENH:${t.heizung_energie}`) ?? `Code ${t.heizung_energie}`);
   const art = (t: Treffer) => (t.klasse == null ? null : kodes?.get(`GKLAS:${t.klasse}`) ?? null);
   const suchen = () => setzen(Object.fromEntries(FELDER.map(f => [f, entwurf[f]?.trim() || null])));
   const leeren = () => { setEntwurf(Object.fromEntries(FELDER.map(f => [f, null])) as typeof werte); setzen(Object.fromEntries(FELDER.map(f => [f, null]))); };
   const exportieren = () => data && downloadXlsx(`gebaeudesuche-${exportTimestamp()}.xlsx`, 'Gebäude', data.map(t => ({
-    Adresse: t.adresse, Gemeinde: t.gemeinde, EGRID: t.egrid, EGID: t.egid, Gebäudeart: art(t), Baujahr: t.baujahr,
+    Adresse: t.adresse, Gemeinde: t.gemeinde, Eigentümer: eigner?.get(t.parzelle_id) ?? '', EGRID: t.egrid, EGID: t.egid, Gebäudeart: art(t), Baujahr: t.baujahr,
     Zimmer: t.zimmer, 'Wohnfläche m²': t.wohnflaeche, Wohnungen: t.wohnungen, Geschosse: t.geschosse, Heizung: heizung(t),
   })));
   const feld = (f: (typeof FELDER)[number], titel: string, platz: string, zahlfeld = true) => (
@@ -118,6 +134,7 @@ export function GebaeudeSuche() {
                     <span className="block truncate text-sm text-muted-foreground">
                       {[t.gemeinde, art(t), heizGruppe(heizung(t))?.titel].filter(Boolean).join(' · ')}
                     </span>
+                    <span className="block truncate text-sm">{eigner?.get(t.parzelle_id) ?? <span className="text-muted-foreground">Eigentümer noch nicht abgefragt</span>}</span>
                   </span>
                   <span className="grid grid-cols-4 gap-4 text-sm tabular-nums sm:text-right">
                     <span><span className="block text-[11px] uppercase tracking-wide text-muted-foreground">Baujahr</span>{t.baujahr ?? '–'}</span>

@@ -81,6 +81,13 @@ jobs:
             -H "apikey: $KEY" -H "Authorization: Bearer $TOKEN" \
             | jq -c '{portfolios: length, parzellen_summe: (map(.portfolio_position[0].count) | add), form: (.[0].portfolio_position)}' \
             | sed 's/^/Form: /' >> "$GITHUB_STEP_SUMMARY" || true
+          # Gebäudesuche (Funktion gebaeude_suchen), wie die Seite sie aufruft.
+          for i in 1 2 3; do
+            r=$(curl -sS -o /dev/null -w '%{http_code} %{time_total}' -X POST "$URL/rest/v1/rpc/gebaeude_suchen" \
+              -H "apikey: $KEY" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+              -d '{"p_gemeinde":"Küsnacht","p_baujahr_von":1940,"p_baujahr_bis":1960,"p_zimmer_min":5,"p_wohnflaeche_min":120,"p_grenze":500}')
+            echo "| Gebäudesuche, Lauf $i | ${r%% *} | ${r##* } | | |" >> "$GITHUB_STEP_SUMMARY"
+          done
           miss "3D: Gebäude, 200 nach EGID" "gebaeude?select=egid,heizung_energie&egid=in.($(seq -s, 302061100 302061299))"
           miss "3D: Codetabelle" "gwr_kode?select=merkmal,code,text"
           cat "$GITHUB_STEP_SUMMARY"
