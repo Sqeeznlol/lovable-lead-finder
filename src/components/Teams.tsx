@@ -46,6 +46,7 @@ export function Teams() {
     if (r.error) setFehler('Nicht gespeichert.');
     await qc.invalidateQueries({ queryKey: ['teams'] });
     await qc.invalidateQueries({ queryKey: ['portfolios'] });
+    await qc.invalidateQueries({ queryKey: ['portfolio-liste'] });
     await qc.invalidateQueries({ queryKey: ['gelegenheiten'] });
   };
 

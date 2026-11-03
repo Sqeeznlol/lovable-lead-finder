@@ -7,7 +7,7 @@ import { Loader2, Printer, Target } from 'lucide-react';
 import { Abschnitt, FELD, KNOPF, KNOPF_HAUPT, Leer, LISTE, Marke, Reiter, Seite, Strichbalken } from '@/components/rahmen';
 import { BILD } from '@/lib/luftbild';
 import { supabase } from '@/integrations/supabase/client';
-import { usePortfolios } from '@/hooks/use-portfolio';
+import { portfolioParzellen, usePortfolioListe } from '@/hooks/use-portfolio';
 import { arrondierungErkennen } from '@/lib/arrondierung';
 import { ANLAESSE, ZUSTAENDE, useGelegenheiten, type Gel, type Parz, type Zustand } from '@/hooks/use-gelegenheiten';
 import { useSchliessen, useUrlWert } from '@/hooks/use-url-wert';
@@ -31,7 +31,8 @@ const m2 = (n: number | null) => (n ? `${Math.round(n).toLocaleString('de-CH')} 
 export function Gelegenheiten() {
   const qc = useQueryClient();
   const { data, isLoading, error } = useGelegenheiten();
-  const { data: portfolios } = usePortfolios(true);
+  // Nur Name und Zahl; die Parzellen eines Portfolios erst bei "Nachbarn prüfen".
+  const { data: portfolios } = usePortfolioListe(true);
   // Reiter, Kunde, aufgeklappte Gelegenheit und Bericht stehen in der
   // Adresse -- "Zurück" im Browser führt jeweils einen Schritt zurück.
   const [zustandWert, setZustandWert] = useUrlWert('reiter', 'offen');
@@ -75,12 +76,10 @@ export function Gelegenheiten() {
   };
 
   const pruefen = async (pfId: string) => {
-    const pf = portfolios?.find(p => p.id === pfId);
-    if (!pf) return;
-    const pos = pf.positionen.filter(p => p.parzelleId && p.egrid)
-      .map(p => ({ parzelleId: p.parzelleId!, egrid: p.egrid!, adresse: p.adresse }));
-    setLauf(l => ({ ...l, [pfId]: `0 von ${pos.length} …` }));
+    setLauf(l => ({ ...l, [pfId]: 'Parzellen werden geladen …' }));
     try {
+      const pos = await portfolioParzellen(pfId);
+      setLauf(l => ({ ...l, [pfId]: `0 von ${pos.length} …` }));
       const e = await arrondierungErkennen(pfId, pos, (f, n) => setLauf(l => ({ ...l, [pfId]: `${f} von ${n} …` })));
       setLauf(l => ({ ...l, [pfId]: `${e.neu} neu, ${e.schon} schon erfasst`
         + (e.ohneNachbarn ? `, ${e.ohneNachbarn} ohne Nachbarn` : '') + (e.fehler ? `, ${e.fehler} Fehler` : '') }));
@@ -117,7 +116,7 @@ export function Gelegenheiten() {
                 <li key={pf.id} className="space-y-2 px-4 py-3">
                   <span className="block min-w-0">
                     <span className="block truncate font-medium">{pf.name}</span>
-                    <span className="block text-sm text-muted-foreground">{pf.positionen.filter(p => p.parzelleId).length} Parzellen{lauf[pf.id] ? ` · ${lauf[pf.id]}` : ''}</span>
+                    <span className="block text-sm text-muted-foreground">{pf.parzellen} Parzellen{lauf[pf.id] ? ` · ${lauf[pf.id]}` : ''}</span>
                   </span>
                   <button type="button" onClick={() => void pruefen(pf.id)} disabled={!!lauf[pf.id]?.endsWith('…')} className={`${KNOPF} w-full`}>
                     Nachbarn prüfen

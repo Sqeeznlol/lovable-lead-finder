@@ -59,6 +59,7 @@ export function PortfolioImport({ onFertig, onAbbrechen }: { onFertig: () => voi
     try {
       await portfolioSpeichern(eigner, name || `${eigner} Portfolio`, art, ergebnisse);
       await qc.invalidateQueries({ queryKey: ['portfolios'] });
+      await qc.invalidateQueries({ queryKey: ['portfolio-liste'] });
       onFertig();
     } catch {
       setFehler('Nicht gespeichert. Angemeldet? Portfolios darf nur anlegen, wer angemeldet ist.');

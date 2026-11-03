@@ -34,6 +34,43 @@ export interface Portfolio {
   positionen: Position[];
 }
 
+/**
+ * Nur Name und Zahl der Parzellen je Portfolio -- für Listen, die nicht
+ * jede Position brauchen. Die volle Abfrage liest alle 3807 Parzellen;
+ * beim ersten Aufruf dauerte das 6 Sekunden (Ablauf Tempo, 3. November),
+ * und die Gelegenheiten stellten sie bei jedem Öffnen.
+ */
+export interface PortfolioKurz { id: string; name: string; parzellen: number }
+export function usePortfolioListe(aktiv: boolean) {
+  return useQuery({
+    queryKey: ['portfolio-liste'],
+    enabled: aktiv,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async (): Promise<PortfolioKurz[]> => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any).from('portfolio')
+        .select('id, name, portfolio_position(count)')
+        .not('portfolio_position.parzelle_id', 'is', null)
+        .order('name');
+      if (error) throw error;
+      return ((data ?? []) as { id: string; name: string; portfolio_position: { count: number }[] }[])
+        .map(z => ({ id: z.id, name: z.name, parzellen: z.portfolio_position?.[0]?.count ?? 0 }));
+    },
+  });
+}
+
+/** Die Parzellen eines einzigen Portfolios, erst wenn sie gebraucht werden. */
+export async function portfolioParzellen(portfolioId: string): Promise<{ parzelleId: string; egrid: string; adresse: string | null }[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any).from('portfolio_position')
+    .select('roh_adresse, parzelle:parzelle_id(id, address, egrid)')
+    .eq('portfolio_id', portfolioId).not('parzelle_id', 'is', null);
+  if (error) throw error;
+  return ((data ?? []) as { roh_adresse: string | null; parzelle: { id: string; address: string | null; egrid: string | null } | null }[])
+    .filter(z => z.parzelle?.egrid)
+    .map(z => ({ parzelleId: z.parzelle!.id, egrid: z.parzelle!.egrid!, adresse: z.parzelle!.address ?? z.roh_adresse }));
+}
+
 export function usePortfolios(aktiv: boolean) {
   return useQuery({
     queryKey: ['portfolios'],
