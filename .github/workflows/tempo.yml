@@ -101,6 +101,18 @@ jobs:
           miss "Merklisten" "merkliste?select=id&limit=1"
           miss "3D: Gebäude, 200 nach EGID" "gebaeude?select=egid,heizung_energie&egid=in.($(seq -s, 302061100 302061299))"
           miss "3D: Codetabelle" "gwr_kode?select=merkmal,code,text"
+          # Was der öffentliche Schlüssel ohne Anmeldung lesen kann (Punkt 8,
+          # Sicherheit): Status und ob eine Zeile zurückkommt -- nie die Zeile.
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Ohne Anmeldung (nur öffentlicher Schlüssel)" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Tabelle | Status | Zeilen zurück |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          for t in properties gebaeude baugesuch nachbarschaft parzelle_punkt akteur mandant portfolio gelegenheit anruf investorprofil merkliste gemeinde_stats_mv potenzial_config gwr_kode; do
+            a=$(curl -sS -w '\n%{http_code}' -H "apikey: $KEY" "$URL/rest/v1/$t?select=*&limit=1")
+            code=${a##*$'\n'}; body=${a%$'\n'*}
+            z=$(printf '%s' "$body" | jq -r 'if type == "array" then length else "–" end' 2>/dev/null || echo '?')
+            echo "| $t | $code | $z |" >> "$GITHUB_STEP_SUMMARY"
+          done
           cat "$GITHUB_STEP_SUMMARY"
 
       - name: Statistik der Datenbank
@@ -172,6 +184,60 @@ jobs:
             from extensions.pg_stat_statements
             where dbid = (select oid from pg_database where datname = current_database()) and calls >= 5
             order by mean_exec_time desc limit 12;
+          \echo
+          \echo 'Indizes, die nie benutzt werden (Kandidaten zum Löschen, Platz):'
+          select i.relname as index, t.relname as tabelle, pg_size_pretty(pg_relation_size(i.oid)) as groesse, s.idx_scan as benutzt
+            from pg_stat_user_indexes s join pg_class i on i.oid = s.indexrelid join pg_class t on t.oid = s.relid
+            join pg_index x on x.indexrelid = i.oid
+            where s.schemaname = 'public' and s.idx_scan = 0 and not x.indisunique and not x.indisprimary
+            order by pg_relation_size(i.oid) desc limit 20;
+          \echo '```'
+          \echo '### Messungen für die Nachtarbeit (3./4. November), nur Zahlen'
+          \echo '```'
+          \echo 'Punkt 1 -- Potenzialrechnung je Kanton (hnf_delta = Reserve in m² HNF):'
+          select kanton, count(*) as parzellen, count(hnf_delta) as gerechnet,
+                 count(*) filter (where hnf_delta >= 200) as reserve_ab_200, count(*) filter (where hnf_delta >= 500) as reserve_ab_500,
+                 count(*) filter (where confidence = 'hoch') as sicher_hoch, count(*) filter (where confidence = 'mittel') as sicher_mittel,
+                 count(*) filter (where gf_zulaessig is not null) as mit_gf_zulaessig, count(zone) as mit_zone
+            from public.properties group by kanton order by 1;
+          \echo 'Punkt 1 -- Portfolio-Parzellen (Demo-Kunden gesondert):'
+          select case when a.name like '%(Demo)' then 'Demo' else 'echt' end as kunde, count(distinct m.id) as kunden, count(distinct pf.id) as portfolios,
+                 count(pos.parzelle_id) as parzellen, count(*) filter (where p.hnf_delta >= 200) as reserve_ab_200,
+                 count(*) filter (where exists (select 1 from public.gebaeude g where g.egrid = p.egrid)) as mit_gebaeude,
+                 count(*) filter (where exists (select 1 from public.gebaeude g where g.egrid = p.egrid and g.baujahr <= 1975)) as gebaeude_bis_1975,
+                 count(*) filter (where exists (select 1 from public.nachbarschaft nb where nb.parzelle_id = p.id)) as mit_nachbarn
+            from public.portfolio_position pos join public.portfolio pf on pf.id = pos.portfolio_id join public.mandant m on m.id = pf.mandant_id
+            join public.akteur a on a.id = m.akteur_id left join public.properties p on p.id = pos.parzelle_id group by 1;
+          select (select count(*) from public.nachbarschaft) as nachbarschaften,
+                 (select count(*) from public.gebaeude where grundflaeche is not null and geschosse is not null) as gebaeude_mit_flaeche_und_geschossen,
+                 (select count(*) from public.gelegenheit where anlass = 'ausnuetzungsreserve') as gelegenheiten_reserve;
+          \echo 'Punkt 3 -- Investorprofile und Akteure:'
+          select (select count(*) from public.investorprofil) as profile, (select count(*) from public.investorprofil where aktiv) as aktiv,
+                 (select count(*) from public.investorprofil where lagen is not null and array_length(lagen, 1) > 0) as mit_lagen,
+                 (select count(*) from public.investorprofil where objekttypen is not null and array_length(objekttypen, 1) > 0) as mit_objekttypen,
+                 (select count(*) from public.investorprofil where budget_max_chf is not null) as mit_budget;
+          select art, count(*) from public.akteur group by 1 order by 1;
+          \echo 'Punkt 5/9 -- Gelegenheiten, Eigentümer, Gespräche:'
+          select anlass, zustand, count(*) from public.gelegenheit group by 1, 2 order by 1, 2;
+          select count(*) filter (where nullif(trim(owner_name), '') is not null) as parzellen_mit_eigentuemer,
+                 count(distinct lower(trim(owner_name))) filter (where nullif(trim(owner_name), '') is not null) as verschiedene_namen,
+                 count(*) filter (where nullif(trim(owner_phone), '') is not null) as mit_telefon,
+                 count(*) filter (where owners_json is not null) as mit_owners_json,
+                 (select count(*) from public.eigentum) as eigentum_zeilen
+            from public.properties;
+          select status, count(*) from public.properties where status not in ('Neu') group by 1 order by 2 desc limit 15;
+          select verkaufsabsicht, count(*) from public.anruf group by 1 order by 1;
+          \echo 'Punkt 6 -- Aadorf mit Kanton ZH (nur Zählungen):'
+          select kanton, gemeinde, bfs_nr, count(*), count(egrid) as mit_egrid, count(zone) as mit_zone from public.properties where gemeinde like 'Aadorf%' group by 1, 2, 3 order by 1, 2, 3;
+          select count(*) as gemeinde_endet_auf_zh from public.properties where gemeinde ~ '\s+ZH$';
+          \echo 'Punkt 21 -- Stand der Daten je Quelle:'
+          select (select max(geladen_am) from public.gebaeude) as gebaeude_geladen,
+                 (select max(publiziert_am) from public.baugesuch) as baugesuch_neuestes,
+                 (select max(geometrie_stand) from public.properties) as geometrie_stand,
+                 (select max(scored_at) from public.properties) as potenzial_gerechnet,
+                 (select max(berechnet_am) from public.nachbarschaft) as nachbarschaft_berechnet,
+                 (select max(erfasst_am) from public.parzelle_punkt) as punkte_erfasst;
+          select count(*) filter (where geometrie is not null) as mit_umriss, count(*) filter (where kanton = 'ZH' and geometrie is not null) as zh_mit_umriss from public.properties;
           \echo '```'
           SQL
           cat "$GITHUB_STEP_SUMMARY"
