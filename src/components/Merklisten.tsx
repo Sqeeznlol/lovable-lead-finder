@@ -41,7 +41,7 @@ export function filterText(f: Filter): string {
   const von = f.bj_von, bis = f.bj_bis, zmin = f.zi_min, zmax = f.zi_max;
   return [
     f.gemeinde,
-    von && bis ? `Baujahr ${von}–${bis}` : von ? `Baujahr ab ${von}` : bis ? `Baujahr bis ${bis}` : null,
+    von && bis ? (von === bis ? `Baujahr ${von}` : `Baujahr ${von}–${bis}`) : von ? `Baujahr ab ${von}` : bis ? `Baujahr bis ${bis}` : null,
     zmin && zmax ? `${zmin}–${zmax} Zimmer` : zmin ? `ab ${zmin} Zimmer` : zmax ? `bis ${zmax} Zimmer` : null,
     f.wf_min ? `ab ${f.wf_min} m²` : null,
     f.art_titel ?? null,
@@ -162,7 +162,9 @@ export function MerklistenSpalte({ aktiv }: { aktiv?: string | null }) {
   return (
     <div className="space-y-3">
       <p className="text-sm font-medium">Meine Listen</p>
-      {error ? <p className="text-sm text-muted-foreground">Listen nicht geladen: {error instanceof Error ? error.message : String(error)}</p>
+      {/* Ohne die Tabelle (Migration merkliste noch nicht eingespielt) kam
+          hier die rohe Meldung der Datenbank. */}
+      {error ? <p className="text-sm text-muted-foreground">{/schema cache|does not exist/i.test(error instanceof Error ? error.message : '') ? 'Listen sind auf dem Server noch nicht eingerichtet.' : `Listen nicht geladen: ${error instanceof Error ? error.message : String(error)}`}</p>
         : !data ? <p className="text-sm text-muted-foreground">Lädt …</p>
         : !data.length ? <p className="text-sm text-muted-foreground">Noch keine. Treffer markieren und speichern, dann stehen sie hier.</p>
         : (
@@ -182,7 +184,30 @@ export function MerklistenSpalte({ aktiv }: { aktiv?: string | null }) {
   );
 }
 
-type Eintrag = Treffer & { eigentuemer: string | null };
+export type Eintrag = Treffer & { eigentuemer: string | null };
+
+export function kennzahlenVon(d: Eintrag[]) {
+  const bj = d.map(t => t.baujahr).filter((x): x is number => x != null);
+  return {
+    gebaeude: d.length,
+    baujahr: bj.length ? Math.round(bj.reduce((a, b) => a + b, 0) / bj.length) : null,
+    fossil: d.filter(t => t.heizung_energie === 7520 || t.heizung_energie === 7530).length,
+    eigner: d.filter(t => t.eigentuemer).length,
+  };
+}
+
+/**
+ * Drucken bzw. als PDF sichern. Der Dateiname des PDF ist der Titel der
+ * Seite -- darum für den Druck der Name, den man eingegeben hat, danach
+ * wieder der alte.
+ */
+export function pdfDrucken(name: string) {
+  const alt = document.title;
+  document.title = name.trim() || 'Gebäude';
+  const zurueck = () => { document.title = alt; window.removeEventListener('afterprint', zurueck); };
+  window.addEventListener('afterprint', zurueck);
+  window.print();
+}
 
 /** Eine gespeicherte Liste: heutige Werte, Excel, PDF, Einträge entfernen. */
 export function MerklisteAnsicht({ id }: { id: string }) {
@@ -204,27 +229,9 @@ export function MerklisteAnsicht({ id }: { id: string }) {
   const [markiert, setMarkiert] = useState<Set<number>>(new Set());
   const heizung = (t: Treffer) => (t.heizung_energie == null ? null : kodes?.get(`GENH:${t.heizung_energie}`) ?? `Code ${t.heizung_energie}`);
   const art = (t: Treffer) => (t.klasse == null ? null : kodes?.get(`GKLAS:${t.klasse}`) ?? null);
-  const kennzahlen = useMemo(() => {
-    const d = data ?? [];
-    const bj = d.map(t => t.baujahr).filter((x): x is number => x != null);
-    const fossil = d.filter(t => t.heizung_energie === 7520 || t.heizung_energie === 7530).length;
-    return {
-      gebaeude: d.length,
-      baujahr: bj.length ? Math.round(bj.reduce((a, b) => a + b, 0) / bj.length) : null,
-      fossil,
-      eigner: d.filter(t => t.eigentuemer).length,
-    };
-  }, [data]);
+  const kennzahlen = useMemo(() => kennzahlenVon(data ?? []), [data]);
 
-  // Der Dateiname des PDF ist der Titel der Seite -- darum für den Druck
-  // den Namen der Liste, danach wieder den alten.
-  const drucken = () => {
-    const alt = document.title;
-    document.title = liste?.name ?? 'Merkliste';
-    const zurueck = () => { document.title = alt; window.removeEventListener('afterprint', zurueck); };
-    window.addEventListener('afterprint', zurueck);
-    window.print();
-  };
+  const drucken = () => pdfDrucken(liste?.name ?? 'Merkliste');
   const exportieren = () => data && downloadXlsx(`${(liste?.name ?? 'merkliste').replace(/[^\wäöüÄÖÜ-]+/g, '-')}-${exportTimestamp()}.xlsx`, 'Gebäude', data.map(t => ({
     Adresse: t.adresse, Gemeinde: t.gemeinde, Eigentümer: t.eigentuemer ?? '', EGRID: t.egrid, EGID: t.egid, Gebäudeart: art(t), Baujahr: t.baujahr,
     Zimmer: t.zimmer, 'Wohnfläche m²': t.wohnflaeche, Wohnungen: t.wohnungen, Geschosse: t.geschosse, Heizung: heizung(t),
@@ -293,8 +300,8 @@ export function MerklisteAnsicht({ id }: { id: string }) {
             )}
         </Seite>
       </div>
-      {liste && data && <MerklisteDruck name={liste.name} filter={liste.filter} gespeichert={liste.erstellt_am} zeilen={data}
-        kennzahlen={kennzahlen} art={art} heizung={heizung} />}
+      {liste && data && <GebaeudeDruck name={liste.name} ueber="Merkliste" zeilen={data} art={art} heizung={heizung}
+        unterzeile={[filterText(liste.filter), `gespeichert am ${datum(liste.erstellt_am)}`].filter(Boolean).join(' · ')} />}
     </>
   );
 }
@@ -311,11 +318,11 @@ export function MerklisteAnsicht({ id }: { id: string }) {
  */
 const EXAKT = { WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' } as const;
 
-function MerklisteDruck({ name, filter, gespeichert, zeilen, kennzahlen, art, heizung }: {
-  name: string; filter: Filter; gespeichert: string; zeilen: Eintrag[];
-  kennzahlen: { gebaeude: number; baujahr: number | null; fossil: number; eigner: number };
+export function GebaeudeDruck({ name, ueber, unterzeile, zeilen, art, heizung }: {
+  name: string; ueber: string; unterzeile: string; zeilen: Eintrag[];
   art: (t: Treffer) => string | null; heizung: (t: Treffer) => string | null;
 }) {
+  const kennzahlen = kennzahlenVon(zeilen);
   const zahlen: [string, string, string?][] = [
     ['Gebäude', n(kennzahlen.gebaeude)],
     ['Baujahr im Schnitt', kennzahlen.baujahr ? String(kennzahlen.baujahr) : '–'],
@@ -337,11 +344,11 @@ function MerklisteDruck({ name, filter, gespeichert, zeilen, kennzahlen, art, he
         <div className="relative flex h-full flex-col justify-between p-6">
           <div className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.16em] text-[#646B78]">
             <span className="inline-block h-2 w-2 rounded-[1px] bg-[#3D45F5]" style={EXAKT} />
-            Bauraum · Merkliste
+            Bauraum · {ueber}
           </div>
           <div>
             <h1 className="max-w-[70%] text-[34px] font-normal leading-[1.05] tracking-tight">{name}</h1>
-            <p className="mt-2 max-w-[70%] text-[11px] text-[#646B78]">{[filterText(filter), `gespeichert am ${datum(gespeichert)}`, `Stand ${heute}`].filter(Boolean).join(' · ')}</p>
+            <p className="mt-2 max-w-[70%] text-[11px] text-[#646B78]">{[unterzeile, `Stand ${heute}`].filter(Boolean).join(' · ')}</p>
           </div>
         </div>
         <span className="absolute bottom-1.5 right-2.5 text-[7px] text-[#646B78]">Luftbild © swisstopo</span>
@@ -390,6 +397,7 @@ function MerklisteDruck({ name, filter, gespeichert, zeilen, kennzahlen, art, he
             <th className="py-1.5 pr-3 text-right font-normal">Zimmer</th>
             <th className="py-1.5 pr-3 text-right font-normal">Fläche</th>
             <th className="py-1.5 pr-3 text-right font-normal">Whg.</th>
+            <th className="py-1.5 pr-3 text-right font-normal">Gesch.</th>
             <th className="py-1.5 font-normal">Heizung</th>
           </tr>
         </thead>
@@ -399,14 +407,19 @@ function MerklisteDruck({ name, filter, gespeichert, zeilen, kennzahlen, art, he
             return (
               <tr key={t.egid} className="break-inside-avoid border-b border-[#ECECEE] align-top">
                 <td className="py-2 pr-2 text-[#9A9FA8] tabular-nums">{i + 1}</td>
-                <td className="py-2 pr-3"><span className="font-medium">{t.adresse ?? `EGRID ${t.egrid}`}</span><br /><span className="text-[#646B78]">{[t.gemeinde, art(t)].filter(Boolean).join(' · ')}</span></td>
+                <td className="py-2 pr-3"><span className="font-medium">{t.adresse ?? `EGRID ${t.egrid}`}</span><br /><span className="text-[#646B78]">{[t.gemeinde, art(t)].filter(Boolean).join(' · ')}</span>
+                  {/* Wie im Excel: die Nummern, mit denen man die Parzelle im Grundbuch und im Register findet. */}
+                  <br /><span className="text-[8px] tracking-wide text-[#9A9FA8]">EGRID {t.egrid} · EGID {t.egid}</span></td>
                 <td className="py-2 pr-3">{t.eigentuemer ?? <span className="text-[#9A9FA8]">noch offen</span>}</td>
                 <td className="py-2 pr-3 text-right tabular-nums">{t.baujahr ?? '–'}</td>
                 <td className="py-2 pr-3 text-right tabular-nums">{n(t.zimmer)}</td>
                 <td className="whitespace-nowrap py-2 pr-3 text-right tabular-nums">{n(t.wohnflaeche, ' m²')}</td>
                 <td className="py-2 pr-3 text-right tabular-nums">{n(t.wohnungen)}</td>
-                <td className="whitespace-nowrap py-2">
-                  {g ? <span className="flex items-center gap-1.5"><span className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ ...EXAKT, background: g.farbe }} />{g.titel}</span> : '–'}
+                <td className="py-2 pr-3 text-right tabular-nums">{n(t.geschosse)}</td>
+                <td className="py-2">
+                  {g ? <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ ...EXAKT, background: g.farbe }} />{g.titel}</span> : '–'}
+                  {/* Die genaue Angabe des Registers, wenn sie mehr sagt als die Gruppe (z.B. "Erdwärmesonde"). */}
+                  {g && heizung(t) && heizung(t)!.toLowerCase() !== g.titel.toLowerCase() && <span className="block pl-3.5 text-[8px] text-[#9A9FA8]">{heizung(t)}</span>}
                 </td>
               </tr>
             );

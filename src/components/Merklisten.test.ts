@@ -11,6 +11,9 @@ describe('filterText', () => {
   it('mit nur einer Grenze', () => {
     expect(filterText({ bj_bis: '1950', zi_max: '4' })).toBe('Baujahr bis 1950 · bis 4 Zimmer');
   });
+  it('ein einzelnes Jahr nur einmal', () => {
+    expect(filterText({ gemeinde: 'Küsnacht (ZH)', bj_von: '1949', bj_bis: '1949' })).toBe('Küsnacht (ZH) · Baujahr 1949');
+  });
   it('leer ohne Filter', () => {
     expect(filterText({})).toBe('');
   });

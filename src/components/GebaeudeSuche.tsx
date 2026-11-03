@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Bookmark, FileSpreadsheet, Search } from 'lucide-react';
+import { Bookmark, FileSpreadsheet, FileText, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { FELD, KNOPF, KNOPF_HAUPT, Leer, LISTE, Seite } from '@/components/rahmen';
 import { Auswahl, AuswahlSuche } from '@/components/Auswahl';
@@ -11,7 +11,7 @@ import { heizGruppe } from '@/lib/karte3d';
 import { downloadXlsx, exportTimestamp } from '@/lib/export-utils';
 import { useGemeindeStats } from '@/hooks/use-master';
 import { gemeindeKanon, gemeindenEinmal } from '@/lib/gemeinden';
-import { GebaeudeZeile, MerklisteAnsicht, MerklistenSpalte, Speichern, n, type Treffer } from '@/components/Merklisten';
+import { GebaeudeDruck, GebaeudeZeile, MerklisteAnsicht, MerklistenSpalte, Speichern, filterText, n, pdfDrucken, type Treffer } from '@/components/Merklisten';
 
 /**
  * Suche im eigenen Bestand nach Gebäuden: Gemeinde, Baujahr, Zimmer,
@@ -68,7 +68,11 @@ function Suche() {
   // Markiert wird je Gebäude; eine neue Suche beginnt ohne Häkchen.
   const [markiert, setMarkiert] = useState<Set<number>>(new Set());
   const [speichern, setSpeichern] = useState(false);
-  useEffect(() => { setMarkiert(new Set()); setSpeichern(false); }, [werte]);
+  useEffect(() => { setMarkiert(new Set()); setSpeichern(false); setPdf(null); }, [werte]);
+  // PDF direkt aus der Suche, ohne Liste (Julian, 3. November: "wie das
+  // Excel, nur PDF fehlt"). Der Name steht auf dem Blatt und ist der
+  // Dateiname; null = Feld zu.
+  const [pdf, setPdf] = useState<string | null>(null);
   const umschalten = (egid: number) => setMarkiert(m => { const x = new Set(m); if (x.has(egid)) x.delete(egid); else x.add(egid); return x; });
 
   const { data, isFetching, error } = useQuery({
@@ -122,12 +126,20 @@ function Suche() {
     </label>
   );
 
+  const filterJetzt = { ...werte, gemeinde: gemeindeName(werte.gemeinde), art_titel: werte.art ? arten.find(a => a.wert === werte.art)?.titel ?? null : null };
+  const auswahl = data ? (markiert.size ? data.filter(t => markiert.has(t.egid)) : data) : [];
+  const fuerPdf = auswahl.map(t => ({ ...t, eigentuemer: eigner?.get(t.parzelle_id) ?? null }));
   return (
+    <>
+    <div className="print:hidden">
     <Seite bild={BILD.gebaeudesuche} ueber="Gebäudesuche · aus dem Gebäuderegister"
       titel={!gesetzt ? 'Gebäude im Bestand finden' : data ? `${n(data.length)}${data.length >= GRENZE ? '+' : ''} Gebäude gefunden` : 'Suche läuft …'}
       unter="Nach Gemeinde, Baujahr, Zimmern, Wohnfläche und Gebäudeart. Zimmer und Fläche sind die Summe aller Wohnungen eines Gebäudes."
       seite={<MerklistenSpalte />}
-      aktionen={data?.length ? <button type="button" onClick={exportieren} className={KNOPF}><FileSpreadsheet className="h-4 w-4" /> Als Excel</button> : undefined}>
+      aktionen={data?.length ? <>
+        <button type="button" onClick={() => setPdf(x => (x == null ? filterText(filterJetzt) || 'Gebäude' : null))} className={KNOPF}><FileText className="h-4 w-4" /> Als PDF</button>
+        <button type="button" onClick={exportieren} className={KNOPF}><FileSpreadsheet className="h-4 w-4" /> Als Excel</button>
+      </> : undefined}>
       <div className="space-y-3 rounded border bg-card p-4">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
           <div className="col-span-2 sm:col-span-4 lg:col-span-2">
@@ -165,9 +177,21 @@ function Suche() {
               </button>
               {markiert.size > 0 && <span className="text-sm text-muted-foreground">{n(markiert.size)} von {n(data.length)} markiert</span>}
             </div>
+            {pdf != null && (
+              <div className="flex flex-wrap items-end gap-2 rounded border bg-card p-4">
+                <label className="block min-w-[200px] flex-1">
+                  <span className="mb-1 block text-xs text-muted-foreground">Name des PDF (steht als Titel drauf)</span>
+                  <input className={`${FELD} w-full`} value={pdf} maxLength={120} autoFocus onChange={e => setPdf(e.target.value)}
+                         onKeyDown={e => e.key === 'Enter' && pdfDrucken(pdf)} />
+                </label>
+                <button type="button" onClick={() => pdfDrucken(pdf)} className={KNOPF_HAUPT}>
+                  <FileText className="h-4 w-4" /> PDF mit {n(auswahl.length)} {markiert.size ? 'markierten ' : ''}Gebäuden
+                </button>
+              </div>
+            )}
             {speichern && (
-              <Speichern treffer={markiert.size ? data.filter(t => markiert.has(t.egid)) : data}
-                filter={{ ...werte, gemeinde: gemeindeName(werte.gemeinde), art_titel: werte.art ? arten.find(a => a.wert === werte.art)?.titel ?? null : null }}
+              <Speichern treffer={auswahl}
+                filter={filterJetzt}
                 onFertig={id => { setSpeichern(false); setMarkiert(new Set()); setzen({ liste: id }); }} />
             )}
             <ul className={LISTE}>
@@ -180,5 +204,11 @@ function Suche() {
         )}
       {data && data.length >= GRENZE && <p className="text-sm text-muted-foreground">Angezeigt werden die {GRENZE} grössten. Filter enger setzen, um alle zu sehen.</p>}
     </Seite>
+    </div>
+    {data && fuerPdf.length > 0 && (
+      <GebaeudeDruck name={pdf?.trim() || filterText(filterJetzt) || 'Gebäude'} ueber="Gebäudesuche" zeilen={fuerPdf} art={art} heizung={heizung}
+        unterzeile={filterText(filterJetzt)} />
+    )}
+    </>
   );
 }
