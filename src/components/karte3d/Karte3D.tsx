@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  BoundingSphere, Cartesian2, Cartesian3, Cartographic, Cesium3DTileColorBlendMode, Cesium3DTileFeature, Cesium3DTileStyle,
+  BoundingSphere, CameraEventType, Cartesian2, Cartesian3, Cartographic, Cesium3DTileColorBlendMode, Cesium3DTileFeature, Cesium3DTileStyle,
   Cesium3DTileset, CesiumTerrainProvider, ClassificationType, Color, ColorMaterialProperty, ConstantProperty, Credit, Entity,
-  GeoJsonDataSource, HeadingPitchRange, ImageryLayer, Ion, JulianDate, Math as CMath, PolygonHierarchy, Rectangle,
+  GeoJsonDataSource, HeadingPitchRange, ImageryLayer, Ion, JulianDate, KeyboardEventModifier, Math as CMath, PolygonHierarchy, Rectangle,
   sampleTerrainMostDetailed, ScreenSpaceEventHandler, ScreenSpaceEventType, ShadowMode, UrlTemplateImageryProvider, Viewer,
 
   type Cesium3DTile,
 } from 'cesium';
 import 'cesium/Build/Cesium/Widgets/widgets.css';
-import { Compass, Layers, Loader2, Minus, Plus, X } from 'lucide-react';
+import { Compass, Layers, Loader2, Minus, Plus, Rotate3d, RotateCcw, RotateCw, X } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { umrissVomBund } from '@/hooks/use-portfolio';
@@ -56,6 +56,21 @@ const SONNE = JulianDate.fromIso8601('2026-04-15T12:30:00Z');
  */
 const BODEN_SCHAETZUNG = 420;
 const KATASTER_URL = 'https://wmts.geo.admin.ch/1.0.0/ch.kantone.cadastralwebmap-farbe/default/current/3857/{z}/{x}/{y}.png';
+/**
+ * Ein Kameraflug, der auch ankommt. Die Karte zeichnet nur auf Anfrage
+ * (requestRenderMode, spart Akku), und ein Flug fordert selbst keine
+ * Bilder an: gemessen am 3. November stand er nach dem ersten Bild still
+ * und kam erst beim nächsten Klick an. Darum hier Bild um Bild anfordern,
+ * bis der Flug fertig oder abgebrochen ist.
+ */
+function fliegen(v: Viewer, kugel: BoundingSphere, offset: HeadingPitchRange, dauer: number) {
+  let laeuft = true;
+  const fertig = () => { laeuft = false; if (!v.isDestroyed()) v.scene.requestRender(); };
+  v.camera.flyToBoundingSphere(kugel, { offset, duration: dauer, complete: fertig, cancel: fertig });
+  const bild = () => { if (!laeuft || v.isDestroyed()) return; v.scene.requestRender(); requestAnimationFrame(bild); };
+  bild();
+}
+
 const GROSS = () => !!window.matchMedia?.('(min-width: 1024px)').matches;
 const leise = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 const n = (x: number | null | undefined, e = '') => (x == null ? '–' : `${Math.round(x).toLocaleString('de-CH')}${e}`);
@@ -153,6 +168,20 @@ export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende,
     v.scene.globe.showGroundAtmosphere = false;
     v.scene.fog.enabled = true;
     v.scene.screenSpaceCameraController.minimumZoomDistance = 40;
+    // Drehen und Neigen auch ohne mittlere Maustaste (Julian, 3. November:
+    // "nicht drehbar" -- Cesium dreht sonst nur mit Mittelklick oder Ctrl).
+    // Rechts ziehen (auf dem Trackpad: mit zwei Fingern gedrückt ziehen)
+    // und Shift + ziehen drehen jetzt; gezoomt wird mit Rad und Fingern.
+    // Shift war bei Cesium "umsehen" (Kamera dreht am Ort) -- das braucht
+    // hier niemand, es verwirrt nur.
+    const steuer = v.scene.screenSpaceCameraController;
+    steuer.tiltEventTypes = [
+      CameraEventType.MIDDLE_DRAG, CameraEventType.PINCH, CameraEventType.RIGHT_DRAG,
+      { eventType: CameraEventType.LEFT_DRAG, modifier: KeyboardEventModifier.CTRL },
+      { eventType: CameraEventType.LEFT_DRAG, modifier: KeyboardEventModifier.SHIFT },
+    ];
+    steuer.zoomEventTypes = [CameraEventType.WHEEL, CameraEventType.PINCH];
+    (steuer as unknown as { lookEventTypes: unknown }).lookEventTypes = undefined;
     v.scene.screenSpaceCameraController.maximumZoomDistance = 25000;
     v.clock.currentTime = SONNE.clone();
     v.clock.shouldAnimate = false;
@@ -275,12 +304,9 @@ export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende,
     const v = viewer.current;
     if (!v || !ziel) return;
     let weg = false;
-    const setzen = (boden: number, dauer: number) => {
-      v.camera.flyToBoundingSphere(new BoundingSphere(Cartesian3.fromDegrees(ziel.lon, ziel.lat, boden + 10), 60), {
-        offset: new HeadingPitchRange(CMath.toRadians(35), CMath.toRadians(-32), ziel.abstand ?? 520), duration: dauer,
-      });
-      v.scene.requestRender();
-    };
+    const setzen = (boden: number, dauer: number) => fliegen(v,
+      new BoundingSphere(Cartesian3.fromDegrees(ziel.lon, ziel.lat, boden + 10), 60),
+      new HeadingPitchRange(CMath.toRadians(35), CMath.toRadians(-32), ziel.abstand ?? 520), dauer);
     if (erstesZiel.current && !bereit) setzen(BODEN_SCHAETZUNG, 0);
     if (bereit) {
       (async () => {
@@ -578,11 +604,24 @@ export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende,
     if (faktor > 1) v.camera.zoomIn(h * 0.35); else v.camera.zoomOut(h * 0.5);
     v.scene.requestRender();
   };
-  const norden = () => {
+  /**
+   * Um den Punkt in der Bildmitte drehen oder neigen, weich. Vorher
+   * drehte "Norden" die Kamera am Ort, und das Quartier schwenkte aus
+   * dem Bild.
+   */
+  const umMitte = (heading: number, pitch: number) => {
     const v = viewer.current; if (!v) return;
-    v.camera.setView({ orientation: { heading: 0, pitch: v.camera.pitch, roll: 0 } });
-    v.scene.requestRender();
+    const c = v.scene.canvas;
+    const strahl = v.camera.getPickRay(new Cartesian2(c.clientWidth / 2, c.clientHeight / 2));
+    const punkt = strahl ? v.scene.globe.pick(strahl, v.scene) : undefined;
+    if (!punkt) return;
+    fliegen(v, new BoundingSphere(punkt, 0), new HeadingPitchRange(heading, pitch, Cartesian3.distance(v.camera.positionWC, punkt)), leise() ? 0 : 0.6);
   };
+  const drehen = (grad: number) => { const v = viewer.current; if (v) umMitte(v.camera.heading + CMath.toRadians(grad), v.camera.pitch); };
+  const norden = () => { const v = viewer.current; if (v) umMitte(0, v.camera.pitch); };
+  // Schräg wie im Video, oder fast senkrecht von oben (Grundrisse, Zonen).
+  const vonOben = () => viewer.current && viewer.current.camera.pitch < CMath.toRadians(-60);
+  const neigen = () => { const v = viewer.current; if (v) umMitte(v.camera.heading, CMath.toRadians(vonOben() ? -32 : -85)); };
 
   const text = (merkmal: string, code: number | null | undefined) =>
     code == null ? '–' : kodes?.get(`${merkmal}:${code}`) ?? `Code ${code}`;
@@ -610,6 +649,9 @@ export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende,
       <div className="absolute right-3 top-3 z-10 flex flex-col gap-1.5">
         <button type="button" className={knopf} onClick={() => zoom(1.5)} aria-label="Näher" title="Näher"><Plus className="h-4 w-4" /></button>
         <button type="button" className={knopf} onClick={() => zoom(0.66)} aria-label="Weiter weg" title="Weiter weg"><Minus className="h-4 w-4" /></button>
+        <button type="button" className={`${knopf} max-sm:hidden`} onClick={() => drehen(-45)} aria-label="Nach links drehen" title="Nach links drehen"><RotateCcw className="h-4 w-4" /></button>
+        <button type="button" className={`${knopf} max-sm:hidden`} onClick={() => drehen(45)} aria-label="Nach rechts drehen" title="Nach rechts drehen"><RotateCw className="h-4 w-4" /></button>
+        <button type="button" className={knopf} onClick={neigen} aria-label="Von oben oder schräg" title="Von oben / schräg"><Rotate3d className="h-4 w-4" /></button>
         <button type="button" className={knopf} onClick={norden} aria-label="Nach Norden ausrichten" title="Nach Norden"><Compass className="h-4 w-4" /></button>
         <button type="button" className={knopf} onClick={() => setLuftbild(l => !l)} aria-label={luftbild ? 'Modell zeigen' : 'Luftbild zeigen'} title={luftbild ? 'Modell' : 'Luftbild'}><Layers className="h-4 w-4" /></button>
       </div>
