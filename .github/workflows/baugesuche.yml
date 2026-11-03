@@ -68,6 +68,9 @@ jobs:
           -- ohne Filter 315 -- dort ist zu viel Wärmepumpe dabei.
           \echo '### Nachbar baut (Gelegenheiten ohne Kunde)'
           select * from public.gelegenheiten_nachbar_baut(:'TAGE'::int, 200, true, true);
+          -- Die vier Funktionen der Nacht vom 3. November brauchen ihre
+          -- Migrationen; solange die fehlen, soll der Lauf nicht rot werden.
+          \set ON_ERROR_STOP off
           \echo '### Entwicklungspotenzial in Kundenportfolios (docs/potenzial-regeln.md)'
           select * from public.gelegenheiten_potenzial(200, true);
           \echo '### Investorprofile abgleichen (Migration 20261103220000)'
@@ -76,6 +79,7 @@ jobs:
           select * from public.eigentuemer_verdichten(true);
           \echo '### Wieder ansprechen: Baugesuch nach einem Nein (Migration 20261103260000)'
           select * from public.gelegenheiten_reaktivierung(:'TAGE'::int, true);
+          \set ON_ERROR_STOP on
           \echo '### Nachher'
           select count(*) as gesuche, count(egrid) as mit_egrid, count(parzelle_id) as im_bestand,
                  count(*) filter (where egrid is not null and parzelle_id is null) as egrid_ohne_parzelle,
@@ -137,6 +141,9 @@ jobs:
           -- Täglich auch die Reserven der Kundenportfolios (Migration
           -- 20261103200000, Regeln in docs/potenzial-regeln.md). Hängt
           -- nicht an Baugesuchen, aber an derselben Uhrzeit.
+          -- Die vier Funktionen der Nacht vom 3. November brauchen ihre
+          -- Migrationen; solange die fehlen, soll der Lauf nicht rot werden.
+          \set ON_ERROR_STOP off
           \echo '### Entwicklungspotenzial in Kundenportfolios'
           select * from public.gelegenheiten_potenzial(200, true);
           \echo '### Investorprofile abgleichen'
@@ -145,6 +152,7 @@ jobs:
           select * from public.eigentuemer_verdichten(true);
           \echo '### Wieder ansprechen: Baugesuch nach einem Nein'
           select * from public.gelegenheiten_reaktivierung(greatest(:'TAGE'::int, 30), true);
+          \set ON_ERROR_STOP on
           \echo '### Bestand der Tabelle'
           select count(*) as gesuche, count(egrid) as mit_egrid, count(parzelle_id) as im_bestand,
                  count(publikation_nr) as mit_publikation,
