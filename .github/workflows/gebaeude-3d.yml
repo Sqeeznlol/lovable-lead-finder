@@ -1,0 +1,51 @@
+name: 3D-Gebäude
+
+# Hält das Zürcher Verzeichnis der 3D-Gebäude (public/3d/zh) auf der
+# Fassung des Bundes. Das Verzeichnis verweist auf die Hauskacheln in
+# einem Ordner pro Fassung (z.B. 20260520); veröffentlicht der Bund eine
+# neue, könnte er den alten Ordner entfernen -- dann fielen die Häuser
+# aus der Karte, bis neu gebaut ist. Deshalb wöchentlich: neu bauen und
+# nur dann committen, wenn sich etwas geändert hat.
+#
+# Die Karte fällt bei einem fehlenden Verzeichnis selbst auf das des
+# Bundes zurück (langsamer, aber mit Häusern).
+
+on:
+  schedule:
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
+
+jobs:
+  bauen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verzeichnis bauen
+        run: |
+          set -euo pipefail
+          {
+            echo "### 3D-Gebäude Kanton Zürich"
+            echo '```'
+            python3 -I tools/gebaeude_kacheln.py public/3d/zh
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Nur bei Änderung committen
+        run: |
+          set -euo pipefail
+          git add -A public/3d/zh
+          if git diff --cached --quiet; then
+            echo "Unverändert -- der Bund hat keine neue Fassung." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          fassung=$(python3 -c "import json; print(json.load(open('public/3d/zh/tileset.json'))['asset']['extras']['fassung'])")
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git commit -q -m "3D-Gebäude: Zürcher Verzeichnis auf Fassung $fassung des Bundes" \
+            -m "Gebaut von tools/gebaeude_kacheln.py (Ablauf 3D-Gebäude)."
+          git push
+          echo "Neu gebaut und committet: Fassung $fassung." | tee -a "$GITHUB_STEP_SUMMARY"

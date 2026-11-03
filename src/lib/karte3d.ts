@@ -19,6 +19,15 @@ import { mitte } from '@/lib/bund-parzelle';
 
 export const GELAENDE_URL = 'https://3d.geo.admin.ch/ch.swisstopo.terrain.3d/v1/';
 export const GEBAEUDE_URL = 'https://3d.geo.admin.ch/ch.swisstopo.swissbuildings3d.3d/v1/tileset.json';
+/**
+ * Dieselben Gebäude, aber mit eigenem, schlankem Verzeichnis für den
+ * Kanton Zürich (tools/gebaeude_kacheln.py, Ablauf "3D-Gebäude"): das des
+ * Bundes kostete beim Öffnen 24 MB, unseres eine Wurzel von 105 kB und
+ * Felder von höchstens 54 kB. Die Häuser selbst kommen weiter vom Bund.
+ */
+export const GEBAEUDE_ZH_URL = '/3d/zh/tileset.json';
+/** Der Rahmen, für den das Zürcher Verzeichnis gebaut ist (Grad, wie im Werkzeug). */
+export const inZuerich = (lat: number, lon: number) => lon >= 8.35 && lon <= 9.0 && lat >= 47.15 && lat <= 47.7;
 export const LUFTBILD_URL = 'https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/{z}/{x}/{y}.jpeg';
 /** Hell und ruhig, wie die Modellansicht im Video. */
 export const MODELL_URL = 'https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-grau/default/current/3857/{z}/{x}/{y}.jpeg';

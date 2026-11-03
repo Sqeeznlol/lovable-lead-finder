@@ -105,6 +105,21 @@ jobs:
               and query !~* '^(begin|commit|set |show |select set_config|deallocate)'
             order by total_exec_time desc limit 15;
           \echo
+          \echo 'Am meisten von der Platte gelesen (Blöcke zu 8 kB) -- das verdrängt den Speicher für alle:'
+          select calls as aufrufe, shared_blks_read as bloecke_platte, shared_blks_hit as bloecke_speicher,
+                 round(mean_exec_time::numeric, 1) as ms_je_aufruf,
+                 left(regexp_replace(query, '\s+', ' ', 'g'), 170) as abfrage
+            from extensions.pg_stat_statements
+            where dbid = (select oid from pg_database where datname = current_database())
+              and query !~* '^(vacuum|copy|create|insert|update|delete|do |analyze)'
+            order by shared_blks_read desc limit 12;
+          \echo
+          \echo 'Grösste Tabellen und Indizes:'
+          select c.relname as name, c.relkind as art, pg_size_pretty(pg_relation_size(c.oid)) as groesse
+            from pg_class c join pg_namespace n on n.oid = c.relnamespace
+            where n.nspname = 'public' and c.relkind in ('r', 'i')
+            order by pg_relation_size(c.oid) desc limit 15;
+          \echo
           \echo 'Je Aufruf am langsamsten (mindestens 5 Aufrufe):'
           select calls as aufrufe, round(mean_exec_time::numeric, 1) as ms_je_aufruf, round(max_exec_time::numeric, 1) as ms_max,
                  left(regexp_replace(query, '\s+', ' ', 'g'), 170) as abfrage

@@ -112,3 +112,13 @@ describe('punktImRing', () => {
     expect(punktImRing(8.47, 47.375, l)).toBe(false);
   });
 });
+
+describe('inZuerich', () => {
+  it('nimmt das eigene Verzeichnis nur im Rahmen, für den es gebaut ist', async () => {
+    const { inZuerich } = await import('@/lib/karte3d');
+    expect(inZuerich(47.379, 8.488)).toBe(true);   // Albisrieden
+    expect(inZuerich(47.5, 8.73)).toBe(true);      // Winterthur
+    expect(inZuerich(46.95, 7.45)).toBe(false);    // Bern
+    expect(inZuerich(47.56, 7.59)).toBe(false);    // Basel
+  });
+});

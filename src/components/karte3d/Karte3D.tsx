@@ -4,7 +4,7 @@ import {
   Cesium3DTileset, CesiumTerrainProvider, ClassificationType, Color, ColorMaterialProperty, ConstantProperty, Credit, Entity,
   GeoJsonDataSource, HeadingPitchRange, ImageryLayer, Ion, JulianDate, Math as CMath, PolygonHierarchy, Rectangle,
   sampleTerrainMostDetailed, ScreenSpaceEventHandler, ScreenSpaceEventType, ShadowMode, UrlTemplateImageryProvider, Viewer,
-  WebMapServiceImageryProvider,
+
   type Cesium3DTile,
 } from 'cesium';
 import 'cesium/Build/Cesium/Widgets/widgets.css';
@@ -15,7 +15,7 @@ import { umrissVomBund } from '@/hooks/use-portfolio';
 import { parallel } from '@/lib/parallel';
 import { useUrlSetzen } from '@/hooks/use-url-wert';
 import {
-  BAUJAHR_STUFEN, baujahrFarbe, GEBAEUDE_URL, gebaeudeLaden, GELAENDE_URL, HEIZ_GRUPPEN, heizGruppe, HOEHE_STUFEN,
+  BAUJAHR_STUFEN, baujahrFarbe, GEBAEUDE_URL, GEBAEUDE_ZH_URL, gebaeudeLaden, inZuerich, GELAENDE_URL, HEIZ_GRUPPEN, heizGruppe, HOEHE_STUFEN,
   dachSpanne, gebaeudeBeimBund, hoeheFarbe, punktImRing, kodesLaden, LUFTBILD_URL, MODELL_URL, ZONEN_LEGENDE, zonenArt, zonenUm, type Gebaeude,
 } from '@/lib/karte3d';
 
@@ -46,6 +46,14 @@ const SCHWEIZ = Rectangle.fromDegrees(5.9, 45.8, 10.5, 47.85);
  * vom Betrachter weg. Abends geöffnet wäre die Stadt sonst schwarz.
  */
 const SONNE = JulianDate.fromIso8601('2026-04-15T12:30:00Z');
+/**
+ * Bodenhöhe, bis das Gelände die echte kennt: Zürich liegt um 410 m. Das
+ * Gelände des Bundes rechnet in derselben Höhe wie der GELAENDEPUNKT der
+ * Häuser (nachgemessen: Median der Differenz 0.1 m über 20 Häuser).
+ */
+const BODEN_SCHAETZUNG = 420;
+const KATASTER_URL = 'https://wmts.geo.admin.ch/1.0.0/ch.kantone.cadastralwebmap-farbe/default/current/3857/{z}/{x}/{y}.png';
+const GROSS = () => !!window.matchMedia?.('(min-width: 1024px)').matches;
 const leise = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 const n = (x: number | null | undefined, e = '') => (x == null ? '–' : `${Math.round(x).toLocaleString('de-CH')}${e}`);
 
@@ -80,6 +88,7 @@ export function Karte3D({ ziel, markiert = [], legende, faerbungen = FAERBUNGEN.
   const box = useRef<HTMLDivElement>(null);
   const viewer = useRef<Viewer | null>(null);
   const tiles = useRef<Cesium3DTileset | null>(null);
+  const quelle = useRef<string | null>(null);
   const grund = useRef<ImageryLayer | null>(null);
   const kataster = useRef<ImageryLayer | null>(null);
   const zonenQuelle = useRef<GeoJsonDataSource | null>(null);
@@ -137,7 +146,7 @@ export function Karte3D({ ziel, markiert = [], legende, faerbungen = FAERBUNGEN.
     if (v.scene.moon) v.scene.moon.show = false;
     // Desktop: Sonne und Schatten machen die Höhen lesbar. Auf dem Handy
     // kosten sie zu viel Akku.
-    const gross = window.matchMedia?.('(min-width: 1024px)').matches;
+    const gross = GROSS();
     if (gross) {
       v.shadows = true;
       v.shadowMap.softShadows = true;
@@ -148,28 +157,13 @@ export function Karte3D({ ziel, markiert = [], legende, faerbungen = FAERBUNGEN.
 
     (async () => {
       try {
-        const gelaende = await CesiumTerrainProvider.fromUrl(GELAENDE_URL, { requestVertexNormals: true });
+        // Ohne Normalen: die Beleuchtung des Geländes ist aus, sie würden
+        // nur jede Geländekachel grösser machen.
+        const gelaende = await CesiumTerrainProvider.fromUrl(GELAENDE_URL);
         if (weg) return;
         v.terrainProvider = gelaende;
-        // Häuser werfen Schatten aufs Gelände, empfangen aber keine: auf den
-        // Wänden selbst gäbe das Streifen (im Test gesehen).
-        // Bildschirmfehler 6 auf dem Desktop holt das Quartier bis zum
-        // Horizont. Das Handy zeichnet doppelt dicht (mehr Pixel verlangen mehr
-        // Kacheln) und hat wenig Speicher: dort 16, der Standard von Cesium.
-        const ts = await Cesium3DTileset.fromUrl(GEBAEUDE_URL, {
-          maximumScreenSpaceError: gross ? 6 : 16, shadows: gross ? ShadowMode.CAST_ONLY : ShadowMode.DISABLED,
-          cacheBytes: (gross ? 768 : 256) * 1024 * 1024,
-        });
-        // Die Kacheln bringen rote Dächer und beige Wände mit. Ersetzen statt
-        // mischen: sonst färbt "weiss" die Dächer rot und "Gas" violett-braun.
-        ts.colorBlendMode = Cesium3DTileColorBlendMode.REPLACE;
-        if (weg) { ts.destroy(); return; }
-        tiles.current = ts;
-        v.scene.primitives.add(ts);
-        ts.tileLoad.addEventListener((tile: Cesium3DTile) => sammeln(tile));
-        ts.style = stil();
-        // Für den Darstellungstest: Kacheln, Kamera und Häuser nachzählen statt raten.
-        if (import.meta.env.DEV) (window as unknown as { karte3d: unknown }).karte3d = { v, ts };
+        await gebaeudeSetzen(ziel && !inZuerich(ziel.lat, ziel.lon) ? GEBAEUDE_URL : GEBAEUDE_ZH_URL);
+        if (weg) return;
         setBereit(true);
       } catch (e) {
         setFehler(e instanceof Error ? e.message : String(e));
@@ -197,31 +191,55 @@ export function Karte3D({ ziel, markiert = [], legende, faerbungen = FAERBUNGEN.
   }, [luftbild]);
 
   // ------------------------------------------- Parzellengrenzen (nah)
+  // Als fertige Kacheln (WMTS) statt gezeichnet (WMS): der WMS-Dienst
+  // zeichnete jede Kachel neu, 87 Anfragen beim Öffnen. Und erst ab Stufe
+  // 16 -- ab 15 waren es 216 Kacheln bis zum Horizont, und von weiter weg
+  // sind Parzellengrenzen nur ein Grauschleier.
   useEffect(() => {
     const v = viewer.current;
     if (!v || kataster.current) return;
-    kataster.current = v.imageryLayers.addImageryProvider(new WebMapServiceImageryProvider({
-      url: 'https://wms.geo.admin.ch/', layers: 'ch.kantone.cadastralwebmap-farbe',
-      parameters: { format: 'image/png', transparent: true }, rectangle: SCHWEIZ, minimumLevel: 6, maximumLevel: 21,
+    kataster.current = v.imageryLayers.addImageryProvider(new UrlTemplateImageryProvider({
+      url: KATASTER_URL, rectangle: SCHWEIZ, minimumLevel: 16, maximumLevel: 19, credit: '© Kantone',
     }));
     kataster.current.alpha = 0.45;
     v.scene.requestRender();
   }, [bereit]);
 
+  // ------------------------------------------------- Quelle der Gebäude
+  // Ausserhalb von Zürich kennt unser Verzeichnis keine Häuser: dort das
+  // des Bundes. Gewechselt wird nur, wenn ein Ziel es verlangt.
+  useEffect(() => {
+    if (!bereit || !ziel) return;
+    const soll = inZuerich(ziel.lat, ziel.lon) ? GEBAEUDE_ZH_URL : GEBAEUDE_URL;
+    if (quelle.current && quelle.current !== soll && quelle.current !== GEBAEUDE_URL) void gebaeudeSetzen(soll).catch(() => {});
+  }, [ziel?.lat, ziel?.lon, bereit]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ------------------------------------------------------------- Kamera
+  // Sofort an den Ort statt vom Erdball her anzufliegen: der Anflug lud
+  // unterwegs Gelände und Karten der halben Welt. Die Bodenhöhe ist zuerst
+  // geschätzt und wird nachgeführt, sobald das Gelände sie kennt. Ein
+  // späteres Ziel (andere Liegenschaft) fliegt die Kamera kurz an.
+  const erstesZiel = useRef(true);
   useEffect(() => {
     const v = viewer.current;
-    if (!v || !ziel || !bereit) return;
+    if (!v || !ziel) return;
     let weg = false;
-    (async () => {
-      const [p] = await sampleTerrainMostDetailed(v.terrainProvider, [Cartographic.fromDegrees(ziel.lon, ziel.lat)]).catch(() => [Cartographic.fromDegrees(ziel.lon, ziel.lat, 420)]);
-      if (weg) return;
-      const kugel = new BoundingSphere(Cartesian3.fromDegrees(ziel.lon, ziel.lat, (p?.height ?? 420) + 10), 60);
-      v.camera.flyToBoundingSphere(kugel, {
-        offset: new HeadingPitchRange(CMath.toRadians(35), CMath.toRadians(-32), ziel.abstand ?? 520),
-        duration: leise() ? 0 : 1.6,
+    const setzen = (boden: number, dauer: number) => {
+      v.camera.flyToBoundingSphere(new BoundingSphere(Cartesian3.fromDegrees(ziel.lon, ziel.lat, boden + 10), 60), {
+        offset: new HeadingPitchRange(CMath.toRadians(35), CMath.toRadians(-32), ziel.abstand ?? 520), duration: dauer,
       });
-    })();
+      v.scene.requestRender();
+    };
+    if (erstesZiel.current && !bereit) setzen(BODEN_SCHAETZUNG, 0);
+    if (bereit) {
+      (async () => {
+        const [p] = await sampleTerrainMostDetailed(v.terrainProvider, [Cartographic.fromDegrees(ziel.lon, ziel.lat)]).catch(() => [null]);
+        if (weg) return;
+        const boden = p?.height ?? BODEN_SCHAETZUNG;
+        if (erstesZiel.current) { erstesZiel.current = false; setzen(boden, 0); }
+        else setzen(boden, leise() ? 0 : 1.2);
+      })();
+    }
     return () => { weg = true; };
   }, [ziel?.lat, ziel?.lon, ziel?.abstand, bereit]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -306,6 +324,46 @@ export function Karte3D({ ziel, markiert = [], legende, faerbungen = FAERBUNGEN.
   }, [faerbung, kodes, geladen]);
 
   // ======================================================== Helfer
+  /**
+   * Die Gebäude laden, aus unserem Verzeichnis oder dem des Bundes. Fehlt
+   * unseres (neue Fassung beim Bund, noch nicht nachgebaut), dann das des
+   * Bundes -- langsamer, aber mit Häusern.
+   */
+  async function gebaeudeSetzen(url: string) {
+    const v = viewer.current;
+    if (!v) return;
+    const gross = GROSS();
+    // Häuser werfen Schatten aufs Gelände, empfangen aber keine: auf den
+    // Wänden selbst gäbe das Streifen (im Test gesehen). 16 ist der
+    // Standard von Cesium; das Handy zeichnet doppelt dicht und hat wenig
+    // Speicher, dort 24.
+    const optionen = {
+      maximumScreenSpaceError: gross ? 16 : 24, shadows: gross ? ShadowMode.CAST_ONLY : ShadowMode.DISABLED,
+      cacheBytes: (gross ? 768 : 256) * 1024 * 1024,
+    };
+    let ts: Cesium3DTileset;
+    try {
+      ts = await Cesium3DTileset.fromUrl(url, optionen);
+    } catch (e) {
+      if (url === GEBAEUDE_URL) throw e;
+      url = GEBAEUDE_URL;
+      ts = await Cesium3DTileset.fromUrl(url, optionen);
+    }
+    if (v.isDestroyed()) { ts.destroy(); return; }
+    // Die Kacheln bringen rote Dächer und beige Wände mit. Ersetzen statt
+    // mischen: sonst färbt "weiss" die Dächer rot und "Gas" violett-braun.
+    ts.colorBlendMode = Cesium3DTileColorBlendMode.REPLACE;
+    ts.tileLoad.addEventListener((tile: Cesium3DTile) => sammeln(tile));
+    ts.style = stil();
+    if (tiles.current) v.scene.primitives.remove(tiles.current);
+    tiles.current = ts;
+    quelle.current = url;
+    v.scene.primitives.add(ts);
+    v.scene.requestRender();
+    // Für den Darstellungstest: Kacheln, Kamera und Häuser nachzählen statt raten.
+    if (import.meta.env.DEV) (window as unknown as { karte3d: unknown }).karte3d = { v, ts, quelle: url };
+  }
+
   /** Der Stil fragt bei jedem Haus die aktuelle Färbung und unsere Daten. */
   function stil(): Cesium3DTileStyle {
     const s = new Cesium3DTileStyle();

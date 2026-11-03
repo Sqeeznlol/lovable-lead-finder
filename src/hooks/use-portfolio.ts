@@ -61,9 +61,15 @@ export function usePortfolios(aktiv: boolean) {
       const ids = zeilen.flatMap(z => z.portfolio_position.map(p => p.parzelle?.id).filter(Boolean)) as string[];
       const managerJe = new Map<string, Set<string>>();
       if (ids.length) {
-        const { data: v } = await db.from('verwaltung')
-          .select('parzelle_id, akteur:akteur_id(name)').in('parzelle_id', ids);
-        for (const r of (v ?? []) as { parzelle_id: string; akteur: { name: string } | null }[]) {
+        // In Paketen: alle 3807 Kennungen in einer Adresse wären rund
+        // 140 kB lang -- weit über dem, was Server annehmen.
+        const pakete: string[][] = [];
+        for (let i = 0; i < ids.length; i += 150) pakete.push(ids.slice(i, i + 150));
+        const antworten = await Promise.all(pakete.map(p => db.from('verwaltung')
+          .select('parzelle_id, akteur:akteur_id(name)').in('parzelle_id', p)));
+        // Die Verwalter sind Beiwerk: fehlt ein Paket, bleiben die Portfolios trotzdem da.
+        const v = antworten.flatMap((a: { data: unknown[] | null }) => a.data ?? []);
+        for (const r of v as { parzelle_id: string; akteur: { name: string } | null }[]) {
           if (!r.akteur) continue;
           if (!managerJe.has(r.parzelle_id)) managerJe.set(r.parzelle_id, new Set());
           managerJe.get(r.parzelle_id)!.add(r.akteur.name);
