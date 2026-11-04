@@ -41,6 +41,20 @@ export function wgs84NachLv95(lat: number, lon: number): Landeskoordinaten {
 }
 
 /**
+ * Wie viel ein Punkt über dem Ellipsoid (WGS84) höher liegt als über
+ * Meer -- aus derselben Quelle, auf etwa einen Meter genau:
+ * h = H + 49.55 - 12.60 y' - 22.64 x', y' und x' in 1000 km vom Nullpunkt
+ * Bern. In Zürich rund 47 m. Gebraucht für die Fotos der 3D-Karte: Google
+ * rechnet über dem Ellipsoid, Gelände und Häuser des Bundes über Meer.
+ */
+export function ellipsoidUeberMeer(lat: number, lon: number): number {
+  const { e, n } = wgs84NachLv95(lat, lon);
+  const y = (e - 2600000) / 1e6;
+  const x = (n - 1200000) / 1e6;
+  return 49.55 - 12.6 * y - 22.64 * x;
+}
+
+/**
  * Zurück: Landeskoordinaten in Längen- und Breitengrad, gleiche Quelle
  * und Genauigkeit. Die Punkte der Liegenschaften liegen in LV95 vor
  * (parzelle_punkt), die Kacheln der Karte erwarten WGS84.

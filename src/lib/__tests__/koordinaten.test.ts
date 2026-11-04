@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lv95NachWgs84, wgs84NachLv95 } from '@/lib/koordinaten';
+import { ellipsoidUeberMeer, lv95NachWgs84, wgs84NachLv95 } from '@/lib/koordinaten';
 
 describe('Landeskoordinaten', () => {
   it('Bundeshaus hin und zurück auf einen Meter', () => {
@@ -11,6 +11,12 @@ describe('Landeskoordinaten', () => {
     const z = lv95NachWgs84(e, n);
     expect(Math.abs(z.lat - lat) * 111_000).toBeLessThan(1.5);
     expect(Math.abs(z.lon - lon) * 76_000).toBeLessThan(1.5);
+  });
+  it('Ellipsoid über Meer: 49.55 m in Bern, in Kloten rund 47 m (Formel von swisstopo)', () => {
+    const bern = ellipsoidUeberMeer(46 + 57 / 60 + 8.66 / 3600, 7 + 26 / 60 + 22.5 / 3600);
+    expect(Math.abs(bern - 49.55)).toBeLessThan(0.01);
+    // Kloten, Dorfstrasse (2686338 / 1256375): 49.55 - 12.60 * 0.0863 - 22.64 * 0.0564
+    expect(ellipsoidUeberMeer(47.4525, 8.5835)).toBeCloseTo(47.19, 1);
   });
   it('Zürich Paradeplatz landet in Zürich', () => {
     const z = lv95NachWgs84(2683000, 1247000);

@@ -110,6 +110,18 @@ jobs:
                 echo "- $d: $r" >> "$GITHUB_STEP_SUMMARY"
                 case "$r" in 200\ *javascript*|200\ *wasm*|200\ *json*) ;; *) fehler=1;; esac
               done
+              # Fotos in der 3D-Karte (Google, Map Tiles API) gibt es nur,
+              # wenn VITE_GOOGLE_MAPS_KEY beim Bau gesetzt war. Ob, steht
+              # im Bündel: im Hauptteil oder in einem Teil, den die
+              # 3D-Karte lädt (lokal gebaut am 4. November: index und
+              # parzelle-gebaeude). Gemeldet wird nur ja oder nein, nie
+              # der Schlüssel -- und es ist kein Fehler, ohne ihn zeigt
+              # die Karte das Modell des Bundes.
+              schluessel=nein
+              for d in "$js" $(curl -s "$adresse/$teil" | grep -oE '"\./[A-Za-z0-9_-]+\.js"' | tr -d '"' | sed 's#^\./#/assets/#' | sort -u); do
+                if curl -s "$adresse$d" | grep -qE 'AIza[0-9A-Za-z_-]{35}'; then schluessel=ja; break; fi
+              done
+              echo "- Google-Schlüssel im Bündel (Fotos der 3D-Karte): $schluessel" >> "$GITHUB_STEP_SUMMARY"
               cat "$GITHUB_STEP_SUMMARY"
               exit $fehler
             fi

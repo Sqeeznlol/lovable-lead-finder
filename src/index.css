@@ -294,3 +294,41 @@ input, textarea, select {
     resize: none !important;
   }
 }
+
+/* Nachweis im Foto der 3D-Karte: Google verlangt, dass Logo und Quellen
+   der Luftaufnahmen sichtbar sind. Cesium zeichnet sie weiss mit Schatten
+   unten links; hier als schmale helle Leiste über die ganze Breite, die
+   Legende rückt darüber (Karte3D, "unten"). */
+.karte3d-foto .cesium-viewer-bottom {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 3px 10px 3px 8px;
+  background: rgba(255, 255, 255, 0.86);
+  font-size: 10px;
+  line-height: 16px;
+  color: #444;
+}
+.karte3d-foto .cesium-viewer .cesium-widget-credits,
+.karte3d-foto .cesium-widget-credits {
+  display: block;
+  color: #444;
+  text-shadow: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.karte3d-foto .cesium-widget-credits img {
+  height: 14px;
+  vertical-align: middle !important;
+  margin-right: 6px;
+}
+/* Das Cesium-ion-Logo gehört zu ion-Konten; wir haben keines. Cesium
+   setzt display inline direkt am Element, darum !important. */
+.karte3d-foto .cesium-credit-logoContainer {
+  display: none !important;
+}
+.karte3d-foto .cesium-credit-expand-link,
+.karte3d-foto .cesium-credit-textContainer {
+  color: #444;
+}

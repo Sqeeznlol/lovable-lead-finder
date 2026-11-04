@@ -43,6 +43,114 @@ die Karten der Gebäudesuche und der Merklisten Zürcher Gebäude --
 Zürcher Parzellen haben im Bestand keinen Umriss (gemessen: 0 von
 394'917), die Lage kommt vom Gebäude.
 
+Drittens, neu seit dem Morgen: für die Fotos in der 3D-Karte die Map
+Tiles API am Google-Schlüssel einschalten (nächster Abschnitt).
+
+## Am Morgen dazu: Foto in der 3D-Karte -- gebaut, braucht den Google-Schlüssel
+
+Julian, 4. November: "die 3D-Map verbessern, es sollte genau so
+aussehen wie das Gebäude." Das Modell des Bundes hat Umriss, Dach und
+Höhe, aber keine Fassaden. Echte Fassaden, Dächer und Bäume gibt es als
+Netz aus Luftaufnahmen von Google ("Photorealistic 3D Tiles", Map Tiles
+API). Die 3D-Karte hat jetzt den Modus **Foto**, links neben Modell:
+
+- Boden und Häuser kommen von Google, der Globus des Bundes ist dabei
+  aus (sonst stäche sein Gelände durch das Netz). Die Zonen starten im
+  Foto ausgeschaltet: sie legen sich dort auch über Dächer und
+  Fassaden und färben die Häuser ein. Ein Tippen auf "Zonen" zeigt
+  sie, dünner als im Modell (35 %). Die Umrisse markierter Parzellen
+  liegen auf den Fotos.
+- Ein Klick trifft weiter das Haus: das Modell des Bundes bleibt
+  unsichtbar geladen und wird für den Klick kurz eingeblendet (in einen
+  unsichtbaren Puffer). Die Tafel zeigt das Register wie im Modell; dazu
+  der Umriss der Parzelle in Blau, weil das Haus selbst im Foto nicht
+  blau werden kann.
+- Die Höhen passen nicht aufeinander, und das ist der Kern der Sache:
+  Der Bund rechnet in Metern über Meer (die Kacheln um Kloten liegen
+  zwischen 419 und 498 m), Google über dem Ellipsoid -- in Zürich nach
+  der Näherung von swisstopo rund 47 m mehr. Ein Klick durch denselben
+  Bildpunkt trifft im Modell deshalb ein Haus weiter hinten. Jetzt nimmt die Karte den Punkt auf dem Foto und schickt von
+  der Kamera aus Strahlen ins Modell, durch Punkte unter dem Klickpunkt:
+  um die Höhe nach der Formel, und weil weder Formel noch Google auf den
+  Meter stimmen, von 6 m darüber bis 6 m darunter. Gewählt wird das
+  Haus, dessen Treffpunkt waagrecht am nächsten beim Klickpunkt liegt
+  (höchstens 3 m); sonst fragt sie senkrecht von oben. Im Test mit
+  angehobenen Bundeshäusern, je 5 sichtbare Häuser in Kloten und
+  Albisrieden: bei 44, 47 und 50 m Versatz je 10 von 10 richtig (der
+  alte Weg durch den Bildpunkt traf alle 30 daneben), bei 0 m -- falls
+  meine Annahme über Googles Höhen ganz falsch wäre -- ebenfalls 10 von
+  10. Die Kamera zielt im Foto um die Höhe höher, sonst stünde das
+  gesuchte Haus hinter der Bildmitte (gerechnet: 47 m bei 32° Neigung
+  sind rund 75 m).
+- Dabei gefunden und behoben: Der Cesium-Viewer wählt bei jedem Klick
+  selbst ein Objekt aus, vor unserem Klick (für Infobox und
+  Auswahlrahmen, die hier aus sind). Sein Pick verstellt die Ansicht,
+  und danach fand die Tiefe am Klickpunkt nichts mehr -- im Test war
+  der Klick deshalb manchmal auf den alten Weg zurückgefallen.
+  Abgeschaltet, mit dem Doppelklick, der die Kamera an ein Objekt hängt.
+- Ebenfalls gefunden: senkrechte Strahlen allein reichen nicht. Cesium
+  prüft bei einem Strahl zuerst den Rahmen der Kachel, und ein Haus,
+  das über seine Kachel hinausragt, ist dort von oben unsichtbar (im
+  Test: das Dach eines Hauses 5 m neben der Stelle, an der es der
+  Strahl von oben zuerst fand). Darum zuerst die schrägen Strahlen von
+  der Kamera.
+- Dabei gefunden und behoben, auch im Modell: Die Kacheln des Bundes
+  tragen nicht überall eine EGID. Gezählt über 573 Kacheln: Albisrieden
+  und Niederdorf 98 bis 99 % der Gebäudeteile mit EGID, Kloten 0 von
+  1'386 (dort auch keine Höhe). Ein Klick in Kloten zeigte deshalb
+  bisher kein Register. Jetzt fragt die Karte in dem Fall das Register
+  beim Bund nach dem nächsten Gebäude an der Mitte des Hauses und
+  markiert das Haus über seine Kennung (UUID). Geprüft an der
+  Dorfstrasse 24 in Kloten: EGID 210205014, Baujahr 1786, das Haus wird
+  blau. Die Färbungen Heizung und Baujahr bleiben in solchen Gebieten
+  weiss -- sie brauchen die EGID je Haus in der Kachel; das liesse sich
+  erst über die Lage der Gebäude lösen (Migration 190000 und Ablauf
+  Gebäude, siehe oben).
+- Unten steht der Nachweis (Google-Logo, Quellen der Aufnahmen); das
+  verlangt Google. Heizung, Baujahr, Höhe, Reserve schalten aufs Modell
+  zurück, denn Fotos lassen sich nicht je Haus einfärben.
+- Foto ist der Start, sobald der Schlüssel da ist; ohne Schlüssel bleibt
+  alles wie bisher, und intern sagt die Legende, was fehlt.
+
+**Was du dafür tun musst** (einmalig, fünf Minuten):
+
+1. Google Cloud Console, dasselbe Projekt wie der Maps-Schlüssel für
+   Street View: *APIs und Dienste → Bibliothek → Map Tiles API →
+   Aktivieren*. Abrechnung muss am Projekt hängen.
+2. Beim Schlüssel unter *Anmeldedaten*: Anwendungseinschränkung
+   HTTP-Referrer mit den Adressen der Seite (Produktion und Vercel-
+   Vorschauen), API-Einschränkung um "Map Tiles API" ergänzen (die
+   Maps Embed API für Street View bleibt).
+3. In Vercel prüfen, dass `VITE_GOOGLE_MAPS_KEY` gesetzt ist, und neu
+   ausliefern (Redeploy): der Schlüssel wird beim Bau eingebacken. Ob
+   er im ausgelieferten Bündel steckt, meldet der Ablauf **Was ist
+   live** bei jedem Push in einer eigenen Zeile ("Google-Schlüssel im
+   Bündel: ja/nein", der Schlüssel selbst erscheint nie).
+4. `/karte3d` öffnen. Lehnt Google ab, steht der Grund in der Legende:
+   403 heisst API nicht eingeschaltet oder Adresse nicht erlaubt, 400
+   heisst Schlüssel unbekannt.
+
+**Was ich nicht prüfen konnte, und was du entscheiden musst:**
+
+- Hier gibt es keinen Google-Schlüssel, und die Sandbox erreicht weder
+  Googles Doku noch die Live-Seite. Geprüft ist der ganze Weg mit
+  Ersatz-Kacheln an Googles Adresse: die Häuser des Bundes um 47 m
+  angehoben (Laden, Globus aus, Zonen, Nachweis, Klick auf je fünf
+  sichtbare Häuser in Kloten und Albisrieden, Umschalten, Fehler 403,
+  iPhone). Wie die echten Fotos aussehen und ob Googles Höhen wirklich
+  um diese 47 m über denen des Bundes liegen, siehst du als Erster --
+  der Klick hängt davon nicht ab, nur die Mitte des Bildes nach einer
+  Suche.
+- Google verrechnet die 3D-Kacheln nach Nutzung (Map Tiles API). Preis
+  und Freikontingent konnte ich von hier nicht nachlesen; sie stehen
+  in der Cloud Console unter Abrechnung. Geladen wird erst, wenn jemand
+  Foto wählt -- und Foto ist der Start, also bei jedem Öffnen der 3D-
+  Karte einmal. Willst du das nicht, setze ich Modell als Start.
+- Cesium warnt, dass Google die Fotokacheln nur zusammen mit Googles
+  eigener Ortssuche erlaubt. Unsere Suche nutzt den Bund. Lies die
+  Richtlinien der Map Tiles API; wenn nötig, stelle ich die Suche im
+  Foto-Modus auf Google um (kostet je Suche).
+
 ## 1. Entwicklungspotenzial erkennt das System selbst -- gebaut
 
 Tims Kernsatz: "The system needs to identify opportunities rather than

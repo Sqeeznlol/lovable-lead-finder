@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   BoundingSphere, CameraEventType, Cartesian2, Cartesian3, Cartographic, Cesium3DTileColorBlendMode, Cesium3DTileFeature, Cesium3DTileStyle,
-  Cesium3DTileset, CesiumTerrainProvider, ClassificationType, Color, ColorMaterialProperty, ConstantProperty, Credit, Entity,
-  GeoJsonDataSource, HeadingPitchRange, ImageryLayer, Ion, JulianDate, KeyboardEventModifier, Math as CMath, PolygonHierarchy, Rectangle,
+  Cesium3DTileset, CesiumTerrainProvider, ClassificationType, Color, ColorMaterialProperty, ConstantProperty, createGooglePhotorealistic3DTileset, Credit, Entity,
+  GeoJsonDataSource, HeadingPitchRange, ImageryLayer, Ion, JulianDate, KeyboardEventModifier, Math as CMath, PolygonHierarchy, Ray, Rectangle,
   sampleTerrainMostDetailed, ScreenSpaceEventHandler, ScreenSpaceEventType, ShadowMode, UrlTemplateImageryProvider, Viewer,
 
   type Cesium3DTile,
@@ -13,10 +13,11 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { umrissVomBund } from '@/hooks/use-portfolio';
 import { parallel } from '@/lib/parallel';
+import { ellipsoidUeberMeer } from '@/lib/koordinaten';
 import { Suche3D } from '@/components/karte3d/Suche3D';
 import { useUrlSetzen } from '@/hooks/use-url-wert';
 import {
-  BAUJAHR_STUFEN, baujahrFarbe, GEBAEUDE_URL, GEBAEUDE_ZH_URL, gebaeudeLaden, inZuerich, GELAENDE_URL, HEIZ_GRUPPEN, heizGruppe, HOEHE_STUFEN,
+  BAUJAHR_STUFEN, baujahrFarbe, egidAmOrt, FOTO_MOEGLICH, GEBAEUDE_URL, GEBAEUDE_ZH_URL, gebaeudeLaden, hausKennung, inZuerich, GELAENDE_URL, GOOGLE_KEY, HEIZ_GRUPPEN, heizGruppe, HOEHE_STUFEN,
   dachSpanne, gebaeudeBeimBund, hoeheFarbe, punktImRing, type Ort, kodesLaden, LUFTBILD_URL, MODELL_URL, ZONEN_LEGENDE, zonenArt, zonenUm, type Gebaeude,
 } from '@/lib/karte3d';
 
@@ -26,13 +27,21 @@ declare const __CESIUM_BASIS__: string;
 // Kein Cesium-ion-Konto: alles kommt vom Bund und vom Kanton.
 Ion.defaultAccessToken = '';
 
-export type Faerbung = 'modell' | 'heizung' | 'baujahr' | 'hoehe' | 'reserve';
+export type Faerbung = 'foto' | 'modell' | 'heizung' | 'baujahr' | 'hoehe' | 'reserve';
 export interface Markierung { egrid: string; farbe: string; titel?: string }
 
 const FAERBUNGEN: { wert: Faerbung; titel: string }[] = [
-  { wert: 'modell', titel: 'Modell' }, { wert: 'heizung', titel: 'Heizung' }, { wert: 'baujahr', titel: 'Baujahr' },
-  { wert: 'hoehe', titel: 'Höhe' }, { wert: 'reserve', titel: 'Reserve' },
+  { wert: 'foto', titel: 'Foto' }, { wert: 'modell', titel: 'Modell' }, { wert: 'heizung', titel: 'Heizung' },
+  { wert: 'baujahr', titel: 'Baujahr' }, { wert: 'hoehe', titel: 'Höhe' }, { wert: 'reserve', titel: 'Reserve' },
 ];
+const OHNE_SCHLUESSEL = 'Fotos brauchen den Google-Schlüssel (VITE_GOOGLE_MAPS_KEY in Vercel) mit eingeschalteter Map Tiles API.';
+/** Warum Google die Kacheln nicht gab -- so, dass man weiss, was zu tun ist. */
+function fotoFehler(e: unknown): string {
+  const code = (e as { statusCode?: number } | null)?.statusCode;
+  if (code === 403) return 'Google lehnt den Schlüssel ab (403): im Google-Cloud-Projekt die Map Tiles API einschalten und die Adresse dieser Seite beim Schlüssel erlauben.';
+  if (code === 400) return 'Google kennt diesen Schlüssel nicht (400): VITE_GOOGLE_MAPS_KEY in Vercel prüfen.';
+  return `Fotos von Google nicht geladen: ${e instanceof Error ? e.message : String(e)}`.slice(0, 220);
+}
 const WEISS = Color.fromCssColorString('#F4F2EE');
 const KEINE: Markierung[] = [];
 const BLAU = '#3D45F5';
@@ -124,18 +133,33 @@ export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende,
   const reserve = useRef(new Map<string, number>());
   const offen = useRef(new Set<number>());
   const gewaehlt = useRef<number | null>(null);
+  /** Das gewählte Haus über seine UUID -- für Kacheln ohne EGID. */
+  const gewaehltHaus = useRef<string | null>(null);
   const markierteFarbe = useRef(new Map<string, Color>());
   /** Umrisse der markierten Parzellen in WGS84, mit Rahmen zum schnellen Aussortieren. */
   const umrisse = useRef<{ farbe: Color; ringe: number[][][]; rahmen: [number, number, number, number] }[]>([]);
   const [bereit, setBereit] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
-  const [faerbung, setFaerbung] = useState<Faerbung>(start);
+  // Foto ohne Schlüssel gibt es nicht: dann das Modell.
+  const [faerbung, setFaerbung] = useState<Faerbung>(start === 'foto' && !GOOGLE_KEY ? 'modell' : start);
   const faerbungRef = useRef(faerbung);
   faerbungRef.current = faerbung;
   const [luftbild, setLuftbild] = useState(false);
-  const [zonen, setZonen] = useState(true);
+  const luftbildRef = useRef(luftbild);
+  luftbildRef.current = luftbild;
+  // Im Foto liegen die Zonen auch auf Dächern und Fassaden und färben die
+  // Häuser ein -- also erst auf Wunsch. Im Modell wie bisher von Anfang an.
+  const [zonen, setZonen] = useState(!(start === 'foto' && GOOGLE_KEY));
   const [zonenLaden, setZonenLaden] = useState(false);
   const [auswahl, setAuswahl] = useState<Auswahl | null>(null);
+  const auswahlRef = useRef(auswahl);
+  auswahlRef.current = auswahl;
+  const fotoKacheln = useRef<Cesium3DTileset | null>(null);
+  const fotoLadung = useRef<Promise<Cesium3DTileset> | null>(null);
+  const [fotoLaden, setFotoLaden] = useState(false);
+  const [fotoHinweis, setFotoHinweis] = useState<string | null>(null);
+  /** Umriss der Parzelle des gewählten Hauses -- im Foto, wo das Haus selbst nicht blau werden kann. */
+  const auswahlUmriss = useRef<Entity[]>([]);
   const [legendeZu, setLegendeZu] = useState(false);
   const [stumm, setStumm] = useState<string | null>(null);
   const [geladen, setGeladen] = useState(0);
@@ -197,6 +221,9 @@ export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende,
       v.scene.globe.enableLighting = false;
     }
     v.creditDisplay.addStaticCredit(new Credit('© swisstopo, Kanton Zürich'));
+    // Cesium beschriftet den Nachweis englisch; sichtbar wird er im Foto.
+    v.creditDisplay.container.querySelector('.cesium-credit-expand-link')?.replaceChildren('Quellen');
+    box.current.querySelector('.cesium-credit-lightbox-title')?.replaceChildren('Daten von:');
 
     (async () => {
       try {
@@ -213,8 +240,16 @@ export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende,
       }
     })();
 
+    // Der Viewer wählt bei jedem Klick selbst ein Objekt aus (scene.pick),
+    // vor unserem Klick -- für Infobox und Auswahlrahmen, die hier aus sind.
+    // Sein pick rechnet die Ansicht für einen kleinen Ausschnitt neu, und
+    // danach fand pickPosition im Foto nichts mehr (im Test: im Klick kein
+    // Punkt, eine Sekunde vorher am selben Bildpunkt schon). Doppelklick
+    // hängt die Kamera an ein Objekt -- braucht hier niemand.
+    v.screenSpaceEventHandler.removeInputAction(ScreenSpaceEventType.LEFT_CLICK);
+    v.screenSpaceEventHandler.removeInputAction(ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
     const klick = new ScreenSpaceEventHandler(v.scene.canvas);
-    klick.setInputAction((ev: { position: Cartesian2 }) => void waehlen(v.scene.pick(ev.position)), ScreenSpaceEventType.LEFT_CLICK);
+    klick.setInputAction((ev: { position: Cartesian2 }) => void waehlen(hausUnterZeiger(ev.position)), ScreenSpaceEventType.LEFT_CLICK);
     return () => { weg = true; klick.destroy(); v.destroy(); viewer.current = null; tiles.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -304,8 +339,12 @@ export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende,
     const v = viewer.current;
     if (!v || !ziel) return;
     let weg = false;
+    // Im Foto liegt der Boden höher: Google rechnet über dem Ellipsoid, das
+    // Gelände des Bundes über Meer (hausUnterZeiger). Ohne Zuschlag zielte
+    // die Kamera 47 m unter das Foto, und das gesuchte Haus stünde hinter
+    // der Bildmitte (gerechnet bei 32° Neigung: rund 75 m).
     const setzen = (boden: number, dauer: number) => fliegen(v,
-      new BoundingSphere(Cartesian3.fromDegrees(ziel.lon, ziel.lat, boden + 10), 60),
+      new BoundingSphere(Cartesian3.fromDegrees(ziel.lon, ziel.lat, boden + 10 + (faerbungRef.current === 'foto' ? ellipsoidUeberMeer(ziel.lat, ziel.lon) : 0)), 60),
       new HeadingPitchRange(CMath.toRadians(35), CMath.toRadians(-32), ziel.abstand ?? 520), dauer);
     if (erstesZiel.current && !bereit) setzen(BODEN_SCHAETZUNG, 0);
     if (bereit) {
@@ -334,22 +373,21 @@ export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende,
         if (!fc || ab.signal.aborted) return;
         const q = await GeoJsonDataSource.load(fc, { clampToGround: true });
         if (ab.signal.aborted) return;
-        for (const e of q.entities.values) {
-          if (!e.polygon) continue;
-          const art = zonenArt(String(e.properties?.typ_zh_code?.getValue() ?? ''));
-          e.polygon.material = new ColorMaterialProperty(Color.fromCssColorString(art.farbe).withAlpha(luftbild ? 0.45 : 0.8));
-          // Nur den Boden einfärben, nicht die Häuser -- wie im Video.
-          e.polygon.classificationType = new ConstantProperty(ClassificationType.TERRAIN);
-          e.polygon.outline = new ConstantProperty(false);
-        }
         zonenQuelle.current = q;
+        zonenStil();
         await v.dataSources.add(q);
         v.scene.requestRender();
       } catch { /* ausserhalb ZH oder Dienst nicht erreichbar: ohne Zonen */ }
       finally { if (!ab.signal.aborted) setZonenLaden(false); }
     })();
     return () => ab.abort();
-  }, [ziel?.lat, ziel?.lon, zonen, luftbild, bereit]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ziel?.lat, ziel?.lon, zonen, bereit]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Deckkraft der Zonen folgt dem Luftbild, ohne sie neu zu laden.
+  useEffect(() => {
+    zonenStil();
+    viewer.current?.scene.requestRender();
+  }, [luftbild]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ----------------------------------- Umrisse der markierten Parzellen
   useEffect(() => {
@@ -376,7 +414,7 @@ export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende,
           polygon: {
             hierarchy: new PolygonHierarchy(Cartesian3.fromDegreesArray(ring.flat())),
             material: Color.fromCssColorString(m.farbe).withAlpha(0.35),
-            classificationType: ClassificationType.TERRAIN,
+            classificationType: klassifikation(),
           },
           polyline: {
             positions: Cartesian3.fromDegreesArray(ring.flat()), width: 3, clampToGround: true,
@@ -400,6 +438,65 @@ export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende,
     viewer.current?.scene.requestRender();
   }, [faerbung, kodes, geladen]);
 
+  // --------------------------------------------------------------- Foto
+  // Fotorealistisch: die Kacheln von Google sind Boden, Häuser und Bäume
+  // in einem Netz aus Luftaufnahmen. Der Globus des Bundes wird dabei
+  // ausgeblendet -- wo seine Höhen um einen Meter abweichen, stäche er
+  // sonst durch das Netz. Das Modell des Bundes bleibt geladen, nur
+  // unsichtbar (preloadWhenHidden): ein Klick trifft damit weiter ein
+  // Haus mit EGID (hausUnterZeiger), und Zonen und Umrisse legen sich auf die
+  // Kacheln statt auf den Boden. Geladen wird das Netz erst, wenn Foto
+  // gewählt ist -- jede Sitzung zählt bei Google.
+  useEffect(() => {
+    const v = viewer.current;
+    if (!v || !bereit) return;
+    (async () => {
+      if (faerbung === 'foto' && !fotoKacheln.current) {
+        if (!GOOGLE_KEY) { setFotoHinweis(OHNE_SCHLUESSEL); setFaerbung('modell'); return; }
+        setFotoLaden(true);
+        try {
+          const gross = GROSS();
+          // Ein Laden für alle, die zugleich warten (schnelles Hin und Her auf den Chips).
+          fotoLadung.current ??= createGooglePhotorealistic3DTileset({ key: GOOGLE_KEY }, {
+            // Google verlangt, dass die Quellen (Google, Luftbildfirmen) zu sehen sind.
+            showCreditsOnScreen: true,
+            // Licht und Schatten stecken schon in den Fotos.
+            shadows: ShadowMode.DISABLED,
+            maximumScreenSpaceError: gross ? 16 : 20,
+            // Auf dem Handy knapper: dort läuft das Modell des Bundes unsichtbar mit.
+            cacheBytes: (gross ? 768 : 256) * 1024 * 1024, maximumCacheOverflowBytes: (gross ? 256 : 128) * 1024 * 1024,
+          });
+          const ts = await fotoLadung.current;
+          if (v.isDestroyed()) { if (!ts.isDestroyed()) ts.destroy(); return; }
+          if (!fotoKacheln.current) { fotoKacheln.current = ts; v.scene.primitives.add(ts); }
+        } catch (e) {
+          fotoLadung.current = null;
+          setFotoLaden(false);
+          if (v.isDestroyed()) return;
+          setFotoHinweis(fotoFehler(e));
+          // Zurück zum Modell, so wie es ohne Fotos aussieht: mit Zonen.
+          if (faerbungRef.current === 'foto') { setFaerbung('modell'); setZonen(true); }
+          return;
+        }
+        setFotoLaden(false);
+      }
+      if (v.isDestroyed()) return;
+      // Nach dem Warten zählt die Wahl von jetzt, nicht die von vorhin.
+      const foto = faerbungRef.current === 'foto';
+      if (fotoKacheln.current) fotoKacheln.current.show = foto;
+      if (tiles.current) tiles.current.show = !foto;
+      v.scene.globe.show = !foto;
+      // Ohne Globus malt Cesium über dem Horizont den Weltraum schwarz
+      // (im Test gesehen): dann lieber die helle Hintergrundfarbe.
+      if (v.scene.skyAtmosphere) v.scene.skyAtmosphere.show = !foto;
+      klassifizieren();
+      const a = auswahlRef.current;
+      if (!foto) auswahlUmrissWeg();
+      else if (a?.geb?.egrid && a.egid) void auswahlUmrissZeigen(a.geb.egrid, a.egid);
+      v.scene.requestRender();
+    })();
+  }, [faerbung, bereit]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ======================================================== Helfer
   /**
    * Die Gebäude laden, aus unserem Verzeichnis oder dem des Bundes. Fehlt
@@ -417,6 +514,8 @@ export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende,
     const optionen = {
       maximumScreenSpaceError: gross ? 16 : 24, shadows: gross ? ShadowMode.CAST_ONLY : ShadowMode.DISABLED,
       cacheBytes: (gross ? 768 : 256) * 1024 * 1024,
+      // Im Foto unsichtbar, aber geladen: so trifft ein Klick das Haus (hausUnterZeiger).
+      preloadWhenHidden: true,
     };
     let ts: Cesium3DTileset;
     try {
@@ -435,10 +534,171 @@ export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende,
     if (tiles.current) v.scene.primitives.remove(tiles.current);
     tiles.current = ts;
     quelle.current = url;
+    ts.show = faerbungRef.current !== 'foto';
     v.scene.primitives.add(ts);
     v.scene.requestRender();
     // Für den Darstellungstest: Kacheln, Kamera und Häuser nachzählen statt raten.
-    if (import.meta.env.DEV) (window as unknown as { karte3d: unknown }).karte3d = { v, ts, quelle: url };
+    if (import.meta.env.DEV) {
+      (window as unknown as { karte3d: unknown }).karte3d = {
+        v, ts, quelle: url, get foto() { return fotoKacheln.current; },
+        // Der Klick im Foto, ohne Maus -- für den Darstellungstest.
+        haus: (x: number, y: number) => hausUnterZeiger(new Cartesian2(x, y)),
+      };
+    }
+  }
+
+  /**
+   * Das Haus des Modells unter dem Zeiger. Im Foto ist das Modell des
+   * Bundes unsichtbar, und die Kacheln von Google kennen keine Häuser
+   * (ein Netz ohne EGID). Dazu kommt die Höhe: der Bund rechnet in Metern
+   * über Meer (gemessen an einem Haus in Altstetten: Dach 434.05 m laut
+   * Kachel, in Cesium ebenfalls 434), Google über dem Ellipsoid -- in
+   * Zürich nach der Näherung von swisstopo rund 47 m mehr. Durch
+   * denselben Bildpunkt läge das Modell also tiefer, und der Strahl träfe
+   * ein Haus weiter hinten (gerechnet bei 32° Neigung rund 75 m; im Test mit um
+   * 47 m angehobenen Häusern als Ersatz für Google traf er bei 10 von 10
+   * Häusern daneben).
+   *
+   * Darum: der Punkt auf dem Foto (Tiefe des letzten Bildes), und von der
+   * Kamera aus Strahlen ins Modell durch Punkte darunter -- um die Höhe
+   * nach der Formel, und weil weder Formel noch Google auf den Meter
+   * stimmen, 6 m darüber bis 6 m darunter. Beim richtigen Versatz trifft
+   * der Strahl das Modell genau unter dem Klickpunkt; gewählt wird das
+   * Haus, dessen Treffpunkt waagrecht am nächsten liegt, höchstens 3 m
+   * weg. Im Test mit 44, 47 und 50 m Versatz je 10 von 10 Häusern
+   * richtig, also auch 3 m neben der Formel; mit 0 m (Annahme ganz
+   * falsch) über den Rückfall ebenfalls 10 von 10.
+   *
+   * Findet das nichts (stimmte die Formel grob nicht), senkrecht von oben
+   * an der Stelle, auch 1.5 und 3 m daneben. Nur als Rückfall: Cesium
+   * prüft bei einem Strahl zuerst den Rahmen der Kachel, und die Kacheln
+   * des Bundes sind auf ihr Raster zugeschnitten. Ragt ein Haus darüber
+   * hinaus, ist dieser Teil für einen senkrechten Strahl unsichtbar (im
+   * Test gesehen: der Strahl fand ein Haus erst 5 m neben dem Punkt, an
+   * dem die Kamera sein Dach traf). Ein schräger Strahl von der Kamera
+   * kreuzt den Rahmen trotzdem.
+   *
+   * Für die Strahlen wird das Modell kurz eingeblendet und das Foto
+   * ausgeblendet; gezeichnet wird dabei nur in einen unsichtbaren Puffer.
+   * Die Kacheln des Modells sind dank preloadWhenHidden geladen. Die
+   * Zonen liegen im Foto auch auf den Häusern und wären der erste
+   * Treffer, darum die Suche durch mehrere Treffer hindurch.
+   */
+  function hausUnterZeiger(pos: Cartesian2): Cesium3DTileFeature | null {
+    const v = viewer.current;
+    if (!v) return null;
+    const g = fotoKacheln.current, ts = tiles.current;
+    if (!g || !g.show || !ts) {
+      const o = v.scene.pick(pos);
+      return o instanceof Cesium3DTileFeature ? o : null;
+    }
+    const haus = (o: unknown): o is Cesium3DTileFeature => o instanceof Cesium3DTileFeature && o.tileset === ts;
+    const neu = () => new Cartesian3();
+    // Strahlen kennt Cesium nur intern (Scene.drillPickFromRay, Fassung 1.146); fehlen sie, unten der abgesenkte Blick.
+    const strahl = (v.scene as unknown as { drillPickFromRay?: (ray: Ray, limit: number) => { object: unknown; position?: Cartesian3 }[] }).drillPickFromRay?.bind(v.scene);
+    const p = v.scene.pickPositionSupported ? v.scene.pickPosition(pos) : undefined;
+    // Ohne Tiefe ist dort Himmel: nichts gewählt. Der Bildpunkt im Modell wäre im Foto ein anderes Haus.
+    if (!p) return null;
+    const ort = Cartographic.fromCartesian(p);
+    const oben = v.scene.globe.ellipsoid.geodeticSurfaceNormal(p, neu());
+    const hub = ellipsoidUeberMeer(CMath.toDegrees(ort.latitude), CMath.toDegrees(ort.longitude));
+    // Ohne Strahlen (andere Fassung von Cesium): der Blick durch den abgesenkten Punkt, 2 m tiefer -- lieber ins Haus als darüber.
+    const ersatz = strahl ? undefined : v.scene.cartesianToCanvasCoordinates(Cartesian3.subtract(p, Cartesian3.multiplyByScalar(oben, hub + 2, neu()), neu()));
+    g.show = false; ts.show = true;
+    try {
+      if (!strahl) return ersatz ? v.scene.drillPick(ersatz, 3).find(haus) ?? null : null;
+      // Waagrechter Abstand zum Klickpunkt: ohne den Anteil nach oben.
+      const waagrecht = (q: Cartesian3) => {
+        const w = Cartesian3.subtract(q, p, neu());
+        return Cartesian3.magnitude(Cartesian3.subtract(w, Cartesian3.multiplyByScalar(oben, Cartesian3.dot(w, oben), neu()), neu()));
+      };
+      const kamera = v.camera.positionWC;
+      let bestes: { f: Cesium3DTileFeature; d: number } | null = null;
+      for (let mehr = -6; mehr <= 6; mehr += 1.5) {
+        const ziel = Cartesian3.subtract(p, Cartesian3.multiplyByScalar(oben, hub + mehr, neu()), neu());
+        const richtung = Cartesian3.normalize(Cartesian3.subtract(ziel, kamera, neu()), neu());
+        const t = strahl(new Ray(kamera, richtung), 3).find(x => haus(x.object));
+        if (!t?.position) continue;
+        const d = waagrecht(t.position);
+        if (!bestes || d < bestes.d) bestes = { f: t.object as Cesium3DTileFeature, d };
+      }
+      if (bestes && bestes.d <= 3) return bestes.f;
+
+      const runter = Cartesian3.negate(oben, neu());
+      const ost = Cartesian3.normalize(Cartesian3.cross(Cartesian3.UNIT_Z, oben, neu()), neu());
+      const nord = Cartesian3.cross(oben, ost, neu());
+      const d = v.camera.directionWC;
+      const richtung = Math.atan2(Cartesian3.dot(d, nord), Cartesian3.dot(d, ost));
+      const proben: [number, number][] = [[0, 0]];
+      for (const r of [1.5, 3]) {
+        for (let i = 0; i < 8; i++) {
+          // Zuerst in Blickrichtung (bei einer Fassade liegt das Haus dahinter), dann immer weiter zur Seite.
+          const w = richtung + (i % 2 ? 1 : -1) * Math.ceil(i / 2) * (Math.PI / 4);
+          proben.push([r * Math.cos(w), r * Math.sin(w)]);
+        }
+      }
+      for (const [de, dn] of proben) {
+        const versatz = Cartesian3.add(Cartesian3.multiplyByScalar(ost, de, neu()), Cartesian3.multiplyByScalar(nord, dn, neu()), neu());
+        const start = Cartesian3.add(Cartesian3.add(p, versatz, neu()), Cartesian3.multiplyByScalar(oben, 400, neu()), neu());
+        const f = strahl(new Ray(start, runter), 3).map(x => x.object).find(haus);
+        if (f) return f;
+      }
+      return null;
+    } finally { ts.show = false; g.show = true; }
+  }
+
+  /** Zonen und Umrisse liegen auf dem, was gezeigt wird: Boden des Bundes oder Kacheln von Google. */
+  function klassifikation() {
+    return faerbungRef.current === 'foto' ? ClassificationType.CESIUM_3D_TILE : ClassificationType.TERRAIN;
+  }
+  function klassifizieren() {
+    const v = viewer.current;
+    if (!v) return;
+    const k = new ConstantProperty(klassifikation());
+    for (const e of v.entities.values) if (e.polygon) e.polygon.classificationType = k;
+    zonenStil();
+  }
+
+  /**
+   * Farbe und Lage der Zonen: im Modell deckend am Boden, auf Luftbild
+   * und Foto dünner. Nur der Boden wird gefärbt, nicht die Häuser des
+   * Modells (wie im Video); im Foto sind Boden und Häuser ein Netz, dort
+   * legt sich die Zone über beides.
+   */
+  function zonenStil() {
+    const q = zonenQuelle.current;
+    if (!q) return;
+    const duenn = faerbungRef.current === 'foto' || luftbildRef.current;
+    for (const e of q.entities.values) {
+      if (!e.polygon) continue;
+      const art = zonenArt(String(e.properties?.typ_zh_code?.getValue() ?? ''));
+      // Auf den Fotos dünner als auf dem Luftbild: sie decken dort auch die Häuser.
+      e.polygon.material = new ColorMaterialProperty(Color.fromCssColorString(art.farbe).withAlpha(faerbungRef.current === 'foto' ? 0.35 : duenn ? 0.45 : 0.8));
+      e.polygon.classificationType = new ConstantProperty(klassifikation());
+      e.polygon.outline = new ConstantProperty(false);
+    }
+  }
+
+  function auswahlUmrissWeg() {
+    const v = viewer.current;
+    if (v && !v.isDestroyed()) auswahlUmriss.current.forEach(e => v.entities.remove(e));
+    auswahlUmriss.current = [];
+  }
+  /** Im Foto wird das gewählte Haus nicht blau (das Modell ist aus): dafür der Umriss seiner Parzelle auf den Kacheln. */
+  async function auswahlUmrissZeigen(egrid: string, egid: number) {
+    const g = await umrissVomBund(egrid).catch(() => null);
+    const v = viewer.current;
+    if (!v || v.isDestroyed() || gewaehlt.current !== egid || faerbungRef.current !== 'foto') return;
+    auswahlUmrissWeg();
+    const ringe = (g?.type === 'Polygon' ? [g.coordinates[0]] : g?.type === 'MultiPolygon' ? g.coordinates.map(p => p[0]) : []) as number[][][];
+    const blau = Color.fromCssColorString(BLAU);
+    for (const ring of ringe) {
+      auswahlUmriss.current.push(v.entities.add({
+        polygon: { hierarchy: new PolygonHierarchy(Cartesian3.fromDegreesArray(ring.flat())), material: blau.withAlpha(0.2), classificationType: klassifikation() },
+        polyline: { positions: Cartesian3.fromDegreesArray(ring.flat()), width: 3, clampToGround: true, material: blau },
+      }));
+    }
+    v.scene.requestRender();
   }
 
   /** Der Stil fragt bei jedem Haus die aktuelle Färbung und unsere Daten. */
@@ -453,6 +713,7 @@ export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende,
   function farbe(f: Cesium3DTileFeature): Color {
     const egid = Number(f.getProperty('EGID')) || null;
     if (egid != null && egid === gewaehlt.current) return Color.fromCssColorString(BLAU);
+    if (gewaehltHaus.current && hausKennung(f.getProperty('UUID')) === gewaehltHaus.current) return Color.fromCssColorString(BLAU);
     const geb = egid != null ? daten.current.get(egid) : undefined;
     const mark = geb?.egrid ? markierteFarbe.current.get(geb.egrid) : undefined;
     if (mark) return mark;
@@ -515,15 +776,27 @@ export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende,
     }, 350);
   }
 
-  async function waehlen(objekt: unknown) {
-    if (!(objekt instanceof Cesium3DTileFeature)) { gewaehlt.current = null; setAuswahl(null); tiles.current?.makeStyleDirty(); viewer.current?.scene.requestRender(); return; }
-    const a = ausKachel(objekt);
-    const egid = a.egid;
-    gewaehlt.current = egid;
-    tiles.current?.makeStyleDirty();
-    viewer.current?.scene.requestRender();
+  async function waehlen(f: Cesium3DTileFeature | null) {
+    auswahlUmrissWeg();
+    const neuZeichnen = () => { tiles.current?.makeStyleDirty(); viewer.current?.scene.requestRender(); };
+    if (!f) { gewaehlt.current = null; gewaehltHaus.current = null; setAuswahl(null); neuZeichnen(); return; }
+    const a = ausKachel(f);
+    const haus = hausKennung(f.getProperty('UUID'));
+    gewaehlt.current = a.egid;
+    gewaehltHaus.current = a.egid ? null : haus;
+    neuZeichnen();
     setAuswahl(a);
-    if (egid) await einzelheiten(egid);
+    if (a.egid) { await einzelheiten(a.egid); return; }
+    // Ohne EGID in der Kachel: das Register beim Bund nach dem Gebäude
+    // an der Mitte dieses Hauses fragen.
+    const lon = Number(f.getProperty('Longitude')), lat = Number(f.getProperty('Latitude'));
+    const egid = Number.isFinite(lat) && Number.isFinite(lon) ? await egidAmOrt(lat, lon).catch(() => null) : null;
+    // Inzwischen ein anderes Haus gewählt oder die Tafel geschlossen.
+    if (gewaehltHaus.current !== haus || gewaehlt.current !== null) return;
+    if (!egid) { setAuswahl(x => (x && x.egid === null ? { ...x, geb: null } : x)); return; }
+    gewaehlt.current = egid;
+    setAuswahl(x => (x && x.egid === null ? { ...x, egid } : x));
+    await einzelheiten(egid);
   }
 
   /** Register, Adresse und unser Objekt zu einem Haus nachladen. */
@@ -541,6 +814,7 @@ export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende,
       const r = await (supabase as any).from('properties').select('id, address').eq('egrid', geb.egrid).limit(1);
       parzelleId = r.data?.[0]?.id ?? null; adresse = r.data?.[0]?.address ?? adresse;
     }
+    if (geb?.egrid && faerbungRef.current === 'foto' && gewaehlt.current === egid) void auswahlUmrissZeigen(geb.egrid, egid);
     setAuswahl(x => (x && x.egid === egid ? { ...x, geb, parzelleId, adresse } : x));
   }
 
@@ -576,6 +850,8 @@ export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende,
     const egid = sprung?.egid;
     if (!egid || !bereit) return;
     gewaehlt.current = egid;
+    gewaehltHaus.current = null;
+    auswahlUmrissWeg();
     tiles.current?.makeStyleDirty();
     setAuswahl({ egid, hoehe: null, dachMin: null, dachMax: null, gelaende: null, objektart: null });
     void einzelheiten(egid);
@@ -589,10 +865,12 @@ export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende,
       } else if (++n >= 30) window.clearInterval(t);
     }, 1000);
     return () => window.clearInterval(t);
-  }, [sprung, bereit]);  
+  }, [sprung, bereit]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const ortWaehlen = (o: Ort) => {
     gewaehlt.current = null;
+    gewaehltHaus.current = null;
+    auswahlUmrissWeg();
     setAuswahl(null);
     setSprung(o);
     onOrt?.(o);
@@ -612,8 +890,11 @@ export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende,
   const umMitte = (heading: number, pitch: number) => {
     const v = viewer.current; if (!v) return;
     const c = v.scene.canvas;
-    const strahl = v.camera.getPickRay(new Cartesian2(c.clientWidth / 2, c.clientHeight / 2));
-    const punkt = strahl ? v.scene.globe.pick(strahl, v.scene) : undefined;
+    const mitte = new Cartesian2(c.clientWidth / 2, c.clientHeight / 2);
+    // Im Foto ist der Globus aus: dann die Tiefe des letzten Bildes, die trifft die Kacheln von Google.
+    const strahl = v.camera.getPickRay(mitte);
+    const punkt = (faerbungRef.current === 'foto' && v.scene.pickPositionSupported ? v.scene.pickPosition(mitte) : undefined)
+      ?? (strahl ? v.scene.globe.pick(strahl, v.scene) : undefined);
     if (!punkt) return;
     fliegen(v, new BoundingSphere(punkt, 0), new HeadingPitchRange(heading, pitch, Cartesian3.distance(v.camera.positionWC, punkt)), leise() ? 0 : 0.6);
   };
@@ -628,17 +909,24 @@ export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende,
   const knopf = 'grid h-11 w-11 place-items-center rounded-[3px] bg-white text-[#111] shadow-[0_2px_8px_rgba(0,0,0,0.18)] hover:bg-[#f2f2f2]';
   const chip = (an: boolean) => `inline-flex h-9 shrink-0 items-center rounded-[3px] px-3 text-[13px] font-medium shadow-[0_1px_4px_rgba(0,0,0,0.16)] ${an ? 'bg-[#111] text-white' : 'bg-white text-[#111]'}`;
   const registerLeer = kodes != null && kodes.size === 0;
+  const imFoto = faerbung === 'foto';
+  // Im Foto steht unten der Nachweis von Google (karte3d-foto in index.css); die Legende rückt darüber.
+  const unten = imFoto ? 'bottom-9' : 'bottom-3';
 
   return (
     <div className={`relative isolate overflow-hidden bg-[#DCE6EF] ${hoehe}`}>
-      <div ref={box} className="absolute inset-0 [&_.cesium-viewer-bottom]:hidden [&_.cesium-widget-credits]:hidden" />
+      <div ref={box} className={`absolute inset-0 ${imFoto ? 'karte3d-foto' : '[&_.cesium-viewer-bottom]:hidden [&_.cesium-widget-credits]:hidden'}`} />
 
       {/* Oben die Suche, darunter die Färbung als Chips (auf dem Handy wischbar). */}
       <div className="absolute left-3 right-16 top-3 z-20 flex flex-col items-start gap-2">
       <Suche3D onWahl={ortWaehlen} />
       <div className="flex max-w-full gap-1.5 overflow-x-auto no-scrollbar">
-        {FAERBUNGEN.filter(f => faerbungen.includes(f.wert) && (intern || f.wert !== 'reserve')).map(f => (
-          <button key={f.wert} type="button" className={chip(faerbung === f.wert)} onClick={() => setFaerbung(f.wert)} aria-pressed={faerbung === f.wert}>{f.titel}</button>
+        {/* Foto ohne Schlüssel: intern als Hinweis, was fehlt; Fondsleitungen sehen den Chip gar nicht. */}
+        {FAERBUNGEN.filter(f => faerbungen.includes(f.wert) && (intern || f.wert !== 'reserve') && (f.wert !== 'foto' || FOTO_MOEGLICH || intern)).map(f => (
+          <button key={f.wert} type="button" className={chip(faerbung === f.wert)} aria-pressed={faerbung === f.wert}
+                  onClick={() => { if (f.wert === 'foto') setFotoHinweis(null); setFaerbung(f.wert); }}>
+            {f.wert === 'foto' && fotoLaden ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}{f.titel}
+          </button>
         ))}
         <button type="button" className={chip(zonen)} onClick={() => setZonen(z => !z)} aria-pressed={zonen}>
           {zonenLaden ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}Zonen
@@ -653,17 +941,20 @@ export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende,
         <button type="button" className={`${knopf} max-sm:hidden`} onClick={() => drehen(45)} aria-label="Nach rechts drehen" title="Nach rechts drehen"><RotateCw className="h-4 w-4" /></button>
         <button type="button" className={knopf} onClick={neigen} aria-label="Von oben oder schräg" title="Von oben / schräg"><Rotate3d className="h-4 w-4" /></button>
         <button type="button" className={knopf} onClick={norden} aria-label="Nach Norden ausrichten" title="Nach Norden"><Compass className="h-4 w-4" /></button>
-        <button type="button" className={knopf} onClick={() => setLuftbild(l => !l)} aria-label={luftbild ? 'Modell zeigen' : 'Luftbild zeigen'} title={luftbild ? 'Modell' : 'Luftbild'}><Layers className="h-4 w-4" /></button>
+        {/* Im Foto gibt es keinen Boden zum Umschalten. */}
+        {!imFoto && <button type="button" className={knopf} onClick={() => setLuftbild(l => !l)} aria-label={luftbild ? 'Modell zeigen' : 'Luftbild zeigen'} title={luftbild ? 'Modell' : 'Luftbild'}><Layers className="h-4 w-4" /></button>}
       </div>
 
       {/* Legende der gewählten Färbung, darunter die Zonen. Ein Tippen klappt
           sie zu: auf dem Handy deckte sie ein Drittel der Karte ab. */}
       {legendeZu ? (
-        <button type="button" className={`absolute bottom-3 left-3 z-10 ${chip(false)} ${auswahl ? 'max-sm:hidden' : ''}`}
+        <button type="button" className={`absolute ${unten} left-3 z-10 ${chip(false)} ${auswahl ? 'max-sm:hidden' : ''}`}
                 onClick={() => setLegendeZu(false)} aria-expanded={false}>Legende</button>
       ) : (
         <button type="button" onClick={() => setLegendeZu(true)} aria-expanded aria-label="Legende einklappen"
-                className={`absolute bottom-3 left-3 z-10 block max-w-[calc(100%-1.5rem)] space-y-1.5 rounded-[3px] bg-white/95 px-3 py-2 text-left text-[12px] text-[#111] shadow-[0_2px_8px_rgba(0,0,0,0.18)] sm:max-w-[360px] ${auswahl ? 'max-sm:hidden' : ''}`}>
+                className={`absolute ${unten} left-3 z-10 block max-w-[calc(100%-1.5rem)] space-y-1.5 rounded-[3px] bg-white/95 px-3 py-2 text-left text-[12px] text-[#111] shadow-[0_2px_8px_rgba(0,0,0,0.18)] sm:max-w-[360px] ${auswahl ? 'max-sm:hidden' : ''}`}>
+          {imFoto && <span className="block text-[#555]">Häuser und Boden fotografisch (Google). Klick auf ein Haus: Register wie im Modell.</span>}
+          {fotoHinweis && <span className="block text-[#B4432E]">{fotoHinweis}</span>}
           {faerbung === 'heizung' && (registerLeer
             ? <span className="block text-[#555]">Heizung: Register noch nicht geladen.</span>
             : <Legende eintraege={HEIZ_GRUPPEN.map(g => ({ titel: g.titel, farbe: g.farbe }))} />)}

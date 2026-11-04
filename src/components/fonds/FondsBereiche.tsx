@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { BILD } from '@/lib/luftbild';
 import { zeitraum } from '@/lib/immo-kalender';
 import { lv95NachWgs84 } from '@/lib/koordinaten';
+import { FOTO_MOEGLICH } from '@/lib/karte3d';
 import { fondsFarbe, POTENZIAL, type PotenzialArt, type Universum as UniversumDaten } from '@/lib/fonds';
 import {
   baugesucheLaden, faellig, lagenLesen, notizErledigt, notizenLaden, notizSpeichern, potenzialSchluessel,
@@ -103,7 +104,8 @@ export function FondsKarte({ data }: BereichProps) {
       ) : (
         <div className="overflow-hidden rounded border">
           <Suspense fallback={<div className={`grid place-items-center bg-[#DCE6EF] text-sm text-[#333] ${KARTE_HOEHE}`}>3D-Karte wird geladen …</div>}>
-            <Karte3D ziel={ziel} markiert={markiert} legende={legende} intern={false} faerbungen={['modell', 'heizung', 'baujahr', 'hoehe']} hoehe={KARTE_HOEHE} />
+            <Karte3D ziel={ziel} markiert={markiert} legende={legende} intern={false} faerbungen={['foto', 'modell', 'heizung', 'baujahr', 'hoehe']}
+              start={FOTO_MOEGLICH ? 'foto' : 'modell'} hoehe={KARTE_HOEHE} />
           </Suspense>
         </div>
       )}

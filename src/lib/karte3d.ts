@@ -11,11 +11,25 @@ import { mitte } from '@/lib/bund-parzelle';
  * Quellen, am 3. November nachgesehen:
  *   Gelände      3d.geo.admin.ch/ch.swisstopo.terrain.3d (quantized-mesh)
  *   Gebäude      3d.geo.admin.ch/ch.swisstopo.swissbuildings3d.3d (3D Tiles,
- *                je Gebäude EGID, GESAMTHOEHE, DACH_MIN/MAX, OBJEKTART)
+ *                je Gebäude EGID, GESAMTHOEHE, DACH_MIN/MAX, OBJEKTART --
+ *                nicht überall: am 4. November in Kloten an 0 von 1'386
+ *                Gebäudeteilen eine EGID, keine Höhe; in Albisrieden und
+ *                im Niederdorf an 98 bis 99 %. Siehe egidAmOrt.)
  *   Zonen        maps.zh.ch/wfs/OGDZHWFS, Grundnutzung aller Zürcher
  *                Gemeinden (typ_zh_code, vollgeschosse_max, gebaeudehoehe_max)
  *   Register     Tabelle `gebaeude` (Ablauf "Gebäude", aus dem BFS-Register)
+ *   Fotos        tile.googleapis.com, Photorealistic 3D Tiles (mit Schlüssel)
  */
+
+/**
+ * Fotorealistische Häuser (Fassaden, Dächer, Bäume aus Luftaufnahmen,
+ * Julian am 4. November: "es sollte genau so aussehen wie das Gebäude")
+ * kommen von Google, "Photorealistic 3D Tiles" der Map Tiles API. Der
+ * Schlüssel ist derselbe wie für Street View (Vercel,
+ * VITE_GOOGLE_MAPS_KEY); ohne ihn bleibt das Modell des Bundes.
+ */
+export const GOOGLE_KEY: string | undefined = import.meta.env.VITE_GOOGLE_MAPS_KEY || undefined;
+export const FOTO_MOEGLICH = !!GOOGLE_KEY;
 
 export const GELAENDE_URL = 'https://3d.geo.admin.ch/ch.swisstopo.terrain.3d/v1/';
 export const GEBAEUDE_URL = 'https://3d.geo.admin.ch/ch.swisstopo.swissbuildings3d.3d/v1/tileset.json';
@@ -133,6 +147,53 @@ export async function gebaeudeBeimBund(egid: number, signal?: AbortSignal): Prom
       heizung_seit: seit ? `${seit[3]}-${seit[2]}-${seit[1]}` : null,
     },
   };
+}
+
+/**
+ * Das Gebäude des Registers an einem Ort. Nicht jede Kachel des Bundes
+ * trägt eine EGID: gemessen am 4. November in Kloten 0 von 1'386
+ * Gebäudeteilen, in Albisrieden und im Niederdorf 98 bis 99 %. Ohne EGID
+ * fragt die Karte das Register beim Bund nach dem nächsten Gebäude um
+ * die Mitte des angeklickten Hauses (api3, identify; Felder am selben
+ * Tag an Klotener Häusern nachgesehen: egid, Lage als x/y in LV95).
+ */
+const GWR_IDENTIFY = 'https://api3.geo.admin.ch/rest/services/ech/MapServer/identify';
+export async function egidAmOrt(lat: number, lon: number, radiusM = 25, signal?: AbortSignal): Promise<number | null> {
+  const { e, n } = wgs84NachLv95(lat, lon);
+  const r = Math.min(Math.max(radiusM, 1), 50);
+  const p = new URLSearchParams({
+    geometryType: 'esriGeometryPoint', geometry: `${e.toFixed(1)},${n.toFixed(1)}`, layers: 'all:ch.bfs.gebaeude_wohnungs_register',
+    // Ausschnitt 100 m auf 100 Pixel: die Toleranz in Pixeln ist der Umkreis in Metern.
+    tolerance: String(Math.round(r)), mapExtent: [e - 50, n - 50, e + 50, n + 50].map(x => x.toFixed(1)).join(','),
+    imageDisplay: '100,100,96', sr: '2056', returnGeometry: 'true', lang: 'de',
+  });
+  const a = await fetch(`${GWR_IDENTIFY}?${p}`, { signal });
+  if (!a.ok) return null;
+  return naechsteEgid((await a.json())?.results, e, n);
+}
+
+/** Aus den Treffern des Registers das Gebäude, das dem Punkt (LV95) am nächsten liegt. */
+export function naechsteEgid(treffer: unknown, e: number, n: number): number | null {
+  if (!Array.isArray(treffer)) return null;
+  let beste: { egid: number; d: number } | null = null;
+  for (const t of treffer as { attributes?: Record<string, unknown>; geometry?: { x?: number; y?: number } }[]) {
+    const egid = Number(t?.attributes?.egid);
+    const x = Number(t?.geometry?.x ?? t?.attributes?.gkode), y = Number(t?.geometry?.y ?? t?.attributes?.gkodn);
+    if (!Number.isFinite(egid) || egid <= 0 || !Number.isFinite(x) || !Number.isFinite(y)) continue;
+    const d = Math.hypot(x - e, y - n);
+    if (!beste || d < beste.d) beste = { egid, d };
+  }
+  return beste?.egid ?? null;
+}
+
+/**
+ * Kennung eines Gebäudes in den Kacheln des Bundes, auch ohne EGID: die
+ * UUID. Ein Haus steht dort zweimal, einmal mit geschweiften Klammern,
+ * einmal ohne (in Kloten an allen 14 Teilen einer Kachel gesehen).
+ */
+export function hausKennung(uuid: unknown): string | null {
+  const s = String(uuid ?? '').replace(/[{}\s]/g, '').toUpperCase();
+  return s || null;
 }
 
 // ---------------------------------------------------------------- Suche
