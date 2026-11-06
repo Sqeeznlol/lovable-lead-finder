@@ -20,7 +20,7 @@ export interface Gesuch {
  */
 const AMTSBLATT_SEITE = (id: string) => `https://amtsblatt.zh.ch/#!/search/publications/detail/${id}`;
 
-export function belege(g: Gesuch): { titel: string; zeile: string; url: string }[] {
+export function belege(g: Pick<Gesuch, 'publikation_id' | 'publikation_nr' | 'quelle_url'>): { titel: string; zeile: string; url: string }[] {
   const b: { titel: string; zeile: string; url: string }[] = [];
   if (g.publikation_id) {
     b.push({ titel: 'Publikation im Amtsblatt', zeile: g.publikation_nr ?? 'Amtsblatt des Kantons Zürich', url: AMTSBLATT_SEITE(g.publikation_id) });

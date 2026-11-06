@@ -1,7 +1,7 @@
 import { PortfolioBericht } from '@/components/PortfolioBericht';
 import { lazy, Suspense, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarDays, Check, HardHat, MessageSquare, Search, Sparkles, Trash2 } from 'lucide-react';
+import { CalendarDays, Check, ChevronDown, ExternalLink, HardHat, MessageSquare, Search, Sparkles, Trash2 } from 'lucide-react';
 import { Abschnitt, FELD, KNOPF, KNOPF_HAUPT, KNOPF_LEISE, Leer, LISTE, Marke, Reiter, Seite, Strichbalken } from '@/components/rahmen';
 import { Auswahl } from '@/components/Auswahl';
 import { ImmoKalender, kalenderZahlen } from '@/components/ImmoKalender';
@@ -13,6 +13,8 @@ import { BILD } from '@/lib/luftbild';
 import { zeitraum } from '@/lib/immo-kalender';
 import { lv95NachWgs84 } from '@/lib/koordinaten';
 import { FOTO_MOEGLICH } from '@/lib/karte3d';
+import { belege } from '@/lib/baugesuch-belege';
+import { FENSTER } from '@/lib/fenster';
 import { fondsFarbe, POTENZIAL, type PotenzialArt, type Universum as UniversumDaten } from '@/lib/fonds';
 import {
   baugesucheLaden, faellig, lagenLesen, liegenschaftSpalten, notizenLaden, notizErledigt, notizLiegenschaft, notizSpeichern,
@@ -194,6 +196,8 @@ export function FondsBaugesuche({ data, als, gehe }: BereichProps) {
   const [tageWert, setTage] = useUrlWert('tage', '30');
   const tage = Number(tageWert) || 30;
   const [lage, setLage] = useUrlWert('lage', 'alle');
+  // Ein Gesuch aufklappen: in der Adresse, damit ein geteilter Link es offen zeigt.
+  const [offen, setOffen] = useUrlWert('gesuch');
   const { data: gesuche, isLoading, error } = useQuery({ queryKey: ['fonds-baugesuche', als, tage], queryFn: () => baugesucheLaden(als, tage) });
   const { data: woche } = useQuery({ queryKey: ['fonds-baugesuche', als, 7], queryFn: () => baugesucheLaden(als, 7) });
   const nr = useMemo(() => new Map(data.fonds.map(f => [f.id, f.nr])), [data]);
@@ -221,21 +225,61 @@ export function FondsBaugesuche({ data, als, gehe }: BereichProps) {
         : error ? <p className="text-sm text-destructive">Baugesuche nicht lesbar.</p>
         : liste.length === 0 ? <Leer titel="Keine Baugesuche in diesem Zeitraum.">Einen längeren Zeitraum wählen.</Leer> : (
         <ul className={LISTE}>
-          {liste.map(g => (
-            <li key={`${g.id}-${g.liegenschaft}`} className="space-y-1.5 px-5 py-4">
-              <span className="flex flex-wrap items-center gap-2">
-                <Marke art={g.lage === 'auf' ? 'lila' : 'heiss'}>{g.lage === 'auf' ? 'Auf Ihrer Liegenschaft' : 'Nebenan'}</Marke>
-                <span className="text-sm text-accent">{vorTagen(g.publiziert_am)}</span>
-                <span className="text-sm text-muted-foreground">{g.zustand}</span>
-              </span>
-              <p className="font-semibold">{g.beschreibung ?? 'Baugesuch'}</p>
-              <p className="text-sm text-muted-foreground">{[g.adresse, g.gemeinde, g.kosten_chf ? `${chf(g.kosten_chf)} CHF` : null].filter(Boolean).join(' · ')}</p>
+          {liste.map(g => {
+            const schluessel = `${g.id}-${g.liegenschaft}`;
+            const auf = offen === schluessel;
+            const links = belege(g);
+            return (
+            <li key={schluessel} className="space-y-1.5 px-5 py-4">
+              <button type="button" aria-expanded={auf} onClick={() => setOffen(auf ? null : schluessel)}
+                      className="flex w-full items-start gap-3 text-left">
+                <span className="min-w-0 flex-1 space-y-1.5">
+                  <span className="flex flex-wrap items-center gap-2">
+                    <Marke art={g.lage === 'auf' ? 'lila' : 'heiss'}>{g.lage === 'auf' ? 'Auf Ihrer Liegenschaft' : 'Nebenan'}</Marke>
+                    <span className="text-sm text-accent">{vorTagen(g.publiziert_am)}</span>
+                    <span className="text-sm text-muted-foreground">{g.zustand}</span>
+                  </span>
+                  <span className="block font-semibold">{g.beschreibung ?? 'Baugesuch'}</span>
+                  <span className="block text-sm text-muted-foreground">{[g.adresse, g.gemeinde, g.kosten_chf ? `${chf(g.kosten_chf)} CHF` : null].filter(Boolean).join(' · ')}</span>
+                </span>
+                <ChevronDown className={`mt-1 h-5 w-5 shrink-0 text-muted-foreground transition-transform ${auf ? 'rotate-180' : ''}`} />
+              </button>
+              {auf && (
+                <div className="space-y-3 border-t pt-3">
+                  <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-4">
+                    {([['Publiziert', datum(g.publiziert_am)], ['Einsprache bis', datum(g.einsprache_bis ?? null)],
+                       ['Publikation', g.publikation_nr ?? '–'], ['Parzelle', g.parzelle_nr ?? '–']] as [string, string][])
+                      .map(([t, v]) => <div key={t} className="min-w-0"><dt className="text-[11px] uppercase tracking-wide text-muted-foreground">{t}</dt><dd className="break-words font-medium">{v}</dd></div>)}
+                  </dl>
+                  {links.length || g.egrid ? (
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {links.map(b => (
+                        <a key={b.url} href={b.url} target={FENSTER.karte} rel="noopener"
+                           className="flex min-h-11 items-center gap-3 rounded-[3px] border px-4 py-2 hover:bg-secondary">
+                          <span className="min-w-0 flex-1"><span className="block text-sm font-medium">{b.titel}</span>
+                            <span className="block truncate text-xs text-muted-foreground">{b.zeile}</span></span>
+                          <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        </a>
+                      ))}
+                      {g.egrid && (
+                        <a href={`https://map.geo.admin.ch/?swisssearch=${g.egrid}&lang=de`} target={FENSTER.karte} rel="noopener"
+                           className="flex min-h-11 items-center gap-3 rounded-[3px] border px-4 py-2 hover:bg-secondary">
+                          <span className="min-w-0 flex-1"><span className="block text-sm font-medium">Parzelle auf der Karte des Bundes</span>
+                            <span className="block truncate text-xs text-muted-foreground">map.geo.admin.ch</span></span>
+                          <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        </a>
+                      )}
+                    </div>
+                  ) : <p className="text-sm text-muted-foreground">Zu diesem Gesuch ist keine Publikation hinterlegt.</p>}
+                </div>
+              )}
               <button type="button" className="inline-flex min-h-11 items-center gap-2 text-sm hover:underline" onClick={() => gehe('karte', { liegenschaft: g.liegenschaft })}>
                 <span className="h-2 w-2 rounded-full" style={{ background: fondsFarbe(nr.get(g.fonds) ?? 1) }} />
                 Ihre Liegenschaft: {g.liegenschaft_adresse ?? '–'} · Fonds {nr.get(g.fonds)}
               </button>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </Seite>

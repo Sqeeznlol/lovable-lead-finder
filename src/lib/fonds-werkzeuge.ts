@@ -25,6 +25,9 @@ export interface FondsGesuch {
   id: string; publiziert_am: string; gemeinde: string | null; adresse: string | null; beschreibung: string | null;
   zustand: string; kosten_chf: number | null; liegenschaft: string; liegenschaft_adresse: string | null; fonds: string;
   lage: 'auf' | 'nebenan';
+  // Zum Nachprüfen (20261106120000_fonds_baugesuche_belege.sql); fehlen, bis sie eingespielt ist.
+  parzelle_nr?: string | null; egrid?: string | null; quelle?: string; publikation_nr?: string | null;
+  publikation_id?: string | null; einsprache_bis?: string | null; publiziert_bis?: string | null; quelle_url?: string | null;
 }
 export async function baugesucheLaden(als: string | null, tage: number): Promise<FondsGesuch[]> {
   return (pruefen(await db().rpc('fonds_baugesuche', { p_team: als, p_tage: tage })) ?? []) as FondsGesuch[];
