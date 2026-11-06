@@ -199,7 +199,6 @@ export function FondsBaugesuche({ data, als, gehe }: BereichProps) {
   // Ein Gesuch aufklappen: in der Adresse, damit ein geteilter Link es offen zeigt.
   const [offen, setOffen] = useUrlWert('gesuch');
   const { data: gesuche, isLoading, error } = useQuery({ queryKey: ['fonds-baugesuche', als, tage], queryFn: () => baugesucheLaden(als, tage) });
-  const { data: woche } = useQuery({ queryKey: ['fonds-baugesuche', als, 7], queryFn: () => baugesucheLaden(als, 7) });
   const nr = useMemo(() => new Map(data.fonds.map(f => [f.id, f.nr])), [data]);
   const liste = (gesuche ?? []).filter(g => lage === 'alle' || g.lage === lage);
   const auf = (gesuche ?? []).filter(g => g.lage === 'auf').length;
@@ -207,7 +206,12 @@ export function FondsBaugesuche({ data, als, gehe }: BereichProps) {
   const betroffen = new Set((gesuche ?? []).map(g => g.liegenschaft)).size;
   return (
     <Seite bild={BILD.fondsBaugesuche} ueber={`Baugesuche · bei Ihren Liegenschaften`}
-      titel={woche ? `${n(new Set(woche.map(g => g.id)).size)} Baugesuche in 7 Tagen an oder neben Ihren Liegenschaften` : ' '}
+      // Der Titel zählt denselben Zeitraum wie die Auswahl darunter -- vorher
+      // stand dort immer "in 7 Tagen", auch bei "Letztes Jahr" (Julian, 6. November).
+      titel={gesuche ? (() => {
+        const z = new Set(gesuche.map(g => g.id)).size;
+        return `${n(z)} ${z === 1 ? 'Baugesuch' : 'Baugesuche'} ${tage >= 365 ? 'im letzten Jahr' : `in den letzten ${tage} Tagen`} an oder neben Ihren Liegenschaften`;
+      })() : ' '}
       unter="Baut der Nachbar, ändert sich der Wert -- und oft entsteht ein Anlass für ein Gespräch. Aus dem Amtsblatt, beim Bund verortet."
       kennzahlen={gesuche ? [
         { titel: 'Gesuche', wert: n(new Set(gesuche.map(g => g.id)).size), marke: <Marke art="minze">{tage} Tage</Marke>, onClick: () => setLage('alle') },
