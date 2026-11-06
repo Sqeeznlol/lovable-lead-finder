@@ -10,11 +10,17 @@ import { AuthProvider } from "@/hooks/use-auth";
 import { Torwaechter } from "@/components/Torwaechter";
 import { useEigentuemerLookupListener } from "@/hooks/use-eigentuemer-lookup";
 import { AuskunftAusLesezeichen } from "@/components/AuskunftAusLesezeichen";
+import { markeFuerHost } from "@/lib/check-marken";
 const Index = lazy(() => import("./pages/Index.tsx"));
 const SwipePage = lazy(() => import("./pages/SwipePage.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 const Anfrage = lazy(() => import("./pages/Anfrage.tsx"));
 const FondsSeite = lazy(() => import("./pages/Fonds.tsx"));
+const Check = lazy(() => import("./pages/Check.tsx"));
+
+// Auf einer Marken-Domain (parzellenchecker.ch, hauschecker.ch ...) ist
+// die ganze Seite der Check -- ohne Anmeldung, ohne Bauraum dahinter.
+const CHECK_MARKE = typeof window !== "undefined" ? markeFuerHost(window.location.hostname) : null;
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -46,7 +52,13 @@ const App = () => (
             die drei Anfrage-Seiten, die nichts lesen können. */}
         <BrowserRouter>
           <Suspense fallback={<div className="min-h-screen bg-background" />}>
+            {CHECK_MARKE ? (
+              <Routes><Route path="*" element={<Check marke={CHECK_MARKE} />} /></Routes>
+            ) : (
             <Routes>
+              {/* Die Check-Seiten zur Vorschau auf unserer Domain: /check, /check/hauschecker ... */}
+              <Route path="/check" element={<Check />} />
+              <Route path="/check/:marke" element={<Check />} />
               {/* Die drei öffentlichen Seiten -- die einzigen Ausnahmen.
                   Sie können nur eine Anfrage einfügen, nichts lesen
                   (20261101240000_anfrage.sql). Alles andere bleibt
@@ -75,6 +87,7 @@ const App = () => (
                 </Torwaechter>
               } />
             </Routes>
+            )}
           </Suspense>
         </BrowserRouter>
       </TooltipProvider>

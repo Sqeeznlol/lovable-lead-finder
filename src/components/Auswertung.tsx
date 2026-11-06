@@ -9,6 +9,7 @@ import { KATEGORIEN, kategorie, type Absicht, type Kategorie } from '@/lib/gespr
 import { Investoren } from '@/components/Investoren';
 import { KennzahlenTim } from '@/components/KennzahlenTim';
 import { useUrlWert } from '@/hooks/use-url-wert';
+import { ANTWORT_TEXT } from '@/lib/check-daten';
 
 /**
  * Auswertung: was aus den Gesprächen folgt, wer kaufen will, und ob
@@ -165,6 +166,24 @@ interface AnfrageZeile {
 }
 const ART_TITEL: Record<AnfrageZeile['art'], string> = { bewertung: 'Bewertung', potenzial: 'Potenzialcheck', investor: 'Investor' };
 
+/** Leads der Check-Seiten (parzellenchecker.ch ...): Marke, Antworten in Worten, Herkunft der Anzeige. */
+function checkZeile(g: Record<string, unknown>): { titel: string; heiss: boolean; antworten: string; grundstueck: string; herkunft: string } | null {
+  if (g.quelle !== 'check') return null;
+  const t = (feld: keyof typeof ANTWORT_TEXT) => {
+    const w = g[feld];
+    return typeof w === 'string' ? (ANTWORT_TEXT[feld] as Record<string, string>)[w] ?? w : null;
+  };
+  return {
+    titel: `Check · ${String(g.domain ?? g.marke ?? '')}`,
+    heiss: g.prioritaet === 'heiss',
+    antworten: [t('eigentuemer') && `Eigentum: ${t('eigentuemer')}`, t('absicht'), t('zeitraum')].filter(Boolean).join(' · '),
+    grundstueck: [g.parzelle && `Parzelle ${g.parzelle}`, g.flaeche && `${Number(g.flaeche).toLocaleString('de-CH')} m²`, g.zone, g.gemeinde,
+      g.gebaeude ? `${g.gebaeude} Gebäude` : null, g.wohnungen ? `${g.wohnungen} Wohnungen` : null, g.baujahr ? `ab ${g.baujahr}` : null,
+      g.projekt ? 'Projekt im Register' : null].filter(Boolean).join(' · '),
+    herkunft: [g.utm_source, g.utm_campaign, g.gclid ? 'Google-Klick' : null, g.fbclid ? 'Meta-Klick' : null].filter(Boolean).join(' · '),
+  };
+}
+
 /** "2 Mio.", "850'000" -> Zahl; die öffentliche Seite nimmt Freitext. */
 const zahl = (v: unknown) => {
   const t = String(v ?? '').toLowerCase().replace(/chf|['’\s]/g, '');
@@ -210,21 +229,33 @@ function Anfragen() {
           <input type="checkbox" checked={alle} onChange={e => setAlle(e.target.checked)} /> auch erledigte
         </label>
       </div>
-      <p className="text-sm text-muted-foreground">Von den öffentlichen Seiten /bewertung, /potenzial und /investor.</p>
+      <p className="text-sm text-muted-foreground">Von den Check-Seiten (parzellenchecker.ch und weitere) und von /bewertung, /potenzial, /investor.</p>
       {isLoading && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> wird geladen …</p>}
       {error && <p className="text-sm text-destructive">Anfragen nicht lesbar.</p>}
       {data && data.length === 0 && <p className="text-sm text-muted-foreground">Keine offene Anfrage.</p>}
       <ul className="space-y-2">
-        {data?.map(a => (
+        {data?.map(a => {
+          const c = checkZeile(a.angaben ?? {});
+          return (
           <li key={a.id} className="rounded-xl border p-4 text-sm">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <span className="font-medium">{ART_TITEL[a.art]} · {a.name}</span>
+              <span className="flex flex-wrap items-center gap-2 font-medium">
+                {c?.heiss && <Marke art="heiss">heiss</Marke>}{c ? c.titel : ART_TITEL[a.art]} · {a.name}
+              </span>
               <span className="text-xs text-muted-foreground">{datum(a.erstellt_am)}{a.bearbeitet ? ' · erledigt' : ''}</span>
             </div>
-            <p className="text-muted-foreground">{[a.adresse, a.email, a.telefon].filter(Boolean).join(' · ')}</p>
+            <p className="text-muted-foreground">{[a.adresse, a.telefon, a.email].filter(Boolean).join(' · ')}</p>
+            {c ? (
+              <>
+                {c.antworten && <p className="font-medium">{c.antworten}</p>}
+                {c.grundstueck && <p className="text-xs text-muted-foreground">{c.grundstueck}</p>}
+                {c.herkunft && <p className="text-xs text-muted-foreground">Herkunft: {c.herkunft}</p>}
+              </>
+            ) : (
             <p className="text-xs text-muted-foreground">
               {Object.entries(a.angaben ?? {}).filter(([k, v]) => v != null && k !== 'lv95').map(([k, v]) => `${k}: ${v}`).join(' · ')}
             </p>
+            )}
             {a.nachricht && <p className="mt-1">{a.nachricht}</p>}
             {!a.bearbeitet && (
               <div className="mt-2 flex flex-wrap gap-2">
@@ -235,7 +266,8 @@ function Anfragen() {
               </div>
             )}
           </li>
-        ))}
+          );
+        })}
       </ul>
     </section>
   );
