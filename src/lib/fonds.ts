@@ -46,6 +46,15 @@ export const fondsFarbe = (nr: number) => FONDSFARBEN[(nr - 1) % FONDSFARBEN.len
  * Bestand (ausserhalb Zürich und Thurgau) kommen als "pos:<id>" aus
  * fonds_universum und haben weder Zone noch Reserve.
  */
+/**
+ * Marge und Suchprofile sind für Fondsleitungen ausgeblendet (Julian,
+ * 6. November: "das hat nichts mehr damit zu tun ... erstmal
+ * ausblenden"). Die Rechnung und die Tabellen bleiben im Hintergrund;
+ * auf true gesetzt, ist alles wieder da.
+ */
+export const FONDS_MARGE = false;
+export const FONDS_SUCHPROFILE = false;
+
 export const imBestand = (p: { id: string }) => !p.id.startsWith('pos:');
 
 export const POTENZIAL: Record<PotenzialArt, { titel: string; kurz: string }> = {
@@ -136,13 +145,13 @@ export function potenzialeAlsCsv(liste: Potenzial[], punkt: Map<string, Punkt>, 
     const t = v == null ? '' : String(v);
     return /[";\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
   };
-  const kopf = ['Art', 'Titel', 'Fonds', 'Adresse', 'Gemeinde', 'EGRID', 'Fläche m²', 'Reserve m²', 'Marge CHF', 'Zone'];
+  const kopf = ['Art', 'Titel', 'Fonds', 'Adresse', 'Gemeinde', 'EGRID', 'Fläche m²', 'Reserve m²', ...(FONDS_MARGE ? ['Marge CHF'] : []), 'Zone'];
   const zeilen = liste.map(p => {
     const a = punkt.get(p.parzelle), b = p.parzelle2 ? punkt.get(p.parzelle2) : undefined;
     const fonds = [a, b].filter(Boolean).map(x => `Fonds ${nr.get(x!.fonds) ?? ''}`).join(' + ');
     return [POTENZIAL[p.art].kurz, p.titel, fonds, a?.adresse ?? p.wo, a?.gemeinde ?? '', a?.egrid ?? '',
       p.flaeche != null ? Math.round(p.flaeche) : '', p.reserve != null ? Math.round(p.reserve) : '',
-      p.marge != null ? Math.round(p.marge) : '', a?.zone ?? ''].map(zelle).join(';');
+      ...(FONDS_MARGE ? [p.marge != null ? Math.round(p.marge) : ''] : []), a?.zone ?? ''].map(zelle).join(';');
   });
   // Mit BOM, sonst zeigt Excel die Umlaute falsch.
   const blob = new Blob(['\ufeff' + [kopf.join(';'), ...zeilen].join('\r\n')], { type: 'text/csv;charset=utf-8' });

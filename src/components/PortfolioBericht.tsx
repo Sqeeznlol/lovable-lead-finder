@@ -54,7 +54,8 @@ export function usePortfolioBericht(mandantId: string | null) {
   });
 }
 
-export function PortfolioBericht({ mandantId, onZurueck }: { mandantId: string; onZurueck: () => void }) {
+// ohneMarge: für Fondsleitungen, die keine Marge sehen (FONDS_MARGE in fonds.ts).
+export function PortfolioBericht({ mandantId, onZurueck, ohneMarge = false }: { mandantId: string; onZurueck: () => void; ohneMarge?: boolean }) {
   const { data, error, isLoading } = usePortfolioBericht(mandantId);
   const heute = new Date().toLocaleDateString('de-CH', { day: 'numeric', month: 'long', year: 'numeric' });
   if (isLoading) return <Leer titel="Der Bericht wird gerechnet …" />;
@@ -71,7 +72,7 @@ export function PortfolioBericht({ mandantId, onZurueck }: { mandantId: string; 
   const zahlen: [string, string, string?][] = [
     ['Parzellen', n(b.parzellen), b.offen ? `${n(b.offen)} nicht zugeordnet` : undefined],
     ['Reserve', m2(b.reserve_hnf), b.mit_reserve ? `${n(b.mit_reserve)} ab 200 m²` : undefined],
-    ['Marge gerechnet', chf(b.marge_chf)],
+    ...(ohneMarge ? [] : [['Marge gerechnet', chf(b.marge_chf)] as [string, string]]),
     ['Gelegenheiten offen', n(offen), erreicht ? `${n(erreicht)} erreicht` : undefined],
   ];
   const th = 'py-1.5 pr-3 font-normal';
@@ -154,13 +155,13 @@ export function PortfolioBericht({ mandantId, onZurueck }: { mandantId: string; 
             {!b.top_reserve.length ? <p className="text-[10px] text-[#9A9FA8]">Keine gerechnete Reserve.</p> : (
               <div className="overflow-x-auto print:overflow-visible"><table className="w-full border-collapse text-[9.5px] leading-snug">
                 <thead><tr className="border-b border-[#111] text-left text-[8.5px] text-[#646B78]">
-                  <th className={th}>Adresse</th><th className={th}>Zone</th><th className={`${th} text-right`}>Fläche</th><th className={`${th} text-right`}>Reserve HNF</th><th className={`${th} text-right`}>Marge</th><th className={`${th} text-right`}>Baujahr</th></tr></thead>
+                  <th className={th}>Adresse</th><th className={th}>Zone</th><th className={`${th} text-right`}>Fläche</th><th className={`${th} text-right`}>Reserve HNF</th>{!ohneMarge && <th className={`${th} text-right`}>Marge</th>}<th className={`${th} text-right`}>Baujahr</th></tr></thead>
                 <tbody>
                   {b.top_reserve.map((t, i) => (
                     <tr key={i} className="break-inside-avoid border-b border-[#ECECEE]">
                       <td className={td}><span className="font-medium">{t.address ?? '–'}</span>{t.gemeinde ? <span className="text-[#646B78]">, {t.gemeinde}</span> : ''}{t.fossil && <span className="ml-1 text-[8px] text-[#8A6512]">Öl/Gas</span>}</td>
                       <td className={td}>{t.zone ?? '–'}</td><td className={`${td} text-right tabular-nums`}>{m2(t.area)}</td>
-                      <td className={`${td} text-right tabular-nums`}>{m2(t.hnf_delta)}</td><td className={`${td} text-right tabular-nums`}>{chf(t.marge_chf)}</td>
+                      <td className={`${td} text-right tabular-nums`}>{m2(t.hnf_delta)}</td>{!ohneMarge && <td className={`${td} text-right tabular-nums`}>{chf(t.marge_chf)}</td>}
                       <td className={`${td} text-right tabular-nums`}>{t.baujahr ?? '–'}</td>
                     </tr>
                   ))}
@@ -233,7 +234,7 @@ export function PortfolioBericht({ mandantId, onZurueck }: { mandantId: string; 
         <p className="mt-4 text-[8px] leading-relaxed text-[#9A9FA8]">
           Grundlagen: Parzellen und Nachbarn vom Bund (geo.admin.ch), Gebäude aus dem Gebäude- und Wohnungsregister (Stand {datum(b.stand.gebaeude)}),
           Baugesuche aus dem offenen Datensatz des Kantons Zürich (neuestes vom {datum(b.stand.baugesuch)}, nur eingereichte Gesuche).
-          Reserve und Marge sind gerechnete Richtwerte aus Zone und Bestand (Stand {datum(b.stand.potenzial)}), keine Bewertung. Zonenplanänderungen sind an keine Quelle angebunden.
+          {ohneMarge ? 'Die Reserve ist ein gerechneter Richtwert' : 'Reserve und Marge sind gerechnete Richtwerte'} aus Zone und Bestand (Stand {datum(b.stand.potenzial)}), keine Bewertung. Zonenplanänderungen sind an keine Quelle angebunden.
           Eigentümer Dritter werden erst mit Ihrer Zustimmung und in Ihrem Namen angefragt; ihre Namen stehen in diesem Bericht nicht.
         </p>
       </div>

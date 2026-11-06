@@ -13,7 +13,7 @@ import { ImmoKalender } from '@/components/ImmoKalender';
 import { FondsBaugesuche, FondsBericht, FondsGespraeche, FondsKalender, FondsKarte, FondsPotenziale, FondsSuchprofile, type BereichProps } from '@/components/fonds/FondsBereiche';
 import { baugesucheLaden, faellig, fondsTeam, notizenLaden } from '@/lib/fonds-werkzeuge';
 import type { ComponentType } from 'react';
-import { fondsFarbe, imBestand, POTENZIAL, potenzialeAlsCsv, universumLaden, verorten, type PotenzialArt } from '@/lib/fonds';
+import { FONDS_MARGE, FONDS_SUCHPROFILE, fondsFarbe, imBestand, POTENZIAL, potenzialeAlsCsv, universumLaden, verorten, type PotenzialArt } from '@/lib/fonds';
 import { FENSTER } from '@/lib/fenster';
 
 const n = (x: number | null | undefined) => (x == null ? '–' : Math.round(x).toLocaleString('de-CH'));
@@ -37,7 +37,7 @@ const BEREICHE: { id: string; titel: string; symbol: ComponentType<{ className?:
   { id: 'potenziale', titel: 'Potenziale', symbol: Sparkles, unten: true, inhalt: FondsPotenziale },
   { id: 'baugesuche', titel: 'Baugesuche', symbol: HardHat, unten: true, inhalt: FondsBaugesuche },
   { id: 'gespraeche', titel: 'Gespräche', symbol: MessageSquare, inhalt: FondsGespraeche },
-  { id: 'suchprofile', titel: 'Suchprofile', symbol: Search, inhalt: FondsSuchprofile },
+  ...(FONDS_SUCHPROFILE ? [{ id: 'suchprofile', titel: 'Suchprofile', symbol: Search, inhalt: FondsSuchprofile }] : []),
   { id: 'kalender', titel: 'Immo-Kalender', symbol: CalendarDays, inhalt: FondsKalender },
   // Der Bericht des Kunden, online und als PDF (Punkt 12 der Nacht vom 3. November).
   { id: 'bericht', titel: 'Bericht', symbol: FileText, inhalt: FondsBericht },
@@ -148,7 +148,7 @@ export function FondsOberflaeche() {
           return <B data={data} als={als} team={team ?? null} gehe={gehe} />;
         })() : (<>
         <div className={`space-y-2 ${AUF}`}>
-          <p className="text-sm text-muted-foreground">Ihr Portfolio · {data.fonds.length} Fonds · Reserve {flaeche(reserve)} · pendente Marge {chf(marge)}</p>
+          <p className="text-sm text-muted-foreground">Ihr Portfolio · {data.fonds.length} Fonds · Reserve {flaeche(reserve)}{FONDS_MARGE ? ` · pendente Marge ${chf(marge)}` : ''}</p>
           <h1 className="max-w-3xl text-[34px] leading-[1.08] sm:text-[48px]">
             {n(data.punkte.length)} Liegenschaften{anFremd ? `, ${n(anFremd)} grenzen an einen anderen Ihrer Fonds` : ''}
           </h1>
@@ -206,7 +206,7 @@ export function FondsOberflaeche() {
                               {[p.wo, p.flaeche ? `${n(p.flaeche)} m²` : null, p.reserve && p.reserve > 0 ? `Reserve ${n(p.reserve)} m²` : null].filter(Boolean).join(' · ')}
                             </span>
                           </span>
-                          <span className="shrink-0 font-semibold text-violett">{p.marge ? chf(p.marge) : ''}</span>
+                          {FONDS_MARGE && <span className="shrink-0 font-semibold text-violett">{p.marge ? chf(p.marge) : ''}</span>}
                         </button>
                       </li>
                     );
@@ -219,7 +219,7 @@ export function FondsOberflaeche() {
               )}
             </Abschnitt>
 
-            <Abschnitt titel="Fonds" zahl={data.fonds.length} symbol={Building2} kachel="akzent" unter="Liegenschaften, Reserve und Marge je Fonds">
+            <Abschnitt titel="Fonds" zahl={data.fonds.length} symbol={Building2} kachel="akzent" unter={FONDS_MARGE ? 'Liegenschaften, Reserve und Marge je Fonds' : 'Liegenschaften und Reserve je Fonds'}>
               <ul className={LISTE}>
                 {data.fonds.map(f => (
                   <li key={f.id}>
@@ -231,7 +231,7 @@ export function FondsOberflaeche() {
                       <span className="hidden truncate text-sm text-muted-foreground sm:inline">{f.name.replace(/^Immofonds \d+ · /, '')}</span>
                     </span>
                     <span className="order-3 col-span-2 sm:order-none sm:col-span-1"><Strichbalken anteil={f.liegenschaften / maxLieg} farbe="akzent" /></span>
-                    <span className="text-right text-sm"><span className="font-semibold">{n(f.liegenschaften)}</span> <span className="text-muted-foreground">· {chf(f.marge)}</span></span>
+                    <span className="text-right text-sm"><span className="font-semibold">{n(f.liegenschaften)}</span> <span className="text-muted-foreground">· {FONDS_MARGE ? chf(f.marge) : `Reserve ${flaeche(f.reserve)}`}</span></span>
                   </button>
                   </li>
                 ))}
@@ -268,7 +268,7 @@ export function FondsOberflaeche() {
                 <p className="text-sm text-muted-foreground">{wahl.gemeinde}{!imBestand(wahl) && ' · Lage vom Bund, Zone und Reserve folgen mit dem Bestand'}</p>
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                   {([['Fläche', wahl.flaeche ? `${n(wahl.flaeche)} m²` : '–'], ['Zone', wahl.zone ?? (imBestand(wahl) ? 'fehlt' : '–')],
-                     ['Reserve', wahl.reserve && wahl.reserve > 0 ? `${n(wahl.reserve)} m²` : '–'], ['Marge', chf(wahl.marge)]] as [string, string][])
+                     ['Reserve', wahl.reserve && wahl.reserve > 0 ? `${n(wahl.reserve)} m²` : '–'], ...(FONDS_MARGE ? [['Marge', chf(wahl.marge)]] : [])] as [string, string][])
                     .map(([t, v]) => <div key={t} className="min-w-0"><dt className="text-[11px] uppercase tracking-wide text-muted-foreground">{t}</dt><dd className="break-words font-medium">{v}</dd></div>)}
                 </dl>
                 {(() => {

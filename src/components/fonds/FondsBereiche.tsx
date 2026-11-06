@@ -15,7 +15,7 @@ import { lv95NachWgs84 } from '@/lib/koordinaten';
 import { FOTO_MOEGLICH } from '@/lib/karte3d';
 import { belege } from '@/lib/baugesuch-belege';
 import { FENSTER } from '@/lib/fenster';
-import { fondsFarbe, POTENZIAL, type PotenzialArt, type Universum as UniversumDaten } from '@/lib/fonds';
+import { FONDS_MARGE, fondsFarbe, POTENZIAL, type PotenzialArt, type Universum as UniversumDaten } from '@/lib/fonds';
 import {
   baugesucheLaden, faellig, lagenLesen, liegenschaftSpalten, notizenLaden, notizErledigt, notizLiegenschaft, notizSpeichern,
   potenzialSchluessel, STAENDE, staendeLaden, standSetzen, suchprofileLaden, suchprofilLoeschen, suchprofilSpeichern, suchtrefferLaden,
@@ -122,7 +122,7 @@ export function FondsKarte({ data }: BereichProps) {
               <span className="block text-lg font-semibold">{w.adresse}</span>
               <span className="block text-sm text-muted-foreground">{[w.gemeinde, w.zone, w.flaeche ? `${n(w.flaeche)} m²` : null].filter(Boolean).join(' · ')}</span>
             </span>
-            <span className="text-right"><span className="block text-xs text-muted-foreground">Marge</span><span className="text-lg font-semibold text-violett">{chf(w.marge)}</span></span>
+            {FONDS_MARGE && <span className="text-right"><span className="block text-xs text-muted-foreground">Marge</span><span className="text-lg font-semibold text-violett">{chf(w.marge)}</span></span>}
           </div>
         );
       })()}
@@ -171,7 +171,7 @@ export function FondsPotenziale({ data, team, gehe }: BereichProps) {
                   <span className="flex flex-wrap items-center gap-2">
                     <Marke art={p.art === 'arrondierung' ? 'heiss' : p.art === 'nachbar_baut' ? 'lila' : p.art === 'reserve' ? 'violett' : 'grau'}>{POTENZIAL[p.art].kurz}</Marke>
                     {a && <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><span className="h-2 w-2 rounded-full" style={{ background: fondsFarbe(nr.get(a.fonds) ?? 1) }} />Fonds {nr.get(a.fonds)}</span>}
-                    {p.marge ? <span className="text-sm font-semibold text-violett">{chf(p.marge)}</span> : null}
+                    {FONDS_MARGE && p.marge ? <span className="text-sm font-semibold text-violett">{chf(p.marge)}</span> : null}
                   </span>
                   <span className="block font-semibold">{p.titel}</span>
                   <span className="block text-sm text-muted-foreground">{p.wo}</span>
@@ -497,5 +497,5 @@ export const BEREICH_SYMBOL = { potenziale: Sparkles, baugesuche: HardHat, gespr
  */
 export function FondsBericht({ data, gehe }: BereichProps) {
   if (!data.mandant) return <Leer titel="Keine Fondsleitung zugeordnet." />;
-  return <PortfolioBericht mandantId={data.mandant} onZurueck={() => gehe('uebersicht')} />;
+  return <PortfolioBericht mandantId={data.mandant} onZurueck={() => gehe('uebersicht')} ohneMarge={!FONDS_MARGE} />;
 }
