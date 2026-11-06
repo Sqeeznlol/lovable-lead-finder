@@ -15,8 +15,8 @@ import { lv95NachWgs84 } from '@/lib/koordinaten';
 import { FOTO_MOEGLICH } from '@/lib/karte3d';
 import { fondsFarbe, POTENZIAL, type PotenzialArt, type Universum as UniversumDaten } from '@/lib/fonds';
 import {
-  baugesucheLaden, faellig, lagenLesen, notizErledigt, notizenLaden, notizSpeichern, potenzialSchluessel,
-  staendeLaden, standSetzen, STAENDE, suchprofileLaden, suchprofilLoeschen, suchprofilSpeichern, suchtrefferLaden,
+  baugesucheLaden, faellig, lagenLesen, liegenschaftSpalten, notizenLaden, notizErledigt, notizLiegenschaft, notizSpeichern,
+  potenzialSchluessel, STAENDE, staendeLaden, standSetzen, suchprofileLaden, suchprofilLoeschen, suchprofilSpeichern, suchtrefferLaden,
   type Stand,
 } from '@/lib/fonds-werkzeuge';
 
@@ -260,7 +260,7 @@ export function FondsGespraeche({ data, team }: BereichProps) {
     if (!team || !f.text.trim()) return;
     setLaeuft(true);
     try {
-      await notizSpeichern({ team_id: team, parzelle_id: f.parzelle || null, mit: f.mit.trim() || null, text: f.text.trim(), am: f.am,
+      await notizSpeichern({ team_id: team, ...liegenschaftSpalten(f.parzelle), mit: f.mit.trim() || null, text: f.text.trim(), am: f.am,
         wiedervorlage: f.wiedervorlage || null, von: user?.email ?? null });
       setF({ ...leer, parzelle: '' }); setNeu(null);
       await qc.invalidateQueries({ queryKey: ['fonds-notizen', team] });
@@ -281,7 +281,7 @@ export function FondsGespraeche({ data, team }: BereichProps) {
         { titel: 'Gespräche', wert: n(notizen?.length ?? 0), onClick: () => setSicht('alle') },
         { titel: 'Fällig', wert: n(fl.length), marke: fl.length ? <Marke art="rosa">heute</Marke> : undefined, onClick: () => setSicht('faellig') },
         { titel: 'Mit Wiedervorlage', wert: n((notizen ?? []).filter(x => !x.erledigt && x.wiedervorlage).length), onClick: () => setSicht('offen') },
-        { titel: 'Liegenschaften', wert: n(new Set((notizen ?? []).map(x => x.parzelle_id).filter(Boolean)).size) },
+        { titel: 'Liegenschaften', wert: n(new Set((notizen ?? []).map(notizLiegenschaft).filter(Boolean)).size) },
       ]}
       seite={
         <section className="space-y-3">
@@ -322,7 +322,7 @@ export function FondsGespraeche({ data, team }: BereichProps) {
                   {x.wiedervorlage && !x.erledigt && <Marke art={faellig(x) ? 'rosa' : 'grau'}>wieder am {datum(x.wiedervorlage)}</Marke>}
                 </span>
                 <span className={`block whitespace-pre-line ${x.erledigt ? 'text-muted-foreground line-through' : ''}`}>{x.text}</span>
-                {x.parzelle_id && <span className="block text-sm text-muted-foreground">{adresse.get(x.parzelle_id) ?? 'Liegenschaft'}</span>}
+                {notizLiegenschaft(x) && <span className="block text-sm text-muted-foreground">{adresse.get(notizLiegenschaft(x)!) ?? 'Liegenschaft'}</span>}
               </span>
             </li>
           ))}

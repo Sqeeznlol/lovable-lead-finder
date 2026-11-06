@@ -44,7 +44,117 @@ Zürcher Parzellen haben im Bestand keinen Umriss (gemessen: 0 von
 394'917), die Lage kommt vom Gebäude.
 
 Drittens, neu seit dem Morgen: für die Fotos in der 3D-Karte die Map
-Tiles API am Google-Schlüssel einschalten (nächster Abschnitt).
+Tiles API am Google-Schlüssel einschalten (übernächster Abschnitt).
+
+Viertens, vom 6. November: die zwei Migrationen des ersten Kunden,
+Text `20261106` -- erst `20261106100000_position_lage` (Lage je
+Position, Universum schweizweit), dann `20261106110000_fondsleitung_helvetica`
+(Helvetica mit zwei Gefässen und 50 Liegenschaften). Der Ablauf nimmt
+beide in dieser Reihenfolge; die zweite läuft auch ein zweites Mal
+ohne Doppel (lokal geprüft). Nächster Abschnitt.
+
+## Am Morgen dazu: der erste Kunde -- Helvetica, zwei Gefässe, 50 Liegenschaften
+
+Julian, 6. November: "Das ist die erste komplette Liste für einen
+Fondsmanager ... Das ist unser erster Fondsmanager, unser erster
+Kunde." Die Liste (Asset_Liste_HSL_HL.xlsx) hat 50 Zeilen mit Gefäss,
+Strasse/Nr., PLZ, Ort und Kanton. Zwei Gefässe: "Helvetica Swiss
+Living Fund (HSL)" mit 42 und "HL Anlagestiftung – Nachhaltiges
+Suburbanes Wohnen Schweiz" mit 8 Liegenschaften, in zwölf Kantonen.
+Nur 9 der 50 liegen in Zürich (4) oder im Thurgau (5), wo der Bestand
+Parzellen kennt. Darum zwei Dinge, nicht eins:
+
+**Das Profil** (Migration `20261106110000_fondsleitung_helvetica`,
+keine Testdaten, mehrfach ausführbar): Fondsleitung "Helvetica" (Team,
+Art fonds), Akteur "Helvetica Asset Management AG" in Zürich -- die
+Liste nennt den Manager nicht, die Fondsleitung beider Gefässe steht
+auf der Website des Anbieters --, Mandant mit Produkt intelligence,
+zwei Portfolios mit den Namen genau wie in der Spalte, 50 Positionen
+mit dem Rohtext der Liste. Noch ohne Konto: wer bei Helvetica
+hineinschauen soll, bekommt ein Konto im Team (Kontomenü), wie bei den
+Demo-Leitungen.
+
+**Jede Zeile beim Bund aufgelöst** (`tools/fondsliste_aufloesen.cjs`,
+558 Anfragen, 32 Sekunden; der Bericht mit allen Eingängen, Gebäuden
+und Parzellen wurde ganz gelesen): Adresse → Eingänge → Gebäude im
+Register (GWR) → Parzelle der Amtlichen Vermessung mit Mitte, Fläche
+und Nachbarn. Ergebnis: alle 50 Zeilen mit Hauptparzelle, 165 Gebäude
+auf 73 Parzellen, 196'168 m², laut Register 1'398 Wohnungen. Was dabei
+nötig war, weil Raten falsch gewesen wäre:
+
+- Bereiche wie "Neubrückstrasse 18-24" meinen die eine Strassenseite.
+  Die andere Seite zählt nur, wenn ihr Haus auf derselben Parzelle
+  steht: "Standweg 1-6" in Liestal ist ein Grundstück mit sechs
+  Häusern, "Hof 23" und "Hof 27" neben "Hof 20-44" in Villmergen sind
+  fremde Einfamilienhäuser mit einer Wohnung. So fielen 19 Eingänge
+  weg (Brügg 19/21/23, Villmergen 23/27, Therwil 3, Basel 44/46/48,
+  Nidau 52-58, Gerlafingen 12/14/45, Wattwil 27/29/31 und 42/44,
+  Erlen 8). Die Liste steht im Kopf der Migration -- beim Kunden
+  gegenprüfen, ob eine davon doch dazugehört.
+- Der Gebäude-Dienst des Bundes sucht "enthält": EGID 346701
+  (Niedergösgen) traf zuerst 502346701 in Rothenburg LU. Nur der
+  exakte EGID zählt.
+- Gleicher Strassenname in zwei Ortschaften derselben PLZ:
+  "Kümmertshauserstrasse 9" gibt es in Erlen und in Engishofen (beide
+  8586). Es zählt die Ortschaft der Liste.
+- "Av. Gare 2" in Granges steht beim Bund als 2a und 2b; fehlt die
+  blanke Nummer, zählen ihre Buchstaben.
+- Parzellen mit Löchern (Starrkirch-Wil) und mit 523 Ecken
+  (Zollikofen, 30'365 m²) lehnt der Nachbarn-Dienst ab -- nur die
+  Aussenringe schicken, bei Bedarf ausgedünnt. Denselben Fehler hatte
+  das Einspielen im Browser (`bund-parzelle.ts`); behoben.
+- 42 Hausnummern der Bereiche gibt es beim Bund nicht (die ungeraden
+  zwischen Hof 20 und 44, Oberer Quai 107 bis 115). Das ist normal,
+  kein Fehler.
+
+**Das Modell** (Migration `20261106100000_position_lage`): Eine
+Position trägt ihre Lage jetzt selbst -- Punkt, EGRID, Nachbarparzellen,
+Gemeinde, Kanton, Fläche vom Bund. Bisher stand eine Liegenschaft
+ausserhalb Zürich/Thurgau nur als "nicht gefunden" in der Liste und
+nirgends sonst. `fonds_universum` zeigt solche Positionen als Punkte
+(Kennung `pos:…`, ohne Zone, Reserve und Marge), zählt sie bei
+Liegenschaften und Fläche, findet Nachbarschaften über die EGRID der
+Nachbarn (bei Helvetica drei: Viaduktstrasse/Bündengasse in Grenchen,
+zweimal in Wattwil, alle im selben Gefäss) und führt sie als "Potenzial
+offen: ausserhalb Zürich und Thurgau". Das Einspielen im Browser legt
+die Lage ab sofort mit ab (`portfolio-import.ts`, `fonds.ts`), ein
+Gespräch kann an einer solchen Position hängen
+(`fonds_notiz.position_id`). In der Oberfläche: rechte Spalte sagt
+"Lage vom Bund, Zone und Reserve folgen mit dem Bestand", Zone zeigt
+"–" statt "fehlt", die Marke der offenen Potenziale heisst "Offen"
+statt "Zone fehlt", die 3D-Karte markiert die Häuser über die EGRID
+auch ausserhalb Zürichs.
+
+**Geprüft:** beide Migrationen in der lokalen Testdatenbank, zweiter
+Lauf "0 neu, 50 standen schon", eine Zürcher Parzelle im Bestand wird
+verknüpft (Punkt, Nachbarschaft, Reserve rechnet), Universum in 15 ms
+mit 50 Punkten, 3 Kanten, 50 Potenzialen. Browser mit genau diesem
+Universum, Desktop und iPhone 13: Übersicht "50 Liegenschaften",
+Karte mit 50 Punkten über die ganze Schweiz, rechte Spalte einer
+Liegenschaft ohne Bestand, Potenziale, Gespräch mit Liegenschaft
+"Neubrückstrasse 18-24, Brügg"; keine Skriptfehler, nichts breiter als
+das Fenster. tsc sauber, 329 Tests grün.
+
+**Was du entscheiden musst:**
+
+1. Der Name: "Helvetica" als Fondsleitung, "Helvetica Asset
+   Management AG" als Akteur. Die Anlagestiftung ist rechtlich eine
+   eigene Stiftung; hier läuft sie als zweites Gefäss derselben
+   Leitung, wie du es gesagt hast ("ein Manager, er hat diese
+   Liegenschaften").
+2. 41 Einträge "Potenzial offen: ausserhalb Zürich und Thurgau" in
+   der Potenziale-Liste. Ehrlich, aber für eine Vorführung viel.
+   Ausblenden ist eine Zeile in `fonds_universum`.
+3. Die Nummern der Fonds kommen aus der Sortierung der Namen (lokal:
+   HL = Fonds 1, HSL = Fonds 2). Soll HSL die 1 sein, braucht es eine
+   Spalte für die Reihenfolge.
+4. 14 Zeilen liegen auf mehreren Parzellen (Finsterrütistrasse 61-67
+   auf vier). Verknüpft wird die Hauptparzelle, die Fläche zählt alle.
+   Die übrigen Parzellen stehen nur im Bericht des Werkzeugs.
+5. Wohnungen, Baujahr und Geschosse aus dem Register werden nicht
+   abgelegt -- die Position hat keine Spalten dafür. Für den Bericht
+   an den Kunden wären sie wertvoll (Baujahr ab 1870 in Gerlafingen,
+   33 Wohnungen an der Müller-Friedberg-Strasse).
 
 ## Am Morgen dazu: Foto in der 3D-Karte -- gebaut, braucht den Google-Schlüssel
 

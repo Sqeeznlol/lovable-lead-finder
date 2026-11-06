@@ -41,11 +41,18 @@ export async function universumLaden(team: string | null): Promise<Universum> {
 export const FONDSFARBEN = ['#5B63FF', '#F26B1D', '#2BB673', '#9B7BFF', '#F2C94C', '#2EC4E6', '#FF6B9A', '#C0C6D4', '#E5484D', '#00B894'];
 export const fondsFarbe = (nr: number) => FONDSFARBEN[(nr - 1) % FONDSFARBEN.length];
 
+/**
+ * Punkte mit Parzelle im Bestand tragen deren UUID; Positionen ohne
+ * Bestand (ausserhalb Zürich und Thurgau) kommen als "pos:<id>" aus
+ * fonds_universum und haben weder Zone noch Reserve.
+ */
+export const imBestand = (p: { id: string }) => !p.id.startsWith('pos:');
+
 export const POTENZIAL: Record<PotenzialArt, { titel: string; kurz: string }> = {
   arrondierung: { titel: 'Fonds grenzen aneinander', kurz: 'Arrondierung' },
   nachbar_baut: { titel: 'Nachbar baut', kurz: 'Nachbar baut' },
   reserve: { titel: 'Ausnützungsreserve', kurz: 'Reserve' },
-  offen: { titel: 'Potenzial offen', kurz: 'Zone fehlt' },
+  offen: { titel: 'Potenzial offen', kurz: 'Offen' },
 };
 
 /**
@@ -112,7 +119,10 @@ export async function einspielen(mandant: string, fonds: string | null, neuerNam
   const gesehen = new Set<string>();
   const pos = ergebnisse
     .filter(e => { const k = schluessel(e); if (vorhanden.has(k) || gesehen.has(k)) return false; gesehen.add(k); return true; })
-    .map(e => ({ portfolio_id: id, parzelle_id: e.parzelleId, roh_adresse: e.roh, zuordnung: e.zuordnung }));
+    .map(e => ({ portfolio_id: id, parzelle_id: e.parzelleId, roh_adresse: e.roh, zuordnung: e.zuordnung,
+      // Ohne Bestand trägt die Position ihre Lage selbst (20261106100000_position_lage.sql).
+      egrid: e.egrid, e: e.lage?.e ?? null, n: e.lage?.n ?? null, flaeche: e.lage?.flaeche ?? null,
+      gemeinde: e.lage?.gemeinde ?? null, kanton: e.lage?.kanton ?? null, nachbar_egrids: e.lage?.nachbarn ?? [] }));
   if (pos.length) {
     const r = await db().from('portfolio_position').insert(pos);
     if (r.error) throw r.error;

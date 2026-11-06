@@ -34,7 +34,16 @@ export async function baugesucheLaden(als: string | null, tage: number): Promise
 export interface Notiz {
   id: string; team_id: string; parzelle_id: string | null; mit: string | null; text: string; am: string;
   wiedervorlage: string | null; erledigt: boolean; von: string | null;
+  /** Liegenschaft ohne Bestand: die Position statt einer Parzelle (20261106100000_position_lage.sql). */
+  position_id?: string | null;
 }
+/** Die Kennung im Universum: Parzelle des Bestands oder "pos:<Position>". */
+export const notizLiegenschaft = (n: Pick<Notiz, 'parzelle_id' | 'position_id'>) =>
+  n.position_id ? `pos:${n.position_id}` : n.parzelle_id;
+/** Umgekehrt: aus der Kennung die Spalten der Notiz. */
+export const liegenschaftSpalten = (id: string | null | undefined) =>
+  !id ? { parzelle_id: null, position_id: null }
+  : id.startsWith('pos:') ? { parzelle_id: null, position_id: id.slice(4) } : { parzelle_id: id, position_id: null };
 export async function notizenLaden(team: string): Promise<Notiz[]> {
   return pruefen(await db().from('fonds_notiz').select('*').eq('team_id', team).order('am', { ascending: false }).limit(500)) as Notiz[];
 }

@@ -13,7 +13,7 @@ import { ImmoKalender } from '@/components/ImmoKalender';
 import { FondsBaugesuche, FondsBericht, FondsGespraeche, FondsKalender, FondsKarte, FondsPotenziale, FondsSuchprofile, type BereichProps } from '@/components/fonds/FondsBereiche';
 import { baugesucheLaden, faellig, fondsTeam, notizenLaden } from '@/lib/fonds-werkzeuge';
 import type { ComponentType } from 'react';
-import { fondsFarbe, POTENZIAL, potenzialeAlsCsv, universumLaden, verorten, type PotenzialArt } from '@/lib/fonds';
+import { fondsFarbe, imBestand, POTENZIAL, potenzialeAlsCsv, universumLaden, verorten, type PotenzialArt } from '@/lib/fonds';
 import { FENSTER } from '@/lib/fenster';
 
 const n = (x: number | null | undefined) => (x == null ? '–' : Math.round(x).toLocaleString('de-CH'));
@@ -265,9 +265,9 @@ export function FondsOberflaeche() {
                   Fonds {nr.get(wahl.fonds)}
                 </p>
                 <h2 className="text-xl leading-tight">{wahl.adresse}</h2>
-                <p className="text-sm text-muted-foreground">{wahl.gemeinde}</p>
+                <p className="text-sm text-muted-foreground">{wahl.gemeinde}{!imBestand(wahl) && ' · Lage vom Bund, Zone und Reserve folgen mit dem Bestand'}</p>
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                  {([['Fläche', wahl.flaeche ? `${n(wahl.flaeche)} m²` : '–'], ['Zone', wahl.zone ?? 'fehlt'],
+                  {([['Fläche', wahl.flaeche ? `${n(wahl.flaeche)} m²` : '–'], ['Zone', wahl.zone ?? (imBestand(wahl) ? 'fehlt' : '–')],
                      ['Reserve', wahl.reserve && wahl.reserve > 0 ? `${n(wahl.reserve)} m²` : '–'], ['Marge', chf(wahl.marge)]] as [string, string][])
                     .map(([t, v]) => <div key={t} className="min-w-0"><dt className="text-[11px] uppercase tracking-wide text-muted-foreground">{t}</dt><dd className="break-words font-medium">{v}</dd></div>)}
                 </dl>
