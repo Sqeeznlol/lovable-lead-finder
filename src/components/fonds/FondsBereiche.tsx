@@ -254,7 +254,7 @@ export function FondsBaugesuche({ data, als, gehe }: BereichProps) {
                   {links.length || g.egrid ? (
                     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                       {links.map(b => (
-                        <a key={b.url} href={b.url} target={FENSTER.karte} rel="noopener"
+                        <a key={b.url} href={b.url} target={FENSTER.karte}
                            className="flex min-h-11 items-center gap-3 rounded-[3px] border px-4 py-2 hover:bg-secondary">
                           <span className="min-w-0 flex-1"><span className="block text-sm font-medium">{b.titel}</span>
                             <span className="block truncate text-xs text-muted-foreground">{b.zeile}</span></span>
@@ -262,7 +262,7 @@ export function FondsBaugesuche({ data, als, gehe }: BereichProps) {
                         </a>
                       ))}
                       {g.egrid && (
-                        <a href={`https://map.geo.admin.ch/?swisssearch=${g.egrid}&lang=de`} target={FENSTER.karte} rel="noopener"
+                        <a href={`https://map.geo.admin.ch/?swisssearch=${g.egrid}&lang=de`} target={FENSTER.karte}
                            className="flex min-h-11 items-center gap-3 rounded-[3px] border px-4 py-2 hover:bg-secondary">
                           <span className="min-w-0 flex-1"><span className="block text-sm font-medium">Parzelle auf der Karte des Bundes</span>
                             <span className="block truncate text-xs text-muted-foreground">map.geo.admin.ch</span></span>
