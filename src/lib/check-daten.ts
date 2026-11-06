@@ -153,3 +153,28 @@ export function leadAngaben(o: { marke: string; domain: string; antwort: Antwort
     ...o.herkunft,
   };
 }
+
+// ------------------------------------------------------------- Prüfungen
+/**
+ * Eine echte Schweizer Nummer, schön geschrieben (+41 79 412 58 36), oder
+ * null. Julian, 6. November: "eine richtige Schweizer Nummer, also +41
+ * oder 076, 079 usw., dass die Leute nicht einfach wilde Zahlen
+ * eintippen". Mobil 075 bis 079, Festnetz mit den Vorwahlen der Schweiz;
+ * keine Gratis- und Mehrwertnummern (0800, 084x, 090x), keine
+ * Zahlenreihen wie 000 00 00 oder 123 45 67.
+ */
+const VORWAHLEN = ['75', '76', '77', '78', '79', '21', '22', '24', '26', '27', '31', '32', '33', '34', '41', '43', '44', '52', '55', '56', '58', '61', '62', '71', '81', '91'];
+export function schweizerNummer(roh: string | null | undefined): string | null {
+  let s = String(roh ?? '').replace(/[\s\-/().]/g, '');
+  if (s.startsWith('0041')) s = '+41' + s.slice(4);
+  else if (s.startsWith('0')) s = '+41' + s.slice(1);
+  if (!/^\+41\d{9}$/.test(s)) return null;
+  const nat = s.slice(3), teil = nat.slice(2);
+  if (!VORWAHLEN.includes(nat.slice(0, 2))) return null;
+  if (/^(\d)\1+$/.test(teil) || '0123456789'.includes(teil) || '9876543210'.includes(teil)) return null;
+  return `+41 ${nat.slice(0, 2)} ${nat.slice(2, 5)} ${nat.slice(5, 7)} ${nat.slice(7)}`;
+}
+
+const WEGWERF = ['mailinator.com', 'yopmail.com', 'trashmail.com', 'guerrillamail.com', '10minutemail.com', 'tempmail.com', 'wegwerfemail.de'];
+export const mailOk = (m: string) => /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(m.trim()) && !WEGWERF.includes(m.trim().split('@')[1].toLowerCase());
+export const nameOk = (t: string) => /^\p{L}[\p{L}' .-]{1,59}$/u.test(t.trim());

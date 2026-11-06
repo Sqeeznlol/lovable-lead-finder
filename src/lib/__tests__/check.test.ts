@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MARKEN, markeFuerHost } from '@/lib/check-marken';
-import { haeuserAus, herkunft, leadAngaben, prioritaet, ueberbauung } from '@/lib/check-daten';
+import { haeuserAus, herkunft, leadAngaben, mailOk, nameOk, prioritaet, schweizerNummer, ueberbauung } from '@/lib/check-daten';
 
 describe('Marken der Check-Seiten', () => {
   it('erkennt die Marke am Hostnamen, auch mit www und Port', () => {
@@ -42,5 +42,28 @@ describe('Lead', () => {
       befund: { adresse: 'Bodenacherstrasse 79', nummer: '2725', egrid: 'CH545639778444', kanton: 'ZH', gemeinde: 'Fällanden', zone: 'Wohnzonen', flaeche: 2119, teile: [], haeuser: h } });
     expect(a).toMatchObject({ quelle: 'check', prioritaet: 'heiss', gebaeude: 1, wohnungen: 16, baujahr: 1973, projekt: true, utm_source: 'meta' });
     expect(JSON.stringify(a).length).toBeLessThan(2000);
+  });
+});
+
+describe('Kontakt prüfen', () => {
+  it('nimmt echte Schweizer Nummern und schreibt sie einheitlich', () => {
+    expect(schweizerNummer('079 412 58 36')).toBe('+41 79 412 58 36');
+    expect(schweizerNummer('+41 79 412 58 36')).toBe('+41 79 412 58 36');
+    expect(schweizerNummer('0041794125836')).toBe('+41 79 412 58 36');
+    expect(schweizerNummer('044 251 23 45')).toBe('+41 44 251 23 45');
+    expect(schweizerNummer('076-388-21-09')).toBe('+41 76 388 21 09');
+  });
+  it('weist wilde Zahlen, Ausland, Gratis- und Mehrwertnummern ab', () => {
+    for (const x of ['079 000 00 00', '079 123 45 67', '076 765 43 21', '0800 123 456', '0900 123 456', '0848 123 456', '123', '+49 151 1234567', '079 412 58 3', '0794125836x', ''])
+      expect(schweizerNummer(x), x).toBeNull();
+  });
+  it('E-Mail und Namen', () => {
+    expect(mailOk('anna@beispiel.ch')).toBe(true);
+    expect(mailOk('anna@beispiel')).toBe(false);
+    expect(mailOk('x@mailinator.com')).toBe(false);
+    expect(nameOk('Zoë')).toBe(true);
+    expect(nameOk("D'Alessandro-Meier")).toBe(true);
+    expect(nameOk('a')).toBe(false);
+    expect(nameOk('1234')).toBe(false);
   });
 });
