@@ -32,6 +32,9 @@ jobs:
           # Wohntraums-Testmaske (/fonds): ein Konto, das nur die Fonds
           # der Demo-Fondsleitung sieht. Fehlt das Secret, bleibt es weg.
           FONDS: ${{ secrets.KONTO_FONDS }}
+          # Der erste Kunde (6. November): das Konto "helvetica" sieht nur
+          # die Fondsleitung Helvetica. Passwort im Secret KONTO_HELVETICA.
+          HELVETICA: ${{ secrets.KONTO_HELVETICA }}
         run: |
           set -euo pipefail
           [ -n "${DB:-}" ]    || { echo "SUPABASE_DB_URL fehlt."; exit 1; }
@@ -103,4 +106,29 @@ jobs:
             psql "$DB" -v ON_ERROR_STOP=1 -X -q --single-transaction -v fonds="$FONDS" -f /tmp/fonds.sql
           else
             echo "KONTO_FONDS nicht gesetzt -- Fonds-Konto übersprungen."
+          fi
+
+          if [ -n "${HELVETICA:-}" ]; then
+            sed -n '/create or replace function pg_temp.konto/,/end \$f\$;/p' /tmp/konto.sql > /tmp/helvetica.sql
+            cat >> /tmp/helvetica.sql <<'SQL'
+          -- Erst das Team, dann das Konto: ein Fondskonto ohne Team gilt
+          -- als internes Konto (Index prueft ist_fondsmanager ueber
+          -- team_mitglied) und saehe Bauraum statt Wohntraums. Darum
+          -- bricht alles ab, solange die Migration 20261106110000 fehlt.
+          do $$ begin
+            if not exists (select 1 from public.team where name = 'Helvetica' and art = 'fonds') then
+              raise exception 'Team Helvetica fehlt -- zuerst Migration 20261106110000_fondsleitung_helvetica einspielen';
+            end if;
+          end $$;
+          select pg_temp.konto('helvetica@wohntraums.life', :'helvetica');
+          insert into public.team_mitglied (team_id, user_id)
+          select t.id, u.id from public.team t, auth.users u
+           where t.name = 'Helvetica' and lower(u.email) = 'helvetica@wohntraums.life'
+          on conflict do nothing;
+          select count(*) as im_team_helvetica from public.team_mitglied tm join public.team t on t.id = tm.team_id
+           join auth.users u on u.id = tm.user_id where t.name = 'Helvetica' and lower(u.email) = 'helvetica@wohntraums.life';
+          SQL
+            psql "$DB" -v ON_ERROR_STOP=1 -X -q --single-transaction -v helvetica="$HELVETICA" -f /tmp/helvetica.sql
+          else
+            echo "KONTO_HELVETICA nicht gesetzt -- Helvetica-Konto übersprungen."
           fi

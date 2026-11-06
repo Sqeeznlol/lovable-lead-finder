@@ -53,6 +53,10 @@ Position, Universum schweizweit), dann `20261106110000_fondsleitung_helvetica`
 beide in dieser Reihenfolge; die zweite läuft auch ein zweites Mal
 ohne Doppel (lokal geprüft). Nächster Abschnitt.
 
+Fünftens: das GitHub-Secret `KONTO_HELVETICA` mit dem Passwort des
+Helvetica-Kontos anlegen und Aktionen → Konten → Workflow ausführen.
+Erst nach den Migrationen -- der Ablauf bricht sonst ab, mit Absicht.
+
 ## Am Morgen dazu: der erste Kunde -- Helvetica, zwei Gefässe, 50 Liegenschaften
 
 Julian, 6. November: "Das ist die erste komplette Liste für einen
@@ -70,9 +74,21 @@ Art fonds), Akteur "Helvetica Asset Management AG" in Zürich -- die
 Liste nennt den Manager nicht, die Fondsleitung beider Gefässe steht
 auf der Website des Anbieters --, Mandant mit Produkt intelligence,
 zwei Portfolios mit den Namen genau wie in der Spalte, 50 Positionen
-mit dem Rohtext der Liste. Noch ohne Konto: wer bei Helvetica
-hineinschauen soll, bekommt ein Konto im Team (Kontomenü), wie bei den
-Demo-Leitungen.
+mit dem Rohtext der Liste.
+
+**Das Konto** (Julian: "ist alles der Helvetica, mach da Fondsmanager"):
+Der Ablauf **Konten** legt neu das Konto `helvetica` an
+(helvetica@wohntraums.life, Anmeldung mit der Kennung "helvetica") und
+stellt es ins Team Helvetica -- damit sieht es nur Wohntraums und nur
+diese Fondsleitung, wie das Demo-Konto `fonds`. Das Passwort kommt aus
+dem GitHub-Secret `KONTO_HELVETICA` (Settings → Secrets and variables →
+Actions), nie aus dem Code: das Repository ist öffentlich. Fehlt das
+Secret, übergeht der Ablauf das Konto. Fehlt das Team, bricht er ab,
+statt das Konto anzulegen: ein Fondskonto ohne Team gälte als internes
+Konto und sähe Bauraum. Also erst die Migrationen, dann das Secret,
+dann Aktionen → Konten → Workflow ausführen; im Protokoll steht
+"im_team_helvetica 1". Im Kontomenü erscheint Helvetica danach mit
+diesem Konto, und ein Klick darauf zeigt die Testmaske.
 
 **Jede Zeile beim Bund aufgelöst** (`tools/fondsliste_aufloesen.cjs`,
 558 Anfragen, 32 Sekunden; der Bericht mit allen Eingängen, Gebäuden
@@ -140,8 +156,7 @@ das Fenster. tsc sauber, 329 Tests grün.
 1. Der Name: "Helvetica" als Fondsleitung, "Helvetica Asset
    Management AG" als Akteur. Die Anlagestiftung ist rechtlich eine
    eigene Stiftung; hier läuft sie als zweites Gefäss derselben
-   Leitung, wie du es gesagt hast ("ein Manager, er hat diese
-   Liegenschaften").
+   Leitung -- bestätigt ("ist alles der Helvetica").
 2. 41 Einträge "Potenzial offen: ausserhalb Zürich und Thurgau" in
    der Potenziale-Liste. Ehrlich, aber für eine Vorführung viel.
    Ausblenden ist eine Zeile in `fonds_universum`.
