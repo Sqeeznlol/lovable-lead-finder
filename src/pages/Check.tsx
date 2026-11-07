@@ -5,7 +5,7 @@ import 'leaflet/dist/leaflet.css';
 import './check.css';
 import { supabase } from '@/integrations/supabase/client';
 import { lv95NachWgs84 } from '@/lib/koordinaten';
-import { markeFuerHost, markeNachId, STANDARD_MARKE, type Marke } from '@/lib/check-marken';
+import { BETREIBER, markeFuerHost, markeNachId, STANDARD_MARKE, type Marke } from '@/lib/check-marken';
 import { KATASTER } from '@/lib/check-hintergrund';
 import {
   ANTWORT_TEXT, befundAmOrt, GEBAEUDEART, HEIZUNG, herkunft, leadAngaben, mailOk, nameOk, schweizerNummer, STATUS, vorschlaege,
@@ -26,9 +26,6 @@ import {
  * potenzial, angaben.quelle = check). Alles Gezeigte kommt vom Bund.
  */
 
-// Wer die Seiten betreibt -- gehört ins Impressum und in die Einwilligung.
-// Rechtlicher Name, Adresse und UID trägt Julian nach (docs/werbeplan-eigentuemer.md, Abschnitt 8).
-const BETREIBER = 'Bauraum';
 
 const n = (x: number | null | undefined) => (x == null ? '–' : Math.round(x).toLocaleString('de-CH'));
 const kurzZone = (z: string | null) => (!z ? '–' : z.replace(/zonen?$/i, '').trim().replace(/^Wohn$/, 'Wohnen') || z);

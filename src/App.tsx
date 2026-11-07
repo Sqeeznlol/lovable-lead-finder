@@ -17,6 +17,7 @@ const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 const Anfrage = lazy(() => import("./pages/Anfrage.tsx"));
 const FondsSeite = lazy(() => import("./pages/Fonds.tsx"));
 const Check = lazy(() => import("./pages/Check.tsx"));
+const Ratgeber = lazy(() => import("./pages/Ratgeber.tsx"));
 
 // Auf einer Marken-Domain (parzellenchecker.ch, hauschecker.ch ...) ist
 // die ganze Seite der Check -- ohne Anmeldung, ohne Bauraum dahinter.
@@ -53,12 +54,16 @@ const App = () => (
         <BrowserRouter>
           <Suspense fallback={<div className="min-h-screen bg-background" />}>
             {CHECK_MARKE ? (
-              <Routes><Route path="*" element={<Check marke={CHECK_MARKE} />} /></Routes>
+              <Routes>
+                <Route path="/ratgeber/:artikel" element={<Ratgeber marke={CHECK_MARKE} />} />
+                <Route path="*" element={<Check marke={CHECK_MARKE} />} />
+              </Routes>
             ) : (
             <Routes>
               {/* Die Check-Seiten zur Vorschau auf unserer Domain: /check, /check/hauschecker ... */}
               <Route path="/check" element={<Check />} />
               <Route path="/check/:marke" element={<Check />} />
+              <Route path="/check/:marke/ratgeber/:artikel" element={<Ratgeber />} />
               {/* Die drei öffentlichen Seiten -- die einzigen Ausnahmen.
                   Sie können nur eine Anfrage einfügen, nichts lesen
                   (20261101240000_anfrage.sql). Alles andere bleibt

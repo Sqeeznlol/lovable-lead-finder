@@ -13,6 +13,11 @@
  * Die Domains waren am 6. November laut Registry (rdap.nic.ch) frei,
  * gekauft ist noch keine. Wer sie kauft, trägt sie hier ein.
  */
+// Wer die Seiten betreibt -- gehört ins Impressum, in die Einwilligung und
+// unter jeden Ratgeber. Rechtlicher Name, Adresse und UID trägt Julian nach
+// (docs/werbeplan-eigentuemer.md, Abschnitt 8).
+export const BETREIBER = 'Bauraum';
+
 export type Schwerpunkt = 'parzelle' | 'haus' | 'bauen' | 'reserve' | 'wert' | 'erbe';
 
 export interface Marke {

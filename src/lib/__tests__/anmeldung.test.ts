@@ -28,7 +28,8 @@ describe('Anmeldung', () => {
     // Die Check-Seiten (parzellenchecker.ch ...): auf einer Marken-Domain die
     // ganze Seite, sonst /check zur Vorschau. Dürfen wie die Anfrage-Seite
     // nur einfügen (Test unten).
-    expect(offen).toEqual(['* Check', '/check Check', '/check/:marke Check',
+    // Der Ratgeber (/ratgeber/<slug>) liest und schreibt gar nichts.
+    expect(offen).toEqual(['/ratgeber/:artikel Ratgeber', '* Check', '/check Check', '/check/:marke Check', '/check/:marke/ratgeber/:artikel Ratgeber',
       '/bewertung Anfrage', '/potenzial Anfrage', '/investor Anfrage', '/fonds FondsSeite', '/fonds/:bereich FondsSeite']);
     const fonds = readFileSync('src/pages/Fonds.tsx', 'utf8');
     expect(fonds).toMatch(/if \(!user\) return <Anmeldung konto="fonds"/);
@@ -54,6 +55,13 @@ describe('Anmeldung', () => {
     const seite = readFileSync('src/pages/Check.tsx', 'utf8');
     expect(seite.match(/\.from\('(\w+)'\)/g)).toEqual([".from('anfrage')"]);
     expect(seite).toMatch(/\.from\('anfrage'\)\.insert\(/);
+  });
+
+  it('der Ratgeber berührt die Datenbank nicht', () => {
+    for (const datei of ['src/pages/Ratgeber.tsx', 'src/lib/ratgeber.ts']) {
+      const s = readFileSync(datei, 'utf8');
+      expect(s).not.toMatch(/supabase|\.from\(|\.rpc\(/);
+    }
   });
 
   it('der Admin-Bereich verlangt die Admin-Rolle', () => {
