@@ -1,16 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Shield, Trash2, Users, Activity, Zap, Phone } from 'lucide-react';
+import { Shield, Trash2, Users, Activity } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { useAutomationSettings, useUpdateAutomationSettings } from '@/hooks/use-app-settings';
 import { Neuberechnung } from '@/components/Neuberechnung';
-import { getMyPhone, setMyPhone } from '@/hooks/use-eigentuemer-lookup';
 
 interface UserWithRoles {
   user_id: string;
@@ -24,9 +20,6 @@ export function AdminSettings() {
   const [loading, setLoading] = useState(true);
   const [newRole, setNewRole] = useState<Record<string, string>>({});
   const { toast } = useToast();
-  const { data: automation } = useAutomationSettings();
-  const updateAutomation = useUpdateAutomationSettings();
-  const [myPhone, setMyPhoneState] = useState(getMyPhone());
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -100,62 +93,8 @@ export function AdminSettings() {
         <p className="text-muted-foreground mt-1">Benutzer, Rollen und Systemkonfiguration</p>
       </div>
 
-      {/* Automation toggles */}
-      <Card className="border-none shadow-md">
-        <CardContent className="p-6 space-y-4">
-          <div className="flex items-center gap-2">
-            <Zap className="h-5 w-5 text-primary" />
-            <h3 className="text-lg font-semibold">Automatisierung</h3>
-          </div>
-          <div className="p-3 rounded-lg bg-muted/30 space-y-1.5">
-            <div className="flex items-center gap-2">
-              <Phone className="h-4 w-4 text-primary" />
-              <p className="text-sm font-medium">Meine Telefonnummer</p>
-            </div>
-            <p className="text-xs text-muted-foreground">Wird automatisch ins ZH-Portal eingefüllt für SMS-Verifikation. Nur lokal gespeichert.</p>
-            <Input
-              type="tel"
-              placeholder="+41 79 123 45 67"
-              value={myPhone}
-              onChange={e => { setMyPhoneState(e.target.value); setMyPhone(e.target.value); }}
-              className="h-9"
-            />
-          </div>
-          {[
-            { key: 'auto_advance' as const, label: 'Smart Auto-Advance', desc: 'Nach Auto-Export automatisch zur nächsten Liegenschaft (2s Countdown)' },
-            { key: 'auto_eigentuemer_lookup' as const, label: 'Auto-Eigentümer-Lookup', desc: 'Bei Stage „Interessant" automatisch ZH-Portal öffnen und Eigentümer abrufen' },
-            { key: 'sms_auto_confirm' as const, label: 'SMS-Bestätigung (Twilio)', desc: 'Sendet automatisch eine Bestätigungs-SMS nach Pipedrive-Push (benötigt Twilio-Connector)' },
-            { key: 'daily_digest' as const, label: 'Tägliches Digest (08:00)', desc: 'Versendet morgens eine Zusammenfassung des Vortags' },
-          ].map(item => (
-            <div key={item.key} className="flex items-start justify-between gap-4 p-3 rounded-lg bg-muted/30">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">{item.label}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{item.desc}</p>
-              </div>
-              <Switch
-                checked={!!(automation as unknown as Record<string, unknown>)?.[item.key]}
-                onCheckedChange={v => updateAutomation.mutate({ [item.key]: v })}
-              />
-            </div>
-          ))}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 rounded-lg bg-muted/30">
-              <p className="text-xs text-muted-foreground">Follow-up nach (Tage)</p>
-              <Input type="number" min={1} max={30}
-                value={automation?.follow_up_days ?? 3}
-                onChange={e => updateAutomation.mutate({ follow_up_days: Number(e.target.value) || 3 })}
-                className="h-9 mt-1" />
-            </div>
-            <div className="p-3 rounded-lg bg-muted/30">
-              <p className="text-xs text-muted-foreground">Stagniert nach (Tage)</p>
-              <Input type="number" min={1} max={60}
-                value={automation?.stagnation_days ?? 7}
-                onChange={e => updateAutomation.mutate({ stagnation_days: Number(e.target.value) || 7 })}
-                className="h-9 mt-1" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Die Automatisierung der Akquise (Portal, SMS, Tagesbericht)
+          steht seit dem 7. November in Bauraum Akquise. */}
 
       {/* User Management */}
       <Card className="border-none shadow-md">

@@ -20,7 +20,7 @@ import { zoneKurzform } from '@/lib/potential';
  * Jede Zahl ist in der Datenbank gezählt, nicht geschätzt, und jede
  * führt dorthin, wo man sie abarbeitet.
  */
-export type Ziel = 'zentrale' | 'baugesuche' | 'gelegenheiten' | 'auswertung' | 'karte' | 'uebersicht';
+export type Ziel = 'zentrale' | 'baugesuche' | 'gelegenheiten' | 'auswertung' | 'karte';
 
 // Die erzeugten Typen kennen die Plattform-Tabellen noch nicht.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -140,8 +140,7 @@ export function Cockpit({ onGehe, onNeu }: { onGehe: (z: Ziel) => void; onNeu?: 
       ] : undefined}
       aktionen={aktionen}
       seite={
-        <Abschnitt titel="Grösstes Potenzial" unter={`Kanton ${current}, Eigentümer noch offen`} symbol={Sparkles} kachel="akzent"
-                   rechts={<button type="button" className={KNOPF_LEISE} onClick={() => onGehe('uebersicht')}>Alle</button>}>
+        <Abschnitt titel="Grösstes Potenzial" unter={`Kanton ${current}, Eigentümer noch offen`} symbol={Sparkles} kachel="akzent">
           {data && data.objekte.length === 0 && <Leer titel="Keine Objekte gefunden." />}
           <Karussell>
             {(data?.objekte ?? []).map(o => <ObjektKarte key={o.id} o={o} onClick={() => setzen({ parzelle: o.id })} />)}

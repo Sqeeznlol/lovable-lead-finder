@@ -76,7 +76,8 @@ jobs:
               # unbemerkt, bis es am 1. November gemessen wurde.
               # Und die Bündel müssen im Browser liegen bleiben dürfen.
               fehler=0
-              for pfad in /bewertung /potenzial /investor; do
+              # Bewertung, Potenzial, Investor sind seit dem 7. November in Bauraum Akquise.
+              for pfad in /fonds; do
                 code=$(curl -s -o /tmp/p.html -w '%{http_code}' "$adresse$pfad")
                 if [ "$code" = 200 ] && grep -q '/assets/index-' /tmp/p.html; then
                   echo "- $pfad: 200" >> "$GITHUB_STEP_SUMMARY"

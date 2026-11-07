@@ -9,7 +9,16 @@ import { KATEGORIEN, kategorie, type Absicht, type Kategorie } from '@/lib/gespr
 import { Investoren } from '@/components/Investoren';
 import { KennzahlenTim } from '@/components/KennzahlenTim';
 import { useUrlWert } from '@/hooks/use-url-wert';
-import { ANTWORT_TEXT } from '@/lib/check-daten';
+
+// Die Check-Seiten leben seit dem 7. November in Bauraum Akquise; ihre
+// Leads kommen weiter hier an. Damit die Antworten lesbar bleiben, stehen
+// die Texte hier -- dieselben wie in check-daten.ts der Akquise.
+const ANTWORT_TEXT = {
+  eigentuemer: { allein: 'Ja, allein', gemeinsam: 'Ja, gemeinsam mit anderen', erbengemeinschaft: 'Ja, als Erbengemeinschaft',
+    vertretung: 'Nein, ich vertrete den Eigentümer', nein: 'Nein' } as Record<string, string>,
+  absicht: { verkaufen: 'Verkaufen', bauen: 'Bauen, aus- oder umbauen', wert: 'Den Wert kennen', informieren: 'Nur informieren' } as Record<string, string>,
+  zeitraum: { 12: 'In den nächsten 12 Monaten', 36: 'In 1 bis 3 Jahren', offen: 'Noch offen' } as Record<string, string>,
+};
 
 /**
  * Auswertung: was aus den Gesprächen folgt, wer kaufen will, und ob

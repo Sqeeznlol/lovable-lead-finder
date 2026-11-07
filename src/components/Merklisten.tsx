@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, FileSpreadsheet, Printer, Trash2, UserSearch } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, FileSpreadsheet, Printer, Trash2 } from 'lucide-react';
 import { TrefferKarte } from '@/components/TrefferKarte';
 import { supabase } from '@/integrations/supabase/client';
 import { FELD, KNOPF, KNOPF_HAUPT, Leer, LISTE, Reiter, Seite } from '@/components/rahmen';
@@ -274,7 +273,6 @@ function StandUndNotiz({ t, onSpeichern }: { t: Eintrag; onSpeichern: (w: { stan
 /** Eine gespeicherte Liste: heutige Werte, Stand je Gebäude, Karte, Excel, PDF. */
 export function MerklisteAnsicht({ id }: { id: string }) {
   const setzen = useUrlSetzen();
-  const navigate = useNavigate();
   const qc = useQueryClient();
   const { toast } = useToast();
   const { data: kodes } = useGwrKodes();
@@ -297,8 +295,6 @@ export function MerklisteAnsicht({ id }: { id: string }) {
   const kennzahlen = useMemo(() => kennzahlenVon(data ?? []), [data]);
   const sichtbar = useMemo(() => (data ?? []).filter(t => !standFilter || (t.stand ?? 'offen') === standFilter), [data, standFilter]);
   const zaehler = useMemo(() => new Map(STAENDE.map(x => [x.wert, (data ?? []).filter(t => (t.stand ?? 'offen') === x.wert).length])), [data]);
-  // Was der Akquise-Modus noch abfragen kann: ohne Eigentümer oder ohne Nummer.
-  const abzufragen = (data ?? []).filter(t => !t.eigentuemer || t.telefon_bekannt === false).length;
 
   // Sofort im Bildschirm, dann in die Datenbank; geht es nicht, kommt der
   // alte Stand zurück und eine Meldung.
@@ -359,15 +355,8 @@ export function MerklisteAnsicht({ id }: { id: string }) {
             <button type="button" onClick={exportieren} disabled={!data?.length} className={`${KNOPF} disabled:opacity-50`}><FileSpreadsheet className="h-4 w-4" /> Als Excel</button>
           </>}
           seite={<MerklistenSpalte aktiv={id} />}>
-          {/* Der nächste Schritt mit der Liste: die fehlenden Eigentümer
-              im Akquise-Modus abfragen, nur diese Parzellen. */}
-          {!!data?.length && abzufragen > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded border bg-card p-4">
-              <p className="min-w-0 text-sm"><span className="font-medium">{n(abzufragen)} von {n(data.length)}</span>
-                <span className="text-muted-foreground"> ohne Eigentümer oder Nummer. Im Akquise-Modus nacheinander abfragen, höchstens 5 je Telefon und Tag.</span></p>
-              <button type="button" onClick={() => navigate(`/akquise?merkliste=${id}`)} className={KNOPF_HAUPT}><UserSearch className="h-4 w-4" /> Eigentümer abfragen</button>
-            </div>
-          )}
+          {/* Eigentümer abfragen geht in Bauraum Akquise, einem eigenen
+              Programm (seit 7. November): dort /akquise?merkliste=<id>. */}
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" onClick={() => setzen({ liste: null, ansicht: null, stand: null })} className={KNOPF}><ArrowLeft className="h-4 w-4" /> Zur Suche</button>
             <Reiter wahl={ansicht as 'liste' | 'karte'} setWahl={w => setzen({ ansicht: w === 'liste' ? null : w })}

@@ -4,7 +4,6 @@ import { ObjektLink } from '@/components/ObjektLink';
 import { Auswahl } from '@/components/Auswahl';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, Phone, Printer, Target } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { mandatLesen } from '@/lib/mandat';
 import { Abschnitt, FELD, KNOPF, KNOPF_HAUPT, Leer, LISTE, Marke, Reiter, Seite, Strichbalken } from '@/components/rahmen';
@@ -236,14 +235,13 @@ export function Gelegenheiten() {
 
 /**
  * Der Anrufer-Ablauf je Kunde (Tims Abschnitt 5, Schritt 5): die
- * Anweisung, die der Akquise-Modus den Anrufern zeigt, und der Sprung
- * dorthin -- er arbeitet dann nur die offenen Gelegenheiten dieses
- * Kunden ab und schreibt das Ergebnis zurück.
+ * Anweisung, die der Akquise-Modus den Anrufern zeigt. Angerufen wird in
+ * Bauraum Akquise, einem eigenen Programm (seit 7. November); hier steht
+ * nur, was die Anrufer für diesen Kunden wissen müssen.
  */
 function Anrufer({ mandantId, offen }: { mandantId: string; offen: number }) {
   const qc = useQueryClient();
   const { toast } = useToast();
-  const navigate = useNavigate();
   const { data: m } = useQuery({ queryKey: ['mandat', mandantId], queryFn: () => mandatLesen(mandantId) });
   const speichern = async (text: string) => {
     const r = await db().from('mandant').update({ anweisung: text.trim() || null }).eq('id', mandantId);
@@ -255,9 +253,7 @@ function Anrufer({ mandantId, offen }: { mandantId: string; offen: number }) {
       <textarea key={m?.anweisung ?? ''} defaultValue={m?.anweisung ?? ''} rows={4} placeholder="z.B. Im Namen der Anlagestiftung anfragen; nur Verkauf, keine Vermietung; Preis nicht nennen."
                 onBlur={e => e.target.value !== (m?.anweisung ?? '') && void speichern(e.target.value)}
                 className="w-full rounded-[3px] border border-input bg-card p-3 text-sm placeholder:text-muted-foreground focus:border-foreground focus:outline-none" />
-      <button type="button" onClick={() => navigate(`/akquise?mandant=${mandantId}`)} disabled={!offen} className={`${KNOPF_HAUPT} w-full disabled:opacity-50`}>
-        <Phone className="h-4 w-4" /> {offen ? `${offen} offene Gelegenheiten anrufen` : 'Nichts offen'}
-      </button>
+      <p className="text-sm text-muted-foreground">{offen ? `${offen} offene Gelegenheiten` : 'Nichts offen'} · angerufen wird in Bauraum Akquise.</p>
     </Abschnitt>
   );
 }

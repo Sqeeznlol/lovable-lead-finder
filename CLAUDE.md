@@ -26,6 +26,16 @@ Praktisch heisst das:
   * Statt den Benutzer nachprüfen zu lassen: einen Test oder einen
     Ablauf schreiben, der es dauerhaft nachprüft.
 
+## Akquise getrennt
+
+Seit dem 7. November ist die Akquise ein eigenes Programm (Julian:
+"alles Akquise ... separiert im Git ... dann weg von der Webseite"):
+Eigentümerabfrage, Nummern, Pipedrive, Chrome-Erweiterung, Check-Seiten,
+Ratgeber und Anfrage-Seiten liegen im Zweig `akquise` (später das
+Repository `bauraum-akquise`). Hier bleiben die Webseite, Wohntraums,
+die Datenbank mit allen Migrationen und die Datenabläufe. Der Test
+`akquise-getrennt.test.ts` wird rot, wenn ein Teil zurückkommt.
+
 ## Was live ist
 
 Jeder Bau schreibt seinen Commit ins Bündel (`__FASSUNG__` in

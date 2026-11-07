@@ -11,11 +11,9 @@ import { Gespraeche } from '@/components/Gespraeche';
 import { Nachbarn } from '@/components/Nachbarn';
 import { WeitereParzellen } from '@/components/WeitereParzellen';
 import { protokolliere } from '@/lib/protokoll';
-import { AuskunftEinfuegen } from '@/components/AuskunftEinfuegen';
-import { weiterverarbeiten } from '@/hooks/use-eigentuemer-lookup';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ExternalLink, MapPin, Phone, Save, Loader2, Bot, RefreshCw, Archive, ClipboardPaste, Box } from 'lucide-react';
+import { ExternalLink, MapPin, Phone, Save, Loader2, Archive, Box } from 'lucide-react';
 import { KNOPF, KNOPF_HAUPT, Marke } from '@/components/rahmen';
 import { zoneKurzform } from '@/lib/potential';
 import { supabase } from '@/integrations/supabase/client';
@@ -24,7 +22,6 @@ import { heizungBeschreiben, useGwrKodes, useParzellenGebaeude } from '@/lib/par
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Tables } from '@/integrations/supabase/types';
-import { useStartEigentuemerLookup, useExtensionAvailable } from '@/hooks/use-eigentuemer-lookup';
 import { FENSTER } from '@/lib/fenster';
 
 type Property = Tables<'properties'>;
@@ -49,11 +46,8 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
   const [data, setData] = useState<Property | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [einfuegen, setEinfuegen] = useState(false);
   const { toast } = useToast();
   const qc = useQueryClient();
-  const startLookup = useStartEigentuemerLookup();
-  const extensionAvailable = useExtensionAvailable();
   const setzen = useUrlSetzen();
   const navigate = useNavigate();
   // Ohne Treffer drehte das Rad für immer (Prüfung der Abläufe).
@@ -135,16 +129,6 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
       return;
     }
     toast({ title: '✓ Gespeichert' });
-
-    // Steht jetzt beides da -- Eigentümer und Nummer -- und war das
-    // Objekt noch nicht draussen, dann ist der nächste Schritt
-    // eindeutig: Deal in Akquise, Phase "Neu". Darauf muss niemand
-    // noch einmal klicken.
-    const vollstaendig = String(data.owner_name ?? '').trim()
-      && String(data.owner_phone ?? '').trim();
-    if (vollstaendig && !data.is_queried) {
-      await weiterverarbeiten(data.id, toast);
-    }
 
     qc.invalidateQueries({ queryKey: ['master'] });
     qc.invalidateQueries({ queryKey: ['properties'] });
@@ -279,14 +263,9 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
                 ) : (
                   <p className="text-sm text-muted-foreground">Aus dem Grundbuch noch nicht abgerufen{!data.egrid && ', keine EGRID vorhanden'}.</p>
                 )}
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  <button type="button" className={`${KNOPF} px-2 text-sm`} disabled={!data.egrid}
-                          onClick={() => startLookup({ propertyId: data.id, egrid: data.egrid, bfsNr: data.bfs_nr, kanton: data.kanton, parzelle: data.parzelle, address: data.address, plzOrt: data.plz_ort || data.gemeinde })}>
-                    {d?.eigentuemer_name ? <><RefreshCw className="h-4 w-4" /> Erneut</> : <><Bot className="h-4 w-4" /> Abrufen</>}
-                  </button>
-                  <button type="button" className={`${KNOPF} px-2 text-sm`} onClick={() => setEinfuegen(true)}><ClipboardPaste className="h-4 w-4" /> Einfügen</button>
-                </div>
-                {!extensionAvailable && <p className="text-xs text-muted-foreground">Mit der Chrome-Erweiterung wird automatisch gespeichert.</p>}
+                {/* Abgefragt wird nicht mehr hier: die Akquise ist seit dem
+                    7. November ein eigenes Programm (src/App.tsx). */}
+                <p className="text-xs text-muted-foreground">Eigentümer werden in Bauraum Akquise abgefragt.</p>
               </div>
               <WeitereParzellen parzelleId={data.id} />
 
@@ -334,11 +313,6 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
             </aside>
           </div>
         )}
-        <AuskunftEinfuegen
-          propertyId={einfuegen ? (data?.id ?? null) : null}
-          adresse={data?.address}
-          onClose={() => setEinfuegen(false)}
-        />
       </DialogContent>
     </Dialog>
   );

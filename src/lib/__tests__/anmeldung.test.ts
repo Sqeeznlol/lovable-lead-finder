@@ -16,52 +16,29 @@ import { geraetGenau, geraetName } from '@/lib/geraet';
 import { kennungZuAdresse } from '@/lib/kennung';
 
 describe('Anmeldung', () => {
-  it('die ganze Anwendung steht hinter dem Torwächter -- bis auf die drei öffentlichen Seiten', () => {
+  it('die ganze Anwendung steht hinter dem Torwächter -- bis auf Wohntraums', () => {
     const app = readFileSync('src/App.tsx', 'utf8');
     expect(app).toMatch(/<AuthProvider>/);
     expect(app).toMatch(/<Torwaechter>[\s\S]*<Route path="\/" element=\{<Index \/>\}[\s\S]*<\/Torwaechter>/);
-    // Ausserhalb des Torwächters stehen genau diese drei, und nur die Anfrage-Seite.
     const aussen = app.replace(/<Torwaechter>[\s\S]*<\/Torwaechter>/, '');
     const offen = [...aussen.matchAll(/<Route path="([^"]+)" element=\{<(\w+)/g)].map(m => `${m[1]} ${m[2]}`);
     // /fonds (Wohntraums) hat eine eigene Anmeldung statt des Torwächters --
     // erlaubt nur, solange die Seite ohne Konto nichts als die Maske zeigt.
-    // Die Check-Seiten (parzellenchecker.ch ...): auf einer Marken-Domain die
-    // ganze Seite, sonst /check zur Vorschau. Dürfen wie die Anfrage-Seite
-    // nur einfügen (Test unten).
-    // Der Ratgeber (/ratgeber/<slug>) liest und schreibt gar nichts.
-    expect(offen).toEqual(['/ratgeber/:artikel Ratgeber', '* Check', '/check Check', '/check/:marke Check', '/check/:marke/ratgeber/:artikel Ratgeber',
-      '/bewertung Anfrage', '/potenzial Anfrage', '/investor Anfrage', '/fonds FondsSeite', '/fonds/:bereich FondsSeite']);
+    // Check-, Ratgeber- und Anfrage-Seiten sind seit dem 7. November in
+    // Bauraum Akquise, nicht mehr hier.
+    expect(offen).toEqual(['/fonds FondsSeite', '/fonds/:bereich FondsSeite']);
     const fonds = readFileSync('src/pages/Fonds.tsx', 'utf8');
     expect(fonds).toMatch(/if \(!user\) return <Anmeldung konto="fonds"/);
     expect(fonds.indexOf('if (!user)')).toBeLessThan(fonds.indexOf('<FondsOberflaeche'));
   });
 
-  it('die öffentliche Seite liest nichts aus der Datenbank, sie fügt nur ein', () => {
-    const seite = readFileSync('src/pages/Anfrage.tsx', 'utf8');
-    expect(seite.match(/\.from\('(\w+)'\)/g)).toEqual([".from('anfrage')"]);
-    expect(seite).toMatch(/\.from\('anfrage'\)\.insert\(/);
-    expect(seite).not.toMatch(/\.select\(|\.rpc\(/);
+  it('Anfragen von aussen dürfen nur eingefügt werden', () => {
+    // Die Seiten, die einfügen, stehen in Bauraum Akquise; die Regel der
+    // Tabelle gehört zur Datenbank und damit hierher.
     const m = readFileSync('supabase/migrations/20261101240000_anfrage.sql', 'utf8');
     expect(m).toMatch(/for insert to anon, authenticated/);
     expect(m).toMatch(/for select to authenticated/);
     expect(m).not.toMatch(/for (select|update|delete|all) to anon/);
-  });
-
-  it('die Check-Seiten lesen nichts aus der Datenbank, sie fügen nur ein', () => {
-    for (const datei of ['src/pages/Check.tsx', 'src/lib/check-daten.ts', 'src/lib/check-marken.ts']) {
-      const s = readFileSync(datei, 'utf8');
-      expect(s).not.toMatch(/\.select\(|\.rpc\(|\.update\(|\.delete\(|\.upsert\(/);
-    }
-    const seite = readFileSync('src/pages/Check.tsx', 'utf8');
-    expect(seite.match(/\.from\('(\w+)'\)/g)).toEqual([".from('anfrage')"]);
-    expect(seite).toMatch(/\.from\('anfrage'\)\.insert\(/);
-  });
-
-  it('der Ratgeber berührt die Datenbank nicht', () => {
-    for (const datei of ['src/pages/Ratgeber.tsx', 'src/lib/ratgeber.ts']) {
-      const s = readFileSync(datei, 'utf8');
-      expect(s).not.toMatch(/supabase|\.from\(|\.rpc\(/);
-    }
   });
 
   it('der Admin-Bereich verlangt die Admin-Rolle', () => {

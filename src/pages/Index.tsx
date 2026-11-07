@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { Building2, LayoutDashboard, Upload, Phone, X, Zap, Search, FileSpreadsheet, Eye, Shield, Share, Plus, Database, Send, Map, Target, BarChart3, Gauge, HardHat, MoreHorizontal, Briefcase, LogOut, Orbit, CalendarDays } from 'lucide-react';
+import { Building2, X, Shield, Share, Plus, Map, Target, BarChart3, Gauge, HardHat, MoreHorizontal, Briefcase, LogOut, Orbit, CalendarDays } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { KontoMenu } from '@/components/KontoMenu';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -7,26 +7,13 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { PropertyDetailDialog } from '@/components/PropertyDetailDialog';
 import { useSchliessen, useUrlWert } from '@/hooks/use-url-wert';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-const Uebersicht = lazy(() => import('@/components/Uebersicht').then(m => ({ default: m.Uebersicht })));
-const Dashboard = lazy(() => import('@/components/Dashboard').then(m => ({ default: m.Dashboard })));
-const PropertyList = lazy(() => import('@/components/PropertyList').then(m => ({ default: m.PropertyList })));
-const CsvImport = lazy(() => import('@/components/CsvImport').then(m => ({ default: m.CsvImport })));
-const MasterImport = lazy(() => import('@/components/MasterImport').then(m => ({ default: m.MasterImport })));
-const MasterList = lazy(() => import('@/components/MasterList').then(m => ({ default: m.MasterList })));
-const PhoneManager = lazy(() => import('@/components/PhoneManager').then(m => ({ default: m.PhoneManager })));
-const AkquiseMode = lazy(() => import('@/components/AkquiseMode').then(m => ({ default: m.AkquiseMode })));
-const TelefonSuche = lazy(() => import('@/components/TelefonSuche').then(m => ({ default: m.TelefonSuche })));
-const PipedriveExport = lazy(() => import('@/components/PipedriveExport').then(m => ({ default: m.PipedriveExport })));
-const Vorauswahl = lazy(() => import('@/components/Vorauswahl').then(m => ({ default: m.Vorauswahl })));
 const Auswertung = lazy(() => import('@/components/Auswertung').then(m => ({ default: m.Auswertung })));
 const Cockpit = lazy(() => import('@/components/Cockpit').then(m => ({ default: m.Cockpit })));
 const Baugesuche = lazy(() => import('@/components/Baugesuche').then(m => ({ default: m.Baugesuche })));
 const Gelegenheiten = lazy(() => import('@/components/Gelegenheiten').then(m => ({ default: m.Gelegenheiten })));
 const Karte3DSeite = lazy(() => import('@/components/karte3d/Karte3DSeite').then(m => ({ default: m.Karte3DSeite })));
 const Kalender = lazy(() => import('@/components/Kalender').then(m => ({ default: m.Kalender })));
-const GebaeudeSuche = lazy(() => import('@/components/GebaeudeSuche').then(m => ({ default: m.GebaeudeSuche })));
 const Nachbarschaft = lazy(() => import('@/components/Nachbarschaft').then(m => ({ default: m.Nachbarschaft })));
 // Die Karte zieht Leaflet nach -- das gehoert nicht ins erste
 // Buendel, sondern wird geholt, wenn jemand den Reiter oeffnet.
@@ -34,49 +21,31 @@ const Karte = lazy(() => import('@/components/Karte').then(m => ({ default: m.Ka
 // Was nur ein Reiter braucht, kommt erst mit dem Reiter: das erste
 // Bündel trägt nur den Rahmen und das Cockpit.
 const Zentrale = lazy(() => import('@/components/Zentrale').then(m => ({ default: m.Zentrale })));
-const Nummern = lazy(() => import('@/components/Nummern').then(m => ({ default: m.Nummern })));
-const PipedriveBereit = lazy(() => import('@/components/PipedriveBereit').then(m => ({ default: m.PipedriveBereit })));
 const Protokoll = lazy(() => import('@/components/Protokoll').then(m => ({ default: m.Protokoll })));
 const Anmeldungen = lazy(() => import('@/components/Anmeldungen').then(m => ({ default: m.Anmeldungen })));
 const Teams = lazy(() => import('@/components/Teams').then(m => ({ default: m.Teams })));
-const Lesezeichen = lazy(() => import('@/components/Lesezeichen').then(m => ({ default: m.Lesezeichen })));
-const ErweiterungHolen = lazy(() => import('@/components/ErweiterungHolen').then(m => ({ default: m.ErweiterungHolen })));
 const AdminSettings = lazy(() => import('@/components/AdminSettings').then(m => ({ default: m.AdminSettings })));
-import { CantonTabs } from '@/components/CantonTabs';
 import { Parzellensuche } from '@/components/Parzellensuche';
 import { useCanton } from '@/hooks/use-canton';
 import { KeyboardShortcutsOverlay } from '@/components/KeyboardShortcutsOverlay';
 import { AdminZugang } from '@/components/AdminZugang';
 import { Auffang } from '@/components/Auffang';
-import { AuskunftAusLesezeichen } from '@/components/AuskunftAusLesezeichen';
 import { useAuth } from '@/hooks/use-auth';
 import { usePlatform } from '@/hooks/use-platform';
-import { useMidnightReset } from '@/hooks/use-phones';
 
 // Jeder Bereich ist eine Adresse: /zentrale, /baugesuche ... ("/" ist
 // das Cockpit). So führt "Zurück" im Browser in den vorigen Bereich.
-const TABS = ['cockpit', 'zentrale', 'baugesuche', 'pipedrive', 'nummern', 'karte', 'nachbarschaft', 'gelegenheiten', 'auswertung', 'kalender', 'karte3d', 'gebaeudesuche', 'uebersicht', 'dashboard', 'master', 'vorauswahl', 'akquise', 'telsuche', 'properties', 'import', 'masterimport', 'phones', 'export', 'admin'] as const;
+const TABS = ['cockpit', 'zentrale', 'baugesuche', 'karte', 'nachbarschaft', 'gelegenheiten', 'auswertung', 'kalender', 'karte3d', 'admin'] as const;
 type Tab = typeof TABS[number];
 const istTab = (x: string | undefined): x is Tab => !!x && (TABS as readonly string[]).includes(x);
 
-// Zehn Reiter waren neun zu viel. Was der neue Ablauf selbst erledigt,
-// braucht keinen eigenen Ort mehr:
-//
-//   Vorauswahl      -- die Zonenregeln archivieren von selbst, was sich
-//                      nicht bebauen lässt
-//   Telefon-Suche   -- läuft nach jeder Abfrage automatisch
-//   Pipedrive Export-- der Deal entsteht beim Abfragen, nicht in einem
-//                      eigenen Schritt
-//   Liegenschaften  -- zeigt dasselbe wie die Master-Liste, nur älter
-//   Kennzahlen      -- die Zahlen, die zählen, stehen oben in der Übersicht
-//
-// Gelöscht ist nichts: die Reiter lassen sich im Admin-Bereich wieder
-// öffnen, ebenso der Master-Import, den man selten und bewusst macht.
+// Die Akquise mit ihren Reitern (Übersicht, Abfrage, Gebäudesuche,
+// Nummern, Pipedrive und die stillgelegten) ist seit dem 7. November ein
+// eigenes Programm, getrennt von dieser Webseite (src/App.tsx).
 type Eintrag = { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> };
 
-// Drei Gruppen statt einer langen Liste: was heute zu tun ist, die
-// Plattform (Karte, Gelegenheiten, Baugesuche, Auswertung), und die
-// tägliche Akquise. Das Cockpit steht zuerst: dort steht alles, was zu
+// Zwei Gruppen statt einer langen Liste: was heute zu tun ist und die
+// Plattform (Karte, Gelegenheiten, Baugesuche, Auswertung). Das Cockpit steht zuerst: dort steht alles, was zu
 // prüfen ist (Julians Frage "wo steht das zur Überprüfung alles?").
 const gruppen: { titel: string; eintraege: Eintrag[] }[] = [
   { titel: 'Heute', eintraege: [
@@ -94,37 +63,11 @@ const gruppen: { titel: string; eintraege: Eintrag[] }[] = [
     // Messen und Kongresse der Branche: wann, wo, mit Adresse.
     { id: 'kalender', label: 'Immo-Kalender', icon: CalendarDays },
   ] },
-  { titel: 'Akquise', eintraege: [
-    { id: 'uebersicht', label: 'Übersicht', icon: LayoutDashboard },
-    { id: 'master', label: 'Abfrage', icon: Database },
-    // Gebäude nach Baujahr, Zimmern, Wohnfläche aus dem Register.
-    { id: 'gebaeudesuche', label: 'Gebäudesuche', icon: Building2 },
-    // Der Zwischenstand braucht einen eigenen Ort: Eigentümer da,
-    // Nummer fehlt.
-    { id: 'nummern', label: 'Nummern', icon: Phone },
-    // Fertige Leads, die auf den Deal warten.
-    { id: 'pipedrive', label: 'Pipedrive', icon: Send },
-  ] },
   { titel: 'Verwaltung', eintraege: [
     { id: 'admin', label: 'Admin', icon: Shield },
   ] },
 ];
 const tabs: Eintrag[] = gruppen.flatMap(g => g.eintraege);
-
-/** Die stillgelegten Reiter -- erreichbar, aber nicht mehr im Weg. */
-const stillgelegt: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  // Die Telefonverwaltung ist eine Einstellung, kein Arbeitsschritt.
-  { id: 'phones', label: 'Telefone', icon: Phone },
-  // Der Akquise-Modus stammt aus der Zeit, als hier telefoniert wurde.
-  // Heute macht die Uebersicht die Abfrage und "Nummern" die Suche;
-  // dazwischen bleibt nichts, was er noch tun muesste.
-  { id: 'akquise', label: 'Akquise-Modus', icon: Zap },
-  { id: 'dashboard', label: 'Kennzahlen', icon: LayoutDashboard },
-  { id: 'vorauswahl', label: 'Vorauswahl', icon: Eye },
-  { id: 'telsuche', label: 'Telefon-Suche', icon: Search },
-  { id: 'properties', label: 'Liegenschaften', icon: Building2 },
-  { id: 'export', label: 'Pipedrive Export', icon: FileSpreadsheet },
-];
 
 // Primary tabs visible in the iPhone bottom bar
 // Auf dem iPhone vier feste Ziele und "Mehr" für den Rest.
@@ -170,7 +113,6 @@ export default function Index() {
   const konto = user?.email?.split('@')[0] ?? '';
   const platform = usePlatform();
   const [showInstallHint, setShowInstallHint] = useState(false);
-  useMidnightReset();
 
   useEffect(() => {
     if (platform.shouldPromptInstall && !sessionStorage.getItem('bauraum-install-hint-dismissed')) {
@@ -202,8 +144,7 @@ export default function Index() {
   };
   // Die Karten füllen den Bildschirm: ohne Kopfzeile und Ränder.
   const karteAktiv = active === 'karte' || active === 'karte3d';
-  const akquise = gruppen.find(g => g.titel === 'Akquise')!.eintraege.some(t => t.id === active);
-  const titel = tabs.find(t => t.id === active)?.label ?? stillgelegt.find(t => t.id === active)?.label ?? '';
+  const titel = tabs.find(t => t.id === active)?.label ?? '';
 
   return (
     <div className="flex min-h-safe-screen bg-background">
@@ -258,8 +199,6 @@ export default function Index() {
                   Kantone, das Wischen greift nie, und auf dem iPhone lag die
                   Kopfzeile 190 px über dem Rand (gemessen 3. November). */}
               <div className="ml-auto flex min-w-0 items-center gap-3">
-                {/* Der Kanton gilt nur für die Akquise. */}
-                {akquise && <div className="flex min-w-0 items-center gap-2 overflow-x-auto no-scrollbar"><CantonTabs /></div>}
                 <button type="button" onClick={neuesVorhaben}
                         className="hidden h-11 items-center gap-2 rounded-[3px] bg-accent px-4 text-[15px] font-medium text-accent-foreground transition-transform active:scale-[0.97] lg:inline-flex">
                   <Plus className="h-4 w-4" /> Neues Vorhaben
@@ -283,26 +222,12 @@ export default function Index() {
             {active === 'cockpit' && <Cockpit onGehe={z => gehe(z)} onNeu={neuesVorhaben} />}
             {active === 'zentrale' && <Zentrale />}
             {active === 'baugesuche' && <Baugesuche />}
-            {active === 'uebersicht' && <Uebersicht />}
-            {active === 'dashboard' && <Dashboard />}
-            {active === 'master' && <MasterList />}
-            {active === 'nummern' && <Nummern />}
             {active === 'karte' && <Karte onSchliessen={() => gehe('cockpit')} />}
             {active === 'nachbarschaft' && <Nachbarschaft />}
-            {active === 'gebaeudesuche' && <GebaeudeSuche />}
             {active === 'gelegenheiten' && <Gelegenheiten />}
             {active === 'kalender' && <Kalender />}
             {active === 'karte3d' && <Karte3DSeite />}
             {active === 'auswertung' && <Auswertung />}
-            {active === 'pipedrive' && <PipedriveBereit />}
-            {active === 'masterimport' && <MasterImport />}
-            {active === 'vorauswahl' && <Vorauswahl />}
-            {active === 'akquise' && <AkquiseMode />}
-            {active === 'telsuche' && <TelefonSuche />}
-            {active === 'properties' && <PropertyList />}
-            {active === 'export' && <PipedriveExport />}
-            {active === 'import' && <CsvImport />}
-            {active === 'phones' && <PhoneManager />}
             {active === 'admin' && (
               <AdminZugang>
               <div className="space-y-6">
@@ -310,50 +235,10 @@ export default function Index() {
                 <Anmeldungen />
                 {/* Wer welchen Kunden sieht -- die Grenze zieht die Datenbank. */}
                 <Teams />
-                {/* Das Lesezeichen steht oben, weil es kein
-                    Einstellungswert ist, sondern ein Werkzeug, das
-                    jeder einmal in seine Leiste zieht. */}
-                <Lesezeichen />
-                <ErweiterungHolen />
 
                 <div className="space-y-6">
                 <AdminSettings />
                 <Protokoll />
-                <div className="rounded-2xl border border-dashed p-5">
-                  <p className="text-sm font-medium">Stillgelegte Bereiche</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Was der Ablauf inzwischen selbst erledigt. Nichts davon
-                    ist gelöscht -- ein Klick öffnet es wieder.
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {stillgelegt.map(t => (
-                      <Button
-                        key={t.id}
-                        variant="outline"
-                        size="sm"
-                        className="gap-2"
-                        onClick={() => gehe(t.id)}
-                      >
-                        <t.icon className="h-4 w-4" /> {t.label}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-dashed p-5">
-                  <p className="text-sm font-medium">Master-Import</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Weitere Listen einlesen. Bestehende Parzellen werden nur
-                    ergänzt, nie überschrieben.
-                  </p>
-                  <Button
-                    variant="outline"
-                    className="mt-3 gap-2"
-                    onClick={() => gehe('masterimport')}
-                  >
-                    <Upload className="h-4 w-4" /> Import öffnen
-                  </Button>
-                </div>
               </div>
               </div>
               </AdminZugang>
