@@ -1,0 +1,40 @@
+# =====================================================================
+# Prüfen
+# =====================================================================
+# Bei jedem Push: Typen, Tests und Bau. Die Akquise hat keine eigene
+# Datenbank -- sie teilt die mit wohntraums.life. Darum prüft dieser
+# Ablauf nur den Code, nichts in der Datenbank.
+#
+# Lint läuft bewusst nicht als Sperre: der übernommene Code trägt
+# 19 alte Fehler (dieselben wie auf der Webseite, 7. November). Neue
+# Dateien sollen sauber sein; das prüft, wer sie schreibt.
+# =====================================================================
+
+name: Prüfen
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  pruefen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Typen
+        run: npx tsc --noEmit -p tsconfig.app.json
+      - name: Tests
+        run: npx vitest run
+      - name: Bau
+        run: npm run build
+      - name: Erweiterung lesbar
+        run: |
+          set -euo pipefail
+          for f in extension/*.js; do node --check "$f"; done
+          python3 -c "import json; json.load(open('extension/manifest.json'))"

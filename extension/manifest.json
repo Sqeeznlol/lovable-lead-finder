@@ -1,0 +1,63 @@
+{
+  "manifest_version": 3,
+  "name": "Akquise GIS Automation",
+  "version": "3.0.0",
+  "description": "Eigentumsauskunft über die kantonalen Portale (ZH, TG) für Bauraum Akquise",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "tabs",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://portal.objektwesen.zh.ch/*",
+    "https://map.geo.tg.ch/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://portal.objektwesen.zh.ch/*"
+      ],
+      "js": [
+        "uebernehmen.js",
+        "content-portal.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://map.geo.tg.ch/*"
+      ],
+      "js": [
+        "uebernehmen.js",
+        "content-thurgau.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "http://localhost:*/*"
+      ],
+      "js": [
+        "content-app.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "externally_connectable": {
+    "matches": [
+      "http://localhost:*/*"
+    ]
+  },
+  "icons": {
+    "48": "icon.png",
+    "128": "icon.png"
+  }
+}

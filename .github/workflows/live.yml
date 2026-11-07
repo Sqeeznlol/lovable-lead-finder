@@ -1,0 +1,146 @@
+# =====================================================================
+# Was ist wirklich live
+# =====================================================================
+# Der Code kann richtig sein, auf main liegen und trotzdem nicht auf
+# der Seite stehen -- am 6. September lagen fünfzehn Änderungen auf
+# main, von denen eine einzige ausgeliefert wurde. Wer das wissen will,
+# muss die Seite selbst fragen, nicht das Repository.
+#
+# Gefragt wird nach dem Commit: seit derselben Änderung schreibt der
+# Bau seinen Commit ins Bündel (window.bauraumFassung). Damit braucht
+# dieser Ablauf keine Liste von Merkmalen mehr, die veraltet, sobald
+# jemand eine Zeile ändert -- er sucht schlicht den Stand, der oben auf
+# main liegt. Er verändert nichts.
+name: Was ist live
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Bei drei Pushes kurz nacheinander interessiert nur der letzte.
+concurrency:
+  group: live
+  cancel-in-progress: true
+
+jobs:
+  pruefen:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Auf die Seite warten und den Stand ablesen
+        env:
+          # Bei einem Push der eben gepushte Stand, sonst der Kopf von main.
+          GESUCHT: ${{ github.sha }}
+          # Die Akquise hat eine eigene Adresse (Repository-Variable
+          # AKQUISE_URL, z. B. https://bauraum-akquise.vercel.app).
+          AKQUISE_URL: ${{ vars.AKQUISE_URL }}
+          # Nach einem Push braucht Vercel ein paar Minuten; bei einem
+          # Lauf von Hand oder am Morgen soll niemand darauf warten.
+          VERSUCHE: ${{ github.event_name == 'push' && 20 || 1 }}
+        run: |
+          set -uo pipefail
+          adresse="${AKQUISE_URL:-}"
+          if [ -z "$adresse" ]; then
+            echo "### Noch keine Adresse" >> "$GITHUB_STEP_SUMMARY"
+            echo "Die Akquise läuft noch nirgends öffentlich. Sobald sie eine hat, als Variable AKQUISE_URL eintragen." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          kurz=${GESUCHT:0:8}
+
+          echo "### Gesucht" >> "$GITHUB_STEP_SUMMARY"
+          echo "Stand \`$kurz\` auf main." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          nachsehen() {
+            curl -sS -o /tmp/seite.html "$adresse" || return 1
+            js=$(grep -oE '/assets/index-[A-Za-z0-9_-]+\.js' /tmp/seite.html | head -1)
+            [ -n "$js" ] || return 1
+            curl -sS -o /tmp/buendel.js "$adresse$js" || return 1
+            # Der Verkleinerer benennt die Zuweisung um -- aus
+            # "window.bauraumFassung" wird "bP". Der Commit selbst
+            # bleibt aber woertlich stehen, und danach wird gesucht.
+            if grep -q -- "$GESUCHT" /tmp/buendel.js; then
+              gefunden=$GESUCHT
+            else
+              gefunden=$(grep -oE '="[0-9a-f]{40}"' /tmp/buendel.js \
+                         | head -1 | grep -oE '[0-9a-f]{40}')
+            fi
+          }
+
+          n=0
+          while :; do
+            n=$((n + 1))
+            nachsehen
+            if [ "${gefunden:-}" = "$GESUCHT" ]; then
+              echo "### Live" >> "$GITHUB_STEP_SUMMARY"
+              echo "Bündel \`$js\` trägt \`$kurz\` -- der Stand ist draussen." \
+                >> "$GITHUB_STEP_SUMMARY"
+              # Die öffentlichen Seiten werden direkt verlinkt; ohne
+              # Weiterleitung auf index.html antworteten sie mit 404 --
+              # unbemerkt, bis es am 1. November gemessen wurde.
+              # Und die Bündel müssen im Browser liegen bleiben dürfen.
+              fehler=0
+              for pfad in /bewertung /potenzial /investor /check /check/hauschecker/ratgeber/haus-zu-gross; do
+                code=$(curl -s -o /tmp/p.html -w '%{http_code}' "$adresse$pfad")
+                if [ "$code" = 200 ] && grep -q '/assets/index-' /tmp/p.html; then
+                  echo "- $pfad: 200" >> "$GITHUB_STEP_SUMMARY"
+                else
+                  echo "- $pfad: $code -- nicht erreichbar" >> "$GITHUB_STEP_SUMMARY"; fehler=1
+                fi
+              done
+              # Ein Programmteil einer älteren Fassung muss "nicht gefunden"
+              # melden, nicht index.html liefern -- sonst zeigt Safari
+              # "'text/html' is not a valid JavaScript MIME type" statt
+              # neu zu laden (1. November).
+              alt=$(curl -s -o /dev/null -w '%{http_code} %{content_type}' "$adresse/assets/Gibt-es-nicht-00000000.js")
+              echo "- fehlender Programmteil: $alt" >> "$GITHUB_STEP_SUMMARY"
+              case "$alt" in 404*) ;; *) fehler=1;; esac
+              cache=$(curl -s -D - -o /dev/null "$adresse$js" | grep -i '^cache-control:' | tr -d '\r')
+              echo "- Bündel: $cache" >> "$GITHUB_STEP_SUMMARY"
+              echo "$cache" | grep -q immutable || fehler=1
+              # 3D-Karte: Ohne die Worker von Cesium zeichnet sie weder
+              # Gelände noch Häuser, die Fläche bleibt leer (Julian,
+              # 3. November). Der Pfad steht im Teil der 3D-Karte, den der
+              # Teil der Hauptseite nachlädt.
+              haupt=$(grep -oE 'assets/Index-[A-Za-z0-9_-]+\.js' /tmp/buendel.js | head -1)
+              teil=$(curl -s "$adresse/$haupt" | grep -oE 'assets/Karte3D-[A-Za-z0-9_-]+\.js' | head -1)
+              cesium=$(curl -s "$adresse/$teil" | grep -oE 'assets/cesium-[0-9][0-9.]*[0-9]' | head -1)
+              if [ -z "$cesium" ]; then
+                echo "- 3D-Karte: Pfad der Cesium-Dateien nicht gefunden" >> "$GITHUB_STEP_SUMMARY"; fehler=1
+              fi
+              for d in "/$cesium/Workers/decodeDraco.js" "/$cesium/Workers/createVerticesFromQuantizedTerrainMesh.js" \
+                       "/$cesium/ThirdParty/draco_decoder.wasm" "/3d/zh/tileset.json"; do
+                r=$(curl -s -o /dev/null -w '%{http_code} %{content_type}' "$adresse$d")
+                echo "- $d: $r" >> "$GITHUB_STEP_SUMMARY"
+                case "$r" in 200\ *javascript*|200\ *wasm*|200\ *json*) ;; *) fehler=1;; esac
+              done
+              # Fotos in der 3D-Karte (Google, Map Tiles API) gibt es nur,
+              # wenn VITE_GOOGLE_MAPS_KEY beim Bau gesetzt war. Ob, steht
+              # im Bündel: im Hauptteil oder in einem Teil, den die
+              # 3D-Karte lädt (lokal gebaut am 4. November: index und
+              # parzelle-gebaeude). Gemeldet wird nur ja oder nein, nie
+              # der Schlüssel -- und es ist kein Fehler, ohne ihn zeigt
+              # die Karte das Modell des Bundes.
+              schluessel=nein
+              for d in "$js" $(curl -s "$adresse/$teil" | grep -oE '"\./[A-Za-z0-9_-]+\.js"' | tr -d '"' | sed 's#^\./#/assets/#' | sort -u); do
+                if curl -s "$adresse$d" | grep -qE 'AIza[0-9A-Za-z_-]{35}'; then schluessel=ja; break; fi
+              done
+              echo "- Google-Schlüssel im Bündel (Fotos der 3D-Karte): $schluessel" >> "$GITHUB_STEP_SUMMARY"
+              cat "$GITHUB_STEP_SUMMARY"
+              exit $fehler
+            fi
+            [ "$n" -lt "$VERSUCHE" ] || break
+            sleep 30
+          done
+
+          echo "### Nicht live" >> "$GITHUB_STEP_SUMMARY"
+          echo "Ausgeliefert ist \`${gefunden:-unbekannt}\`, erwartet \`$kurz\`." \
+            >> "$GITHUB_STEP_SUMMARY"
+          echo "Bündel: \`${js:-keines gefunden}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Vercel hat diesen Push nicht gebaut. Steht in Vercel ein" \
+               "fertiger Preview, bringt ihn *Promote to Production* ohne" \
+               "neuen Bau live; sind die drei Geheimnisse gesetzt, macht" \
+               "es der Ablauf **Ausliefern** von selbst." >> "$GITHUB_STEP_SUMMARY"
+          cat "$GITHUB_STEP_SUMMARY"
+          exit 1

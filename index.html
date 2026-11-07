@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Aurora — CRM Schweiz</title>
+    <meta name="description" content="Bauraum — Off-Market Immobilien-Akquise CRM für die Schweiz. Multi-Kanton, KI-Scoring, Pipedrive-Integration." />
+    <meta name="author" content="Bauraum" />
+
+    <!-- iOS Safari / PWA -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Bauraum" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="theme-color" content="#EFECE7" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#181613" media="(prefers-color-scheme: dark)" />
+    <link rel="apple-touch-icon" href="/placeholder.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Bauraum — Immobilien-Akquise Schweiz" />
+    <meta property="og:description" content="Off-Market Immobilien-Akquise CRM für die Schweiz." />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Bauraum" />
+    <meta name="twitter:description" content="Off-Market Immobilien-Akquise CRM für die Schweiz." />
+    <!-- Hell oder dunkel vor dem ersten Bild setzen, sonst blitzt die
+         Seite im dunklen Modus beim Laden weiss auf. Derselbe Schlüssel
+         wie src/hooks/use-theme.tsx. -->
+    <script>
+      try {
+        var m = localStorage.getItem('bauraum-theme');
+        if (m === 'system') m = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        if (m === 'dark' || m === 'bluelight') document.documentElement.classList.add(m);
+      } catch (e) {}
+    </script>
+</head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

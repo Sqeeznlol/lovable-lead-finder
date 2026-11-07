@@ -1,0 +1,124 @@
+# =====================================================================
+# Edge-Funktionen ausliefern
+# =====================================================================
+# Die Funktionen unter supabase/functions laufen bei Supabase, nicht auf
+# der Webseite. Eine Änderung an ihnen wirkt deshalb nicht dadurch, dass
+# sie auf main liegt -- sie muss hochgeladen werden.
+#
+# Genau daran hing heute schon einmal ein halber Tag, nur mit Vercel:
+# der Code war richtig, lag auf main und stand trotzdem nirgends. Damit
+# das hier nicht dasselbe wird, lädt dieser Ablauf sie bei jeder
+# Änderung selbst hoch und sagt hinterher, welche.
+#
+# Gebraucht wird ein Zugriffstoken von Supabase:
+#   Konto -> Account -> Access Tokens -> Generate new token
+#   im Repository als Secret SUPABASE_ACCESS_TOKEN hinterlegen
+# Fehlt es, bricht der Ablauf nicht ab, sondern sagt es -- ein rotes
+# Kreuz für etwas, das niemand gesetzt hat, wäre eine Falschmeldung.
+# =====================================================================
+
+name: Funktionen ausliefern
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+      - '.github/workflows/funktionen.yml'
+  workflow_dispatch:
+
+jobs:
+  ausliefern:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Token vorhanden?
+        id: pruefen
+        env:
+          TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          if [ -z "${TOKEN:-}" ]; then
+            {
+              echo "### Kein Zugriffstoken hinterlegt"
+              echo ""
+              echo "Erwartet wird das Secret \`SUPABASE_ACCESS_TOKEN\`."
+              echo "Zu holen unter Supabase → Account → Access Tokens."
+              echo ""
+              echo "Solange es fehlt, müssen die Funktionen von Hand"
+              echo "hochgeladen werden: \`supabase functions deploy\`."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo 'weiter=nein' >> "$GITHUB_OUTPUT"
+          else
+            echo 'weiter=ja' >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: supabase/setup-cli@v1
+        if: steps.pruefen.outputs.weiter == 'ja'
+        with:
+          version: latest
+
+      - name: Geheimnisse der Funktionen setzen
+        if: steps.pruefen.outputs.weiter == 'ja'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          # Der Name des Secrets weicht je nach Anlage ab -- geprueft
+          # werden mehrere, genommen der erste, der etwas enthaelt.
+          A: ${{ secrets.PIPEDRIVE_API_TOKEN }}
+          B: ${{ secrets.PIPEDRIVEAPITOKEN }}
+          C: ${{ secrets.PIPEDRIVE_TOKEN }}
+          D: ${{ secrets.PIPEDRIVETOKEN }}
+          E: ${{ secrets.PIPEDRIVE }}
+        run: |
+          set -euo pipefail
+          # Die Funktion laeuft bei Supabase und kennt die
+          # GitHub-Secrets nicht. Ohne diesen Schritt antwortet sie
+          # "PIPEDRIVE_API_TOKEN not configured" -- und der Deal
+          # entsteht nie.
+          token=""
+          for kandidat in "${A:-}" "${B:-}" "${C:-}" "${D:-}" "${E:-}"; do
+            if [ -n "$kandidat" ]; then token="$kandidat"; break; fi
+          done
+          if [ -z "$token" ]; then
+            echo "Kein Pipedrive-Token unter den geprueften Namen." \
+              >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          projekt=$(grep -oP 'project_id\s*=\s*"\K[^"]+' supabase/config.toml)
+          # Der Wert erscheint nirgends: --env-file statt Kommandozeile,
+          # und die Datei wird gleich wieder geloescht.
+          umask 077
+          printf 'PIPEDRIVE_API_TOKEN=%s\n' "$token" > /tmp/funktionen.env
+          supabase secrets set --env-file /tmp/funktionen.env \
+            --project-ref "$projekt" > /dev/null
+          rm -f /tmp/funktionen.env
+          echo "Pipedrive-Token bei den Funktionen hinterlegt." \
+            >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Hochladen
+        if: steps.pruefen.outputs.weiter == 'ja'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Die Projektkennung steht im Repository (supabase/config.toml)
+          # und ist kein Geheimnis -- sie steht in jeder Adresse.
+          projekt=$(grep -oP 'project_id\s*=\s*"\K[^"]+' supabase/config.toml)
+          echo "### Ausgeliefert nach $projekt" >> "$GITHUB_STEP_SUMMARY"
+
+          for pfad in supabase/functions/*/; do
+            name=$(basename "$pfad")
+            [ -f "$pfad/index.ts" ] || continue
+            # Das Gateway liesse auch den öffentlichen Schlüssel durch
+            # (er ist ein gültiges JWT). Jede Funktion fragt darum selbst
+            # GoTrue, ob ein angemeldeter Mensch dahinter steht
+            # (supabase/functions/_shared/zugang.ts).
+            if supabase functions deploy "$name" \
+                 --project-ref "$projekt" --no-verify-jwt; then
+              echo "- $name ✓" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "- $name **fehlgeschlagen**" >> "$GITHUB_STEP_SUMMARY"
+              fehler=1
+            fi
+          done
+          exit "${fehler:-0}"
