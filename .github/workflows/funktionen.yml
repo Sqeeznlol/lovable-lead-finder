@@ -89,7 +89,7 @@ jobs:
           # und die Datei wird gleich wieder geloescht.
           umask 077
           printf 'PIPEDRIVE_API_TOKEN=%s\n' "$token" > /tmp/funktionen.env
-          supabase secrets set --env-file /tmp/funktionen.env \
+          supabase secrets set --yes --env-file /tmp/funktionen.env \
             --project-ref "$projekt" > /dev/null
           rm -f /tmp/funktionen.env
           echo "Pipedrive-Token bei den Funktionen hinterlegt." \
@@ -113,7 +113,7 @@ jobs:
             # (er ist ein gültiges JWT). Jede Funktion fragt darum selbst
             # GoTrue, ob ein angemeldeter Mensch dahinter steht
             # (supabase/functions/_shared/zugang.ts).
-            if supabase functions deploy "$name" \
+            if supabase functions deploy --yes "$name" \
                  --project-ref "$projekt" --no-verify-jwt; then
               echo "- $name ✓" >> "$GITHUB_STEP_SUMMARY"
             else
