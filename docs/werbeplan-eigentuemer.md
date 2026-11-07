@@ -234,8 +234,9 @@ Formular. Sie heisst jetzt "Acquisition Desk" und richtet sich an Käufer
   einfach Meta-Leads?" antworten sie: "Nein. Werbung ist nur ein Teil
   der Gewinnung."
 
-Für uns heisst das zweierlei: Um "Parzelle prüfen" bei Eigentümern
-konkurriert diese Seite nicht mehr. Und ihr Preismodell zeigt, was
+Für uns heisst das zweierlei: Eigentümer gewinnen sie weiter über
+Kampagnen, nur nicht mehr mit einem Check auf dieser Domain. Und ihr
+Preismodell zeigt, was
 Käufer für einen solchen Zugang bezahlen -- dasselbe könnten wir
 Fondsleitungen wie Helvetica anbieten, mit unserem Bestand als Vorsprung.
 
