@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { lv95NachWgs84 } from '@/lib/koordinaten';
 import { BETREIBER, markeFuerHost, markeNachId, STANDARD_MARKE, type Marke } from '@/lib/check-marken';
 import { KATASTER } from '@/lib/check-hintergrund';
+import { buehnenBild, markenAttribute, markenStil, schriftLaden } from '@/lib/check-gestaltung';
 import {
   ANTWORT_TEXT, befundAmOrt, GEBAEUDEART, HEIZUNG, herkunft, leadAngaben, mailOk, nameOk, schweizerNummer, STATUS, vorschlaege,
   type Antwort, type Befund, type Ort,
@@ -82,12 +83,8 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
 
   useEffect(() => {
     document.title = `${marke.name.join('')} – ${marke.titel}`;
-    if (!document.getElementById('gisk-fonts')) {
-      const l = document.createElement('link');
-      l.id = 'gisk-fonts'; l.rel = 'stylesheet';
-      l.href = 'https://fonts.googleapis.com/css2?family=Urbanist:wght@300;400;500;600;700&display=swap';
-      document.head.appendChild(l);
-    }
+    // Jede Marke hat ihre Schrift (check-marken.ts, Gestaltung).
+    schriftLaden(marke);
   }, [marke]);
 
   // Vorschläge, kurz verzögert; ältere Antworten verwerfen.
@@ -218,7 +215,7 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
   const wortmarke = <><span className="zeichen" aria-hidden="true"><i /></span><span>{marke.name[0]}<b>{marke.name[1]}</b></span></>;
 
   return (
-    <div className={`pc${befund ? ' hat-ergebnis' : ''}`} style={{ ['--marke' as string]: marke.farbe, ['--marke-hell' as string]: marke.hell }}>
+    <div className={`pc${befund ? ' hat-ergebnis' : ''}`} style={markenStil(marke)} {...markenAttribute(marke)}>
       <header className="kopf">
         <div className="huelle">
           <a className="wortmarke" href="#top" onClick={() => setRecht(null)}>{wortmarke}</a>
@@ -238,6 +235,7 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
       ) : (
       <main id="top">
         <section className="buehne">
+          {buehnenBild(marke) && <div className="foto" aria-hidden="true" />}
           <svg className="kataster" viewBox={`0 0 ${KATASTER.breite} ${KATASTER.hoehe}`} preserveAspectRatio="xMidYMid slice" aria-hidden="true">
             <path className="linien" d={KATASTER.linien} /><path className="hervor" d={KATASTER.hervor} />
           </svg>

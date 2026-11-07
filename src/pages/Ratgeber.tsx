@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import './check.css';
 import { BETREIBER, markeFuerHost, markeNachId, STANDARD_MARKE, type Marke } from '@/lib/check-marken';
 import { KATASTER } from '@/lib/check-hintergrund';
+import { markenAttribute, markenStil, schriftLaden } from '@/lib/check-gestaltung';
 import { artikelNachSlug, zumCheck, type Artikel } from '@/lib/ratgeber';
 
 /**
@@ -23,18 +24,14 @@ export default function Ratgeber({ marke: vorgabe }: { marke?: Marke }) {
 
   useEffect(() => {
     document.title = artikel ? `${artikel.titel} | ${marke.name.join('')}` : marke.name.join('');
-    if (!document.getElementById('gisk-fonts')) {
-      const l = document.createElement('link');
-      l.id = 'gisk-fonts'; l.rel = 'stylesheet';
-      l.href = 'https://fonts.googleapis.com/css2?family=Urbanist:wght@300;400;500;600;700&display=swap';
-      document.head.appendChild(l);
-    }
+    // Jede Marke hat ihre Schrift (check-marken.ts, Gestaltung).
+    schriftLaden(marke);
   }, [artikel, marke]);
 
   const wortmarke = <><span className="zeichen" aria-hidden="true"><i /></span><span>{marke.name[0]}<b>{marke.name[1]}</b></span></>;
 
   return (
-    <div className="pc ratgeber" style={{ ['--marke' as string]: marke.farbe, ['--marke-hell' as string]: marke.hell }}>
+    <div className="pc ratgeber" style={markenStil(marke)} {...markenAttribute(marke)}>
       <header className="kopf">
         <div className="huelle">
           <a className="wortmarke" href={ziel}>{wortmarke}</a>
