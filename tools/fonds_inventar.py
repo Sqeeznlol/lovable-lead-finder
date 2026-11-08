@@ -118,6 +118,63 @@ def lesen(zeilen):
     return aus, totale
 
 
+STRASSE = re.compile(r"(strasse|str\.|weg|gasse|platz|rain|halde|ring|allee|matte|acker|hof|berg|graben|quai|steig|park|feld|wies|zelg|rue|route|chemin|avenue|av\.|ch\.|rte|via|viale|piazza|place|boulevard|bd|quai|impasse|sentier|promenade|\d+[a-z]?\s*[-–/]\s*\d+)", re.I)
+UMSATZ = re.compile(r"K[äa]ufe|Verk[äa]ufe|Zuk[äa]ufe|Achats|Ventes|Transaktionen|Acquisitions|Kaufdatum|Verkaufsdatum|Hypothek|Bauprojekt|Projekte", re.I)
+
+
+def lesen_breit(zeilen, spalte):
+    """Ohne Tabellentitel: jede Zeile mit Strassennamen und zwei Beträgen ab CHF 100'000.
+    spalte = Index des Betrags, der als Verkehrswert gilt (1 = zweiter, 0 = erster)."""
+    aus, totale, aus_tabelle = [], [], False
+    for z in zeilen:
+        roh = z.strip()
+        if not roh:
+            continue
+        grosse = [m for m in ZAHL.finditer(z) if betrag(m.group()) >= 100_000]
+        if TOTAL.match(roh):
+            totale += [betrag(m.group()) for m in grosse]
+            continue
+        if len(grosse) < 2 and UMSATZ.search(roh) and len(roh) < 120:
+            aus_tabelle = True   # Titel einer Kauf-/Verkaufsliste: bis zum nächsten Inventar nichts zählen
+            continue
+        if len(grosse) < 2 and re.search(r"Inventar|Inventaire|Verzeichnis|Liegenschaften|Immeubles|Objekt", roh, re.I) and len(roh) < 80:
+            aus_tabelle = False
+        if aus_tabelle or len(grosse) < 2 or NICHT.search(roh):
+            continue
+        links = z[: grosse[0].start()]
+        if not STRASSE.search(links) or not re.search(r"[A-Za-zÄÖÜäöüéèàç]{3,}", links):
+            continue
+        teile = [t for t in re.split(r"\s{2,}", links.strip()) if t and not re.fullmatch(r"[A-Z]{2}", t)]
+        worte = [t for t in teile if re.search(r"[A-Za-zÄÖÜäöüéèàç]{3,}", t) and not ART.match(t)]
+        name = EIGENTUM.sub("", ", ".join(worte[:2])).strip(" ,")
+        name = re.sub(r"(\d[\w/–-]*)\s+\d(?:,\s*\d)*$", r"\1", name)
+        if not name or not re.match(r"[A-ZÄÖÜÉÈÂ]", name) or len(grosse) <= spalte:
+            continue
+        jahr = JAHR.search(links)
+        wert = betrag(grosse[spalte].group())
+        rest = [betrag(m.group()) for m in ZAHL.finditer(z[grosse[spalte].end():]) if 10_000 <= betrag(m.group()) < wert]
+        aus.append({"name": name, "baujahr": jahr.group() if jahr else "", "gestehung": betrag(grosse[0].group()) if spalte else "",
+                    "verkehrswert": wert, "sollmiete": rest[0] if rest else ""})
+    return aus, totale
+
+
+def bester(zeilen):
+    """Die Lesart, deren Summe zu einem Total des Berichts passt; sonst die mit dem kleinsten Abstand."""
+    def einmal(k):
+        # Dieselbe Liegenschaft steht oft zweimal (Inventar und Übersicht nach Kanton): einmal zählen.
+        gesehen, aus = set(), []
+        for x in k[0]:
+            if (x["name"], x["verkehrswert"]) not in gesehen:
+                gesehen.add((x["name"], x["verkehrswert"])); aus.append(x)
+        return aus, k[1]
+    kandidaten = [einmal(lesen(zeilen)), einmal(lesen_breit(zeilen, 1)), einmal(lesen_breit(zeilen, 0))]
+    def abstand(k):
+        ls, tot = k
+        s = sum(x["verkehrswert"] for x in ls)
+        return min((abs(s - t) / t for t in tot if t), default=9) if ls else 9
+    return min(kandidaten, key=abstand)
+
+
 def main():
     liste, ordner, ziel, bericht = sys.argv[1:5]
     os.makedirs(ordner, exist_ok=True)
@@ -130,12 +187,13 @@ def main():
             b.write(f"OHNE PDF  {f['name']}\n")
             continue
         try:
-            ls, totale = lesen(hole(f["pdf_url"], ordner))
+            ls, totale = bester(hole(f["pdf_url"], ordner))
         except Exception as e:
             b.write(f"FEHLER    {f['name']}: {str(e)[:120]}\n")
             continue
         summe = sum(x["verkehrswert"] for x in ls)
-        treffer = [t for t in totale if t and abs(summe - t) / t <= 0.01]
+        # Wenige Zeilen treffen ein Total leicht zufällig (eine Zeile = ein Zwischentotal): erst ab 8.
+        treffer = [t for t in totale if t and abs(summe - t) / t <= 0.01] if len(ls) >= 8 else []
         naechst = min(totale, key=lambda t: abs(summe - t)) if totale else 0
         stimmt = bool(treffer)
         gut += stimmt
