@@ -64,6 +64,40 @@ export function markenAttribute(m: Marke): Record<string, string | undefined> {
   };
 }
 
+/** Grundton der Seite; derselbe Wert wie --papier im CSS. */
+export function grundton(m: Marke): string {
+  return m.design.dunkel ? '#0E1315' : (m.design.papier ?? '#FAF9F7');
+}
+
+/**
+ * Safari auf dem iPhone: Leiste und Überscrollen in der Farbe der Marke
+ * statt im Grau des CRM, und Zoomen mit zwei Fingern erlaubt. Das CRM
+ * sperrt es in index.html; die Check-Seiten lesen ältere Eigentümer, die
+ * vergrössern wollen. Alle Eingaben haben mindestens 16px, darum zoomt
+ * Safari beim Antippen trotzdem nicht. Gibt die Rücknahme zurück.
+ */
+export function seiteEinrichten(m: Marke): () => void {
+  schriftLaden(m);
+  if (typeof document === 'undefined') return () => {};
+  const ton = grundton(m);
+  const html = document.documentElement;
+  const vorher = { hg: html.style.backgroundColor, body: document.body.style.backgroundColor };
+  html.style.backgroundColor = ton;
+  document.body.style.backgroundColor = ton;
+  const farben = [...document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')];
+  const alteFarben = farben.map(f => f.content);
+  farben.forEach(f => { f.content = ton; });
+  const ansicht = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
+  const alteAnsicht = ansicht?.content;
+  if (ansicht) ansicht.content = 'width=device-width, initial-scale=1, viewport-fit=cover';
+  return () => {
+    html.style.backgroundColor = vorher.hg;
+    document.body.style.backgroundColor = vorher.body;
+    farben.forEach((f, i) => { f.content = alteFarben[i]; });
+    if (ansicht && alteAnsicht !== undefined) ansicht.content = alteAnsicht;
+  };
+}
+
 /** Lädt die Schriften der Marke einmal; mehrfaches Aufrufen schadet nicht. */
 export function schriftLaden(m: Marke): void {
   if (typeof document === 'undefined') return;

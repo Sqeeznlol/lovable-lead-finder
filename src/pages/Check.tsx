@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { lv95NachWgs84 } from '@/lib/koordinaten';
 import { BETREIBER, markeFuerHost, markeNachId, STANDARD_MARKE, type Marke } from '@/lib/check-marken';
 import { KATASTER } from '@/lib/check-hintergrund';
-import { buehnenBild, markenAttribute, markenStil, schriftLaden } from '@/lib/check-gestaltung';
+import { buehnenBild, markenAttribute, markenStil, seiteEinrichten } from '@/lib/check-gestaltung';
 import {
   ANTWORT_TEXT, befundAmOrt, GEBAEUDEART, HEIZUNG, herkunft, leadAngaben, mailOk, nameOk, schweizerNummer, STATUS, vorschlaege,
   type Antwort, type Befund, type Ort,
@@ -84,7 +84,7 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
   useEffect(() => {
     document.title = `${marke.name.join('')} – ${marke.titel}`;
     // Jede Marke hat ihre Schrift (check-marken.ts, Gestaltung).
-    schriftLaden(marke);
+    return seiteEinrichten(marke);
   }, [marke]);
 
   // Vorschläge, kurz verzögert; ältere Antworten verwerfen.
@@ -215,7 +215,7 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
   const wortmarke = <><span className="zeichen" aria-hidden="true"><i /></span><span>{marke.name[0]}<b>{marke.name[1]}</b></span></>;
 
   return (
-    <div className={`pc${befund ? ' hat-ergebnis' : ''}`} style={markenStil(marke)} {...markenAttribute(marke)}>
+    <div className={`pc${befund && schritt === 0 && !recht ? ' hat-ergebnis' : ''}`} style={markenStil(marke)} {...markenAttribute(marke)}>
       <header className="kopf">
         <div className="huelle">
           <a className="wortmarke" href="#top" onClick={() => setRecht(null)}>{wortmarke}</a>

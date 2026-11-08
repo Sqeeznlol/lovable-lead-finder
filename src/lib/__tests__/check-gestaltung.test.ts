@@ -5,7 +5,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import { MARKEN } from '@/lib/check-marken';
-import { buehnenBild, markenAttribute, markenStil, schriftAdresse } from '@/lib/check-gestaltung';
+import { readFileSync } from 'node:fs';
+import { buehnenBild, grundton, markenAttribute, markenStil, schriftAdresse } from '@/lib/check-gestaltung';
 
 // Am 7. November bei fonts.googleapis.com abgefragt: alle mit 400 bis 700.
 const SCHRIFTEN = new Set(['Urbanist', 'Figtree', 'Manrope', 'Sora', 'Public Sans', 'Newsreader', 'Albert Sans', 'Fraunces',
@@ -90,6 +91,14 @@ describe('20 Marken', () => {
       const text = [m.etikett, m.titel, m.satz, m.aufruf, m.ueber, m.analyse, ...m.vorteile, ...m.name].join('\n');
       expect(text, m.id).not.toMatch(/ß|–|—| -- /);
       expect(text, m.id).not.toMatch(/neutral|unabhängig/i);
+    }
+  });
+
+  it('iPhone: Safari-Leiste in der Farbe des Grunds, dunkel wie im CSS', () => {
+    const css = readFileSync('src/pages/check.css', 'utf8');
+    const dunkel = css.match(/data-dunkel\]\{--papier: *(#[0-9A-Fa-f]{6})/)?.[1];
+    for (const m of MARKEN) {
+      expect(grundton(m), m.id).toBe(m.design.dunkel ? dunkel : (m.design.papier ?? HELL_PAPIER));
     }
   });
 });

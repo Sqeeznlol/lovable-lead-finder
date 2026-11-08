@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import './check.css';
 import { BETREIBER, markeFuerHost, markeNachId, STANDARD_MARKE, type Marke } from '@/lib/check-marken';
 import { KATASTER } from '@/lib/check-hintergrund';
-import { markenAttribute, markenStil, schriftLaden } from '@/lib/check-gestaltung';
+import { markenAttribute, markenStil, seiteEinrichten } from '@/lib/check-gestaltung';
 import { artikelNachSlug, zumCheck, type Artikel } from '@/lib/ratgeber';
 
 /**
@@ -25,7 +25,7 @@ export default function Ratgeber({ marke: vorgabe }: { marke?: Marke }) {
   useEffect(() => {
     document.title = artikel ? `${artikel.titel} | ${marke.name.join('')}` : marke.name.join('');
     // Jede Marke hat ihre Schrift (check-marken.ts, Gestaltung).
-    schriftLaden(marke);
+    return seiteEinrichten(marke);
   }, [artikel, marke]);
 
   const wortmarke = <><span className="zeichen" aria-hidden="true"><i /></span><span>{marke.name[0]}<b>{marke.name[1]}</b></span></>;

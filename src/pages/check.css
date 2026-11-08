@@ -151,3 +151,31 @@
 .pc .karte-schalter button{color: #12161C;}
 .pc .karte-schalter button[aria-pressed="true"]{color: #FFFFFF;}
 .pc .leaflet-bar a, .pc .leaflet-control-attribution a{color: #12161C;}
+
+/* --- iPhone und Safari --- */
+/* Beim Drehen ins Querformat vergrössert Safari sonst eigenmächtig die Schrift. */
+.pc{-webkit-text-size-adjust: 100%; text-size-adjust: 100%;}
+/* 100vh schliesst in Safari die Adressleiste ein; svh nicht. */
+.pc{min-height: 100svh;}
+/* Kein grauer Blitz beim Antippen, und kein Warten auf einen Doppeltipp. */
+.pc a, .pc button, .pc summary, .pc input, .pc label{-webkit-tap-highlight-color: transparent; touch-action: manipulation;}
+/* iOS legt Textfeldern eigene Rundung und einen Innenschatten an. */
+.pc input[type="text"], .pc input[type="email"], .pc input[type="tel"], .pc input:not([type]), .pc input[type="search"]{-webkit-appearance: none; appearance: none; border-radius: var(--r-klein); box-shadow: none;}
+.pc .suche input{border-radius: 0;}
+.pc .feld input:focus{box-shadow: 0 0 0 3px var(--marke-hell);}
+.pc button{-webkit-appearance: none; appearance: none;}
+/* Querformat mit Notch: Inhalt nicht unter die Kamera. */
+.pc .huelle{padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right));}
+@media (min-width: 900px){.pc .huelle{padding-left: max(40px, env(safe-area-inset-left)); padding-right: max(40px, env(safe-area-inset-right));}}
+.pc .mobil-aufruf{padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right));}
+.pc footer .huelle{padding-bottom: calc(40px + env(safe-area-inset-bottom));}
+/* Leiste unten und Seitenende: die Leiste deckt den Fuss sonst ab. */
+@media (max-width: 999px){.pc.hat-ergebnis{padding-bottom: calc(80px + env(safe-area-inset-bottom));}}
+/* Tippflächen nach Apple mindestens 44px. */
+.pc footer button{min-height: 44px;}
+.pc .zustimmung{min-height: 44px;}
+.pc .zustimmung input{width: 24px; height: 24px;}
+/* Reglergriff gross genug für den Daumen. */
+.pc .rechner input[type=range]{height: 44px; margin: 10px 0 0;}
+.pc .wortmarke{min-height: 44px;}
+.pc .leaflet-touch .leaflet-bar a{width: 44px; height: 44px; line-height: 44px; font-size: 22px;}
