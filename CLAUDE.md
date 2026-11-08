@@ -36,6 +36,10 @@ Repository `bauraum-akquise`). Hier bleiben die Webseite, Wohntraums,
 die Datenbank mit allen Migrationen und die Datenabläufe. Der Test
 `akquise-getrennt.test.ts` wird rot, wenn ein Teil zurückkommt.
 
+Ausnahme seit dem 8. November (Julian: "es soll da sein"): der Reiter
+"Leads" zeigt hier die Leads und Zahlen der Check-Seiten. Er liest nur
+(`anfrage`, `check_trichter`); die Seiten selbst bleiben in der Akquise.
+
 ## Was live ist
 
 Jeder Bau schreibt seinen Commit ins Bündel (`__FASSUNG__` in

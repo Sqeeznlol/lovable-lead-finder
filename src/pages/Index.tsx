@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { Building2, X, Shield, Share, Plus, Map, Target, BarChart3, Gauge, HardHat, MoreHorizontal, Briefcase, LogOut, Orbit, CalendarDays } from 'lucide-react';
+import { Building2, X, Shield, Share, Plus, Map, Target, BarChart3, Gauge, HardHat, MoreHorizontal, Briefcase, LogOut, Orbit, CalendarDays, Inbox } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { KontoMenu } from '@/components/KontoMenu';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -9,6 +9,7 @@ import { PropertyDetailDialog } from '@/components/PropertyDetailDialog';
 import { useSchliessen, useUrlWert } from '@/hooks/use-url-wert';
 import { Skeleton } from '@/components/ui/skeleton';
 const Auswertung = lazy(() => import('@/components/Auswertung').then(m => ({ default: m.Auswertung })));
+const Leads = lazy(() => import('@/components/Leads').then(m => ({ default: m.Leads })));
 const Cockpit = lazy(() => import('@/components/Cockpit').then(m => ({ default: m.Cockpit })));
 const Baugesuche = lazy(() => import('@/components/Baugesuche').then(m => ({ default: m.Baugesuche })));
 const Gelegenheiten = lazy(() => import('@/components/Gelegenheiten').then(m => ({ default: m.Gelegenheiten })));
@@ -35,7 +36,7 @@ import { usePlatform } from '@/hooks/use-platform';
 
 // Jeder Bereich ist eine Adresse: /zentrale, /baugesuche ... ("/" ist
 // das Cockpit). So führt "Zurück" im Browser in den vorigen Bereich.
-const TABS = ['cockpit', 'zentrale', 'baugesuche', 'karte', 'nachbarschaft', 'gelegenheiten', 'auswertung', 'kalender', 'karte3d', 'admin'] as const;
+const TABS = ['cockpit', 'leads', 'zentrale', 'baugesuche', 'karte', 'nachbarschaft', 'gelegenheiten', 'auswertung', 'kalender', 'karte3d', 'admin'] as const;
 type Tab = typeof TABS[number];
 const istTab = (x: string | undefined): x is Tab => !!x && (TABS as readonly string[]).includes(x);
 
@@ -50,6 +51,8 @@ type Eintrag = { id: Tab; label: string; icon: React.ComponentType<{ className?:
 const gruppen: { titel: string; eintraege: Eintrag[] }[] = [
   { titel: 'Heute', eintraege: [
     { id: 'cockpit', label: 'Cockpit', icon: Gauge },
+    // Die Leads der Check-Seiten (20 Webseiten, eine Liste), mit Zahlen je Webseite.
+    { id: 'leads', label: 'Leads', icon: Inbox },
     // Jedes Kundenvorhaben an einem Ort: von der Adressliste bis zur
     // Akquise in seinem Namen.
     { id: 'zentrale', label: 'Zentrale', icon: Briefcase },
@@ -71,7 +74,7 @@ const tabs: Eintrag[] = gruppen.flatMap(g => g.eintraege);
 
 // Primary tabs visible in the iPhone bottom bar
 // Auf dem iPhone vier feste Ziele und "Mehr" für den Rest.
-const mobileBottomTabs: Tab[] = ['cockpit', 'zentrale', 'karte', 'gelegenheiten'];
+const mobileBottomTabs: Tab[] = ['cockpit', 'leads', 'zentrale', 'karte'];
 
 /** Ein Punkt der Icon-Leiste: Symbol, aktiv als schwarzes Quadrat, Name beim Überfahren. */
 function LeistenPunkt({ t, an, onClick }: { t: Eintrag; an: boolean; onClick: () => void }) {
@@ -220,6 +223,7 @@ export default function Index() {
             </div>
           }>
             {active === 'cockpit' && <Cockpit onGehe={z => gehe(z)} onNeu={neuesVorhaben} />}
+            {active === 'leads' && <Leads />}
             {active === 'zentrale' && <Zentrale />}
             {active === 'baugesuche' && <Baugesuche />}
             {active === 'karte' && <Karte onSchliessen={() => gehe('cockpit')} />}
