@@ -17,7 +17,7 @@ export type Art = 'bewertung' | 'potenzial' | 'investor';
 const TEXT: Record<Art, { ueber: string; titel: string; satz: string; knopf: string }> = {
   bewertung: {
     ueber: 'Liegenschaft bewerten', titel: 'Was ist Ihre Liegenschaft wert?',
-    satz: 'Ein paar Angaben genügen. Wir melden uns mit einer Einschätzung -- unverbindlich und kostenlos.',
+    satz: 'Ein paar Angaben genügen. Wir melden uns mit einer Einschätzung, unverbindlich und kostenlos.',
     knopf: 'Bewertung anfragen',
   },
   potenzial: {
@@ -27,7 +27,7 @@ const TEXT: Record<Art, { ueber: string; titel: string; satz: string; knopf: str
   },
   investor: {
     ueber: 'Für Investoren', titel: 'Sie suchen Liegenschaften?',
-    satz: 'Sagen Sie uns, was Sie suchen. Passt ein Objekt, melden wir uns -- oft bevor es auf dem Markt ist.',
+    satz: 'Sagen Sie uns, was Sie suchen. Passt ein Objekt, melden wir uns, oft bevor es auf dem Markt ist.',
     knopf: 'Suchprofil senden',
   },
 };

@@ -268,7 +268,7 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
               <ul className="haken"><li>Kostenlos und unverbindlich</li><li>Amtliche Daten von Bund und Kantonen</li><li>Keine Weitergabe an Dritte</li></ul>
             </div>
             <aside className="beispiel" aria-label="Beispiel einer Auswertung">
-              <div className="oben"><span>Beispiel einer Auswertung</span><em>Rechenbeispiel</em></div>
+              <div className="oben"><span>Beispiel einer Auswertung</span></div>
               <div className="gitter">
                 <div><small>Grundstück</small><b>1'240 m²</b></div>
                 <div><small>Bauzone</small><b>Wohnen</b></div>
@@ -430,9 +430,9 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
             <h2 className="titel">In drei Schritten zu Ihrer Analyse</h2>
             <p className="lead-satz">Kein Konto, kein Abo, keine Verpflichtung. Sie sehen zuerst, was die amtlichen Daten sagen, und entscheiden dann, ob Sie mehr wissen möchten.</p>
             <div className="schritte">
-              <div className="schritt-karte"><div className="nr">1</div><h3>Adresse eingeben</h3><p>Wir finden Ihre Parzelle in der amtlichen Vermessung, schweizweit.</p></div>
-              <div className="schritt-karte"><div className="nr">2</div><h3>Daten sehen und rechnen</h3><p>Fläche, Bauzone, Gebäude und Baujahr, dazu ein Rechner für die Ausnützung.</p></div>
-              <div className="schritt-karte"><div className="nr">3</div><h3>Analyse erhalten</h3><p>Fachleute prüfen die Bau- und Zonenordnung Ihrer Gemeinde und melden sich innert zwei Arbeitstagen.</p></div>
+              <div className="schritt-karte"><div className="nr" aria-hidden="true">1</div><h3>Adresse eingeben</h3><p>Wir finden Ihre Parzelle in der amtlichen Vermessung, schweizweit.</p></div>
+              <div className="schritt-karte"><div className="nr" aria-hidden="true">2</div><h3>Daten sehen und rechnen</h3><p>Fläche, Bauzone, Gebäude und Baujahr, dazu ein Rechner für die Ausnützung.</p></div>
+              <div className="schritt-karte"><div className="nr" aria-hidden="true">3</div><h3>Analyse erhalten</h3><p>Fachleute prüfen die Bau- und Zonenordnung Ihrer Gemeinde und melden sich innert zwei Arbeitstagen.</p></div>
             </div>
           </div>
         </section>
@@ -459,8 +459,7 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
             <li><button type="button" onClick={() => { setRecht('impressum'); window.scrollTo({ top: 0 }); }}>Impressum</button></li>
             <li><button type="button" onClick={() => { setRecht('datenschutz'); window.scrollTo({ top: 0 }); }}>Datenschutz</button></li>
           </ul></div>
-          <div><h4>Datenquellen</h4><ul><li>Amtliche Vermessung</li><li>Bauzonen Schweiz (ARE)</li><li>Gebäude- und Wohnungsregister (BFS)</li><li>swisstopo</li></ul></div>
-          <div className="unten">Vorprüfung auf Grundlage amtlicher Daten, keine Bewilligungszusage und keine Verkehrswertschätzung.</div>
+                    <div className="unten">Vorprüfung auf Grundlage amtlicher Daten, keine Bewilligungszusage und keine Verkehrswertschätzung.</div>
         </div>
       </footer>
 

@@ -204,3 +204,20 @@
 .pc .wahl button::before{content: ""; flex: none; width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid #C9C6C0; background: var(--tafel); box-sizing: border-box; transition: border-width .15s, border-color .15s;}
 .pc .wahl button[aria-pressed="true"]::before{border: 6px solid var(--marke);}
 .pc .haken li{text-align: left;}
+
+/* --- Nach design-wie-apple (8.11.) --- */
+/* Zwischentitel in der Schrift der Marke; index.css gab h3 sonst die
+   Schrift des CRM. Kleine Etiketten und der Fuss bleiben in der Grundschrift. */
+.pc h3{font-family: var(--titel-schrift, var(--schrift));}
+.pc .block h3, .pc .ratgeber-kasten .ueber, .pc h4{font-family: var(--schrift);}
+/* Das Etikett über dem Titel sagte dasselbe wie die Häkchen unter der Suche. */
+.pc .buehne .etikett{display: none;}
+.pc .buehne h1{margin-top: 0;}
+/* Drei Schritte ohne Karten und Schatten: eine Linie, eine grosse Zahl. */
+.pc .schritte{gap: 32px;}
+.pc .schritt-karte, .pc[data-buehne] .schritt-karte{background: none; border: 0; border-top: 1px solid var(--tinte); border-radius: 0; box-shadow: none; padding: 20px 0 0;}
+.pc .schritt-karte .nr{background: none; width: auto; height: auto; display: block; border-radius: 0; font-family: var(--titel-schrift, var(--schrift)); font-size: 40px; font-weight: 500; line-height: 1; letter-spacing: -0.02em; color: var(--marke);}
+.pc .schritt-karte h3{margin-top: 16px;}
+/* Fuss: Datenquellen stehen schon im Band unter der Bühne. */
+@media (min-width: 800px){.pc footer .huelle{grid-template-columns: 2fr 1fr;}}
+.pc footer ul{gap: 0;}
