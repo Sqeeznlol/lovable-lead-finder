@@ -8,11 +8,8 @@ import { ThemeProvider } from "@/hooks/use-theme";
 import { CantonProvider } from "@/hooks/use-canton";
 import { AuthProvider } from "@/hooks/use-auth";
 import { Torwaechter } from "@/components/Torwaechter";
-import { useEigentuemerLookupListener } from "@/hooks/use-eigentuemer-lookup";
-import { AuskunftAusLesezeichen } from "@/components/AuskunftAusLesezeichen";
 import { markeFuerHost } from "@/lib/check-marken";
 const Index = lazy(() => import("./pages/Index.tsx"));
-const SwipePage = lazy(() => import("./pages/SwipePage.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 const Anfrage = lazy(() => import("./pages/Anfrage.tsx"));
 const Check = lazy(() => import("./pages/Check.tsx"));
@@ -24,8 +21,8 @@ const Ratgeber = lazy(() => import("./pages/Ratgeber.tsx"));
  * von der Webseite"). Es teilt nur die Datenbank mit der Webseite.
  *
  * Drei Teile:
- *   - die Akquise hinter der Anmeldung: Übersicht, Abfrage, Gebäudesuche,
- *     Nummern, Pipedrive und die stillgelegten Werkzeuge;
+ *   - hinter der Anmeldung das Leads-Dashboard der Check-Seiten und der
+ *     Admin (Julian, 8. November: die alte Eigentümerabfrage ist weg);
  *   - die Check-Seiten und der Ratgeber, auf ihren eigenen Domains offen;
  *   - die Anfrage-Seiten Bewertung, Potenzial, Investor, ebenfalls offen.
  */
@@ -42,13 +39,6 @@ const queryClient = new QueryClient({
     },
   },
 });
-
-function GlobalListeners() {
-  useEigentuemerLookupListener();
-  // Das Lesezeichen bringt die Auskunft hinter der Raute mit; hier
-  // wird sie entgegengenommen, gleich auf welcher Seite man landet.
-  return <AuskunftAusLesezeichen />;
-}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -83,14 +73,11 @@ const App = () => (
               <Route path="/investor" element={<Anfrage art="investor" />} />
               <Route path="*" element={
                 <Torwaechter>
-                  <GlobalListeners />
                   <Suspense fallback={<div className="min-h-screen bg-background" />}>
                     <Routes>
                       <Route path="/" element={<Index />} />
-                      {/* Jeder Bereich hat seine Adresse (/nummern, /pipedrive ...),
-                          damit "Zurück" im Browser funktioniert. */}
+                      {/* /admin hat eine eigene Adresse; alte Adressen führen zum Dashboard. */}
                       <Route path="/:bereich" element={<Index />} />
-                      <Route path="/swipe" element={<SwipePage />} />
                       <Route path="*" element={<NotFound />} />
                     </Routes>
                   </Suspense>

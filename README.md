@@ -10,19 +10,25 @@ dem Repository der Webseite.
 
 | Teil | Wo | Wer sieht es |
 |---|---|---|
-| Akquise: Übersicht, Abfrage, Gebäudesuche, Nummern, Pipedrive | `src/pages/Index.tsx` | nur angemeldet, keine Fondsleitungen |
-| Stillgelegt: Akquise-Modus, Telefone, Vorauswahl, Telefon-Suche, Liegenschaften, Export, Import | Admin → Stillgelegte Bereiche | nur angemeldet |
-| Chrome-Erweiterung für die Eigentumsauskunft ZH und TG | `extension/` | wer sie installiert |
-| Lesezeichen für die Auskunft | Admin | angemeldet |
+| Leads-Dashboard (Startseite): alle Leads der Check-Seiten, Zahlen je Webseite und Quelle | `src/pages/Index.tsx`, `src/components/Leads.tsx` | nur angemeldet, keine Fondsleitungen |
+| Admin: Benutzer und Protokoll | `/admin` | nur Admins |
 | Check-Seiten (ParzellenChecker, HausChecker, ...) | `src/pages/Check.tsx`, `src/lib/check-marken.ts` | öffentlich, auf ihren Domains |
-| Leads aller Marken und Zahlen je Marke (Besucher bis Lead, Quelle) | `src/components/Leads.tsx`, Reiter "Leads" | nur angemeldet |
 | Ratgeber für Eigentümer | `src/pages/Ratgeber.tsx`, `src/lib/ratgeber.ts` | öffentlich |
 | Anfrage-Seiten Bewertung, Potenzial, Investor | `src/pages/Anfrage.tsx` | öffentlich |
 | Server-Funktionen: Telefonsuche, Pipedrive, SMS, Tagesbericht | `supabase/functions/` | Supabase |
 | Pipedrive-Werkzeuge | `tools/pipedrive-*.py`, Ablauf "Pipedrive ansehen" | GitHub Actions |
 | Werbeplan | `docs/werbeplan-eigentuemer.md` | intern |
 
-## Was automatisch läuft und was nicht
+## Nicht mehr in der Oberfläche
+
+Seit dem 8. November (Julian: "neues Tool ... die alten Funktionen
+einfach weg") zeigt die App nur noch Leads und Admin. Die frühere
+Eigentümerabfrage (Abfrage, Gebäudesuche, Nummern, Pipedrive,
+Chrome-Erweiterung, Lesezeichen) ist nicht mehr erreichbar; ihr Code und
+der folgende Abschnitt bleiben stehen, bis entschieden ist, ob er
+gelöscht wird.
+
+## Was automatisch läuft und was nicht (frühere Eigentümerabfrage)
 
 Nach einer Eigentumsauskunft läuft alles von selbst: Nummer suchen
 (tel-search), Deal in Pipedrive anlegen (pipedrive-push), Objekt aus der
