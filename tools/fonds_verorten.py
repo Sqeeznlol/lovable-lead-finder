@@ -40,6 +40,9 @@ def zerlegen(ort_adresse):
     """"Basel, Birsigstrasse 80 / 82, Bachlettenstrasse 13" -> ("Basel", "Birsigstrasse", "80")."""
     teile = [t.strip() for t in ort_adresse.split(",")]
     ort, rest = teile[0], ", ".join(teile[1:])
+    # Ohne Ort vorne ("Rue de Lausanne 72 / Rue Rothschild 50"): ganz als Strasse suchen.
+    if re.search(r"\d", ort) or not rest:
+        ort, rest = "", ort_adresse
     ort = re.sub(r"\s*\((?:[A-Z]{2})\)$", "", re.sub(r"-(Nord|Süd|Ost|West|Zentrum).*$", "", ort))
     ort = EXONYM.get(ort, ort)
     rest = rest.replace("’", "'")
@@ -56,7 +59,7 @@ def suchen(ort, strasse, nr):
         a = r.get("attrs", {})
         lab = norm(re.sub(r"<[^>]+>", "", a.get("label", "")))
         # Mit der Strasse muss der Ort oder seine Postleitzahl-Ortschaft passen.
-        if norm(strasse).split()[-1] in lab and any(w in lab for w in norm(ort).split()[:1]):
+        if norm(strasse).split()[-1] in lab and (not ort or any(w in lab for w in norm(ort).split()[:1])):
             return a.get("y"), a.get("x"), re.sub(r"<[^>]+>", "", a.get("label", ""))
     return None
 

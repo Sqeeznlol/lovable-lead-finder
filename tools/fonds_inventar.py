@@ -29,7 +29,7 @@ KOPF = re.compile(r"Ort,? +Adresse|Gemeinde +Adresse|Ort +Strasse|Liegenschaftsv
 # Ein blosses "Total" mit Beträgen schliesst die Tabelle auch (SRPF); "Total Wohnbauten" nicht.
 ENDE = re.compile(r"^(Gesamttotal|Total g[ée]n[ée]ral|Total Liegenschaften|Total Grundst|Total\s{2,})", re.I)
 TOTAL = re.compile(r"^(Gesamt)?total|^Total|^Sous-total|^Zwischentotal|^Summe", re.I)
-NICHT = re.compile(r"hypothek|darlehen|kredit|festvorsch|zinssatz|laufzeit|verbindlichkeit|bewertung|r[ée]partition|anteil", re.I)
+NICHT = re.compile(r"hypothek|darlehen|kredit|festvorsch|zinssatz|laufzeit|verbindlichkeit|bewertung|r[ée]partition|anteil|gewinn|verlust|ertr[äa]g|aufwand|erfolg|r[üu]ckstellung|steuer|verm[öo]gen|kosten|einnahmen|ausgaben|revenu|charge|b[ée]n[ée]fice|perte|provision|fortune|amortis|abschreib|wertberichtig|mietzins|dividend|aussch[üu]ttung|kapital", re.I)
 SPALTE = re.compile(r"Verkehrs-?\s*wert|Gestehungs|Einstand|valeur v[ée]nale|prix de revient|Marktwert", re.I)
 EIGENTUM = re.compile(r",?\s*(Alleineigentum|Miteigentum|Stockwerkeigentum|Baurecht|propri[ée]t[ée] (individuelle|par [ée]tages)|copropri[ée]t[ée])\b.*$", re.I)
 ART = re.compile(r"^(Wohnbauten|Wohnliegenschaften|Gemischte Bauten|Kommerziell[a-z ]*|Gesch[äa]ftsliegenschaften|Bauland[a-z ,]*|Angefangene Bauten[a-z ,]*|Immeubles d.habitation|Immeubles commerciaux|Immeubles mixtes|Wohnen|Gemischt|Gewerbe)\b", re.I)
@@ -111,7 +111,10 @@ def lesen(zeilen):
         jahr = JAHR.search(links)
         gest, wert = betrag(grosse[0].group()), betrag(grosse[1].group())
         rest = [betrag(m.group()) for m in ZAHL.finditer(z[grosse[1].end():]) if betrag(m.group()) >= 10_000]
-        if name and re.match(r"[A-ZÄÖÜÉÈÂ]", name):
+        # Eine Liegenschaft hat eine Adresse: Hausnummer, Strassenwort oder "Ort, Lage".
+        # "Waadt" oder "Zürich" allein ist eine Zusammenfassung nach Kanton.
+        adresse = bool(re.search(r"\d", name) or STRASSE.search(name) or "," in name)
+        if name and re.match(r"[A-ZÄÖÜÉÈÂ]", name) and adresse:
             aus.append({"name": name, "baujahr": jahr.group() if jahr else "", "gestehung": gest,
                         "verkehrswert": wert, "sollmiete": rest[0] if rest else ""})
         text_davor = []
@@ -202,6 +205,10 @@ def main():
                 f"{'= Total' if stimmt else f'vs. nächstes Total {naechst:,}'}\n".replace(",", "'").replace("' Summe", ", Summe"))
         for x in ls:
             r = round(x["sollmiete"] / x["verkehrswert"] * 100, 2) if x["sollmiete"] and x["verkehrswert"] else ""
+            # Der Verkehrswert ist über das Total geprüft, die Miete nicht: eine Rendite
+            # ausserhalb 1 bis 12 % heisst, die falsche Spalte wurde gelesen. Dann lieber leer.
+            if r != "" and not 1 <= r <= 12:
+                x["sollmiete"], r = "", ""
             w.writerow([f["name"], f.get("typ", ""), f.get("berichtsdatum", ""), x["name"], x["baujahr"], x["gestehung"],
                         x["verkehrswert"], x["sollmiete"], r, f["pdf_url"]])
     b.write(f"\nGefässe mit Summe = Total: {gut}\nLiegenschaften gelesen: {n_ges}\n")
