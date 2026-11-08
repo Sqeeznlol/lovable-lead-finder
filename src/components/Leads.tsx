@@ -62,14 +62,18 @@ export function Leads() {
 
   return (
     <Seite bild={BILD.pipedrive} ueber="Check-Seiten" titel="Leads"
-      unter={<>Alle Marken schreiben in dieselbe Liste. Zeitraum: letzte {tage} Tage.</>}
+      unter={<>
+        <span className="block">Alle Marken schreiben in dieselbe Liste.</span>
+        {/* Die Zeitwahl gehört sichtbar unter den Titel: "aktionen" erscheint
+            am Computer nur mit einer Seitentafel, die diese Seite nicht hat. */}
+        <span className="mt-4 block"><Reiter<Zeitraum> wahl={tage} setWahl={setTage} optionen={[{ wert: '7' as Zeitraum, titel: '7 Tage' }, { wert: '30' as Zeitraum, titel: '30 Tage' }, { wert: '90' as Zeitraum, titel: '90 Tage' }]} /></span>
+      </>}
       kennzahlen={[
-        { titel: 'Leads', wert: String(leads.data?.length ?? 0), marke: heiss ? <Marke art="heiss">{heiss} heiss offen</Marke> : undefined },
+        { titel: `Leads ${tage} Tage`, wert: String(leads.data?.length ?? 0), marke: heiss ? <Marke art="heiss">{heiss} heiss offen</Marke> : undefined },
         { titel: 'Besucher', wert: trichter.data ? String(summe.aufruf) : '–' },
         { titel: 'Abschluss', wert: trichter.data ? prozent(summe.aufruf ? summe.lead / summe.aufruf : null) : '–' },
         { titel: 'Marken mit Besuch', wert: trichter.data ? String(t.filter(m => m.werte.aufruf).length) : '–' },
       ]}
-      aktionen={<Reiter<Zeitraum> wahl={tage} setWahl={setTage} optionen={[{ wert: '7' as Zeitraum, titel: '7 Tage' }, { wert: '30' as Zeitraum, titel: '30 Tage' }, { wert: '90' as Zeitraum, titel: '90 Tage' }]} />}
     >
       <Abschnitt titel="Leads" zahl={liste.length}
         rechts={<button type="button" className={KNOPF} onClick={() => setNurOffen(!nurOffen)}>{nurOffen ? 'Auch erledigte zeigen' : 'Nur offene'}</button>}>
