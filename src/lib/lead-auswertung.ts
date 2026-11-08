@@ -48,3 +48,14 @@ export function quellen(zeilen: TrichterZeile[]): { quelle: string; besucher: nu
 }
 
 export const prozent = (x: number | null) => (x == null ? '–' : `${(x * 100).toFixed(x < 0.1 ? 1 : 0)} %`);
+
+/** Die Antworten aus dem Fragebogen der Check-Seiten, wie sie im Lead stehen. */
+export const ANTWORT_TEXT: Record<'eigentuemer' | 'absicht' | 'zeitraum', Record<string, string>> = {
+  eigentuemer: { allein: 'Ja, allein', gemeinsam: 'Ja, gemeinsam mit anderen', erbengemeinschaft: 'Ja, als Erbengemeinschaft',
+    vertretung: 'Nein, ich vertrete den Eigentümer', nein: 'Nein' },
+  absicht: { verkaufen: 'Verkaufen', bauen: 'Bauen, aus- oder umbauen', wert: 'Den Wert kennen', informieren: 'Nur informieren' },
+  zeitraum: { 12: 'In den nächsten 12 Monaten', 36: 'In 1 bis 3 Jahren', offen: 'Noch offen' },
+};
+
+/** Testdaten der Testphase: markiert im Lead oder mit Quelle "test". */
+export const istTest = (l: { angaben?: Record<string, unknown> | null }) => !!l.angaben?.test || l.angaben?.utm_source === 'test';
