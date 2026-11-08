@@ -255,7 +255,7 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
                            if (e.key === 'ArrowUp') { setAktiv(a => (a - 1 + liste.length) % liste.length); e.preventDefault(); }
                            if (e.key === 'Escape') setListe([]);
                          }} />
-                  <button className="knopf marke" type="submit">Jetzt prüfen</button>
+                  <button className="knopf marke" type="submit"><span className="lang">Jetzt prüfen</span><span className="kurz">Prüfen</span></button>
                 </div>
                 {liste.length > 0 && (
                   <ul className="vorschlaege" role="listbox">

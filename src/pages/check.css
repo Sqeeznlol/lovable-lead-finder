@@ -179,3 +179,19 @@
 .pc .rechner input[type=range]{height: 44px; margin: 10px 0 0;}
 .pc .wortmarke{min-height: 44px;}
 .pc .leaflet-touch .leaflet-bar a{width: 44px; height: 44px; line-height: 44px; font-size: 22px;}
+/* Suche auf dem Handy: Feld und Knopf in einer Zeile wie bei Apple, nicht
+   ein Kasten mit einem Balken über die ganze Breite (Julian, 8.11.). */
+.pc .suche .kurz{display: none;}
+@media (max-width: 520px){
+  .pc .suche .feldzeile{flex-direction: row; padding: 6px; gap: 6px;}
+  .pc .suche input{padding: 0 10px; height: 48px;}
+  .pc .suche .knopf{width: auto; height: 48px; min-height: 48px; padding: 0 18px;}
+  .pc .suche .lang{display: none;}
+  .pc .suche .kurz{display: inline;}
+}
+/* Das Raster nahm die Breite des längsten Worts an; auf 320px (iPhone SE)
+   ragte die Bühne rechts hinaus und wurde abgeschnitten. */
+@media (max-width: 999px){.pc .buehne .huelle, .pc[data-buehne] .buehne .huelle{grid-template-columns: minmax(0, 1fr);}}
+.pc[data-buehne="mitte"] .buehne .huelle{grid-template-columns: minmax(0, 1fr);}
+.pc .buehne h1{overflow-wrap: break-word;}
+.pc .buehne .huelle > *{min-width: 0; max-width: 100%;}
