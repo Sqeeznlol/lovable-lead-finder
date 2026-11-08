@@ -1,7 +1,8 @@
 /**
  * Auswertung der Check-Seiten: aus den Zeilen von check_trichter() je
- * Marke, wie viele Besucher jeden Schritt erreicht haben, und wo sie
- * aussteigen. Rein und ohne Datenbank, damit es ein Test prüfen kann.
+ * Webseite (Domain), wie viele Besucher jeden Schritt erreicht haben, und
+ * wo sie aussteigen. Je Webseite, nicht je Marke (Julian, 8. November):
+ * eine Marke kann mehrere Domains haben, und die Werbung läuft je Domain. Rein und ohne Datenbank, damit es ein Test prüfen kann.
  */
 export const SCHRITTE = ['aufruf', 'suche', 'ergebnis', 'rechner', 'kontakt', 'lead'] as const;
 export type Schritt = typeof SCHRITTE[number];
@@ -11,23 +12,24 @@ export const SCHRITT_TEXT: Record<Schritt, string> = {
 };
 
 export interface TrichterZeile { marke: string; domain: string; ereignis: string; sitzungen: number; quelle: string }
-export interface MarkenTrichter { marke: string; werte: Record<Schritt, number>; quote: number | null }
+export interface SeitenTrichter { domain: string; marke: string; werte: Record<Schritt, number>; quote: number | null }
 
-export function trichterJeMarke(zeilen: TrichterZeile[]): MarkenTrichter[] {
-  const je = new Map<string, Record<Schritt, number>>();
+export function trichterJeSeite(zeilen: TrichterZeile[]): SeitenTrichter[] {
+  const je = new Map<string, { marke: string; werte: Record<Schritt, number> }>();
   for (const z of zeilen) {
     if (!(SCHRITTE as readonly string[]).includes(z.ereignis)) continue;
-    const w = je.get(z.marke) ?? Object.fromEntries(SCHRITTE.map(s => [s, 0])) as Record<Schritt, number>;
-    w[z.ereignis as Schritt] += Number(z.sitzungen) || 0;
-    je.set(z.marke, w);
+    const domain = z.domain.replace(/^www\./, '');
+    const e = je.get(domain) ?? { marke: z.marke, werte: Object.fromEntries(SCHRITTE.map(s => [s, 0])) as Record<Schritt, number> };
+    e.werte[z.ereignis as Schritt] += Number(z.sitzungen) || 0;
+    je.set(domain, e);
   }
   return [...je.entries()]
-    .map(([marke, werte]) => ({ marke, werte, quote: werte.aufruf ? werte.lead / werte.aufruf : null }))
+    .map(([domain, { marke, werte }]) => ({ domain, marke, werte, quote: werte.aufruf ? werte.lead / werte.aufruf : null }))
     .sort((a, b) => b.werte.lead - a.werte.lead || b.werte.aufruf - a.werte.aufruf);
 }
 
-/** Summe über alle Marken, für die Kennzahlenleiste. */
-export function gesamt(t: MarkenTrichter[]): Record<Schritt, number> {
+/** Summe über alle Webseiten, für die Kennzahlenleiste. */
+export function gesamt(t: SeitenTrichter[]): Record<Schritt, number> {
   const s = Object.fromEntries(SCHRITTE.map(x => [x, 0])) as Record<Schritt, number>;
   for (const m of t) for (const x of SCHRITTE) s[x] += m.werte[x];
   return s;

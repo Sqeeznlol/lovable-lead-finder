@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { gesamt, quellen, trichterJeMarke, type TrichterZeile } from '@/lib/lead-auswertung';
+import { gesamt, quellen, trichterJeSeite, type TrichterZeile } from '@/lib/lead-auswertung';
 
 const z = (marke: string, ereignis: string, sitzungen: number, quelle = 'direkt'): TrichterZeile => ({ marke, domain: `${marke}.ch`, ereignis, sitzungen, quelle });
 
@@ -10,16 +10,26 @@ describe('Auswertung der Check-Seiten', () => {
     z('parzellenchecker', 'ratgeber', 9),
   ];
 
-  it('zählt je Marke über alle Quellen und Domains, Ratgeber zählt nicht als Schritt', () => {
-    const t = trichterJeMarke(zeilen);
-    expect(t.map(m => m.marke)).toEqual(['hauszugross', 'parzellenchecker']);
+  it('zählt je Webseite über alle Quellen, Ratgeber zählt nicht als Schritt', () => {
+    const t = trichterJeSeite(zeilen);
+    expect(t.map(m => m.domain)).toEqual(['hauszugross.ch', 'parzellenchecker.ch']);
     expect(t[0].werte).toMatchObject({ aufruf: 100, suche: 40, lead: 4, ergebnis: 0 });
     expect(t[0].quote).toBeCloseTo(0.04);
     expect(t[1].werte.aufruf).toBe(50);
   });
 
+  it('trennt zwei Domains derselben Marke, www zählt zur Domain', () => {
+    const t = trichterJeSeite([
+      { marke: 'hauszugross', domain: 'hauszugross.ch', ereignis: 'aufruf', sitzungen: 10, quelle: 'direkt' },
+      { marke: 'hauszugross', domain: 'www.hauszugross.ch', ereignis: 'aufruf', sitzungen: 5, quelle: 'direkt' },
+      { marke: 'hauszugross', domain: 'haus-zu-gross.ch', ereignis: 'aufruf', sitzungen: 7, quelle: 'direkt' },
+    ]);
+    expect(t.map(x => [x.domain, x.werte.aufruf])).toEqual([['hauszugross.ch', 15], ['haus-zu-gross.ch', 7]]);
+    expect(t.every(x => x.marke === 'hauszugross')).toBe(true);
+  });
+
   it('summiert und teilt nach Quelle', () => {
-    expect(gesamt(trichterJeMarke(zeilen))).toMatchObject({ aufruf: 150, lead: 5 });
+    expect(gesamt(trichterJeSeite(zeilen))).toMatchObject({ aufruf: 150, lead: 5 });
     expect(quellen(zeilen)).toEqual([
       { quelle: 'facebook', besucher: 80, leads: 4 },
       { quelle: 'direkt', besucher: 70, leads: 1 },
@@ -27,6 +37,15 @@ describe('Auswertung der Check-Seiten', () => {
   });
 
   it('ohne Besucher keine Quote statt Division durch null', () => {
-    expect(trichterJeMarke([z('x1', 'lead', 1)])[0].quote).toBeNull();
+    expect(trichterJeSeite([z('x1', 'lead', 1)])[0].quote).toBeNull();
+  });
+});
+
+describe('Meta-Pixel', () => {
+  it('Lead geht als Lead an Meta, Zwischenschritte als Standardereignisse', async () => {
+    const { PIXEL_FUER } = await import('@/lib/check-zaehlen');
+    expect(PIXEL_FUER.lead).toBe('Lead');
+    expect(PIXEL_FUER.aufruf).toBe('PageView');
+    expect(PIXEL_FUER.kontakt).toBeUndefined();
   });
 });

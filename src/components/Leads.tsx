@@ -5,7 +5,7 @@ import { Abschnitt, KNOPF, Leer, LISTE, Marke, Reiter, Seite } from '@/component
 import { BILD } from '@/lib/luftbild';
 import { markeNachId } from '@/lib/check-marken';
 import { ANTWORT_TEXT } from '@/lib/check-daten';
-import { gesamt, prozent, quellen, SCHRITT_TEXT, SCHRITTE, trichterJeMarke, type TrichterZeile } from '@/lib/lead-auswertung';
+import { gesamt, prozent, quellen, SCHRITT_TEXT, SCHRITTE, trichterJeSeite, type TrichterZeile } from '@/lib/lead-auswertung';
 
 /**
  * Alle Leads der Check-Seiten in einer Liste, dazu die Zahlen je Marke
@@ -49,7 +49,7 @@ export function Leads() {
     },
   });
 
-  const t = useMemo(() => trichterJeMarke(trichter.data ?? []), [trichter.data]);
+  const t = useMemo(() => trichterJeSeite(trichter.data ?? []), [trichter.data]);
   const summe = gesamt(t);
   const q = quellen(trichter.data ?? []);
   const liste = (leads.data ?? []).filter(l => !nurOffen || !l.bearbeitet);
@@ -63,7 +63,7 @@ export function Leads() {
   return (
     <Seite bild={BILD.pipedrive} ueber="Check-Seiten" titel="Leads"
       unter={<>
-        <span className="block">Alle Marken schreiben in dieselbe Liste.</span>
+        <span className="block">Alle Webseiten schreiben in dieselbe Liste.</span>
         {/* Die Zeitwahl gehört sichtbar unter den Titel: "aktionen" erscheint
             am Computer nur mit einer Seitentafel, die diese Seite nicht hat. */}
         <span className="mt-4 block"><Reiter<Zeitraum> wahl={tage} setWahl={setTage} optionen={[{ wert: '7' as Zeitraum, titel: '7 Tage' }, { wert: '30' as Zeitraum, titel: '30 Tage' }, { wert: '90' as Zeitraum, titel: '90 Tage' }]} /></span>
@@ -72,7 +72,7 @@ export function Leads() {
         { titel: `Leads ${tage} Tage`, wert: String(leads.data?.length ?? 0), marke: heiss ? <Marke art="heiss">{heiss} heiss offen</Marke> : undefined },
         { titel: 'Besucher', wert: trichter.data ? String(summe.aufruf) : '–' },
         { titel: 'Abschluss', wert: trichter.data ? prozent(summe.aufruf ? summe.lead / summe.aufruf : null) : '–' },
-        { titel: 'Marken mit Besuch', wert: trichter.data ? String(t.filter(m => m.werte.aufruf).length) : '–' },
+        { titel: 'Webseiten mit Besuch', wert: trichter.data ? String(t.filter(m => m.werte.aufruf).length) : '–' },
       ]}
     >
       <Abschnitt titel="Leads" zahl={liste.length}
@@ -97,7 +97,7 @@ export function Leads() {
                         <span className="font-medium">{l.name}</span>
                         {a.prioritaet === 'heiss' && <Marke art="heiss">heiss</Marke>}
                         {a.prioritaet === 'warm' && <Marke art="violett">warm</Marke>}
-                        <Marke>{m ? m.name.join('') : String(a.marke ?? 'Anfrage')}</Marke>
+                        <Marke>{String(a.domain ?? (m ? m.name.join('') : 'Anfrage'))}</Marke>
                         {(a.utm_source || a.fbclid || a.gclid) && <Marke>{String(a.utm_source ?? (a.fbclid ? 'facebook' : 'google'))}</Marke>}
                       </div>
                       <div className="text-sm">{l.adresse ?? '–'}{a.flaeche ? ` · ${a.flaeche} m²` : ''}{a.zone ? ` · ${a.zone}` : ''}</div>
@@ -116,21 +116,21 @@ export function Leads() {
           )}
       </Abschnitt>
 
-      <Abschnitt titel="Je Marke" hinweis="Sitzungen, die den Schritt erreicht haben. Abschluss = Leads je Besucher.">
+      <Abschnitt titel="Je Webseite" hinweis="Sitzungen, die den Schritt erreicht haben. Abschluss = Leads je Besucher.">
         {trichter.data === null ? <Leer titel="Die Zählung ist noch nicht eingerichtet.">In GitHub den Ablauf «Migrationen» mit «einspielen» starten (Repository der Webseite).</Leer>
           : !t.length ? <Leer titel="Noch keine Besucher in diesem Zeitraum." />
           : (
             <div className="overflow-x-auto rounded border bg-card">
               <table className="w-full min-w-[720px] text-sm">
                 <thead><tr className="border-b text-left text-muted-foreground">
-                  <th className="p-3 font-medium">Marke</th>
+                  <th className="p-3 font-medium">Webseite</th>
                   {SCHRITTE.map(s => <th key={s} className="p-3 text-right font-medium">{SCHRITT_TEXT[s]}</th>)}
                   <th className="p-3 text-right font-medium">Abschluss</th>
                 </tr></thead>
                 <tbody>
                   {t.map(m => (
-                    <tr key={m.marke} className="border-b last:border-0">
-                      <td className="p-3">{markeNachId(m.marke)?.name.join('') ?? m.marke}</td>
+                    <tr key={m.domain} className="border-b last:border-0">
+                      <td className="p-3"><span className="block font-medium">{m.domain}</span><span className="block text-xs text-muted-foreground">{markeNachId(m.marke)?.name.join('') ?? m.marke}</span></td>
                       {SCHRITTE.map(s => <td key={s} className="p-3 text-right tabular-nums">{m.werte[s]}</td>)}
                       <td className="p-3 text-right tabular-nums font-medium">{prozent(m.quote)}</td>
                     </tr>

@@ -59,9 +59,14 @@ Adresse, diese an zwei Stellen eintragen:
    `npm run build`, Ausgabe `dist`. Umgebungsvariablen wie in `.env`.
 2. Die Marken-Domains (hauschecker.ch, parzellenchecker.ch, ...) diesem
    Projekt hinzufügen, nicht der Webseite.
-3. Die Adresse als Repository-Variable `AKQUISE_URL` eintragen; dann
+3. Meta-Pixel für die Facebook-Werbung: bei Vercel die Umgebungsvariable
+   `VITE_META_PIXEL_ID` mit der Pixel-ID aus dem Meta-Werbekonto setzen
+   und neu bauen. Ohne sie lädt kein Pixel. Gesendet werden PageView,
+   Search, ViewContent, InitiateCheckout und Lead, je mit der Domain,
+   nie Name, Adresse oder Nummer.
+4. Die Adresse als Repository-Variable `AKQUISE_URL` eintragen; dann
    prüft "Was ist live" jeden Push.
-4. Secrets für die Abläufe: `SUPABASE_ACCESS_TOKEN` (Funktionen),
+5. Secrets für die Abläufe: `SUPABASE_ACCESS_TOKEN` (Funktionen),
    `PIPEDRIVE_API_TOKEN`, `SUPABASE_DB_URL` und die Konto-Passwörter, die
    `tools/anmelden.sh` liest (Pipedrive ansehen).
 

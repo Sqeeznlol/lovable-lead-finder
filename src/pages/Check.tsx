@@ -252,7 +252,7 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
           <h2>{recht === 'impressum' ? 'Impressum' : 'Datenschutz'}</h2>
           {recht === 'impressum'
             ? <p>{marke.name.join('')} ist ein Angebot von {BETREIBER}. Firmenname, Postadresse, E-Mail und UID werden hier ergänzt.</p>
-            : <p>Wir speichern die Angaben, die Sie im Formular machen (Vorname, Name, E-Mail, Telefon, Adresse der Liegenschaft und Ihre Antworten), um Ihnen die Berechnung und Analyse zu erstellen und Sie zu Ihrer Liegenschaft zu kontaktieren. An Dritte geben wir sie nicht weiter. Die angezeigten Grundstücksdaten stammen von geo.admin.ch. Die vollständige Datenschutzerklärung mit Verantwortlichem, Auftragsbearbeitern und Ländern wird mit den Angaben zum Betreiber ergänzt.</p>}
+            : <p>Wir speichern die Angaben, die Sie im Formular machen (Vorname, Name, E-Mail, Telefon, Adresse der Liegenschaft und Ihre Antworten), um Ihnen die Berechnung und Analyse zu erstellen und Sie zu Ihrer Liegenschaft zu kontaktieren. An Dritte geben wir sie nicht weiter. Die angezeigten Grundstücksdaten stammen von geo.admin.ch. Für unsere Werbung auf Facebook und Instagram nutzen wir das Meta-Pixel von Meta Platforms Ireland: Es meldet Meta, dass jemand die Seite besucht, eine Adresse gesucht oder eine Anfrage gesendet hat, ohne Ihre Angaben aus dem Formular. Meta kann dies mit einem Konto bei Facebook oder Instagram verbinden. Die vollständige Datenschutzerklärung mit Verantwortlichem, Auftragsbearbeitern und Ländern wird mit den Angaben zum Betreiber ergänzt.</p>}
           <button type="button" className="knopf" onClick={() => setRecht(null)}>Zurück</button>
         </main>
       ) : (

@@ -8,6 +8,7 @@
  * darf die Seite nicht darunter leiden.
  */
 import { supabase } from '@/integrations/supabase/client';
+import { pixel, type PixelEreignis } from '@/lib/meta-pixel';
 
 export type Ereignis = 'aufruf' | 'suche' | 'ergebnis' | 'rechner' | 'kontakt' | 'lead' | 'ratgeber' | 'ratgeber_klick';
 
@@ -48,12 +49,20 @@ function sitzungsQuelle(): { quelle: string | null; kampagne: string | null } {
 
 const gesendet = new Set<string>();
 
+// Unsere Schritte als Standardereignisse von Meta. "Lead" ist das, worauf
+// die Werbung optimiert; die Schritte davor zeigen Meta, wer nahe dran war.
+export const PIXEL_FUER: Partial<Record<Ereignis, PixelEreignis>> = {
+  aufruf: 'PageView', ratgeber: 'PageView', suche: 'Search', ergebnis: 'ViewContent', rechner: 'InitiateCheckout', lead: 'Lead',
+};
+
 /** Jeden Schritt einmal je Sitzung und Marke. */
 export function zaehlen(marke: string, domain: string, ereignis: Ereignis): void {
   if (typeof window === 'undefined') return;
   const schluessel = `${marke}|${ereignis}`;
   if (gesendet.has(schluessel)) return;
   gesendet.add(schluessel);
+  const p = PIXEL_FUER[ereignis];
+  if (p) pixel(p, { content_name: domain, content_category: marke });
   const { quelle, kampagne } = sitzungsQuelle();
   const geraet = window.matchMedia?.('(max-width: 999px)').matches ? 'handy' : 'computer';
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
