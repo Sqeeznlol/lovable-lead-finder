@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { KNOPF, KNOPF_HAUPT, Marke } from '@/components/rahmen';
 import { luftbildLv95 } from '@/lib/luftbild';
@@ -22,6 +24,52 @@ const zeile = (titel: string, wert: unknown) =>
       <span className="text-right font-medium">{String(wert)}</span>
     </div>
   );
+
+type FondsObjekt = { gefaess: string; ort_adresse: string; verkehrswert: number; brutto_rendite: number | null; baujahr: number | null; e: number; n: number };
+
+/**
+ * Liegenschaften regulierter Gefässe im Umkreis (Tabelle fonds_liegenschaft,
+ * aus den Jahresberichten): wer hier schon hält, kauft hier eher wieder.
+ */
+function FondsInDerNaehe({ lv95 }: { lv95: number[] }) {
+  const R = 2000;
+  const { data } = useQuery({
+    queryKey: ['fonds-naehe', lv95[0], lv95[1]],
+    queryFn: async (): Promise<FondsObjekt[]> => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any).from('fonds_liegenschaft')
+        .select('gefaess, ort_adresse, verkehrswert, brutto_rendite, baujahr, e, n')
+        .gte('e', lv95[0] - R).lte('e', lv95[0] + R).gte('n', lv95[1] - R).lte('n', lv95[1] + R).limit(200);
+      if (error) return [];
+      return (data ?? []) as FondsObjekt[];
+    },
+    staleTime: 10 * 60 * 1000,
+  });
+  const nah = (data ?? [])
+    .map(f => ({ ...f, m: Math.hypot(f.e - lv95[0], f.n - lv95[1]) }))
+    .filter(f => f.m <= R).sort((a, b) => a.m - b.m);
+  const gefaesse = new Set(nah.map(f => f.gefaess)).size;
+  const renditen = nah.map(f => Number(f.brutto_rendite)).filter(x => x > 0).sort((a, b) => a - b);
+  return (
+    <section>
+      <h3 className="mb-1 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Fonds in der Nähe (2 km)</h3>
+      {!data ? <p className="py-2 text-sm text-muted-foreground">Lädt …</p>
+        : !nah.length ? <p className="py-2 text-sm text-muted-foreground">Kein reguliertes Gefäss hält im Umkreis von 2 km eine Liegenschaft (laut den eingelesenen Jahresberichten).</p>
+        : (
+          <>
+            <p className="py-2 text-sm">{nah.length} Liegenschaften von {gefaesse} {gefaesse === 1 ? 'Gefäss' : 'Gefässen'}
+              {renditen.length ? `, Bruttorendite ${renditen[0].toFixed(1)} bis ${renditen[renditen.length - 1].toFixed(1)} %` : ''}.</p>
+            {nah.slice(0, 8).map(f => (
+              <div key={`${f.gefaess}-${f.ort_adresse}`} className="border-b py-2 text-sm last:border-0">
+                <div className="flex justify-between gap-3"><span className="font-medium">{f.ort_adresse}</span><span className="shrink-0 text-muted-foreground">{f.m < 1000 ? `${Math.round(f.m / 10) * 10} m` : `${(f.m / 1000).toFixed(1)} km`}</span></div>
+                <div className="text-muted-foreground">{f.gefaess} · CHF {(f.verkehrswert / 1e6).toFixed(1)} Mio.{f.brutto_rendite ? ` · ${Number(f.brutto_rendite).toFixed(1)} %` : ''}{f.baujahr ? ` · ${f.baujahr}` : ''}</div>
+              </div>
+            ))}
+          </>
+        )}
+    </section>
+  );
+}
 
 export function LeadDetail({ lead, onClose, onErledigt, onNotiz }: {
   lead: Lead | null; onClose: () => void; onErledigt: (l: Lead) => void; onNotiz: (l: Lead, text: string) => Promise<void>;
@@ -91,6 +139,8 @@ export function LeadDetail({ lead, onClose, onErledigt, onNotiz }: {
               {zeile('Ältestes Baujahr', a.baujahr)}
               {zeile('Bauprojekt im Register', a.projekt ? 'ja' : null)}
             </section>
+
+            {lv95 && <FondsInDerNaehe lv95={lv95} />}
 
             <section>
               <h3 className="mb-1 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Herkunft</h3>
