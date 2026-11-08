@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import './check.css';
 import { BETREIBER, markeFuerHost, markeNachId, STANDARD_MARKE, type Marke } from '@/lib/check-marken';
 import { KATASTER } from '@/lib/check-hintergrund';
+import { useImBild } from '@/lib/im-bild';
 import { markenAttribute, markenStil, seiteEinrichten } from '@/lib/check-gestaltung';
 import { artikelNachSlug, zumCheck, type Artikel } from '@/lib/ratgeber';
 
@@ -28,6 +29,12 @@ export default function Ratgeber({ marke: vorgabe }: { marke?: Marke }) {
     return seiteEinrichten(marke);
   }, [artikel, marke]);
 
+  // Auf dem Handy führt eine Leiste unten zum Check, sobald die Einleitung
+  // gelesen ist; sie weicht, solange ein Angebotskasten im Bild ist. Solange
+  // sie steht, verschwindet der gleiche Knopf im Kopf.
+  const andererAufruf = useImBild('.pc .ratgeber-kopf, .pc .ratgeber-kasten', [artikel?.slug]);
+  const leiste = !!artikel && !andererAufruf;
+
   const wortmarke = <><span className="zeichen" aria-hidden="true"><i /></span><span>{marke.name[0]}<b>{marke.name[1]}</b></span></>;
 
   return (
@@ -35,11 +42,11 @@ export default function Ratgeber({ marke: vorgabe }: { marke?: Marke }) {
       <header className="kopf">
         <div className="huelle">
           <a className="wortmarke" href={ziel}>{wortmarke}</a>
-          <div className="rechts"><a className="knopf marke" href={ziel}>Kostenlos prüfen</a></div>
+          <div className="rechts"><a className={`knopf marke${leiste ? ' nur-gross' : ''}`} href={ziel}>Kostenlos prüfen</a></div>
         </div>
       </header>
 
-      {artikel ? <Inhalt artikel={artikel} ziel={ziel} /> : (
+      {artikel ? <Inhalt artikel={artikel} ziel={ziel} leiste={leiste} /> : (
         <main className="huelle artikel">
           <h1>Diesen Artikel gibt es nicht.</h1>
           <p>Vielleicht wurde er verschoben. Ihr Grundstück können Sie trotzdem prüfen.</p>
@@ -58,7 +65,8 @@ export default function Ratgeber({ marke: vorgabe }: { marke?: Marke }) {
   );
 }
 
-function Inhalt({ artikel, ziel }: { artikel: Artikel; ziel: string }) {
+function Inhalt({ artikel, ziel, leiste }: { artikel: Artikel; ziel: string; leiste: boolean }) {
+
   const kasten = (
     <aside className="ratgeber-kasten" aria-label="Angebot">
       <div>
@@ -90,6 +98,9 @@ function Inhalt({ artikel, ziel }: { artikel: Artikel; ziel: string }) {
           </section>
         ))}
         {kasten}
+        {leiste && (
+          <div className="mobil-aufruf sichtbar"><a className="knopf marke" href={ziel}>{artikel.kasten.knopf}</a></div>
+        )}
         <div className="quellen">
           <h4>Quellen</h4>
           <ul>{artikel.quellen.map(q => <li key={q.url}><a href={q.url}>{q.text}</a></li>)}</ul>

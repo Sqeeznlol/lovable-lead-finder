@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { lv95NachWgs84 } from '@/lib/koordinaten';
 import { BETREIBER, markeFuerHost, markeNachId, STANDARD_MARKE, type Marke } from '@/lib/check-marken';
 import { KATASTER } from '@/lib/check-hintergrund';
+import { useImBild } from '@/lib/im-bild';
 import { buehnenBild, markenAttribute, markenStil, seiteEinrichten } from '@/lib/check-gestaltung';
 import {
   ANTWORT_TEXT, befundAmOrt, GEBAEUDEART, HEIZUNG, herkunft, leadAngaben, mailOk, nameOk, schweizerNummer, STATUS, vorschlaege,
@@ -131,7 +132,12 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
     }
   }, [befund, ort, marke]);
 
-  const zurSuche = () => { window.scrollTo({ top: 0, behavior: leise() ? 'auto' : 'smooth' }); setTimeout(() => eingabeRef.current?.focus(), 350); };
+  // Fokus noch im Tippen setzen: Nur dann öffnet Safari auf dem iPhone die
+  // Tastatur. Danach weich nach oben; preventScroll verhindert den Sprung.
+  const zurSuche = () => {
+    eingabeRef.current?.focus({ preventScroll: true });
+    window.scrollTo({ top: 0, behavior: leise() ? 'auto' : 'smooth' });
+  };
 
   const waehlen = async (v: Ort) => {
     setOrt(v); setText(v.label); setListe([]); setBefund(null); setLaden('laeuft'); setFehler(null);
@@ -212,10 +218,16 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
   const heuteFl = best.reduce((s, h) => s + (h.grundflaeche ?? 0) * (h.geschosse ?? 1), 0);
   const baujahre = best.map(h => h.baujahr).filter((x): x is number => x != null);
   const moeglich = (befund?.flaeche ?? 0) * az;
+  // Aufrufleiste auf dem Handy: nur, wenn gerade kein anderer Aufruf im Bild ist.
+  const andererAufruf = useImBild('.pc .suche, .pc .aufruf, .pc .rechner, .pc .formular.offen, .pc .danke.sichtbar, .pc .schritte-aufruf', [befund, schritt, recht]);
+  const leiste = recht || schritt !== 0 || andererAufruf ? null
+    : befund ? { text: 'Reserve kostenlos berechnen', tun: oeffnen }
+    : { text: 'Grundstück kostenlos prüfen', tun: zurSuche };
+
   const wortmarke = <><span className="zeichen" aria-hidden="true"><i /></span><span>{marke.name[0]}<b>{marke.name[1]}</b></span></>;
 
   return (
-    <div className={`pc${befund && schritt === 0 && !recht ? ' hat-ergebnis' : ''}`} style={markenStil(marke)} {...markenAttribute(marke)}>
+    <div className="pc" style={markenStil(marke)} {...markenAttribute(marke)}>
       <header className="kopf">
         <div className="huelle">
           <a className="wortmarke" href="#top" onClick={() => setRecht(null)}>{wortmarke}</a>
@@ -434,6 +446,10 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
               <div className="schritt-karte"><div className="nr" aria-hidden="true">2</div><h3>Daten sehen und rechnen</h3><p>Fläche, Bauzone, Gebäude und Baujahr, dazu ein Rechner für die Ausnützung.</p></div>
               <div className="schritt-karte"><div className="nr" aria-hidden="true">3</div><h3>Analyse erhalten</h3><p>Fachleute prüfen die Bau- und Zonenordnung Ihrer Gemeinde und melden sich innert zwei Arbeitstagen.</p></div>
             </div>
+            <div className="schritte-aufruf">
+              <button type="button" className="knopf marke" onClick={() => (befund ? oeffnen() : zurSuche())}>{befund ? 'Reserve kostenlos berechnen' : 'Mit Schritt 1 beginnen'}</button>
+              <span>Kostenlos, ohne Konto, in einer Minute.</span>
+            </div>
           </div>
         </section>
 
@@ -463,8 +479,8 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
         </div>
       </footer>
 
-      {befund && schritt === 0 && !recht && (
-        <div className="mobil-aufruf sichtbar"><button type="button" className="knopf marke" onClick={oeffnen}>Reserve kostenlos berechnen</button></div>
+      {leiste && (
+        <div className="mobil-aufruf sichtbar"><button type="button" className="knopf marke" onClick={leiste.tun}>{leiste.text}</button></div>
       )}
     </div>
   );
