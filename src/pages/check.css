@@ -243,3 +243,4 @@
 .pc .zurueck{display: block; margin: 16px auto 0; background: none; border: 0; padding: 0 12px; min-height: 44px; color: var(--grau); font-weight: 500; cursor: pointer; text-decoration: underline; text-underline-offset: 3px;}
 .pc .knopf.senden{width: 100%; min-height: 56px; font-size: 18px; margin-top: 20px;}
 .pc .einwilligung{font-size: 12px; color: var(--hell); line-height: 1.45; margin: 12px 0 0;}
+.pc .vorschlaege.hinweis-nummer{padding: 14px 16px; color: var(--grau); font-size: 15px;}

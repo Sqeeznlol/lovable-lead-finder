@@ -26,6 +26,8 @@ const db = supabase as any;
 export function Leads() {
   const [tage, setTage] = useState<Zeitraum>('30');
   const [nurOffen, setNurOffen] = useState(true);
+  // Testdaten der Testphase (angaben.test, Quelle "test") lassen sich ausblenden.
+  const [ohneTest, setOhneTest] = useState(false);
   const qc = useQueryClient();
   const von = useMemo(() => new Date(Date.now() - Number(tage) * 864e5).toISOString(), [tage]);
 
@@ -49,11 +51,13 @@ export function Leads() {
     },
   });
 
-  const t = useMemo(() => trichterJeSeite(trichter.data ?? []), [trichter.data]);
+  const zeilen = useMemo(() => (trichter.data ?? []).filter(z => !ohneTest || z.quelle !== 'test'), [trichter.data, ohneTest]);
+  const t = useMemo(() => trichterJeSeite(zeilen), [zeilen]);
   const summe = gesamt(t);
-  const q = quellen(trichter.data ?? []);
-  const liste = (leads.data ?? []).filter(l => !nurOffen || !l.bearbeitet);
-  const heiss = (leads.data ?? []).filter(l => l.angaben?.prioritaet === 'heiss' && !l.bearbeitet).length;
+  const q = quellen(zeilen);
+  const alle = (leads.data ?? []).filter(l => !ohneTest || !l.angaben?.test);
+  const liste = alle.filter(l => !nurOffen || !l.bearbeitet);
+  const heiss = alle.filter(l => l.angaben?.prioritaet === 'heiss' && !l.bearbeitet).length;
 
   const erledigt = async (l: Lead) => {
     await db.from('anfrage').update({ bearbeitet: !l.bearbeitet }).eq('id', l.id);
@@ -69,14 +73,17 @@ export function Leads() {
         <span className="mt-4 block"><Reiter<Zeitraum> wahl={tage} setWahl={setTage} optionen={[{ wert: '7' as Zeitraum, titel: '7 Tage' }, { wert: '30' as Zeitraum, titel: '30 Tage' }, { wert: '90' as Zeitraum, titel: '90 Tage' }]} /></span>
       </>}
       kennzahlen={[
-        { titel: `Leads ${tage} Tage`, wert: String(leads.data?.length ?? 0), marke: heiss ? <Marke art="heiss">{heiss} heiss offen</Marke> : undefined },
+        { titel: `Leads ${tage} Tage`, wert: String(alle.length), marke: heiss ? <Marke art="heiss">{heiss} heiss offen</Marke> : undefined },
         { titel: 'Besucher', wert: trichter.data ? String(summe.aufruf) : '–' },
         { titel: 'Abschluss', wert: trichter.data ? prozent(summe.aufruf ? summe.lead / summe.aufruf : null) : '–' },
         { titel: 'Webseiten mit Besuch', wert: trichter.data ? String(t.filter(m => m.werte.aufruf).length) : '–' },
       ]}
     >
       <Abschnitt titel="Leads" zahl={liste.length}
-        rechts={<button type="button" className={KNOPF} onClick={() => setNurOffen(!nurOffen)}>{nurOffen ? 'Auch erledigte zeigen' : 'Nur offene'}</button>}>
+        rechts={<div className="flex flex-wrap gap-2">
+          <button type="button" className={KNOPF} onClick={() => setOhneTest(!ohneTest)}>{ohneTest ? 'Testdaten zeigen' : 'Testdaten ausblenden'}</button>
+          <button type="button" className={KNOPF} onClick={() => setNurOffen(!nurOffen)}>{nurOffen ? 'Auch erledigte zeigen' : 'Nur offene'}</button>
+        </div>}>
         {leads.isLoading ? <Leer titel="Lädt …" />
           : leads.error ? <Leer titel="Leads konnten nicht geladen werden." />
           : !liste.length ? <Leer titel="Noch keine Leads in diesem Zeitraum." />
@@ -95,6 +102,7 @@ export function Leads() {
                     <div className="min-w-0 space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-medium">{l.name}</span>
+                        {a.test && <Marke>Test</Marke>}
                         {a.prioritaet === 'heiss' && <Marke art="heiss">heiss</Marke>}
                         {a.prioritaet === 'warm' && <Marke art="violett">warm</Marke>}
                         <Marke>{String(a.domain ?? (m ? m.name.join('') : 'Anfrage'))}</Marke>

@@ -47,8 +47,27 @@ export async function vorschlaege(text: string, signal?: AbortSignal): Promise<O
   const j = await r.json();
   // Mit sr=2056 steht der Ostwert in y, der Nordwert in x.
   return ((j?.results ?? []) as { attrs?: Record<string, unknown> }[]).map(x => ({
-    label: String(x.attrs?.label ?? '').replace(/<[^>]+>/g, '').trim(), e: Number(x.attrs?.y), n: Number(x.attrs?.x),
+    label: vorschlagText(String(x.attrs?.label ?? ''), String(x.attrs?.origin ?? '')) ?? '', e: Number(x.attrs?.y), n: Number(x.attrs?.x),
   })).filter(v => v.label && Number.isFinite(v.e) && Number.isFinite(v.n));
+}
+
+/**
+ * Der Text eines Vorschlags, wie ein Besucher ihn lesen soll, oder null.
+ * Der Suchdienst des Bundes liefert für eine Strasse ohne Hausnummer
+ * "Bahnhofstrasse # 3920 Zermatt" (Julian, 8. November: "wieso kommen da
+ * Zeichen wie #"). Ohne Nummer gibt es keine Parzelle, darum fallen diese
+ * weg. Parzellen kommen als "Fällanden      2725 (CH 5456 3977 8444)";
+ * daraus wird "Parzelle 2725, Fällanden".
+ */
+export function vorschlagText(roh: string, herkunft: string): string | null {
+  const t = roh.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+  if (!t) return null;
+  if (herkunft === 'parcel') {
+    const m = t.match(/^(.+?) (\S+) \(CH[\d ]+\)$/);
+    return m ? `Parzelle ${m[2]}, ${m[1]}` : t.replace(/\s*\(CH[\d ]+\)$/, '');
+  }
+  if (/(^|\s)#(\s|$)/.test(t)) return null;
+  return t;
 }
 
 const zahl = (v: unknown) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));

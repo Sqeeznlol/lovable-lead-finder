@@ -102,3 +102,13 @@ describe('20 Marken', () => {
     }
   });
 });
+
+describe('Vorschläge der Adresssuche', () => {
+  it('ohne "#" und ohne lange Kennung (Julian, 8. November)', async () => {
+    const { vorschlagText } = await import('@/lib/check-daten');
+    expect(vorschlagText('Bahnhofstrasse # <b>3920 Zermatt</b>', 'address')).toBeNull();
+    expect(vorschlagText('Bahnhofstrasse 1 <b>8610 Uster</b>', 'address')).toBe('Bahnhofstrasse 1 8610 Uster');
+    expect(vorschlagText('<b>Fällanden                                         </b> 2725 (CH 5456 3977 8444)', 'parcel')).toBe('Parzelle 2725, Fällanden');
+    expect(vorschlagText('<b>Disentis/Mustér  </b> 1234 (CH 9861 2326 7942)', 'parcel')).toBe('Parzelle 1234, Disentis/Mustér');
+  });
+});

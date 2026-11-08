@@ -287,6 +287,11 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
                     ))}
                   </ul>
                 )}
+                {/* Ohne Hausnummer findet sich keine Parzelle; statt einer leeren
+                    Liste sagt die Seite, was fehlt. */}
+                {!liste.length && !ort && text.trim().length >= 4 && !/\d/.test(text) && (
+                  <p className="vorschlaege hinweis-nummer" role="status">Bitte mit Hausnummer, zum Beispiel «{text.trim().split(/\s+/)[0]} 12»</p>
+                )}
               </form>
               <ul className="haken"><li>Kostenlos und unverbindlich</li><li>Amtliche Daten von Bund und Kantonen</li><li>Keine Weitergabe an Dritte</li></ul>
             </div>
