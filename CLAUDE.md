@@ -59,6 +59,22 @@ Oberfläche lesen. Das Cockpit ist das Muster für jede Seite (Julian:
 Kennzahlenleiste, Tafeln mit Grafik, rechte Spalte mit Karten, Bewegung,
 Handy-Fassung. Gebaut wird mit `<Seite>` aus `src/components/rahmen.tsx`.
 
+## Arbeitsweise mit Julian (seine Rückmeldungen, gesammelt)
+
+  * Kurz und klar antworten, keine Extrazeilen; Empfehlung statt Auswahl.
+  * Nie raten: selber nachsehen, messen, live prüfen (siehe oben).
+  * Alles laufend selbst kontrollieren und verbessern (8. November:
+    "in jeder Weise überall immer kontrollierst ... um jede Ecke
+    denken"): nach jeder Änderung Tests, Bau, live und iPhone prüfen;
+    Folgefehler selber suchen; jede Rückmeldung hier als Regel ablegen.
+  * Öffentliche Seiten: iPhone und Safari zuerst; Tippflächen ab 44px,
+    Eingaben ab 16px, nichts ragt über den Rand.
+  * Gestaltung nach design-wie-apple: nichts doppelt, keine Abzeichen
+    oder Kästchen um Zahlen, keine Karten-mit-Schatten-Flut.
+  * Formulare kinderleicht: eine Frage je Bild, ein Tipp führt weiter.
+  * Testdaten immer gekennzeichnet (Name TEST, Quelle test) und
+    ausblendbar.
+
 ## Sprache
 
 Code, Kommentare, Commits und Antworten auf Deutsch. Kommentare sagen,

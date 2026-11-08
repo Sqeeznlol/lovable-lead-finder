@@ -1,0 +1,92 @@
+# =====================================================================
+# Fondsliegenschaften einlesen
+# =====================================================================
+# Julian, 8. November: alle regulierten Immobiliengefässe
+# veröffentlichen im Jahresbericht ihr Liegenschaftsinventar. Dieser
+# Ablauf lädt die Berichte aus data/fonds-liste.csv, liest die
+# Inventare (tools/fonds_inventar.py, je Bericht gegen das Total
+# geprüft), verortet sie beim Bund (tools/fonds_verorten.py) und
+# ersetzt den Inhalt von public.fonds_liegenschaft.
+#
+# Geladen werden nur Gefässe, deren Summe auf 1 % zum Total stimmt:
+# lieber ein Fonds weniger als falsche Werte. Das Protokoll nennt jedes
+# Gefäss mit seinem Ergebnis -- ganz lesen.
+#
+# Die Verbindungsangabe liegt als Secret und erscheint nirgends.
+# =====================================================================
+
+name: Fonds einlesen
+
+on:
+  workflow_dispatch:
+    inputs:
+      schritt:
+        description: 'probe = nur lesen und berichten, laden = in die Datenbank schreiben'
+        required: true
+        default: 'probe'
+        type: choice
+        options: [probe, laden]
+
+jobs:
+  einlesen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Werkzeuge
+        run: sudo apt-get install -y -qq poppler-utils postgresql-client
+
+      - name: Berichte lesen
+        run: |
+          set -euo pipefail
+          mkdir -p arbeit
+          python3 -I tools/fonds_inventar.py data/fonds-liste.csv arbeit/pdf arbeit/inventar.csv arbeit/bericht.txt
+          {
+            echo "### Gefässe"
+            echo '```'
+            cat arbeit/bericht.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Nur stimmende Gefässe behalten
+        run: |
+          set -euo pipefail
+          python3 -I - <<'EOF'
+          import csv
+          gut = {z[10:].split(':')[0] for z in open('arbeit/bericht.txt', encoding='utf8') if z.startswith('OK ')}
+          r = list(csv.DictReader(open('arbeit/inventar.csv', encoding='utf8')))
+          w = csv.DictWriter(open('arbeit/gut.csv', 'w', newline='', encoding='utf8'), fieldnames=r[0].keys())
+          w.writeheader(); [w.writerow(x) for x in r if x['gefaess'] in gut]
+          print(len(gut), 'Gefässe,', sum(1 for x in r if x['gefaess'] in gut), 'Liegenschaften')
+          EOF
+
+      - name: Verorten
+        run: |
+          set -euo pipefail
+          python3 -I tools/fonds_verorten.py arbeit/gut.csv arbeit/verortet.csv | tee arbeit/verorten.txt | tail -40
+          echo "### Verortet" >> "$GITHUB_STEP_SUMMARY"
+          tail -1 arbeit/verorten.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: In die Datenbank
+        if: inputs.schritt == 'laden'
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          psql "$DB" -v ON_ERROR_STOP=1 -q <<'SQL'
+          begin;
+          create temp table neu (gefaess text, typ text, berichtsdatum text, ort_adresse text, baujahr text, gestehung text,
+            verkehrswert text, sollmiete text, brutto_rendite text, quelle text, gemeinde text, kanton text, e text, n text, egrid text, treffer text);
+          \copy neu from 'arbeit/verortet.csv' with (format csv, header true)
+          delete from public.fonds_liegenschaft;
+          insert into public.fonds_liegenschaft (gefaess, typ, berichtsdatum, ort_adresse, baujahr, gestehung, verkehrswert, sollmiete,
+            brutto_rendite, gemeinde, kanton, e, n, egrid, quelle)
+          select gefaess, coalesce(nullif(typ, ''), 'fonds'), nullif(berichtsdatum, ''), ort_adresse, nullif(baujahr, '')::int,
+            nullif(gestehung, '')::bigint, verkehrswert::bigint, nullif(sollmiete, '')::bigint, nullif(brutto_rendite, '')::numeric,
+            nullif(gemeinde, ''), nullif(kanton, ''), nullif(e, '')::float8, nullif(n, '')::float8, nullif(egrid, ''), quelle
+          from neu
+          on conflict (gefaess, ort_adresse, verkehrswert) do nothing;
+          commit;
+          SQL
+          psql "$DB" -t -A -c "select count(*) || ' Liegenschaften, ' || count(distinct gefaess) || ' Gefässe, verortet ' || count(e) from public.fonds_liegenschaft;" \
+            | sed 's/^/### Datenbank: /' >> "$GITHUB_STEP_SUMMARY"
