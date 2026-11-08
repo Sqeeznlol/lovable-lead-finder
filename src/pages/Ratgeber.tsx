@@ -4,6 +4,7 @@ import './check.css';
 import { BETREIBER, markeFuerHost, markeNachId, STANDARD_MARKE, type Marke } from '@/lib/check-marken';
 import { KATASTER } from '@/lib/check-hintergrund';
 import { useImBild } from '@/lib/im-bild';
+import { zaehlen } from '@/lib/check-zaehlen';
 import { markenAttribute, markenStil, seiteEinrichten } from '@/lib/check-gestaltung';
 import { artikelNachSlug, zumCheck, type Artikel } from '@/lib/ratgeber';
 
@@ -26,6 +27,7 @@ export default function Ratgeber({ marke: vorgabe }: { marke?: Marke }) {
   useEffect(() => {
     document.title = artikel ? `${artikel.titel} | ${marke.name.join('')}` : marke.name.join('');
     // Jede Marke hat ihre Schrift (check-marken.ts, Gestaltung).
+    zaehlen(marke.id, window.location.hostname, 'ratgeber');
     return seiteEinrichten(marke);
   }, [artikel, marke]);
 
@@ -38,7 +40,9 @@ export default function Ratgeber({ marke: vorgabe }: { marke?: Marke }) {
   const wortmarke = <><span className="zeichen" aria-hidden="true"><i /></span><span>{marke.name[0]}<b>{marke.name[1]}</b></span></>;
 
   return (
-    <div className="pc ratgeber" style={markenStil(marke)} {...markenAttribute(marke)}>
+    <div className="pc ratgeber" style={markenStil(marke)} {...markenAttribute(marke)}
+         // Jeder Knopf zum Check zählt als Klick aus dem Ratgeber.
+         onClickCapture={e => { if ((e.target as HTMLElement).closest('a.knopf')) zaehlen(marke.id, window.location.hostname, 'ratgeber_klick'); }}>
       <header className="kopf">
         <div className="huelle">
           <a className="wortmarke" href={ziel}>{wortmarke}</a>

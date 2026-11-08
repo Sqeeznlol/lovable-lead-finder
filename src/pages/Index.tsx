@@ -20,6 +20,7 @@ const TelefonSuche = lazy(() => import('@/components/TelefonSuche').then(m => ({
 const PipedriveExport = lazy(() => import('@/components/PipedriveExport').then(m => ({ default: m.PipedriveExport })));
 const Vorauswahl = lazy(() => import('@/components/Vorauswahl').then(m => ({ default: m.Vorauswahl })));
 const GebaeudeSuche = lazy(() => import('@/components/GebaeudeSuche').then(m => ({ default: m.GebaeudeSuche })));
+const Leads = lazy(() => import('@/components/Leads').then(m => ({ default: m.Leads })));
 const Nummern = lazy(() => import('@/components/Nummern').then(m => ({ default: m.Nummern })));
 const PipedriveBereit = lazy(() => import('@/components/PipedriveBereit').then(m => ({ default: m.PipedriveBereit })));
 const Protokoll = lazy(() => import('@/components/Protokoll').then(m => ({ default: m.Protokoll })));
@@ -39,7 +40,7 @@ import { useMidnightReset } from '@/hooks/use-phones';
 
 // Jeder Bereich ist eine Adresse: /zentrale, /baugesuche ... ("/" ist
 // das Cockpit). So führt "Zurück" im Browser in den vorigen Bereich.
-const TABS = ['uebersicht', 'master', 'gebaeudesuche', 'nummern', 'pipedrive', 'dashboard', 'vorauswahl', 'akquise', 'telsuche', 'properties', 'import', 'masterimport', 'phones', 'export', 'admin'] as const;
+const TABS = ['uebersicht', 'leads', 'master', 'gebaeudesuche', 'nummern', 'pipedrive', 'dashboard', 'vorauswahl', 'akquise', 'telsuche', 'properties', 'import', 'masterimport', 'phones', 'export', 'admin'] as const;
 type Tab = typeof TABS[number];
 const istTab = (x: string | undefined): x is Tab => !!x && (TABS as readonly string[]).includes(x);
 
@@ -67,6 +68,8 @@ type Eintrag = { id: Tab; label: string; icon: React.ComponentType<{ className?:
 const gruppen: { titel: string; eintraege: Eintrag[] }[] = [
   { titel: 'Akquise', eintraege: [
     { id: 'uebersicht', label: 'Übersicht', icon: LayoutDashboard },
+    // Alle Leads der Check-Seiten, dazu Besucher und Abschluss je Marke.
+    { id: 'leads', label: 'Leads', icon: Target },
     { id: 'master', label: 'Abfrage', icon: Database },
     // Gebäude nach Baujahr, Zimmern, Wohnfläche aus dem Register.
     { id: 'gebaeudesuche', label: 'Gebäudesuche', icon: Building2 },
@@ -99,7 +102,7 @@ const stillgelegt: { id: Tab; label: string; icon: React.ComponentType<{ classNa
 
 // Primary tabs visible in the iPhone bottom bar
 // Auf dem iPhone vier feste Ziele und "Mehr" für den Rest.
-const mobileBottomTabs: Tab[] = ['uebersicht', 'master', 'nummern', 'pipedrive'];
+const mobileBottomTabs: Tab[] = ['uebersicht', 'leads', 'master', 'nummern'];
 
 /** Ein Punkt der Icon-Leiste: Symbol, aktiv als schwarzes Quadrat, Name beim Überfahren. */
 function LeistenPunkt({ t, an, onClick }: { t: Eintrag; an: boolean; onClick: () => void }) {
@@ -251,6 +254,7 @@ export default function Index() {
             </div>
           }>
             {active === 'uebersicht' && <Uebersicht />}
+            {active === 'leads' && <Leads />}
             {active === 'dashboard' && <Dashboard />}
             {active === 'master' && <MasterList />}
             {active === 'nummern' && <Nummern />}

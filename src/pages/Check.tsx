@@ -8,6 +8,7 @@ import { lv95NachWgs84 } from '@/lib/koordinaten';
 import { BETREIBER, markeFuerHost, markeNachId, STANDARD_MARKE, type Marke } from '@/lib/check-marken';
 import { KATASTER } from '@/lib/check-hintergrund';
 import { useImBild } from '@/lib/im-bild';
+import { zaehlen } from '@/lib/check-zaehlen';
 import { buehnenBild, markenAttribute, markenStil, seiteEinrichten } from '@/lib/check-gestaltung';
 import {
   ANTWORT_TEXT, befundAmOrt, GEBAEUDEART, HEIZUNG, herkunft, leadAngaben, mailOk, nameOk, schweizerNummer, STATUS, vorschlaege,
@@ -46,7 +47,7 @@ const FRAGEN: [string, string][] = [
   ['Was passiert mit meinen Angaben?', 'Wir verwenden sie für Ihre Berechnung und Analyse und um Sie zu Ihrer Liegenschaft zu kontaktieren. An Dritte geben wir sie nicht weiter. Sie können Ihre Einwilligung jederzeit widerrufen.'],
 ];
 
-type Feld = 'vorname' | 'nachname' | 'email' | 'telefon';
+type Feld = 'name' | 'email' | 'telefon';
 
 export default function Check({ marke: vorgabe }: { marke?: Marke }) {
   const { marke: markeId } = useParams();
@@ -65,9 +66,10 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
   // 0 gesperrt, 1 Fragen, 2 Kontakt, 3 freigeschaltet
   const [schritt, setSchritt] = useState<0 | 1 | 2 | 3>(0);
   const [antwort, setAntwort] = useState<Antwort>({ eigentuemer: null, absicht: null, zeitraum: null });
-  const [kontakt, setKontakt] = useState<Record<Feld | 'website', string>>({ vorname: '', nachname: '', email: '', telefon: '', website: '' });
+  const [kontakt, setKontakt] = useState<Record<Feld | 'website', string>>({ name: '', email: '', telefon: '', website: '' });
   const [beruehrt, setBeruehrt] = useState<Set<Feld>>(new Set());
-  const [ja, setJa] = useState(false);
+  // Fragen einzeln, eine nach der anderen: ein Tipp genügt (Julian: "kinderleicht").
+  const [frage, setFrage] = useState(0);
   const [sendet, setSendet] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
   const [luftbild, setLuftbild] = useState(true);
@@ -85,8 +87,9 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
   useEffect(() => {
     document.title = `${marke.name.join('')} – ${marke.titel}`;
     // Jede Marke hat ihre Schrift (check-marken.ts, Gestaltung).
+    zaehlen(marke.id, domain, 'aufruf');
     return seiteEinrichten(marke);
-  }, [marke]);
+  }, [marke, domain]);
 
   // Vorschläge, kurz verzögert; ältere Antworten verwerfen.
   useEffect(() => {
@@ -143,22 +146,22 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
     setOrt(v); setText(v.label); setListe([]); setBefund(null); setLaden('laeuft'); setFehler(null);
     if (schritt !== 3) setSchritt(0);
     setTimeout(() => ergebnisRef.current?.scrollIntoView({ behavior: leise() ? 'auto' : 'smooth', block: 'start' }), 60);
-    try { setBefund(await befundAmOrt(v)); setLaden(''); } catch { setLaden('fehler'); }
+    zaehlen(marke.id, domain, 'suche');
+    try { setBefund(await befundAmOrt(v)); setLaden(''); zaehlen(marke.id, domain, 'ergebnis'); } catch { setLaden('fehler'); }
   };
 
   const oeffnen = () => {
     if (!befund) { zurSuche(); return; }
-    if (schritt === 0) { setSchritt(1); geoeffnet.current = Date.now(); }
+    if (schritt === 0) { setSchritt(1); setFrage(0); geoeffnet.current = Date.now(); zaehlen(marke.id, domain, 'rechner'); }
     setTimeout(() => rechnerRef.current?.scrollIntoView({ behavior: leise() ? 'auto' : 'smooth', block: 'start' }), 30);
   };
 
   const meldung: Record<Feld, string> = {
-    vorname: nameOk(kontakt.vorname) ? '' : 'Bitte Ihren Vornamen.',
-    nachname: nameOk(kontakt.nachname) ? '' : 'Bitte Ihren Namen.',
+    name: nameOk(kontakt.name) ? '' : 'Bitte Ihren Namen.',
     email: mailOk(kontakt.email) ? '' : 'Bitte eine gültige E-Mail-Adresse.',
     telefon: schweizerNummer(kontakt.telefon) ? '' : 'Bitte eine Schweizer Nummer, z. B. 079 412 58 36.',
   };
-  const bereit = Object.values(meldung).every(t => !t) && ja;
+  const bereit = Object.values(meldung).every(t => !t);
   const feld = (k: Feld, titel: string, typ: string, auto: string, extra?: { inputMode?: 'email' | 'tel'; placeholder?: string }) => {
     const zeigen = beruehrt.has(k) ? meldung[k] : '';
     return (
@@ -178,7 +181,7 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
 
   const senden = async (e: React.FormEvent) => {
     e.preventDefault();
-    setBeruehrt(new Set<Feld>(['vorname', 'nachname', 'email', 'telefon']));
+    setBeruehrt(new Set<Feld>(['name', 'email', 'telefon']));
     if (!bereit || !befund || sendet) return;
     // Spamschutz: verstecktes Feld, nicht schneller als ein Mensch, höchstens drei Anfragen je Tag und Gerät.
     if (kontakt.website) return;
@@ -193,7 +196,7 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
     // Ohne Rückgabe der Zeile: der öffentliche Schlüssel darf einfügen, nicht lesen.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase as any).from('anfrage').insert({
-      art: 'potenzial', name: `${kontakt.vorname.trim()} ${kontakt.nachname.trim()}`.slice(0, 120),
+      art: 'potenzial', name: kontakt.name.trim().replace(/\s+/g, ' ').slice(0, 120),
       email: kontakt.email.trim(), telefon: schweizerNummer(kontakt.telefon),
       adresse: befund.adresse.slice(0, 200), egrid: befund.egrid, angaben, einwilligung: true,
     });
@@ -201,13 +204,21 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
     if (error) { setFehler('Das hat nicht geklappt. Bitte versuchen Sie es noch einmal.'); return; }
     try { localStorage.setItem(ZAEHLER, JSON.stringify([...heuteSchon(), Date.now()])); } catch { /* privates Fenster */ }
     setSchritt(3);
+    zaehlen(marke.id, domain, 'lead');
     setTimeout(() => rechnerRef.current?.scrollIntoView({ behavior: leise() ? 'auto' : 'smooth', block: 'start' }), 30);
   };
 
+  // Ein Tipp wählt und führt weiter; die kurze Pause zeigt, was gewählt ist.
   const wahl = <K extends keyof Antwort>(k: K, werte: Record<string, string>) => (
     <div className="wahl">
       {Object.entries(werte).map(([w, t]) => (
-        <button key={w} type="button" aria-pressed={antwort[k] === w} onClick={() => setAntwort(a => ({ ...a, [k]: w as Antwort[K] }))}>{t}</button>
+        <button key={w} type="button" aria-pressed={antwort[k] === w} onClick={() => {
+          setAntwort(a => ({ ...a, [k]: w as Antwort[K] }));
+          setTimeout(() => {
+            if (frage < 2) setFrage(frage + 1);
+            else { setSchritt(2); zaehlen(marke.id, domain, 'kontakt'); }
+          }, leise() ? 0 : 220);
+        }}>{t}</button>
       ))}
     </div>
   );
@@ -372,42 +383,29 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
 
                       {(schritt === 1 || schritt === 2) && (
                         <form onSubmit={senden} noValidate>
-                          <div className="fortschritt"><i className="an" /><i className={schritt === 2 ? 'an' : ''} /></div>
+                          <div className="fortschritt" aria-hidden="true">{[0, 1, 2, 3].map(i => <i key={i} className={(schritt === 2 ? 3 : frage) >= i ? 'an' : ''} />)}</div>
                           {schritt === 1 ? (
                             <>
-                              <div className="frage">Sind Sie Eigentümer/in dieser Liegenschaft?</div>
-                              {wahl('eigentuemer', ANTWORT_TEXT.eigentuemer)}
-                              <div className="frage">Was beschäftigt Sie?</div>
-                              {wahl('absicht', ANTWORT_TEXT.absicht)}
-                              <div className="frage">Bis wann?</div>
-                              {wahl('zeitraum', ANTWORT_TEXT.zeitraum)}
-                              <div className="zeile">
-                                <button type="button" className="knopf" onClick={() => setSchritt(0)}>Abbrechen</button>
-                                <button type="button" className="knopf marke" disabled={!(antwort.eigentuemer && antwort.absicht && antwort.zeitraum)} onClick={() => setSchritt(2)}>Weiter</button>
-                              </div>
+                              <div className="frage-nr">Frage {frage + 1} von 3</div>
+                              {frage === 0 && <><div className="frage">Sind Sie Eigentümer/in dieser Liegenschaft?</div>{wahl('eigentuemer', ANTWORT_TEXT.eigentuemer)}</>}
+                              {frage === 1 && <><div className="frage">Was beschäftigt Sie?</div>{wahl('absicht', ANTWORT_TEXT.absicht)}</>}
+                              {frage === 2 && <><div className="frage">Bis wann?</div>{wahl('zeitraum', ANTWORT_TEXT.zeitraum)}</>}
+                              <button type="button" className="zurueck" onClick={() => (frage > 0 ? setFrage(frage - 1) : setSchritt(0))}>Zurück</button>
                             </>
                           ) : (
                             <>
-                              <div className="frage">Wohin dürfen wir Ihre Berechnung schicken?</div>
-                              <p className="klein" style={{ margin: 0 }}>Die Berechnung erscheint sofort. Die ausführliche Analyse senden wir Ihnen persönlich.</p>
-                              <div className="zwei">
-                                {feld('vorname', 'Vorname', 'text', 'given-name')}
-                                {feld('nachname', 'Name', 'text', 'family-name')}
-                              </div>
-                              {feld('email', 'E-Mail', 'email', 'email', { inputMode: 'email' })}
+                              <div className="frage">Fast geschafft: Wohin dürfen wir die Berechnung schicken?</div>
+                              <p className="klein" style={{ margin: 0 }}>Die Berechnung erscheint sofort hier. Die ausführliche Analyse senden wir Ihnen persönlich.</p>
+                              {feld('name', 'Vor- und Nachname', 'text', 'name')}
                               {feld('telefon', 'Telefon', 'tel', 'tel', { inputMode: 'tel', placeholder: '079 412 58 36' })}
+                              {feld('email', 'E-Mail', 'email', 'email', { inputMode: 'email' })}
                               <input className="falle" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true"
                                      value={kontakt.website} onChange={e => setKontakt(k => ({ ...k, website: e.target.value }))} />
-                              <label className="zustimmung">
-                                <input type="checkbox" checked={ja} onChange={e => setJa(e.target.checked)} />
-                                <span>Ich bin einverstanden, dass {BETREIBER} meine Angaben speichert und mich zu dieser Liegenschaft kontaktiert, auch zu einem möglichen Verkauf oder einer Entwicklung. Ich kann die Einwilligung jederzeit widerrufen.</span>
-                              </label>
                               {fehler && <p className="fehler">{fehler}</p>}
-                              <div className="zeile">
-                                <button type="button" className="knopf" onClick={() => setSchritt(1)}>Zurück</button>
-                                <button type="submit" className="knopf marke" disabled={!bereit || sendet}>{sendet ? 'Wird gesendet …' : 'Berechnung freischalten'}</button>
-                              </div>
-                              <div className="sicher">Verschlüsselt übertragen · keine Weitergabe an Dritte · jederzeit widerrufbar</div>
+                              <button type="submit" className="knopf marke senden" disabled={sendet}>{sendet ? 'Wird gesendet …' : 'Berechnung jetzt anzeigen'}</button>
+                              <p className="einwilligung">Mit dem Absenden sind Sie einverstanden, dass {BETREIBER} Ihre Angaben speichert und Sie zu dieser Liegenschaft kontaktiert, auch zu einem möglichen Verkauf oder einer Entwicklung. Widerruf jederzeit möglich.</p>
+                              <button type="button" className="zurueck" onClick={() => { setSchritt(1); setFrage(2); }}>Zurück</button>
+                              <div className="sicher">Verschlüsselt übertragen · keine Weitergabe an Dritte</div>
                             </>
                           )}
                         </form>
@@ -415,7 +413,7 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
 
                       {schritt === 3 && (
                         <>
-                          <div className="freigeschaltet"><span>Freigeschaltet. Danke, {kontakt.vorname.trim()}: Ihre ausführliche Analyse folgt innert zwei Arbeitstagen.</span></div>
+                          <div className="freigeschaltet"><span>Freigeschaltet. Danke, {kontakt.name.trim().split(/\s+/)[0]}: Ihre ausführliche Analyse folgt innert zwei Arbeitstagen.</span></div>
                           <div className="zeile-oben"><h3>Ausnützung durchrechnen</h3><span className="wert">AZ {az.toFixed(2)}</span></div>
                           <p className="klein" style={{ margin: '6px 0 0' }}>Stellen Sie die Ausnützungsziffer Ihrer Zone ein. Den gültigen Wert Ihrer Gemeinde prüfen wir in der Analyse.</p>
                           <input type="range" min={0.2} max={2} step={0.05} value={az} aria-label="Ausnützungsziffer" onChange={e => setAz(Number(e.target.value))} />

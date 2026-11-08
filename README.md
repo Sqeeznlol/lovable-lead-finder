@@ -15,6 +15,7 @@ dem Repository der Webseite.
 | Chrome-Erweiterung für die Eigentumsauskunft ZH und TG | `extension/` | wer sie installiert |
 | Lesezeichen für die Auskunft | Admin | angemeldet |
 | Check-Seiten (ParzellenChecker, HausChecker, ...) | `src/pages/Check.tsx`, `src/lib/check-marken.ts` | öffentlich, auf ihren Domains |
+| Leads aller Marken und Zahlen je Marke (Besucher bis Lead, Quelle) | `src/components/Leads.tsx`, Reiter "Leads" | nur angemeldet |
 | Ratgeber für Eigentümer | `src/pages/Ratgeber.tsx`, `src/lib/ratgeber.ts` | öffentlich |
 | Anfrage-Seiten Bewertung, Potenzial, Investor | `src/pages/Anfrage.tsx` | öffentlich |
 | Server-Funktionen: Telefonsuche, Pipedrive, SMS, Tagesbericht | `supabase/functions/` | Supabase |
