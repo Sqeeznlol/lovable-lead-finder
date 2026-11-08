@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { KNOPF, KNOPF_HAUPT, Marke } from '@/components/rahmen';
 import { luftbildLv95 } from '@/lib/luftbild';
+import { FENSTER } from '@/lib/fenster';
 import { ANTWORT_TEXT, istTest } from '@/lib/lead-auswertung';
 
 /**
@@ -55,7 +56,7 @@ export function LeadDetail({ lead, onClose, onErledigt, onNotiz }: {
             </div>
 
             {lv95 && (
-              <a href={geoAdmin!} target="_blank" rel="noreferrer" className="block overflow-hidden rounded border">
+              <a href={geoAdmin!} target={FENSTER.karte} className="block overflow-hidden rounded border">
                 <img src={luftbildLv95(lv95[0], lv95[1], 160, 1000)} alt={`Luftbild ${lead.adresse ?? ''}`} className="aspect-video w-full object-cover" />
                 <span className="block px-3 py-2 text-xs text-muted-foreground">Luftbild © swisstopo · in map.geo.admin.ch öffnen</span>
               </a>
