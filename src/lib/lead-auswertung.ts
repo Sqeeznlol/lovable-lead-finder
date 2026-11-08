@@ -56,3 +56,6 @@ export const ANTWORT_TEXT: Record<'eigentuemer' | 'absicht' | 'zeitraum', Record
   absicht: { verkaufen: 'Verkaufen', bauen: 'Bauen, aus- oder umbauen', wert: 'Den Wert kennen', informieren: 'Nur informieren' },
   zeitraum: { 12: 'In den nächsten 12 Monaten', 36: 'In 1 bis 3 Jahren', offen: 'Noch offen' },
 };
+
+/** Testdaten der Testphase: markiert im Lead oder mit Quelle "test". */
+export const istTest = (l: { angaben?: Record<string, unknown> | null }) => !!l.angaben?.test || l.angaben?.utm_source === 'test';

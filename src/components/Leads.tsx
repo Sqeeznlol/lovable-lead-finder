@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Abschnitt, KNOPF, Leer, LISTE, Marke, Reiter, Seite } from '@/components/rahmen';
 import { BILD } from '@/lib/luftbild';
-import { ANTWORT_TEXT, gesamt, prozent, quellen, SCHRITT_TEXT, SCHRITTE, trichterJeSeite, type TrichterZeile } from '@/lib/lead-auswertung';
+import { LeadDetail, type Lead } from '@/components/LeadDetail';
+import { ANTWORT_TEXT, gesamt, istTest, prozent, quellen, SCHRITT_TEXT, SCHRITTE, trichterJeSeite, type TrichterZeile } from '@/lib/lead-auswertung';
 
 /**
  * Alle Leads der Check-Seiten in einer Liste, dazu die Zahlen je Webseite
@@ -13,20 +14,21 @@ import { ANTWORT_TEXT, gesamt, prozent, quellen, SCHRITT_TEXT, SCHRITTE, trichte
  * laufen in der Akquise (Zweig akquise); hier wird nur gelesen. Alle Marken schreiben in dieselbe Tabelle anfrage; die
  * Schritte der Besucher stehen in check_ereignis.
  */
-type Lead = {
-  id: string; name: string; email: string | null; telefon: string | null; adresse: string | null;
-  angaben: Record<string, unknown>; erstellt_am: string; bearbeitet: boolean;
-};
 type Zeitraum = '7' | '30' | '90';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
+// Die Marken stehen in der Akquise; hier genügt ihre Kennung.
+const MARKEN_NAME = (id: string) => id;
 
 export function Leads() {
   const [tage, setTage] = useState<Zeitraum>('30');
   const [nurOffen, setNurOffen] = useState(true);
   // Testdaten der Testphase (angaben.test, Quelle "test") lassen sich ausblenden.
   const [ohneTest, setOhneTest] = useState(false);
+  const [offenId, setOffenId] = useState<string | null>(null);
+  // Eine Webseite in der Tabelle aufklappen: darunter ihre Leads.
+  const [seiteAuf, setSeiteAuf] = useState<string | null>(null);
   const qc = useQueryClient();
   const von = useMemo(() => new Date(Date.now() - Number(tage) * 864e5).toISOString(), [tage]);
 
@@ -34,7 +36,7 @@ export function Leads() {
     queryKey: ['check-leads', tage],
     queryFn: async (): Promise<Lead[]> => {
       const { data, error } = await db.from('anfrage')
-        .select('id, name, email, telefon, adresse, angaben, erstellt_am, bearbeitet')
+        .select('id, name, email, telefon, adresse, egrid, angaben, erstellt_am, bearbeitet, bemerkung')
         .gte('erstellt_am', von).order('erstellt_am', { ascending: false }).limit(500);
       if (error) throw error;
       return data ?? [];
@@ -54,13 +56,18 @@ export function Leads() {
   const t = useMemo(() => trichterJeSeite(zeilen), [zeilen]);
   const summe = gesamt(t);
   const q = quellen(zeilen);
-  const alle = (leads.data ?? []).filter(l => !ohneTest || !l.angaben?.test);
+  const alle = (leads.data ?? []).filter(l => !ohneTest || !istTest(l));
+  const offen = (leads.data ?? []).find(l => l.id === offenId) ?? null;
   const liste = alle.filter(l => !nurOffen || !l.bearbeitet);
   const heiss = alle.filter(l => l.angaben?.prioritaet === 'heiss' && !l.bearbeitet).length;
 
   const erledigt = async (l: Lead) => {
     await db.from('anfrage').update({ bearbeitet: !l.bearbeitet }).eq('id', l.id);
     void qc.invalidateQueries({ queryKey: ['check-leads'] });
+  };
+  const notiz = async (l: Lead, text: string) => {
+    await db.from('anfrage').update({ bemerkung: text.trim() || null }).eq('id', l.id);
+    await qc.invalidateQueries({ queryKey: ['check-leads'] });
   };
 
   return (
@@ -96,11 +103,12 @@ export function Leads() {
                   ANTWORT_TEXT.zeitraum[String(a.zeitraum)],
                 ].filter(Boolean).join(' · ');
                 return (
-                  <li key={l.id} className={`grid gap-2 p-4 sm:grid-cols-[minmax(0,1fr)_auto] ${l.bearbeitet ? 'opacity-55' : ''}`}>
+                  <li key={l.id} className={`grid cursor-pointer gap-2 p-4 transition-colors hover:bg-secondary/60 sm:grid-cols-[minmax(0,1fr)_auto] ${l.bearbeitet ? 'opacity-55' : ''}`}
+                      onClick={e => { if (!(e.target as HTMLElement).closest('a, button')) setOffenId(l.id); }}>
                     <div className="min-w-0 space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium">{l.name}</span>
-                        {a.test && <Marke>Test</Marke>}
+                        <button type="button" className="text-left font-medium underline-offset-4 hover:underline" onClick={() => setOffenId(l.id)}>{l.name}</button>
+                        {istTest(l) && <Marke>Test</Marke>}
                         {a.prioritaet === 'heiss' && <Marke art="heiss">heiss</Marke>}
                         {a.prioritaet === 'warm' && <Marke art="violett">warm</Marke>}
                         <Marke>{String(a.domain ?? a.marke ?? 'Anfrage')}</Marke>
@@ -122,7 +130,7 @@ export function Leads() {
           )}
       </Abschnitt>
 
-      <Abschnitt titel="Je Webseite" hinweis="Sitzungen, die den Schritt erreicht haben. Abschluss = Leads je Besucher.">
+      <Abschnitt titel="Je Webseite" hinweis="Sitzungen, die den Schritt erreicht haben. Abschluss = Leads je Besucher. Ein Klick auf eine Webseite zeigt ihre Leads.">
         {trichter.data === null ? <Leer titel="Die Zählung ist noch nicht eingerichtet.">In GitHub den Ablauf «Migrationen» mit «einspielen» starten (Repository der Webseite).</Leer>
           : !t.length ? <Leer titel="Noch keine Besucher in diesem Zeitraum." />
           : (
@@ -134,18 +142,52 @@ export function Leads() {
                   <th className="p-3 text-right font-medium">Abschluss</th>
                 </tr></thead>
                 <tbody>
-                  {t.map(m => (
-                    <tr key={m.domain} className="border-b last:border-0">
-                      <td className="p-3"><span className="block font-medium">{m.domain}</span><span className="block text-xs text-muted-foreground">{m.marke}</span></td>
-                      {SCHRITTE.map(s => <td key={s} className="p-3 text-right tabular-nums">{m.werte[s]}</td>)}
-                      <td className="p-3 text-right tabular-nums font-medium">{prozent(m.quote)}</td>
-                    </tr>
-                  ))}
+                  {t.map(m => {
+                    const auf = seiteAuf === m.domain;
+                    const ihre = alle.filter(l => String(l.angaben?.domain ?? '').replace(/^www\./, '') === m.domain);
+                    return (
+                      <Fragment key={m.domain}>
+                        <tr className={`cursor-pointer border-b last:border-0 hover:bg-secondary/60 ${auf ? 'bg-secondary/60' : ''}`}
+                            onClick={() => setSeiteAuf(auf ? null : m.domain)} aria-expanded={auf}>
+                          <td className="p-3">
+                            <span className="flex items-center gap-2 font-medium"><span aria-hidden className={`inline-block transition-transform ${auf ? 'rotate-90' : ''}`}>›</span>{m.domain}</span>
+                            <span className="block pl-4 text-xs text-muted-foreground">{MARKEN_NAME(m.marke)} · {ihre.length} {ihre.length === 1 ? 'Lead' : 'Leads'} in der Liste</span>
+                          </td>
+                          {SCHRITTE.map(s => <td key={s} className="p-3 text-right tabular-nums">{m.werte[s]}</td>)}
+                          <td className="p-3 text-right tabular-nums font-medium">{prozent(m.quote)}</td>
+                        </tr>
+                        {auf && (
+                          <tr className="border-b bg-secondary/30">
+                            <td colSpan={SCHRITTE.length + 2} className="p-0">
+                              {!ihre.length ? <p className="p-4 text-sm text-muted-foreground">Noch keine Leads von {m.domain} in diesem Zeitraum.</p> : (
+                                <ul className="divide-y">
+                                  {ihre.map(l => (
+                                    <li key={l.id}>
+                                      <button type="button" onClick={() => setOffenId(l.id)}
+                                              className="flex w-full flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-left hover:bg-card">
+                                        <span className="font-medium">{l.name}</span>
+                                        {l.angaben?.prioritaet === 'heiss' && <Marke art="heiss">heiss</Marke>}
+                                        <span className="text-muted-foreground">{l.adresse ?? '–'}</span>
+                                        <span className="text-muted-foreground">{l.telefon}</span>
+                                        <span className="ml-auto text-xs text-muted-foreground">{new Date(l.erstellt_am).toLocaleDateString('de-CH')}{l.bearbeitet ? ' · erledigt' : ''}</span>
+                                      </button>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           )}
       </Abschnitt>
+
+      <LeadDetail lead={offen} onClose={() => setOffenId(null)} onErledigt={l => void erledigt(l)} onNotiz={notiz} />
 
       {q.length > 0 && (
         <Abschnitt titel="Woher die Besucher kommen">
