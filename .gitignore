@@ -28,3 +28,6 @@ dist-ssr
 test-results/
 .tmp-ui/
 test-results/
+
+# Python-Zwischendateien der Werkzeuge
+__pycache__/
