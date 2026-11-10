@@ -65,7 +65,7 @@ const gruppen: { titel: string; eintraege: Eintrag[] }[] = [
     { id: 'auswertung', label: 'Auswertung', icon: BarChart3 },
     { id: 'nachbarschaft', label: 'Nachbarschaft', icon: Share },
     // Nachbarparzellen der Kundenliegenschaften (Helvetica) nach Potenzial.
-    { id: 'arrondierung', label: 'Arrondieren', icon: Combine },
+    { id: 'arrondierung', label: 'Mögliche Arrondierungen', icon: Combine },
     // Messen und Kongresse der Branche: wann, wo, mit Adresse.
     { id: 'kalender', label: 'Immo-Kalender', icon: CalendarDays },
   ] },

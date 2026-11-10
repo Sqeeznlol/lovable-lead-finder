@@ -4,9 +4,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { Abschnitt, Leer, LISTE, Marke, Reiter, Seite, Strichbalken } from '@/components/rahmen';
 import { BILD } from '@/lib/luftbild';
 import { FENSTER } from '@/lib/fenster';
+import { ArrondierungZusammen, type ZusammenDaten } from '@/components/ArrondierungZusammen';
 
 /**
- * Arrondieren im Kundenportfolio (Julian, 10. November: "mit dem
+ * Mögliche Arrondierungen im Kundenportfolio (Julian, 10. November: "mit dem
  * Helvetica-Fonds eine Übersicht, welche die Nachbarparzellen sind,
  * damit wir sehen, welche Potenzial haben").
  *
@@ -21,10 +22,10 @@ import { FENSTER } from '@/lib/fenster';
  * wir die selektionieren können"): je Parzelle ein Stand, gespeichert in
  * nachbar_auswahl. Fondsleitungen sehen weder Seite noch Daten (RLS).
  */
-type Nachbar = {
+type Nachbar = ZusammenDaten & {
   position: number; haupt_egrid: string; haupt_adresse: string; nachbar_egrid: string; nummer: string | null;
   gemeinde: string | null; kanton: string | null; zone: string | null; flaeche: number | null; gebaeude: number | null;
-  baujahr: number | null; wohnungen: number | null; az_heute: number | null; punkte: number; gruende: string | null;
+  az_heute: number | null; punkte: number; gruende: string | null;
 };
 type Filter = 'alle' | 'potenzial' | 'unbebaut' | 'auswahl';
 type Stand = 'offen' | 'ausgewaehlt' | 'kontaktiert' | 'kein_interesse';
@@ -47,6 +48,7 @@ async function inStuecken<T>(egrids: string[], frage: (teil: string[]) => Promis
 export function Arrondierung() {
   const [filter, setFilter] = useState<Filter>('potenzial');
   const [gewaehlt, setGewaehlt] = useState<string | null>(null);
+  const [offen, setOffen] = useState<string | null>(null);
   const qc = useQueryClient();
   const portfolios = useQuery({
     queryKey: ['nachbar-portfolios'],
@@ -72,7 +74,7 @@ export function Arrondierung() {
     queryKey: ['nachbar-potenzial', PORTFOLIO],
     queryFn: async (): Promise<Nachbar[] | null> => {
       const { data, error } = await db.from('nachbar_potenzial')
-        .select('position, haupt_egrid, haupt_adresse, nachbar_egrid, nummer, gemeinde, kanton, zone, flaeche, gebaeude, baujahr, wohnungen, az_heute, punkte, gruende')
+        .select('position, haupt_egrid, haupt_adresse, nachbar_egrid, nummer, gemeinde, kanton, zone, flaeche, gebaeude, baujahr, wohnungen, gf_heute, az_heute, punkte, gruende, umriss, haupt_flaeche, haupt_zone, haupt_gebaeude, haupt_baujahr, haupt_wohnungen, haupt_gf_heute, haupt_umriss')
         .eq('portfolio', PORTFOLIO).order('punkte', { ascending: false }).limit(2000);
       return error ? null : data ?? [];
     },
@@ -121,7 +123,7 @@ export function Arrondierung() {
   const flaecheFrei = alle.filter(n => n.punkte >= 50).reduce((s, n) => s + (n.flaeche ?? 0), 0);
 
   return (
-    <Seite bild={BILD.gelegenheiten} ueber={`Manager-Ansicht · ${PORTFOLIO_NAME[PORTFOLIO] ?? PORTFOLIO}`} titel="Arrondieren"
+    <Seite bild={BILD.gelegenheiten} ueber={`Manager-Ansicht · ${PORTFOLIO_NAME[PORTFOLIO] ?? PORTFOLIO}`} titel="Mögliche Arrondierungen"
       unter={<>Nachbarparzellen der {positionen || 'Kunden-'}Liegenschaften: wo ein Zukauf am meisten bringt. Davon {unbebaut} unbebaut in der Bauzone.</>}
       kennzahlen={[
         { titel: 'Nachbarparzellen', wert: String(alle.length) },
@@ -147,8 +149,10 @@ export function Arrondierung() {
             <ul className={LISTE}>
               {g.map(n => {
                 const wem = eigentuemer.data?.get(n.nachbar_egrid);
+                const schluessel = `${n.haupt_egrid}-${n.nachbar_egrid}`;
                 return (
-                  <li key={n.nachbar_egrid} className="grid gap-3 p-4 sm:grid-cols-[minmax(0,1fr)_220px] sm:items-center">
+                  <li key={n.nachbar_egrid} className="p-4">
+                  <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px] sm:items-center">
                     <div className="min-w-0 space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-medium">Parzelle {n.nummer ?? '?'}{n.gemeinde ? `, ${n.gemeinde}` : ''}</span>
@@ -167,6 +171,10 @@ export function Arrondierung() {
                         <span className={wem ? '' : 'text-muted-foreground'}>{wem ?? 'Eigentümer nicht bekannt'}</span>
                         <a className="underline underline-offset-2" target={FENSTER.karte}
                            href={`https://map.geo.admin.ch/?swisssearch=${n.nachbar_egrid}&lang=de&bgLayer=ch.swisstopo.swissimage`}>Karte</a>
+                        <button type="button" className="font-medium underline underline-offset-2" aria-expanded={offen === schluessel}
+                                onClick={() => setOffen(offen === schluessel ? null : schluessel)}>
+                          {offen === schluessel ? 'Zusammen schliessen' : 'Zusammen rechnen'}
+                        </button>
                       </div>
                     </div>
                     <div className="space-y-3">
@@ -182,6 +190,8 @@ export function Arrondierung() {
                         ))}
                       </div>
                     </div>
+                  </div>
+                  {offen === schluessel && <div className="mt-4"><ArrondierungZusammen d={n} nummer={n.nummer} /></div>}
                   </li>
                 );
               })}

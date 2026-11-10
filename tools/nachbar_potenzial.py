@@ -30,7 +30,7 @@ def hole(url, daten=None):
     for versuch in range(3):
         try:
             r = urllib.request.Request(url, data=daten, headers={"User-Agent": "Bauraum Nachbarpotenzial"})
-            with urllib.request.urlopen(r, timeout=60) as a:
+            with urllib.request.urlopen(r, timeout=30) as a:  # lieber neu fragen als hängen: ein Lauf stand mit 60 s 12 min still
                 return json.load(a)
         except Exception:
             time.sleep(1.5 * (versuch + 1))
@@ -157,7 +157,8 @@ def pruefen(eg):
             "flaeche": fl, "kompakt": round(kompaktheit(ring), 3), "e": round(m[0], 1), "n": round(m[1], 1), "gebaeude": len(geb),
             "baujahr": min(jahre) if jahre else None, "geschosse": max((a.get("gastw") or 0) for a in geb) if geb else None,
             "wohnungen": sum((a.get("ganzwhg") or 0) for a in geb) if geb else None,
-            "gf_heute": round(gf) if geb else 0, "az_heute": round(gf / fl, 2) if fl and geb else (0.0 if fl else None)}
+            "gf_heute": round(gf) if geb else 0, "az_heute": round(gf / fl, 2) if fl and geb else (0.0 if fl else None),
+            "umriss": [[[round(p[0], 1), round(p[1], 1)] for p in r] for r in par["ringe"]]}
 
 
 def main():
@@ -169,14 +170,27 @@ def main():
     eigene = {p["egrid"] for p in positionen}
     print(len(positionen), "Positionen,", sum(len(p["nachbarn"]) for p in positionen), "Nachbarn")
     gesehen, aus = {}, []
-    # Der Bund antwortet heute teils erst nach 40 s: sechzehn Parzellen gleichzeitig.
-    from concurrent.futures import ThreadPoolExecutor
-    alle = sorted({eg for p in positionen for eg in p["nachbarn"] if eg not in eigene})
+    # Zwischenstand auf der Platte: Der Bund antwortet mal in 0,2 s, mal erst
+    # nach einer Minute; ein abgebrochener Lauf fängt so nicht von vorne an.
+    zwischen = ziel_csv + ".zwischen.json"
+    try:
+        gesehen = json.load(open(zwischen, encoding="utf8"))
+    except (OSError, ValueError):
+        gesehen = {}
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    # Die eigenen Liegenschaften auch: Für «zusammen» braucht es beide Seiten.
+    alle = sorted({eg for p in positionen for eg in p["nachbarn"]} | eigene)
+    offen = [eg for eg in alle if eg not in gesehen]
     with ThreadPoolExecutor(16) as pool:
-        for eg, z in zip(alle, pool.map(pruefen, alle)):
-            gesehen[eg] = z
-    print(len(alle), "Nachbarparzellen geprüft", flush=True)
+        auftrag = {pool.submit(pruefen, eg): eg for eg in offen}
+        for i, fertig in enumerate(as_completed(auftrag), 1):
+            gesehen[auftrag[fertig]] = fertig.result()
+            if i % 25 == 0 or i == len(offen):
+                json.dump(gesehen, open(zwischen, "w", encoding="utf8"))
+                print(f"{i} von {len(offen)} geprüft", flush=True)
+    print(len(alle), "Parzellen geprüft", flush=True)
     for p in positionen:
+        h = gesehen.get(p["egrid"]) or {}
         for eg in p["nachbarn"]:
             if eg in eigene:
                 continue  # gehört schon dem Portfolio
@@ -185,19 +199,24 @@ def main():
                 continue
             punkte, gruende = bewerten(z, p["flaeche"])
             aus.append({"portfolio": portfolio, "position": p["nr"], "haupt_egrid": p["egrid"], "haupt_adresse": p["adresse"], "nachbar_egrid": eg,
-                        **{k: v for k, v in z.items()}, "punkte": punkte, "gruende": " · ".join(gruende)})
-        print(f"Position {p['nr']}: {len(p['nachbarn'])} Nachbarn", flush=True)
-    felder = list(aus[0].keys())
-    w = csv.DictWriter(open(ziel_csv, "w", newline="", encoding="utf8"), fieldnames=felder)
+                        **{k: v for k, v in z.items()}, "punkte": punkte, "gruende": " · ".join(gruende),
+                        # Fläche der Liste (alle Parzellen der Zeile), Gebäude der Hauptparzelle laut GWR
+                        "haupt_flaeche": p["flaeche"], "haupt_zone": h.get("zone"), "haupt_gebaeude": h.get("gebaeude"),
+                        "haupt_baujahr": h.get("baujahr"), "haupt_wohnungen": h.get("wohnungen"), "haupt_gf_heute": h.get("gf_heute"),
+                        "haupt_umriss": h.get("umriss")})
+    felder = [k for k in aus[0] if "umriss" not in k]
+    w = csv.DictWriter(open(ziel_csv, "w", newline="", encoding="utf8"), fieldnames=felder, extrasaction="ignore")
     w.writeheader(); [w.writerow(x) for x in aus]
-    q = lambda v: "null" if v is None or v == "" else (str(v) if isinstance(v, (int, float)) else "'" + str(v).replace("'", "''") + "'")
+    q = lambda v: ("null" if v is None or v == "" else str(v) if isinstance(v, (int, float))
+                   else "'" + json.dumps(v) + "'::jsonb" if isinstance(v, list) else "'" + str(v).replace("'", "''") + "'")
+    spalten = ["portfolio", "position", "haupt_egrid", "haupt_adresse", "nachbar_egrid", "nummer", "kanton", "gemeinde", "zone", "flaeche", "e", "n",
+               "gebaeude", "baujahr", "geschosse", "wohnungen", "gf_heute", "az_heute", "punkte", "gruende", "umriss", "haupt_flaeche", "haupt_zone",
+               "haupt_gebaeude", "haupt_baujahr", "haupt_wohnungen", "haupt_gf_heute", "haupt_umriss"]
     with open(ziel_sql, "w", encoding="utf8") as f:
         f.write(f"-- Erzeugt mit tools/nachbar_potenzial.py: {len(aus)} Nachbarparzellen von {len(positionen)} Positionen ({portfolio}).\n")
         f.write(f"delete from public.nachbar_potenzial where portfolio = {q(portfolio)};\n")
-        f.write("insert into public.nachbar_potenzial (portfolio, position, haupt_egrid, haupt_adresse, nachbar_egrid, nummer, kanton, gemeinde, zone, flaeche, e, n, gebaeude, baujahr, geschosse, wohnungen, gf_heute, az_heute, punkte, gruende) values\n")
-        f.write(",\n".join("(" + ", ".join(q(x[k]) for k in ["portfolio", "position", "haupt_egrid", "haupt_adresse", "nachbar_egrid", "nummer", "kanton", "gemeinde",
-                                                             "zone", "flaeche", "e", "n", "gebaeude", "baujahr", "geschosse", "wohnungen", "gf_heute", "az_heute",
-                                                             "punkte", "gruende"]) + ")" for x in aus) + ";\n")
+        f.write(f"insert into public.nachbar_potenzial ({', '.join(spalten)}) values\n")
+        f.write(",\n".join("(" + ", ".join(q(x[k]) for k in spalten) + ")" for x in aus) + ";\n")
     print(f"Fertig: {len(aus)} Nachbarparzellen, {sum(1 for x in aus if x['punkte'] >= 50)} mit 50 Punkten oder mehr, "
           f"{sum(1 for v in gesehen.values() if v is None)} EGRID ohne Parzelle beim Bund")
 
