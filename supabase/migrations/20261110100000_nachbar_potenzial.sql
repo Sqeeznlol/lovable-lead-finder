@@ -8,7 +8,9 @@
 -- Gerechnet mit tools/nachbar_potenzial.py, für jeden Kanton gleich
 -- (Bund: Amtliche Vermessung, Bauzonen, GWR).
 --
--- Lesen nur angemeldet: Wer arrondieren will, verrät damit eine Absicht.
+-- Nur für das Bauraum-Team (Julian: "nur für uns als Manager-Ansicht"):
+-- Fondsleitungs-Konten sind auch angemeldet, sehen hier aber nichts --
+-- wer arrondieren will, verrät damit eine Absicht, auch gegenüber dem Kunden.
 -- =====================================================================
 
 create table if not exists public.nachbar_potenzial (
@@ -41,5 +43,23 @@ create index if not exists idx_nachbar_potenzial_portfolio on public.nachbar_pot
 
 alter table public.nachbar_potenzial enable row level security;
 drop policy if exists nachbar_potenzial_lesen on public.nachbar_potenzial;
-create policy nachbar_potenzial_lesen on public.nachbar_potenzial for select to authenticated using (true);
+create policy nachbar_potenzial_lesen on public.nachbar_potenzial for select to authenticated using (not public.ist_fondsmanager());
 grant select on public.nachbar_potenzial to authenticated;
+
+-- Auswahl des Teams je Nachbarparzelle (Julian: "damit wir die selektionieren
+-- können"): eigene Tabelle, damit eine neue Berechnung die Auswahl nicht löscht.
+create table if not exists public.nachbar_auswahl (
+  portfolio      text not null,
+  nachbar_egrid  text not null check (nachbar_egrid ~ '^CH[0-9A-Z]{12}$'),
+  stand          text not null default 'ausgewaehlt' check (stand in ('offen', 'ausgewaehlt', 'kontaktiert', 'kein_interesse')),
+  notiz          text check (notiz is null or length(notiz) <= 2000),
+  geaendert_von  uuid default auth.uid(),
+  geaendert_am   timestamptz not null default now(),
+  primary key (portfolio, nachbar_egrid)
+);
+
+alter table public.nachbar_auswahl enable row level security;
+drop policy if exists nachbar_auswahl_team on public.nachbar_auswahl;
+create policy nachbar_auswahl_team on public.nachbar_auswahl for all to authenticated
+  using (not public.ist_fondsmanager()) with check (not public.ist_fondsmanager());
+grant select, insert, update, delete on public.nachbar_auswahl to authenticated;

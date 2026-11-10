@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Abschnitt, Leer, LISTE, Marke, Reiter, Seite, Strichbalken } from '@/components/rahmen';
 import { BILD } from '@/lib/luftbild';
@@ -16,17 +16,27 @@ import { FENSTER } from '@/lib/fenster';
  * Arealüberbauung. Die Nachbarparzelle ist für den Eigentümer nebenan
  * mehr wert als für jeden anderen Käufer -- darum steht hier, wem sie
  * gehört, soweit bekannt (Eigentumsauskunft im Bestand, Fondsinventar).
+ *
+ * Manager-Ansicht nur für das Bauraum-Team (Julian: "nur für uns ... damit
+ * wir die selektionieren können"): je Parzelle ein Stand, gespeichert in
+ * nachbar_auswahl. Fondsleitungen sehen weder Seite noch Daten (RLS).
  */
 type Nachbar = {
   position: number; haupt_egrid: string; haupt_adresse: string; nachbar_egrid: string; nummer: string | null;
   gemeinde: string | null; kanton: string | null; zone: string | null; flaeche: number | null; gebaeude: number | null;
   baujahr: number | null; wohnungen: number | null; az_heute: number | null; punkte: number; gruende: string | null;
 };
-type Filter = 'alle' | 'potenzial' | 'unbebaut';
+type Filter = 'alle' | 'potenzial' | 'unbebaut' | 'auswahl';
+type Stand = 'offen' | 'ausgewaehlt' | 'kontaktiert' | 'kein_interesse';
+const STAND: { wert: Stand; titel: string }[] = [
+  { wert: 'offen', titel: 'Offen' }, { wert: 'ausgewaehlt', titel: 'Ausgewählt' },
+  { wert: 'kontaktiert', titel: 'Kontaktiert' }, { wert: 'kein_interesse', titel: 'Kein Interesse' },
+];
+// Anzeigenamen der Portfolios; neue erscheinen mit ihrer Kennung, bis sie hier stehen.
+const PORTFOLIO_NAME: Record<string, string> = { helvetica: 'Helvetica Swiss Living Fund' };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
-const PORTFOLIO = 'helvetica';
 
 async function inStuecken<T>(egrids: string[], frage: (teil: string[]) => Promise<T[]>): Promise<T[]> {
   const aus: T[] = [];
@@ -36,6 +46,28 @@ async function inStuecken<T>(egrids: string[], frage: (teil: string[]) => Promis
 
 export function Arrondierung() {
   const [filter, setFilter] = useState<Filter>('potenzial');
+  const [gewaehlt, setGewaehlt] = useState<string | null>(null);
+  const qc = useQueryClient();
+  const portfolios = useQuery({
+    queryKey: ['nachbar-portfolios'],
+    queryFn: async (): Promise<string[]> => {
+      const { data } = await db.from('nachbar_potenzial').select('portfolio').limit(5000);
+      return [...new Set(((data ?? []) as { portfolio: string }[]).map(x => x.portfolio))].sort();
+    },
+  });
+  const PORTFOLIO = gewaehlt ?? portfolios.data?.[0] ?? 'helvetica';
+  const auswahl = useQuery({
+    queryKey: ['nachbar-auswahl', PORTFOLIO],
+    queryFn: async () => {
+      const { data } = await db.from('nachbar_auswahl').select('nachbar_egrid, stand').eq('portfolio', PORTFOLIO);
+      return new Map(((data ?? []) as { nachbar_egrid: string; stand: Stand }[]).map(x => [x.nachbar_egrid, x.stand]));
+    },
+  });
+  const setzen = async (egrid: string, stand: Stand) => {
+    await db.from('nachbar_auswahl').upsert({ portfolio: PORTFOLIO, nachbar_egrid: egrid, stand, geaendert_am: new Date().toISOString() });
+    await qc.invalidateQueries({ queryKey: ['nachbar-auswahl', PORTFOLIO] });
+  };
+  const stand = (egrid: string): Stand => auswahl.data?.get(egrid) ?? 'offen';
   const nachbarn = useQuery({
     queryKey: ['nachbar-potenzial', PORTFOLIO],
     queryFn: async (): Promise<Nachbar[] | null> => {
@@ -71,7 +103,11 @@ export function Arrondierung() {
     for (const n of alle) m.set(n.nachbar_egrid, (m.get(n.nachbar_egrid) ?? new Set()).add(n.haupt_egrid));
     return m;
   }, [alle]);
-  const sicht = alle.filter(n => filter === 'alle' || (filter === 'potenzial' ? n.punkte >= 50 : !n.gebaeude && n.punkte > 0));
+  const sicht = alle.filter(n => filter === 'alle'
+    || (filter === 'potenzial' ? n.punkte >= 50
+      : filter === 'auswahl' ? ['ausgewaehlt', 'kontaktiert'].includes(stand(n.nachbar_egrid))
+      : !n.gebaeude && n.punkte > 0));
+  const ausgewaehlt = new Set(alle.filter(n => ['ausgewaehlt', 'kontaktiert'].includes(stand(n.nachbar_egrid))).map(n => n.nachbar_egrid)).size;
   const gruppen = useMemo(() => {
     const g = new Map<string, Nachbar[]>();
     for (const n of sicht) g.set(n.haupt_egrid, [...(g.get(n.haupt_egrid) ?? []), n]);
@@ -85,15 +121,19 @@ export function Arrondierung() {
   const flaecheFrei = alle.filter(n => n.punkte >= 50).reduce((s, n) => s + (n.flaeche ?? 0), 0);
 
   return (
-    <Seite bild={BILD.gelegenheiten} ueber="Helvetica Swiss Living Fund" titel="Arrondieren"
+    <Seite bild={BILD.gelegenheiten} ueber={`Manager-Ansicht · ${PORTFOLIO_NAME[PORTFOLIO] ?? PORTFOLIO}`} titel="Arrondieren"
       unter={<>Nachbarparzellen der {positionen || 'Kunden-'}Liegenschaften: wo ein Zukauf am meisten bringt. Davon {unbebaut} unbebaut in der Bauzone.</>}
       kennzahlen={[
         { titel: 'Nachbarparzellen', wert: String(alle.length) },
         { titel: 'Mit Potenzial', wert: String(mitPotenzial), marke: mitPotenzial ? <Marke art="heiss">50+ Punkte</Marke> : undefined },
         { titel: 'Verbinden Liegenschaften', wert: String(verbindende) },
-        { titel: 'Fläche mit Potenzial', wert: `${Math.round(flaecheFrei).toLocaleString('de-CH')} m²` },
+        { titel: 'Ausgewählt', wert: String(ausgewaehlt) },
       ]}>
+      {(portfolios.data?.length ?? 0) > 1 && (
+        <Reiter<string> wahl={PORTFOLIO} setWahl={setGewaehlt} optionen={(portfolios.data ?? []).map(p => ({ wert: p, titel: PORTFOLIO_NAME[p] ?? p }))} />
+      )}
       <Reiter<Filter> wahl={filter} setWahl={setFilter} optionen={[
+        { wert: 'auswahl', titel: 'Ausgewählt', zahl: ausgewaehlt },
         { wert: 'potenzial', titel: 'Mit Potenzial', zahl: mitPotenzial },
         { wert: 'unbebaut', titel: 'Unbebaut', zahl: unbebaut },
         { wert: 'alle', titel: 'Alle', zahl: alle.length },
@@ -129,7 +169,19 @@ export function Arrondierung() {
                            href={`https://map.geo.admin.ch/?swisssearch=${n.nachbar_egrid}&lang=de&bgLayer=ch.swisstopo.swissimage`}>Karte</a>
                       </div>
                     </div>
-                    <Strichbalken anteil={n.punkte / 100} titel="Potenzial" farbe={n.punkte >= 50 ? 'heiss' : 'akzent'} />
+                    <div className="space-y-3">
+                      <Strichbalken anteil={n.punkte / 100} titel="Potenzial" farbe={n.punkte >= 50 ? 'heiss' : 'akzent'} />
+                      {/* Der Stand gilt je Parzelle, auch wenn sie an mehrere Liegenschaften grenzt. */}
+                      <div className="grid grid-cols-2 gap-1" role="group" aria-label="Stand">
+                        {STAND.map(x => (
+                          <button key={x.wert} type="button" aria-pressed={stand(n.nachbar_egrid) === x.wert}
+                                  onClick={() => void setzen(n.nachbar_egrid, x.wert)}
+                                  className={`h-11 rounded-[3px] border px-2 text-xs font-medium transition-colors ${stand(n.nachbar_egrid) === x.wert ? 'border-foreground bg-foreground text-background' : 'bg-card hover:bg-secondary'}`}>
+                            {x.titel}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </li>
                 );
               })}
