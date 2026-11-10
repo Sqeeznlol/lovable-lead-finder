@@ -4,7 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Abschnitt, Leer, LISTE, Marke, Reiter, Seite, Strichbalken } from '@/components/rahmen';
 import { BILD } from '@/lib/luftbild';
 import { FENSTER } from '@/lib/fenster';
-import { ArrondierungZusammen, type ZusammenDaten } from '@/components/ArrondierungZusammen';
+import { ArrondierungZusammen } from '@/components/ArrondierungZusammen';
+import type { Gebaeude, Parzelle, Ring } from '@/lib/arrondierung-zusammen';
 
 /**
  * Mögliche Arrondierungen im Kundenportfolio (Julian, 10. November: "mit dem
@@ -26,11 +27,20 @@ import { ArrondierungZusammen, type ZusammenDaten } from '@/components/Arrondier
  * wir die selektionieren können"): je Parzelle ein Stand, gespeichert in
  * nachbar_auswahl. Fondsleitungen sehen weder Seite noch Daten (RLS).
  */
-type Nachbar = ZusammenDaten & {
+type Nachbar = {
+  umriss: Ring[] | null; geb_liste: Gebaeude[] | null; baujahr: number | null; wohnungen: number | null;
+  haupt_nummer: string | null; haupt_flaeche: number | null; haupt_zone: string | null; haupt_umriss: Ring[] | null;
+  haupt_geb_liste: Gebaeude[] | null; gerechnet_am: string | null;
   position: number; haupt_egrid: string; haupt_adresse: string; nachbar_egrid: string; nummer: string | null;
   gemeinde: string | null; kanton: string | null; zone: string | null; flaeche: number | null; gebaeude: number | null;
-  az_heute: number | null; punkte: number; gruende: string | null;
+  punkte: number; gruende: string | null;
 };
+const nachbarParzelle = (n: Nachbar): Parzelle => ({
+  egrid: n.nachbar_egrid, nummer: n.nummer, flaeche: n.flaeche, zone: n.zone, umriss: n.umriss, gebaeude: n.geb_liste ?? [],
+});
+const hauptParzelle = (n: Nachbar): Parzelle => ({
+  egrid: n.haupt_egrid, nummer: n.haupt_nummer, flaeche: n.haupt_flaeche, zone: n.haupt_zone, umriss: n.haupt_umriss, gebaeude: n.haupt_geb_liste ?? [],
+});
 type Filter = 'alle' | 'potenzial' | 'unbebaut' | 'auswahl';
 type Stand = 'offen' | 'ausgewaehlt' | 'kontaktiert' | 'kein_interesse';
 const STAND: { wert: Stand; titel: string }[] = [
@@ -120,7 +130,7 @@ export function Arrondierung() {
     enabled: !!gewaehlt,
     queryFn: async (): Promise<Nachbar[] | null> => {
       let q = db.from('nachbar_potenzial')
-        .select('position, haupt_egrid, haupt_adresse, nachbar_egrid, nummer, gemeinde, kanton, zone, flaeche, gebaeude, baujahr, wohnungen, gf_heute, az_heute, punkte, gruende, umriss, haupt_flaeche, haupt_zone, haupt_gebaeude, haupt_baujahr, haupt_wohnungen, haupt_gf_heute, haupt_umriss')
+        .select('position, haupt_egrid, haupt_adresse, nachbar_egrid, nummer, gemeinde, kanton, zone, flaeche, gebaeude, baujahr, wohnungen, punkte, gruende, umriss, geb_liste, haupt_nummer, haupt_flaeche, haupt_zone, haupt_umriss, haupt_geb_liste, gerechnet_am')
         .eq('portfolio', PORTFOLIO);
       q = gewaehlt?.zeilen[0]?.gefaess ? q.eq('gefaess', gewaehlt.zeilen[0].gefaess) : q;
       const { data, error } = await q.order('punkte', { ascending: false }).limit(2000);
@@ -252,7 +262,7 @@ export function Arrondierung() {
                         {[n.flaeche ? `${n.flaeche.toLocaleString('de-CH')} m²` : null,
                           n.gebaeude ? `${n.gebaeude} Gebäude${n.baujahr ? ` ab ${n.baujahr}` : ''}` : null,
                           n.wohnungen ? `${n.wohnungen} ${n.wohnungen === 1 ? 'Wohnung' : 'Wohnungen'}` : null,
-                          n.az_heute != null && n.gebaeude ? `heute ${Number(n.az_heute).toFixed(2)} genutzt` : null].filter(Boolean).join(' · ')}
+                          ].filter(Boolean).join(' · ')}
                       </div>
                       {n.gruende && <div className="text-sm">{n.gruende}</div>}
                       <div className="flex flex-wrap gap-x-4 text-sm">
@@ -279,7 +289,13 @@ export function Arrondierung() {
                       </div>
                     </div>
                   </div>
-                  {offen === schluessel && <div className="mt-4"><ArrondierungZusammen d={n} nummer={n.nummer} /></div>}
+                  {offen === schluessel && (
+                    <div className="mt-4">
+                      {/* Alle Nachbarn dieser Liegenschaft, auch die ausserhalb des Filters: dazuklicken soll man jeden können. */}
+                      <ArrondierungZusammen haupt={hauptParzelle(n)} adresse={n.haupt_adresse} start={n.nachbar_egrid} stand={n.gerechnet_am}
+                        nachbarn={alle.filter(x => x.haupt_egrid === n.haupt_egrid).map(nachbarParzelle)} />
+                    </div>
+                  )}
                   </li>
                 );
               })}

@@ -1,38 +1,61 @@
-// Rechnung für «Mögliche Arrondierungen»: eigene Liegenschaft und Nachbar zusammen.
+/**
+ * Rechnung für «Mögliche Arrondierungen»: die eigene Parzelle und die
+ * dazugeklickten Nachbarn zusammen. Nur gemessene Werte (Amtliche
+ * Vermessung, GWR); geschätzt wird nichts (Julian, 10. November: "damit
+ * der Architekt das rechnen kann und die echten Zahlen sieht, nicht
+ * irgendeine Schätzung"). Was möglich ist, rechnet sich erst mit der
+ * Ausnützungsziffer, die man aus der BZO der Gemeinde einträgt.
+ */
 export type Ring = number[][];
-export type ZusammenDaten = {
-  flaeche: number | null; gebaeude: number | null; baujahr: number | null; wohnungen: number | null; gf_heute: number | null;
-  zone: string | null; umriss: Ring[] | null;
-  haupt_flaeche: number | null; haupt_gebaeude: number | null; haupt_baujahr: number | null; haupt_wohnungen: number | null;
-  haupt_gf_heute: number | null; haupt_zone: string | null; haupt_umriss: Ring[] | null;
+
+/** Ein Gebäude, wie das GWR es führt. */
+export type Gebaeude = {
+  egid: string | null; adresse: string | null; baujahr: number | null; status: number | null;
+  geschosse: number | null; grundflaeche: number | null; ebf: number | null; volumen: number | null;
+  wohnungen: number | null; wohnflaeche: number | null; e: number | null; n: number | null;
 };
 
-// Hauptnutzfläche aus der Geschossfläche: Wände, Treppen, Technik und
-// Erschliessung abgezogen bleiben im Wohnbau rund 80 %.
-export const HNF_ANTEIL = 0.8;
-// Ab dieser Fläche lassen die meisten Kantone eine Arealüberbauung mit Bonus zu.
-export const AREAL_AB = 3000;
+export type Parzelle = {
+  egrid: string; nummer: string | null; flaeche: number | null; zone: string | null;
+  umriss: Ring[] | null; gebaeude: Gebaeude[];
+};
 
-/**
- * Ausnützung als Annahme: was die eigene Liegenschaft heute schon hat
- * (sie ist meist nach der geltenden BZO gebaut; Amriswil Lohstrasse steht
- * bei 1,55, die Zonenannahme 0,8 hätte «nichts mehr möglich» ergeben),
- * mindestens aber der Richtwert der Zonenart. Auf 0,05 gerundet.
- */
-export function azAnnahme(zone: string | null, hauptAzHeute = 0): number {
-  const richtwert = /Zentrum|Kern/i.test(zone ?? '') ? 1.3 : /Misch/i.test(zone ?? '') ? 1.0 : 0.8;
-  return Math.round(Math.max(richtwert, hauptAzHeute) * 20) / 20;
-}
+/** GWR-Gebäudestatus, Codes laut Merkmalskatalog des BFS. */
+export const GEB_STATUS: Record<number, string> = {
+  1001: 'projektiert', 1002: 'bewilligt', 1003: 'im Bau', 1004: 'bestehend', 1005: 'nicht nutzbar',
+};
 
-export function zusammenRechnen(d: ZusammenDaten, az: number, bonus: number) {
-  const fl = (d.haupt_flaeche ?? 0) + (d.flaeche ?? 0);
-  const gfHeute = (d.haupt_gf_heute ?? 0) + (d.gf_heute ?? 0);
-  const gfMoeglich = Math.round(fl * az * (1 + (fl >= AREAL_AB ? bonus : 0) / 100));
+const summe = (werte: (number | null | undefined)[]) => {
+  const da = werte.filter((w): w is number => typeof w === 'number');
+  return da.length ? da.reduce((s, w) => s + w, 0) : null;
+};
+
+export type Summe = {
+  flaeche: number | null; gebaeude: number; grundflaeche: number | null; ebf: number | null; volumen: number | null;
+  wohnungen: number | null; wohnflaeche: number | null; baujahr: number | null; geschosse: number | null;
+  /** Überbauung heute: Grundfläche der Gebäude geteilt durch die Parzellenfläche. */
+  ueberbauung: number | null;
+  /** Gebäude ohne Angabe zählen nicht mit; so sieht man, wo eine Summe unvollständig ist. */
+  ohneEbf: number; ohneWohnflaeche: number;
+};
+
+export function summieren(parzellen: Parzelle[]): Summe {
+  const geb = parzellen.flatMap(p => p.gebaeude);
+  const flaeche = summe(parzellen.map(p => p.flaeche));
+  const grundflaeche = summe(geb.map(g => g.grundflaeche));
+  const jahre = geb.map(g => g.baujahr).filter((j): j is number => !!j);
+  const geschosse = geb.map(g => g.geschosse).filter((x): x is number => !!x);
   return {
-    fl, gfHeute, gfMoeglich,
-    hnfHeute: Math.round(gfHeute * HNF_ANTEIL), hnfMoeglich: Math.round(gfMoeglich * HNF_ANTEIL),
-    mehrHnf: Math.max(0, Math.round((gfMoeglich - gfHeute) * HNF_ANTEIL)),
-    azHeute: fl ? gfHeute / fl : 0, areal: fl >= AREAL_AB,
+    flaeche, gebaeude: geb.length, grundflaeche, ebf: summe(geb.map(g => g.ebf)), volumen: summe(geb.map(g => g.volumen)),
+    wohnungen: summe(geb.map(g => g.wohnungen)), wohnflaeche: summe(geb.map(g => g.wohnflaeche)),
+    baujahr: jahre.length ? Math.min(...jahre) : null, geschosse: geschosse.length ? Math.max(...geschosse) : null,
+    ueberbauung: flaeche && grundflaeche != null ? grundflaeche / flaeche : null,
+    ohneEbf: geb.filter(g => g.ebf == null).length, ohneWohnflaeche: geb.filter(g => g.wohnungen && g.wohnflaeche == null).length,
   };
 }
 
+/** Anrechenbare Geschossfläche nach BZO: Fläche mal AZ, mit Bonus in Prozent. Ohne AZ keine Zahl. */
+export function moeglich(flaeche: number | null, az: number | null, bonusProzent: number | null): number | null {
+  if (!flaeche || !az || az <= 0) return null;
+  return Math.round(flaeche * az * (1 + Math.max(0, bonusProzent ?? 0) / 100));
+}

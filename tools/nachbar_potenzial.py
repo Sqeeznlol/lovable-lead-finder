@@ -135,9 +135,9 @@ def bewerten(z, haupt_flaeche):
         elif z["baujahr"] and z["baujahr"] < 1975:
             p += 15; gruende.append(f"Gebäude von {z['baujahr']}")
         if z["az_heute"] is not None and z["az_heute"] < 0.4:
-            p += 20; gruende.append(f"nur {z['az_heute']:.2f} ausgenützt")
+            p += 20; gruende.append(f"Grundfläche × Geschosse nur {z['az_heute']:.2f} der Parzelle")
         elif z["az_heute"] is not None and z["az_heute"] < 0.6:
-            p += 10; gruende.append(f"{z['az_heute']:.2f} ausgenützt")
+            p += 10; gruende.append(f"Grundfläche × Geschosse {z['az_heute']:.2f} der Parzelle")
         if z["wohnungen"] and z["wohnungen"] <= 2:
             p += 10; gruende.append("ein bis zwei Wohnungen: wenige Eigentümer, schneller Entscheid")
     if z["flaeche"] >= 800:
@@ -170,7 +170,18 @@ def pruefen_roh(eg):
             "baujahr": min(jahre) if jahre else None, "geschosse": max((a.get("gastw") or 0) for a in geb) if geb else None,
             "wohnungen": sum((a.get("ganzwhg") or 0) for a in geb) if geb else None,
             "gf_heute": round(gf) if geb else 0, "az_heute": round(gf / fl, 2) if fl and geb else (0.0 if fl else None),
-            "umriss": [[[round(p[0], 1), round(p[1], 1)] for p in r] for r in par["ringe"]]}
+            "umriss": [[[round(p[0], 1), round(p[1], 1)] for p in r] for r in par["ringe"]],
+            # Jedes Gebäude einzeln mit den Werten des GWR, ungeschätzt (Julian: "damit
+            # der Architekt das rechnen kann und die echten Zahlen sieht").
+            "geb_liste": [gebaeude_zeile(a) for a in geb]}
+
+
+def gebaeude_zeile(a):
+    whg = [w for w, s in zip(a.get("warea") or [], a.get("wstat") or []) if s not in (3007, 3008)]  # aufgehoben, nicht realisiert
+    return {"egid": a.get("egid"), "adresse": a.get("strname_deinr"), "baujahr": a.get("gbauj"), "status": a.get("gstat"),
+            "geschosse": a.get("gastw"), "grundflaeche": a.get("garea"), "ebf": a.get("gebf"), "volumen": a.get("gvol"),
+            "wohnungen": a.get("ganzwhg"), "wohnflaeche": sum(w for w in whg if w) if whg else None,
+            "e": a.get("gkode"), "n": a.get("gkodn")}
 
 
 def main():
@@ -192,7 +203,7 @@ def main():
     from concurrent.futures import ThreadPoolExecutor, as_completed
     # Die eigenen Liegenschaften auch: Für «zusammen» braucht es beide Seiten.
     alle = sorted({eg for p in positionen for eg in p["nachbarn"]} | eigene)
-    offen = [eg for eg in alle if gesehen.get(eg) is None]
+    offen = [eg for eg in alle if gesehen.get(eg) is None or "geb_liste" not in gesehen[eg]]
     with ThreadPoolExecutor(16) as pool:
         auftrag = {pool.submit(pruefen, eg): eg for eg in offen}
         for i, fertig in enumerate(as_completed(auftrag), 1):
@@ -213,17 +224,18 @@ def main():
             aus.append({"portfolio": portfolio, "gefaess": p["gefaess"], "position": p["nr"], "haupt_egrid": p["egrid"], "haupt_adresse": p["adresse"], "nachbar_egrid": eg,
                         **{k: v for k, v in z.items()}, "punkte": punkte, "gruende": " · ".join(gruende),
                         # Fläche der Liste (alle Parzellen der Zeile), Gebäude der Hauptparzelle laut GWR
-                        "haupt_flaeche": p["flaeche"], "haupt_zone": h.get("zone"), "haupt_gebaeude": h.get("gebaeude"),
+                        "haupt_flaeche": h.get("flaeche") or p["flaeche"], "haupt_nummer": h.get("nummer"), "haupt_zone": h.get("zone"), "haupt_gebaeude": h.get("gebaeude"),
                         "haupt_baujahr": h.get("baujahr"), "haupt_wohnungen": h.get("wohnungen"), "haupt_gf_heute": h.get("gf_heute"),
-                        "haupt_umriss": h.get("umriss")})
-    felder = [k for k in aus[0] if "umriss" not in k]
+                        "haupt_umriss": h.get("umriss"), "haupt_geb_liste": h.get("geb_liste")})
+    felder = [k for k in aus[0] if "umriss" not in k and "geb_liste" not in k]
     w = csv.DictWriter(open(ziel_csv, "w", newline="", encoding="utf8"), fieldnames=felder, extrasaction="ignore")
     w.writeheader(); [w.writerow(x) for x in aus]
     q = lambda v: ("null" if v is None or v == "" else str(v) if isinstance(v, (int, float))
-                   else "'" + json.dumps(v) + "'::jsonb" if isinstance(v, list) else "'" + str(v).replace("'", "''") + "'")
+                   else "'" + json.dumps(v, ensure_ascii=False).replace("'", "''") + "'::jsonb" if isinstance(v, list) else "'" + str(v).replace("'", "''") + "'")
     spalten = ["portfolio", "gefaess", "position", "haupt_egrid", "haupt_adresse", "nachbar_egrid", "nummer", "kanton", "gemeinde", "zone", "flaeche", "e", "n",
                "gebaeude", "baujahr", "geschosse", "wohnungen", "gf_heute", "az_heute", "punkte", "gruende", "umriss", "haupt_flaeche", "haupt_zone",
-               "haupt_gebaeude", "haupt_baujahr", "haupt_wohnungen", "haupt_gf_heute", "haupt_umriss"]
+               "haupt_gebaeude", "haupt_baujahr", "haupt_wohnungen", "haupt_gf_heute", "haupt_umriss",
+               "geb_liste", "haupt_geb_liste", "haupt_nummer"]
     with open(ziel_sql, "w", encoding="utf8") as f:
         f.write(f"-- Erzeugt mit tools/nachbar_potenzial.py: {len(aus)} Nachbarparzellen von {len(positionen)} Positionen ({portfolio}).\n")
         f.write(f"delete from public.nachbar_potenzial where portfolio = {q(portfolio)};\n")

@@ -1,94 +1,156 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { ArrondierungKarte } from '@/components/ArrondierungKarte';
+import { GEB_STATUS, moeglich, summieren, type Parzelle, type Summe } from '@/lib/arrondierung-zusammen';
 
 /**
- * Beide Parzellen zusammen (Julian, 10. November: "beide parzellen
- * zusammen sieht und die daten zusammenfügen kann also bsp hnf 1 und
- * hnf 2 zusammen rechnen mit potenzial").
+ * Eigene Parzelle und Nachbarn zusammen (Julian, 10. November: "wenn
+ * beide Nachbarn anrechenbar sind, dann beide dazuklicken, es muss real
+ * aussehen, damit später der Architekt das rechnen kann und die echten
+ * Zahlen sieht, nicht irgendeine Schätzung").
  *
- * Heute: Grundstück, Gebäude und Geschossfläche aus dem GWR (Grundfläche
- * mal Geschosse), je Seite und zusammen. Möglich: Grundstück zusammen mal
- * Ausnützung. Die Ausnützung der Zone steht beim Bund nicht (die
- * harmonisierten Bauzonen kennen nur die Art); darum ist sie hier eine
- * Annahme je Zonenart, die man nach der BZO der Gemeinde einträgt.
+ * Alles hier ist gemessen: Fläche und Umriss aus der Amtlichen
+ * Vermessung, jedes Gebäude mit seinen Werten aus dem GWR. Was möglich
+ * ist, steht erst da, wenn man die Ausnützungsziffer der BZO einträgt.
  */
-import { AREAL_AB, HNF_ANTEIL, azAnnahme, zusammenRechnen, type Ring, type ZusammenDaten } from '@/lib/arrondierung-zusammen';
-
-export type { ZusammenDaten };
-
 const zahl = (v: number | null | undefined, einheit = '') => v == null ? '–' : `${Math.round(v).toLocaleString('de-CH')}${einheit}`;
+const prozent = (v: number | null) => v == null ? '–' : `${(v * 100).toFixed(1)} %`;
 
-/** Beide Umrisse in LV95, Norden oben; die eigene Liegenschaft grau, der Nachbar in der Akzentfarbe. */
-function Zeichnung({ haupt, nachbar }: { haupt: Ring[] | null; nachbar: Ring[] | null }) {
-  const alle = [...(haupt ?? []), ...(nachbar ?? [])].flat();
-  if (!alle.length) return null;
-  const xs = alle.map(p => p[0]), ys = alle.map(p => p[1]);
-  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
-  const rand = Math.max(x1 - x0, y1 - y0) * 0.06;
-  const pfad = (rr: Ring[] | null) => (rr ?? []).map(r => 'M' + r.map(p => `${(p[0] - x0).toFixed(1)},${(y1 - p[1]).toFixed(1)}`).join('L') + 'Z').join('');
-  return (
-    <svg viewBox={`${-rand} ${-rand} ${x1 - x0 + 2 * rand} ${y1 - y0 + 2 * rand}`} className="h-56 w-full" role="img"
-         aria-label="Umriss der eigenen Liegenschaft und der Nachbarparzelle">
-      <path d={pfad(haupt)} className="fill-foreground/15 stroke-foreground" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
-      <path d={pfad(nachbar)} className="fill-accent/30 stroke-accent" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
-    </svg>
-  );
+// leer: Zeile ausblenden, wenn das GWR den Wert für keine gewählte Parzelle führt (EBF und Volumen fehlen oft ganz).
+type Zeile = { titel: string; wert: (s: Summe, p?: Parzelle) => string; quelle: string; leer?: (s: Summe) => boolean };
+const ZEILEN: Zeile[] = [
+  { titel: 'Parzellenfläche', wert: s => zahl(s.flaeche, ' m²'), quelle: 'AV' },
+  { titel: 'Bauzone', wert: (_s, p) => p ? p.zone || '–' : '', quelle: 'ARE' },
+  { titel: 'Gebäude', wert: s => String(s.gebaeude), quelle: 'GWR' },
+  { titel: 'Ältestes Baujahr', wert: s => s.baujahr ? String(s.baujahr) : '–', quelle: 'GWR' },
+  { titel: 'Geschosse (höchstes)', wert: s => s.geschosse ? String(s.geschosse) : '–', quelle: 'GWR' },
+  { titel: 'Grundfläche Gebäude', wert: s => zahl(s.grundflaeche, ' m²'), quelle: 'GWR' },
+  // Nicht «Überbauungsziffer»: das GWR zählt auch Tiefgaragen mit (Menziken, Hauptstrasse 83.1: 2'167 m² ohne Geschosse).
+  { titel: 'Grundfläche / Parzelle', wert: s => prozent(s.ueberbauung), quelle: 'GWR / AV' },
+  { titel: 'Energiebezugsfläche', wert: s => zahl(s.ebf, ' m²') + (s.ohneEbf ? ` (${s.ohneEbf} ohne Angabe)` : ''), quelle: 'GWR', leer: s => s.ebf == null },
+  { titel: 'Gebäudevolumen', wert: s => zahl(s.volumen, ' m³'), quelle: 'GWR', leer: s => s.volumen == null },
+  { titel: 'Wohnungen', wert: s => zahl(s.wohnungen), quelle: 'GWR' },
+  { titel: 'Wohnfläche', wert: s => zahl(s.wohnflaeche, ' m²') + (s.ohneWohnflaeche ? ` (${s.ohneWohnflaeche} ohne Angabe)` : ''), quelle: 'GWR' },
+];
+
+function csv(teile: Parzelle[], spalten: string[], summen: Summe[]): string {
+  const z = (s: string) => `"${s.replace(/"/g, '""')}"`;
+  const kopf = ['Wert', ...spalten, 'Quelle'];
+  const zeilen = ZEILEN.map(r => [r.titel, ...summen.map((s, i) => r.wert(s, teile[i])), r.quelle]);
+  const geb = teile.flatMap(p => p.gebaeude.map(g => [p.nummer ?? '', p.egrid, g.egid ?? '', g.adresse ?? '', g.baujahr ?? '', g.status ? GEB_STATUS[g.status] ?? g.status : '',
+    g.geschosse ?? '', g.grundflaeche ?? '', g.ebf ?? '', g.volumen ?? '', g.wohnungen ?? '', g.wohnflaeche ?? ''].map(String)));
+  return [kopf, ...zeilen, [], ['Parzelle', 'EGRID', 'EGID', 'Adresse', 'Baujahr', 'Status', 'Geschosse', 'Grundfläche m²', 'EBF m²', 'Volumen m³', 'Wohnungen', 'Wohnfläche m²'], ...geb]
+    .map(r => r.map(x => z(String(x))).join(';')).join('\n');
 }
 
-export function ArrondierungZusammen({ d, nummer }: { d: ZusammenDaten; nummer: string | null }) {
-  const [az, setAz] = useState(() => azAnnahme(d.haupt_zone ?? d.zone, d.haupt_flaeche ? (d.haupt_gf_heute ?? 0) / d.haupt_flaeche : 0));
-  const [bonus, setBonus] = useState(10);
-  const r = zusammenRechnen(d, az, bonus);
-  const zeilen: [string, string, string, string][] = [
-    ['Grundstück', zahl(d.haupt_flaeche, ' m²'), zahl(d.flaeche, ' m²'), zahl(r.fl, ' m²')],
-    ['Gebäude', zahl(d.haupt_gebaeude), zahl(d.gebaeude), zahl((d.haupt_gebaeude ?? 0) + (d.gebaeude ?? 0))],
-    ['Ältestes Baujahr', d.haupt_baujahr ? String(d.haupt_baujahr) : '–', d.baujahr ? String(d.baujahr) : '–', '–'],
-    ['Wohnungen', zahl(d.haupt_wohnungen), zahl(d.wohnungen), zahl((d.haupt_wohnungen ?? 0) + (d.wohnungen ?? 0))],
-    ['Geschossfläche heute', zahl(d.haupt_gf_heute, ' m²'), zahl(d.gf_heute, ' m²'), zahl(r.gfHeute, ' m²')],
-    ['HNF heute', zahl((d.haupt_gf_heute ?? 0) * HNF_ANTEIL, ' m²'), zahl((d.gf_heute ?? 0) * HNF_ANTEIL, ' m²'), zahl(r.hnfHeute, ' m²')],
-  ];
+export function ArrondierungZusammen({ haupt, adresse, nachbarn, start, stand }: {
+  haupt: Parzelle; adresse: string; nachbarn: Parzelle[]; start: string; stand: string | null;
+}) {
+  const [gewaehlt, setGewaehlt] = useState<Set<string>>(() => new Set([start]));
+  const [az, setAz] = useState('');
+  const [bonus, setBonus] = useState('');
+  const umschalten = (egrid: string) => setGewaehlt(alt => {
+    const neu = new Set(alt);
+    if (neu.has(egrid)) neu.delete(egrid); else neu.add(egrid);
+    return neu;
+  });
+  const dazu = nachbarn.filter(p => gewaehlt.has(p.egrid));
+  const teile = [haupt, ...dazu];
+  const summen = teile.map(p => summieren([p]));
+  const gesamt = summieren(teile);
+  const azZahl = Number(az.replace(',', '.')) || null;
+  const agf = moeglich(gesamt.flaeche, azZahl, Number(bonus.replace(',', '.')) || 0);
+  const spalten = [`Eigene (${haupt.nummer ?? '?'})`, ...dazu.map(p => `Parzelle ${p.nummer ?? '?'}`)];
+  const geb = teile.flatMap(p => p.gebaeude.map(g => ({ p, g })));
+  const zeilen = ZEILEN.filter(r => !r.leer?.(gesamt));
+  const datei = useMemo(() => `arrondierung-${adresse.replace(/[^\wäöüÄÖÜ]+/g, '-').slice(0, 40)}.csv`, [adresse]);
+  const herunterladen = () => {
+    const b = new Blob(['﻿' + csv(teile, spalten, summen.concat(teile.length > 1 ? [gesamt] : []))], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(b); a.download = datei; a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
   return (
-    <div className="grid gap-4 border-t pt-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+    <div className="space-y-5 border-t pt-4">
+      <ArrondierungKarte haupt={haupt} nachbarn={nachbarn} gewaehlt={gewaehlt} umschalten={umschalten} />
       <div>
-        <Zeichnung haupt={d.haupt_umriss} nachbar={d.umriss} />
-        <div className="mt-2 flex gap-4 text-xs text-muted-foreground">
-          <span><span className="mr-1 inline-block h-2.5 w-2.5 rounded-sm bg-foreground/30 align-middle" />Eigene Liegenschaft</span>
-          <span><span className="mr-1 inline-block h-2.5 w-2.5 rounded-sm bg-accent align-middle" />Parzelle {nummer ?? '?'}</span>
+        <div className="mb-2 text-xs text-muted-foreground">Nachbarn dazunehmen (auch auf der Karte anklicken)</div>
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Nachbarparzellen">
+          {nachbarn.map(p => (
+            <button key={p.egrid} type="button" aria-pressed={gewaehlt.has(p.egrid)} onClick={() => umschalten(p.egrid)}
+                    className={`h-11 rounded-[3px] border px-3 text-sm transition-colors ${gewaehlt.has(p.egrid) ? 'border-accent bg-accent text-white' : 'bg-card hover:bg-secondary'}`}>
+              Parzelle {p.nummer ?? '?'} · {zahl(p.flaeche, ' m²')}
+            </button>
+          ))}
         </div>
       </div>
-      <div className="min-w-0 space-y-4">
-        <table className="w-full text-sm tabular-nums">
+
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[520px] text-sm tabular-nums">
           <thead className="text-xs text-muted-foreground">
-            <tr><th className="py-1 text-left font-normal" /><th className="py-1 text-right font-normal">Eigene</th>
-              <th className="py-1 text-right font-normal">Nachbar</th><th className="py-1 text-right font-medium text-foreground">Zusammen</th></tr>
+            <tr>
+              <th className="py-1 pr-3 text-left font-normal" />
+              {spalten.map(s => <th key={s} className="py-1 pl-3 text-right font-normal">{s}</th>)}
+              {teile.length > 1 && <th className="py-1 pl-3 text-right font-medium text-foreground">Zusammen</th>}
+            </tr>
           </thead>
           <tbody className="divide-y">
-            {zeilen.map(z => (
-              <tr key={z[0]}><td className="py-1.5 pr-2">{z[0]}</td><td className="py-1.5 text-right">{z[1]}</td>
-                <td className="py-1.5 text-right">{z[2]}</td><td className="py-1.5 text-right font-medium">{z[3]}</td></tr>
+            {zeilen.map(r => (
+              <tr key={r.titel}>
+                <td className="py-1.5 pr-3">{r.titel} <span className="text-xs text-muted-foreground">{r.quelle}</span></td>
+                {summen.map((s, i) => <td key={i} className="py-1.5 pl-3 text-right">{r.wert(s, teile[i])}</td>)}
+                {teile.length > 1 && <td className="py-1.5 pl-3 text-right font-medium">{r.titel === 'Bauzone' ? '' : r.wert(gesamt)}</td>}
+              </tr>
             ))}
           </tbody>
         </table>
-        <div className="grid grid-cols-2 gap-3">
-          <label className="text-xs text-muted-foreground">Ausnützung (Annahme: wie die eigene, nach BZO anpassen)
-            <input type="number" inputMode="decimal" step="0.05" min="0.1" max="5" value={az}
-                   onChange={e => setAz(Math.max(0, Number(e.target.value) || 0))}
-                   className="mt-1 h-11 w-full rounded-[3px] border bg-card px-3 text-base text-foreground" />
-          </label>
-          <label className="text-xs text-muted-foreground">Bonus Arealüberbauung in %{r.areal ? '' : ` (erst ab ${AREAL_AB.toLocaleString('de-CH')} m²)`}
-            <input type="number" inputMode="numeric" step="5" min="0" max="50" value={bonus} disabled={!r.areal}
-                   onChange={e => setBonus(Math.max(0, Number(e.target.value) || 0))}
-                   className="mt-1 h-11 w-full rounded-[3px] border bg-card px-3 text-base text-foreground disabled:opacity-50" />
-          </label>
+      </div>
+
+      <details className="text-sm">
+        <summary className="flex h-11 cursor-pointer items-center font-medium">Alle {geb.length} Gebäude einzeln</summary>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] tabular-nums">
+            <thead className="text-xs text-muted-foreground">
+              <tr>{['Parzelle', 'Adresse', 'EGID', 'Baujahr', 'Status', 'Geschosse', 'Grundfläche', 'EBF', 'Volumen', 'Wohnungen', 'Wohnfläche'].map((t, i) => (
+                <th key={t} className={`py-1 font-normal ${i < 3 ? 'pr-3 text-left' : 'pl-3 text-right'}`}>{t}</th>))}</tr>
+            </thead>
+            <tbody className="divide-y">
+              {geb.map(({ p, g }, i) => (
+                <tr key={`${g.egid}-${i}`}>
+                  <td className="py-1.5 pr-3">{p.nummer ?? '?'}</td><td className="py-1.5 pr-3">{g.adresse ?? '–'}</td>
+                  <td className="py-1.5 pr-3">{g.egid ?? '–'}</td><td className="py-1.5 pl-3 text-right">{g.baujahr ?? '–'}</td>
+                  <td className="py-1.5 pl-3 text-right">{g.status ? GEB_STATUS[g.status] ?? g.status : '–'}</td>
+                  <td className="py-1.5 pl-3 text-right">{g.geschosse ?? '–'}</td><td className="py-1.5 pl-3 text-right">{zahl(g.grundflaeche, ' m²')}</td>
+                  <td className="py-1.5 pl-3 text-right">{zahl(g.ebf, ' m²')}</td><td className="py-1.5 pl-3 text-right">{zahl(g.volumen, ' m³')}</td>
+                  <td className="py-1.5 pl-3 text-right">{g.wohnungen ?? '–'}</td><td className="py-1.5 pl-3 text-right">{zahl(g.wohnflaeche, ' m²')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-        <dl className="grid grid-cols-3 gap-3">
-          <div><dt className="text-xs text-muted-foreground">HNF möglich</dt><dd className="text-xl font-semibold tabular-nums">{zahl(r.hnfMoeglich, ' m²')}</dd></div>
-          <div><dt className="text-xs text-muted-foreground">Mehr als heute</dt><dd className="text-xl font-semibold tabular-nums">{zahl(r.mehrHnf, ' m²')}</dd></div>
-          <div><dt className="text-xs text-muted-foreground">Ausnützung heute</dt><dd className="text-xl font-semibold tabular-nums">{r.azHeute.toFixed(2)}</dd></div>
-        </dl>
-        <p className="text-xs text-muted-foreground">
-          Geschossfläche aus dem GWR (Grundfläche mal Geschosse), HNF als {Math.round(HNF_ANTEIL * 100)} % davon.
-          Möglich = Grundstück zusammen mal Ausnützung{r.areal ? ', mit Bonus für die Arealüberbauung' : ''}.
-        </p>
+      </details>
+
+      <div className="grid gap-3 sm:grid-cols-[1fr_1fr_minmax(0,1.4fr)] sm:items-end">
+        <label className="text-xs text-muted-foreground">Ausnützungsziffer laut BZO
+          <input type="text" inputMode="decimal" placeholder="z. B. 0,9" value={az} onChange={e => setAz(e.target.value)}
+                 className="mt-1 h-11 w-full rounded-[3px] border bg-card px-3 text-base text-foreground" />
+        </label>
+        <label className="text-xs text-muted-foreground">Bonus Arealüberbauung in % laut BZO
+          <input type="text" inputMode="decimal" placeholder="0" value={bonus} onChange={e => setBonus(e.target.value)}
+                 className="mt-1 h-11 w-full rounded-[3px] border bg-card px-3 text-base text-foreground" />
+        </label>
+        <div>
+          <div className="text-xs text-muted-foreground">Anrechenbare Geschossfläche möglich</div>
+          <div className="text-xl font-semibold tabular-nums">{agf == null ? 'AZ eintragen' : zahl(agf, ' m²')}</div>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+        <p>Quellen: AV = Amtliche Vermessung (Fläche, Umriss), GWR = Gebäude- und Wohnungsregister des BFS (je Gebäude), ARE = Bauzonen Schweiz
+          (harmonisiert, ohne Ziffern).{stand ? ` Abgefragt am ${new Date(stand).toLocaleDateString('de-CH')}.` : ''}</p>
+        <button type="button" onClick={herunterladen} className="h-11 rounded-[3px] border bg-card px-4 text-sm font-medium text-foreground hover:bg-secondary">
+          Tabelle für den Architekten (CSV)
+        </button>
       </div>
     </div>
   );
