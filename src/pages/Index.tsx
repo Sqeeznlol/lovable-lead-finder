@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { Building2, X, Shield, Share, Plus, Map, Target, BarChart3, Gauge, HardHat, MoreHorizontal, Briefcase, LogOut, Orbit, CalendarDays, Inbox } from 'lucide-react';
+import { Building2, X, Shield, Share, Plus, Map, Target, BarChart3, Gauge, HardHat, MoreHorizontal, Briefcase, LogOut, Orbit, CalendarDays, Inbox, Combine } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { KontoMenu } from '@/components/KontoMenu';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -9,6 +9,7 @@ import { PropertyDetailDialog } from '@/components/PropertyDetailDialog';
 import { useSchliessen, useUrlWert } from '@/hooks/use-url-wert';
 import { Skeleton } from '@/components/ui/skeleton';
 const Auswertung = lazy(() => import('@/components/Auswertung').then(m => ({ default: m.Auswertung })));
+const Arrondierung = lazy(() => import('@/components/Arrondierung').then(m => ({ default: m.Arrondierung })));
 const Leads = lazy(() => import('@/components/Leads').then(m => ({ default: m.Leads })));
 const Cockpit = lazy(() => import('@/components/Cockpit').then(m => ({ default: m.Cockpit })));
 const Baugesuche = lazy(() => import('@/components/Baugesuche').then(m => ({ default: m.Baugesuche })));
@@ -36,7 +37,7 @@ import { usePlatform } from '@/hooks/use-platform';
 
 // Jeder Bereich ist eine Adresse: /zentrale, /baugesuche ... ("/" ist
 // das Cockpit). So führt "Zurück" im Browser in den vorigen Bereich.
-const TABS = ['cockpit', 'leads', 'zentrale', 'baugesuche', 'karte', 'nachbarschaft', 'gelegenheiten', 'auswertung', 'kalender', 'karte3d', 'admin'] as const;
+const TABS = ['cockpit', 'leads', 'zentrale', 'baugesuche', 'karte', 'nachbarschaft', 'arrondierung', 'gelegenheiten', 'auswertung', 'kalender', 'karte3d', 'admin'] as const;
 type Tab = typeof TABS[number];
 const istTab = (x: string | undefined): x is Tab => !!x && (TABS as readonly string[]).includes(x);
 
@@ -63,6 +64,8 @@ const gruppen: { titel: string; eintraege: Eintrag[] }[] = [
     { id: 'baugesuche', label: 'Baugesuche', icon: HardHat },
     { id: 'auswertung', label: 'Auswertung', icon: BarChart3 },
     { id: 'nachbarschaft', label: 'Nachbarschaft', icon: Share },
+    // Nachbarparzellen der Kundenliegenschaften (Helvetica) nach Potenzial.
+    { id: 'arrondierung', label: 'Arrondieren', icon: Combine },
     // Messen und Kongresse der Branche: wann, wo, mit Adresse.
     { id: 'kalender', label: 'Immo-Kalender', icon: CalendarDays },
   ] },
@@ -228,6 +231,7 @@ export default function Index() {
             {active === 'baugesuche' && <Baugesuche />}
             {active === 'karte' && <Karte onSchliessen={() => gehe('cockpit')} />}
             {active === 'nachbarschaft' && <Nachbarschaft />}
+            {active === 'arrondierung' && <Arrondierung />}
             {active === 'gelegenheiten' && <Gelegenheiten />}
             {active === 'kalender' && <Kalender />}
             {active === 'karte3d' && <Karte3DSeite />}
