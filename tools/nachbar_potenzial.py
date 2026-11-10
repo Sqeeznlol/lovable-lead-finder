@@ -72,18 +72,45 @@ def am_punkt(e, n, ebene):
     return (hole(f"{API}/all/MapServer/identify?{q}").get("results") or [{}])[0].get("attributes", {})
 
 
-def gebaeude(egrid):
-    # Die Suche über den Umriss liefert beim GWR nichts; die über die EGRID schon
-    # (so auch die Check-Seiten). Nur die exakte EGRID zählt.
+def innen(pt, ring):
+    x, y, drin = pt[0], pt[1], False
+    for i in range(len(ring) - 1):
+        (x1, y1), (x2, y2) = ring[i][:2], ring[i + 1][:2]
+        if (y1 > y) != (y2 > y) and x < x1 + (y - y1) * (x2 - x1) / (y2 - y1):
+            drin = not drin
+    return drin
+
+
+def gebaeude(egrid, ringe):
+    """Gebäude über die EGRID und über die Lage im Umriss: Das GWR führt
+    nicht bei jedem Gebäude die EGRID der Parzelle (Zollikofen 301 kam so
+    als «unbebaut» heraus, obwohl Häuser darauf stehen)."""
     q = urllib.parse.urlencode({"layer": "ch.bfs.gebaeude_wohnungs_register", "searchField": "egrid", "searchText": egrid,
                                 "contains": "false", "returnGeometry": "false", "lang": "de"})
-    aus = []
+    aus = {}
     for x in hole(f"{API}/ech/MapServer/find?{q}").get("results", []):
         a = x.get("attributes", {})
-        if a.get("egrid") != egrid or a.get("gstat") in (1007, 1008):  # abgebrochen, nicht realisiert
-            continue
-        aus.append(a)
-    return aus
+        if a.get("egrid") == egrid:
+            aus[a.get("egid")] = a
+    for ring in ringe:
+        xs, ys = [p[0] for p in ring], [p[1] for p in ring]
+        box = f"{min(xs)},{min(ys)},{max(xs)},{max(ys)}"
+        q = urllib.parse.urlencode({"geometryType": "esriGeometryEnvelope", "geometry": box, "sr": "2056", "tolerance": "0",
+                                    "returnGeometry": "true", "geometryFormat": "geojson", "layers": "all:ch.bfs.gebaeude_wohnungs_register",
+                                    "mapExtent": box, "imageDisplay": "400,400,96", "lang": "de"})
+        for x in hole(f"{API}/all/MapServer/identify?{q}").get("results", []):
+            g = x.get("geometry") or {}
+            if g.get("type") == "Point" and innen(g["coordinates"], ring):
+                a = x.get("properties", {})
+                aus.setdefault(a.get("egid"), a)
+    return [a for a in aus.values() if a.get("gstat") not in (1007, 1008)]  # abgebrochen, nicht realisiert
+
+
+def kompaktheit(ring):
+    """1 für einen Kreis, gegen 0 für einen Streifen: Strassen, Wege und
+    Bäche sind eigene Parzellen und grenzen fast überall an."""
+    u = sum(math.dist(ring[i][:2], ring[i + 1][:2]) for i in range(len(ring) - 1))
+    return 4 * math.pi * flaeche(ring) / u ** 2 if u else 0
 
 
 def bewerten(z, haupt_flaeche):
@@ -93,6 +120,8 @@ def bewerten(z, haupt_flaeche):
         return 0, ["nicht in Wohn-, Misch- oder Zentrumszone" if z["zone"] else "ausserhalb der Bauzone"]
     if z["flaeche"] < 150:
         return 0, ["Splitter unter 150 m²"]
+    if z["kompakt"] < 0.15:
+        return 0, ["schmaler Streifen: Strasse, Weg oder Bach"]
     if not z["gebaeude"]:
         p += 50; gruende.append("unbebaut in der Bauzone")
     else:
@@ -121,11 +150,11 @@ def pruefen(eg):
     fl = round(sum(flaeche(r) for r in par["ringe"]))
     m = mitte(ring)
     zone = am_punkt(m[0], m[1], "ch.are.bauzonen")
-    geb = gebaeude(eg)
+    geb = gebaeude(eg, par["ringe"])
     jahre = [a["gbauj"] for a in geb if a.get("gbauj")]
     gf = sum((a.get("garea") or 0) * (a.get("gastw") or 1) for a in geb)
     return {"nummer": par["nummer"], "kanton": par["kanton"], "gemeinde": zone.get("name") or "", "zone": zone.get("ch_bez_d") or "",
-            "flaeche": fl, "e": round(m[0], 1), "n": round(m[1], 1), "gebaeude": len(geb),
+            "flaeche": fl, "kompakt": round(kompaktheit(ring), 3), "e": round(m[0], 1), "n": round(m[1], 1), "gebaeude": len(geb),
             "baujahr": min(jahre) if jahre else None, "geschosse": max((a.get("gastw") or 0) for a in geb) if geb else None,
             "wohnungen": sum((a.get("ganzwhg") or 0) for a in geb) if geb else None,
             "gf_heute": round(gf) if geb else 0, "az_heute": round(gf / fl, 2) if fl and geb else (0.0 if fl else None)}
