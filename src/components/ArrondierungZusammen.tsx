@@ -35,7 +35,7 @@ function Zeichnung({ haupt, nachbar }: { haupt: Ring[] | null; nachbar: Ring[] |
 }
 
 export function ArrondierungZusammen({ d, nummer }: { d: ZusammenDaten; nummer: string | null }) {
-  const [az, setAz] = useState(() => azAnnahme(d.haupt_zone ?? d.zone));
+  const [az, setAz] = useState(() => azAnnahme(d.haupt_zone ?? d.zone, d.haupt_flaeche ? (d.haupt_gf_heute ?? 0) / d.haupt_flaeche : 0));
   const [bonus, setBonus] = useState(10);
   const r = zusammenRechnen(d, az, bonus);
   const zeilen: [string, string, string, string][] = [
@@ -69,7 +69,7 @@ export function ArrondierungZusammen({ d, nummer }: { d: ZusammenDaten; nummer: 
           </tbody>
         </table>
         <div className="grid grid-cols-2 gap-3">
-          <label className="text-xs text-muted-foreground">Ausnützung (Annahme, nach BZO)
+          <label className="text-xs text-muted-foreground">Ausnützung (Annahme: wie die eigene, nach BZO anpassen)
             <input type="number" inputMode="decimal" step="0.05" min="0.1" max="5" value={az}
                    onChange={e => setAz(Math.max(0, Number(e.target.value) || 0))}
                    className="mt-1 h-11 w-full rounded-[3px] border bg-card px-3 text-base text-foreground" />

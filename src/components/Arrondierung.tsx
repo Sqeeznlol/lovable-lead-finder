@@ -124,7 +124,7 @@ export function Arrondierung() {
 
   return (
     <Seite bild={BILD.gelegenheiten} ueber={`Manager-Ansicht · ${PORTFOLIO_NAME[PORTFOLIO] ?? PORTFOLIO}`} titel="Mögliche Arrondierungen"
-      unter={<>Nachbarparzellen der {positionen || 'Kunden-'}Liegenschaften: wo ein Zukauf am meisten bringt. Davon {unbebaut} unbebaut in der Bauzone.</>}
+      unter={<>Nachbarparzellen der {positionen ? `${positionen} ` : 'Kunden-'}Liegenschaften: wo ein Zukauf am meisten bringt. Davon {unbebaut} unbebaut in der Bauzone.</>}
       kennzahlen={[
         { titel: 'Nachbarparzellen', wert: String(alle.length) },
         { titel: 'Mit Potenzial', wert: String(mitPotenzial), marke: mitPotenzial ? <Marke art="heiss">50+ Punkte</Marke> : undefined },
@@ -163,7 +163,7 @@ export function Arrondierung() {
                       <div className="text-sm text-muted-foreground">
                         {[n.flaeche ? `${n.flaeche.toLocaleString('de-CH')} m²` : null,
                           n.gebaeude ? `${n.gebaeude} Gebäude${n.baujahr ? ` ab ${n.baujahr}` : ''}` : null,
-                          n.wohnungen ? `${n.wohnungen} Wohnungen` : null,
+                          n.wohnungen ? `${n.wohnungen} ${n.wohnungen === 1 ? 'Wohnung' : 'Wohnungen'}` : null,
                           n.az_heute != null && n.gebaeude ? `heute ${Number(n.az_heute).toFixed(2)} genutzt` : null].filter(Boolean).join(' · ')}
                       </div>
                       {n.gruende && <div className="text-sm">{n.gruende}</div>}

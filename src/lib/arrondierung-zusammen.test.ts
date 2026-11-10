@@ -30,4 +30,8 @@ describe('zusammenRechnen', () => {
     expect(azAnnahme('Wohnzonen')).toBe(0.8);
     expect(azAnnahme(null)).toBe(0.8);
   });
+  it('nimmt die Ausnützung der eigenen Liegenschaft, wenn sie höher ist (Amriswil 1,55)', () => {
+    expect(azAnnahme('Mischzonen', 5496 / 3554)).toBe(1.55);
+    expect(azAnnahme('Wohnzonen', 0.3)).toBe(0.8);
+  });
 });

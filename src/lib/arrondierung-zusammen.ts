@@ -13,10 +13,15 @@ export const HNF_ANTEIL = 0.8;
 // Ab dieser Fläche lassen die meisten Kantone eine Arealüberbauung mit Bonus zu.
 export const AREAL_AB = 3000;
 
-export function azAnnahme(zone: string | null): number {
-  if (/Zentrum|Kern/i.test(zone ?? '')) return 1.3;
-  if (/Misch/i.test(zone ?? '')) return 1.0;
-  return 0.8;
+/**
+ * Ausnützung als Annahme: was die eigene Liegenschaft heute schon hat
+ * (sie ist meist nach der geltenden BZO gebaut; Amriswil Lohstrasse steht
+ * bei 1,55, die Zonenannahme 0,8 hätte «nichts mehr möglich» ergeben),
+ * mindestens aber der Richtwert der Zonenart. Auf 0,05 gerundet.
+ */
+export function azAnnahme(zone: string | null, hauptAzHeute = 0): number {
+  const richtwert = /Zentrum|Kern/i.test(zone ?? '') ? 1.3 : /Misch/i.test(zone ?? '') ? 1.0 : 0.8;
+  return Math.round(Math.max(richtwert, hauptAzHeute) * 20) / 20;
 }
 
 export function zusammenRechnen(d: ZusammenDaten, az: number, bonus: number) {
