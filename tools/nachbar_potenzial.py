@@ -26,6 +26,11 @@ API = "https://api3.geo.admin.ch/rest/services"
 BAUZONE_GUT = re.compile(r"Wohn|Misch|Zentrum|Kern", re.I)
 
 
+class KeineAntwort(Exception):
+    """Der Bund hat nicht geantwortet. Nie als «leer» werten: Wattwil
+    Müller-Friedberg-Strasse 5 kam so als Parzelle ohne Gebäude heraus."""
+
+
 def hole(url, daten=None):
     for versuch in range(3):
         try:
@@ -34,7 +39,7 @@ def hole(url, daten=None):
                 return json.load(a)
         except Exception:
             time.sleep(1.5 * (versuch + 1))
-    return {}
+    raise KeineAntwort(url.split("?")[0])
 
 
 def flaeche(ring):
@@ -120,7 +125,7 @@ def bewerten(z, haupt_flaeche):
         return 0, ["nicht in Wohn-, Misch- oder Zentrumszone" if z["zone"] else "ausserhalb der Bauzone"]
     if z["flaeche"] < 150:
         return 0, ["Splitter unter 150 m²"]
-    if z["kompakt"] < 0.15:
+    if z["kompakt"] < 0.2:  # Basel 9144 (0,18) und Birr 627 (0,17) sind Strassen
         return 0, ["schmaler Streifen: Strasse, Weg oder Bach"]
     if not z["gebaeude"]:
         p += 50; gruende.append("unbebaut in der Bauzone")
@@ -143,6 +148,13 @@ def bewerten(z, haupt_flaeche):
 
 
 def pruefen(eg):
+    try:
+        return pruefen_roh(eg)
+    except KeineAntwort:
+        return None  # bleibt offen und wird beim nächsten Lauf neu gefragt
+
+
+def pruefen_roh(eg):
     par = parzelle(eg)
     if not par:
         return None
@@ -180,7 +192,7 @@ def main():
     from concurrent.futures import ThreadPoolExecutor, as_completed
     # Die eigenen Liegenschaften auch: Für «zusammen» braucht es beide Seiten.
     alle = sorted({eg for p in positionen for eg in p["nachbarn"]} | eigene)
-    offen = [eg for eg in alle if eg not in gesehen]
+    offen = [eg for eg in alle if gesehen.get(eg) is None]
     with ThreadPoolExecutor(16) as pool:
         auftrag = {pool.submit(pruefen, eg): eg for eg in offen}
         for i, fertig in enumerate(as_completed(auftrag), 1):
@@ -218,7 +230,7 @@ def main():
         f.write(f"insert into public.nachbar_potenzial ({', '.join(spalten)}) values\n")
         f.write(",\n".join("(" + ", ".join(q(x[k]) for k in spalten) + ")" for x in aus) + ";\n")
     print(f"Fertig: {len(aus)} Nachbarparzellen, {sum(1 for x in aus if x['punkte'] >= 50)} mit 50 Punkten oder mehr, "
-          f"{sum(1 for v in gesehen.values() if v is None)} EGRID ohne Parzelle beim Bund")
+          f"{sum(1 for v in gesehen.values() if v is None)} ohne Antwort oder ohne Parzelle beim Bund (nächster Lauf fragt sie neu)")
 
 
 if __name__ == "__main__":
