@@ -210,7 +210,7 @@ def main():
             if not z:
                 continue
             punkte, gruende = bewerten(z, p["flaeche"])
-            aus.append({"portfolio": portfolio, "position": p["nr"], "haupt_egrid": p["egrid"], "haupt_adresse": p["adresse"], "nachbar_egrid": eg,
+            aus.append({"portfolio": portfolio, "gefaess": p["gefaess"], "position": p["nr"], "haupt_egrid": p["egrid"], "haupt_adresse": p["adresse"], "nachbar_egrid": eg,
                         **{k: v for k, v in z.items()}, "punkte": punkte, "gruende": " · ".join(gruende),
                         # Fläche der Liste (alle Parzellen der Zeile), Gebäude der Hauptparzelle laut GWR
                         "haupt_flaeche": p["flaeche"], "haupt_zone": h.get("zone"), "haupt_gebaeude": h.get("gebaeude"),
@@ -221,7 +221,7 @@ def main():
     w.writeheader(); [w.writerow(x) for x in aus]
     q = lambda v: ("null" if v is None or v == "" else str(v) if isinstance(v, (int, float))
                    else "'" + json.dumps(v) + "'::jsonb" if isinstance(v, list) else "'" + str(v).replace("'", "''") + "'")
-    spalten = ["portfolio", "position", "haupt_egrid", "haupt_adresse", "nachbar_egrid", "nummer", "kanton", "gemeinde", "zone", "flaeche", "e", "n",
+    spalten = ["portfolio", "gefaess", "position", "haupt_egrid", "haupt_adresse", "nachbar_egrid", "nummer", "kanton", "gemeinde", "zone", "flaeche", "e", "n",
                "gebaeude", "baujahr", "geschosse", "wohnungen", "gf_heute", "az_heute", "punkte", "gruende", "umriss", "haupt_flaeche", "haupt_zone",
                "haupt_gebaeude", "haupt_baujahr", "haupt_wohnungen", "haupt_gf_heute", "haupt_umriss"]
     with open(ziel_sql, "w", encoding="utf8") as f:

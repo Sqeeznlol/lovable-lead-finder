@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Abschnitt, Leer, LISTE, Marke, Reiter, Seite, Strichbalken } from '@/components/rahmen';
@@ -18,6 +18,10 @@ import { ArrondierungZusammen, type ZusammenDaten } from '@/components/Arrondier
  * mehr wert als für jeden anderen Käufer -- darum steht hier, wem sie
  * gehört, soweit bekannt (Eigentumsauskunft im Bestand, Fondsinventar).
  *
+ * Zuerst wählt man den Fonds (Julian: "ich muss zb den Fond auswählen
+ * können. und erst dann sehen wer seine nachbarparzellen sind"); die
+ * Wahl steht in der Adresse (?fonds=hsl), damit Zurück und Links gehen.
+ *
  * Manager-Ansicht nur für das Bauraum-Team (Julian: "nur für uns ... damit
  * wir die selektionieren können"): je Parzelle ein Stand, gespeichert in
  * nachbar_auswahl. Fondsleitungen sehen weder Seite noch Daten (RLS).
@@ -33,8 +37,20 @@ const STAND: { wert: Stand; titel: string }[] = [
   { wert: 'offen', titel: 'Offen' }, { wert: 'ausgewaehlt', titel: 'Ausgewählt' },
   { wert: 'kontaktiert', titel: 'Kontaktiert' }, { wert: 'kein_interesse', titel: 'Kein Interesse' },
 ];
-// Anzeigenamen der Portfolios; neue erscheinen mit ihrer Kennung, bis sie hier stehen.
-const PORTFOLIO_NAME: Record<string, string> = { helvetica: 'Helvetica Swiss Living Fund' };
+// Anzeigenamen; neue Fonds erscheinen mit ihrer Kennung, bis sie hier stehen.
+const FONDSLEITUNG: Record<string, string> = { helvetica: 'Helvetica Asset Management' };
+const GEFAESS_NAME: Record<string, string> = {
+  hsl: 'Helvetica Swiss Living Fund (HSL)',
+  hl: 'HL Anlagestiftung – Nachhaltiges Suburbanes Wohnen Schweiz',
+};
+// Kurzname für den Seitentitel: der volle Name der HL füllte auf dem iPhone den ganzen Kopf.
+const GEFAESS_KURZ: Record<string, string> = { hsl: 'Helvetica Swiss Living Fund', hl: 'HL Anlagestiftung' };
+type Kurz = { portfolio: string; gefaess: string | null; haupt_egrid: string; nachbar_egrid: string; punkte: number; gebaeude: number | null };
+const fondsSchluessel = (portfolio: string, gefaess: string | null) => gefaess ?? portfolio;
+
+function fondsAusAdresse(): string | null {
+  try { return new URLSearchParams(window.location.search).get('fonds'); } catch { return null; }
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
@@ -47,17 +63,46 @@ async function inStuecken<T>(egrids: string[], frage: (teil: string[]) => Promis
 
 export function Arrondierung() {
   const [filter, setFilter] = useState<Filter>('potenzial');
-  const [gewaehlt, setGewaehlt] = useState<string | null>(null);
+  const [fonds, setFondsRoh] = useState<string | null>(fondsAusAdresse);
+  const setFonds = (f: string | null) => {
+    const u = new URL(window.location.href);
+    if (f) u.searchParams.set('fonds', f); else u.searchParams.delete('fonds');
+    window.history.pushState(null, '', u);
+    setFondsRoh(f);
+    window.scrollTo({ top: 0 });
+  };
+  useEffect(() => {
+    const zurueck = () => setFondsRoh(fondsAusAdresse());
+    window.addEventListener('popstate', zurueck);
+    return () => window.removeEventListener('popstate', zurueck);
+  }, []);
   const [offen, setOffen] = useState<string | null>(null);
   const qc = useQueryClient();
-  const portfolios = useQuery({
-    queryKey: ['nachbar-portfolios'],
-    queryFn: async (): Promise<string[]> => {
-      const { data } = await db.from('nachbar_potenzial').select('portfolio').limit(5000);
-      return [...new Set(((data ?? []) as { portfolio: string }[]).map(x => x.portfolio))].sort();
+  // Übersicht ohne Umrisse: je Zeile nur, was die Fondsliste zählt.
+  const uebersicht = useQuery({
+    queryKey: ['nachbar-uebersicht'],
+    queryFn: async (): Promise<Kurz[] | null> => {
+      const { data, error } = await db.from('nachbar_potenzial').select('portfolio, gefaess, haupt_egrid, nachbar_egrid, punkte, gebaeude').limit(20000);
+      return error ? null : data ?? [];
     },
   });
-  const PORTFOLIO = gewaehlt ?? portfolios.data?.[0] ?? 'helvetica';
+  const fondsListe = useMemo(() => {
+    const m = new Map<string, { schluessel: string; portfolio: string; zeilen: Kurz[] }>();
+    for (const z of uebersicht.data ?? []) {
+      const s = fondsSchluessel(z.portfolio, z.gefaess);
+      if (!m.has(s)) m.set(s, { schluessel: s, portfolio: z.portfolio, zeilen: [] });
+      m.get(s)!.zeilen.push(z);
+    }
+    return [...m.values()].map(f => ({
+      ...f,
+      liegenschaften: new Set(f.zeilen.map(z => z.haupt_egrid)).size,
+      potenzial: f.zeilen.filter(z => z.punkte >= 50).length,
+      unbebaut: f.zeilen.filter(z => !z.gebaeude && z.punkte > 0).length,
+      bester: Math.max(0, ...f.zeilen.map(z => z.punkte)),
+    })).sort((a, b) => b.potenzial - a.potenzial);
+  }, [uebersicht.data]);
+  const gewaehlt = fondsListe.find(f => f.schluessel === fonds) ?? null;
+  const PORTFOLIO = gewaehlt?.portfolio ?? 'helvetica';
   const auswahl = useQuery({
     queryKey: ['nachbar-auswahl', PORTFOLIO],
     queryFn: async () => {
@@ -71,11 +116,14 @@ export function Arrondierung() {
   };
   const stand = (egrid: string): Stand => auswahl.data?.get(egrid) ?? 'offen';
   const nachbarn = useQuery({
-    queryKey: ['nachbar-potenzial', PORTFOLIO],
+    queryKey: ['nachbar-potenzial', fonds],
+    enabled: !!gewaehlt,
     queryFn: async (): Promise<Nachbar[] | null> => {
-      const { data, error } = await db.from('nachbar_potenzial')
+      let q = db.from('nachbar_potenzial')
         .select('position, haupt_egrid, haupt_adresse, nachbar_egrid, nummer, gemeinde, kanton, zone, flaeche, gebaeude, baujahr, wohnungen, gf_heute, az_heute, punkte, gruende, umriss, haupt_flaeche, haupt_zone, haupt_gebaeude, haupt_baujahr, haupt_wohnungen, haupt_gf_heute, haupt_umriss')
-        .eq('portfolio', PORTFOLIO).order('punkte', { ascending: false }).limit(2000);
+        .eq('portfolio', PORTFOLIO);
+      q = gewaehlt?.zeilen[0]?.gefaess ? q.eq('gefaess', gewaehlt.zeilen[0].gefaess) : q;
+      const { data, error } = await q.order('punkte', { ascending: false }).limit(2000);
       return error ? null : data ?? [];
     },
   });
@@ -122,18 +170,58 @@ export function Arrondierung() {
   const unbebaut = alle.filter(n => !n.gebaeude && n.punkte > 0).length;
   const flaecheFrei = alle.filter(n => n.punkte >= 50).reduce((s, n) => s + (n.flaeche ?? 0), 0);
 
+  if (!gewaehlt) {
+    const summe = (f: (x: typeof fondsListe[number]) => number) => fondsListe.reduce((s, x) => s + f(x), 0);
+    return (
+      <Seite bild={BILD.gelegenheiten} ueber="Manager-Ansicht" titel="Mögliche Arrondierungen"
+        unter={<>Zuerst den Fonds wählen, dann seine Liegenschaften und ihre Nachbarparzellen mit Potenzial.</>}
+        kennzahlen={[
+          { titel: 'Fonds', wert: String(fondsListe.length) },
+          { titel: 'Liegenschaften', wert: String(summe(x => x.liegenschaften)) },
+          { titel: 'Nachbarparzellen', wert: String(summe(x => x.zeilen.length)) },
+          { titel: 'Mit Potenzial', wert: String(summe(x => x.potenzial)) },
+        ]}>
+        {uebersicht.isLoading ? <Leer titel="Lädt …" />
+          : uebersicht.data === null ? <Leer titel="Die Nachbarparzellen sind noch nicht gerechnet.">Ablauf «Migrationen» mit «einspielen» starten.</Leer>
+          : !fondsListe.length ? <Leer titel="Noch kein Fonds gerechnet." />
+          : (
+          <Abschnitt titel="Fonds" zahl={fondsListe.length}>
+            <ul className={LISTE}>
+              {fondsListe.map(f => (
+                <li key={f.schluessel}>
+                  <button type="button" onClick={() => setFonds(f.schluessel)}
+                          className="grid w-full gap-3 p-4 text-left transition-colors hover:bg-secondary sm:grid-cols-[minmax(0,1fr)_220px] sm:items-center">
+                    <div className="min-w-0 space-y-1">
+                      <div className="font-medium">{GEFAESS_NAME[f.schluessel] ?? f.schluessel}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {FONDSLEITUNG[f.portfolio] ?? f.portfolio} · {f.liegenschaften} Liegenschaften · {f.zeilen.length} Nachbarparzellen · {f.unbebaut} unbebaut
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 sm:justify-end">
+                      <span className="text-sm"><span className="text-xl font-semibold tabular-nums">{f.potenzial}</span> mit Potenzial</span>
+                      <span aria-hidden className="text-muted-foreground">›</span>
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </Abschnitt>
+        )}
+      </Seite>
+    );
+  }
+
   return (
-    <Seite bild={BILD.gelegenheiten} ueber={`Manager-Ansicht · ${PORTFOLIO_NAME[PORTFOLIO] ?? PORTFOLIO}`} titel="Mögliche Arrondierungen"
-      unter={<>Nachbarparzellen der {positionen ? `${positionen} ` : 'Kunden-'}Liegenschaften: wo ein Zukauf am meisten bringt. Davon {unbebaut} unbebaut in der Bauzone.</>}
+    <Seite bild={BILD.gelegenheiten} ueber={`Mögliche Arrondierungen · ${FONDSLEITUNG[gewaehlt.portfolio] ?? gewaehlt.portfolio}`}
+      titel={GEFAESS_KURZ[gewaehlt.schluessel] ?? GEFAESS_NAME[gewaehlt.schluessel] ?? gewaehlt.schluessel}
+      unter={<>Nachbarparzellen der {positionen ? `${positionen} ` : ''}Liegenschaften, wo ein Zukauf am meisten bringt. Davon {unbebaut} unbebaut in der Bauzone.</>}
       kennzahlen={[
         { titel: 'Nachbarparzellen', wert: String(alle.length) },
         { titel: 'Mit Potenzial', wert: String(mitPotenzial), marke: mitPotenzial ? <Marke art="heiss">50+ Punkte</Marke> : undefined },
         { titel: 'Verbinden Liegenschaften', wert: String(verbindende) },
         { titel: 'Ausgewählt', wert: String(ausgewaehlt) },
       ]}>
-      {(portfolios.data?.length ?? 0) > 1 && (
-        <Reiter<string> wahl={PORTFOLIO} setWahl={setGewaehlt} optionen={(portfolios.data ?? []).map(p => ({ wert: p, titel: PORTFOLIO_NAME[p] ?? p }))} />
-      )}
+      <button type="button" onClick={() => setFonds(null)} className="h-11 text-sm font-medium underline underline-offset-2">‹ Alle Fonds</button>
       <Reiter<Filter> wahl={filter} setWahl={setFilter} optionen={[
         { wert: 'auswahl', titel: 'Ausgewählt', zahl: ausgewaehlt },
         { wert: 'potenzial', titel: 'Mit Potenzial', zahl: mitPotenzial },
