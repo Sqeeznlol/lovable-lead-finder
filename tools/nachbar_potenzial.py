@@ -169,10 +169,10 @@ def main():
     eigene = {p["egrid"] for p in positionen}
     print(len(positionen), "Positionen,", sum(len(p["nachbarn"]) for p in positionen), "Nachbarn")
     gesehen, aus = {}, []
-    # Der Bund antwortet heute teils erst nach 40 s: acht Parzellen gleichzeitig.
+    # Der Bund antwortet heute teils erst nach 40 s: sechzehn Parzellen gleichzeitig.
     from concurrent.futures import ThreadPoolExecutor
     alle = sorted({eg for p in positionen for eg in p["nachbarn"] if eg not in eigene})
-    with ThreadPoolExecutor(8) as pool:
+    with ThreadPoolExecutor(16) as pool:
         for eg, z in zip(alle, pool.map(pruefen, alle)):
             gesehen[eg] = z
     print(len(alle), "Nachbarparzellen geprüft", flush=True)
