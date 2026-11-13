@@ -5,7 +5,7 @@ import { Abschnitt, KNOPF, Leer, LISTE, Marke, Reiter, Seite } from '@/component
 import { BILD } from '@/lib/luftbild';
 import { LeadDetail, type Lead } from '@/components/LeadDetail';
 import { markeNachId } from '@/lib/check-marken';
-import { ANTWORT_TEXT, gesamt, istTest, prozent, quellen, SCHRITT_TEXT, SCHRITTE, trichterJeSeite, type TrichterZeile } from '@/lib/lead-auswertung';
+import { ANTWORT_TEXT, gesamt, prozent, quellen, SCHRITT_TEXT, SCHRITTE, trichterJeSeite, type TrichterZeile } from '@/lib/lead-auswertung';
 
 /**
  * Alle Leads der Check-Seiten in einer Liste, dazu die Zahlen je Marke
@@ -23,8 +23,6 @@ const MARKEN_NAME = (id: string) => markeNachId(id)?.name.join('') ?? id;
 export function Leads() {
   const [tage, setTage] = useState<Zeitraum>('30');
   const [nurOffen, setNurOffen] = useState(true);
-  // Testdaten der Testphase (angaben.test, Quelle "test") lassen sich ausblenden.
-  const [ohneTest, setOhneTest] = useState(false);
   const [offenId, setOffenId] = useState<string | null>(null);
   // Eine Webseite in der Tabelle aufklappen: darunter ihre Leads.
   const [seiteAuf, setSeiteAuf] = useState<string | null>(null);
@@ -51,11 +49,11 @@ export function Leads() {
     },
   });
 
-  const zeilen = useMemo(() => (trichter.data ?? []).filter(z => !ohneTest || z.quelle !== 'test'), [trichter.data, ohneTest]);
+  const zeilen = useMemo(() => trichter.data ?? [], [trichter.data]);
   const t = useMemo(() => trichterJeSeite(zeilen), [zeilen]);
   const summe = gesamt(t);
   const q = quellen(zeilen);
-  const alle = (leads.data ?? []).filter(l => !ohneTest || !istTest(l));
+  const alle = leads.data ?? [];
   const offen = (leads.data ?? []).find(l => l.id === offenId) ?? null;
   const liste = alle.filter(l => !nurOffen || !l.bearbeitet);
   const heiss = alle.filter(l => l.angaben?.prioritaet === 'heiss' && !l.bearbeitet).length;
@@ -86,7 +84,6 @@ export function Leads() {
     >
       <Abschnitt titel="Leads" zahl={liste.length}
         rechts={<div className="flex flex-wrap gap-2">
-          <button type="button" className={KNOPF} onClick={() => setOhneTest(!ohneTest)}>{ohneTest ? 'Testdaten zeigen' : 'Testdaten ausblenden'}</button>
           <button type="button" className={KNOPF} onClick={() => setNurOffen(!nurOffen)}>{nurOffen ? 'Auch erledigte zeigen' : 'Nur offene'}</button>
         </div>}>
         {leads.isLoading ? <Leer titel="Lädt …" />
@@ -108,7 +105,6 @@ export function Leads() {
                     <div className="min-w-0 space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <button type="button" className="text-left font-medium underline-offset-4 hover:underline" onClick={() => setOffenId(l.id)}>{l.name}</button>
-                        {istTest(l) && <Marke>Test</Marke>}
                         {a.prioritaet === 'heiss' && <Marke art="heiss">heiss</Marke>}
                         {a.prioritaet === 'warm' && <Marke art="violett">warm</Marke>}
                         <Marke>{String(a.domain ?? (m ? m.name.join('') : 'Anfrage'))}</Marke>
