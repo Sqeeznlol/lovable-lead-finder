@@ -5,7 +5,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { KNOPF, KNOPF_HAUPT, Marke } from '@/components/rahmen';
 import { luftbildLv95 } from '@/lib/luftbild';
 import { FENSTER } from '@/lib/fenster';
-import { ANTWORT_TEXT, istTest } from '@/lib/lead-auswertung';
+import { ANTWORT_TEXT } from '@/lib/lead-auswertung';
 
 /**
  * Ein Lead ganz: wer, welche Liegenschaft, was er will, woher er kam
@@ -90,7 +90,6 @@ export function LeadDetail({ lead, onClose, onErledigt, onNotiz }: {
               <div className="flex flex-wrap gap-2">
                 {a.prioritaet === 'heiss' && <Marke art="heiss">heiss</Marke>}
                 {a.prioritaet === 'warm' && <Marke art="violett">warm</Marke>}
-                {istTest(lead) && <Marke>Test</Marke>}
                 {a.domain ? <Marke>{String(a.domain)}</Marke> : null}
                 {lead.bearbeitet && <Marke art="gruen">erledigt</Marke>}
               </div>
