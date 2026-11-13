@@ -244,3 +244,21 @@
 .pc .knopf.senden{width: 100%; min-height: 56px; font-size: 18px; margin-top: 20px;}
 .pc .einwilligung{font-size: 12px; color: var(--hell); line-height: 1.45; margin: 12px 0 0;}
 .pc .vorschlaege.hinweis-nummer{padding: 14px 16px; color: var(--grau); font-size: 15px;}
+
+/* Julian, 13. November: "perfektioniere die Web-Browser-Ansicht und die
+   am Handy, iPhone und iPad". Gemessen an sechs Marken auf sieben Geräten:
+   (1) Auf dem iPad hoch (810px) fehlte das Beispiel der Auswertung ganz,
+       unter dem Suchfeld blieb eine leere Fläche -- ab 640px steht es
+       jetzt darunter. (2) Die drei Häkchen brachen in der schmalen linken
+       Spalte zwei plus eins um -- dort stehen sie jetzt sauber untereinander.
+   (3) Die Links im Kopf waren 24px hoch, zu klein für den Finger auf dem
+       iPad quer -- jetzt 44px. */
+@media (min-width: 640px) and (max-width: 999px){
+  .pc .beispiel, .pc[data-buehne="mitte"] .beispiel{display: block; justify-self: start; margin-top: 40px;}
+  .pc .buehne .huelle > .beispiel{max-width: 520px;}
+  .pc[data-buehne="mitte"] .beispiel{justify-self: center;}
+}
+@media (min-width: 1000px){
+  .pc:not([data-buehne="mitte"]) .buehne .haken{flex-direction: column; gap: 8px;}
+}
+.pc .kopf nav a{min-height: 44px; display: inline-flex; align-items: center;}
