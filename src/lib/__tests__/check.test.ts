@@ -6,7 +6,7 @@ describe('Marken der Check-Seiten', () => {
   it('erkennt die Marke am Hostnamen, auch mit www und Port', () => {
     expect(markeFuerHost('parzellenchecker.ch')?.id).toBe('parzellenchecker');
     expect(markeFuerHost('www.hauschecker.ch')?.id).toBe('hauschecker');
-    expect(markeFuerHost('WasDarfIchBauen.ch:443')?.id).toBe('wasdarfichbauen');
+    expect(markeFuerHost('Was-Kann-Ich-Bauen.ch:443')?.id).toBe('wasdarfichbauen');
     expect(markeFuerHost('wohntraums.life')).toBeNull();
     expect(markeFuerHost('127.0.0.1')).toBeNull();
   });

@@ -1,10 +1,11 @@
 /**
- * Die 20 Marken (Julian, 7. November: "20 verschiedene Designs und
- * andere Namen"). Eine neue Marke soll nicht unbemerkt unlesbar,
+ * Die Marken (Julian, 7. November: "20 verschiedene Designs und
+ * andere Namen"; 13. November: 23 Domains gekauft, je eine Seite mit
+ * dem genauen Namen -- seither 28 Marken). Eine neue Marke soll nicht unbemerkt unlesbar,
  * doppelt oder mit einer Schrift kommen, die es nicht gibt.
  */
 import { describe, expect, it } from 'vitest';
-import { MARKEN } from '@/lib/check-marken';
+import { GEKAUFT, MARKEN, markeFuerHost } from '@/lib/check-marken';
 import { readFileSync } from 'node:fs';
 import { buehnenBild, grundton, markenAttribute, markenStil, schriftAdresse } from '@/lib/check-gestaltung';
 
@@ -26,10 +27,12 @@ function kontrast(a: string, b: string): number {
 const DUNKEL_PAPIER = '#0E1315';
 const HELL_PAPIER = '#FAF9F7';
 
-describe('20 Marken', () => {
-  it('sind 20, mit eindeutiger Kennung und eindeutigen Domains', () => {
-    expect(MARKEN).toHaveLength(20);
-    expect(new Set(MARKEN.map(m => m.id)).size).toBe(20);
+const ANZAHL = 28;
+
+describe('Marken', () => {
+  it('sind 28, mit eindeutiger Kennung und eindeutigen Domains', () => {
+    expect(MARKEN).toHaveLength(ANZAHL);
+    expect(new Set(MARKEN.map(m => m.id)).size).toBe(ANZAHL);
     const alle = MARKEN.flatMap(m => m.domains);
     expect(new Set(alle).size).toBe(alle.length);
     for (const d of alle) expect(d).toMatch(/^[a-z0-9-]+\.ch$/);
@@ -38,12 +41,20 @@ describe('20 Marken', () => {
   });
 
   it('jede Marke sieht anders aus: keine zwei mit gleicher Farbe oder gleicher Schrift samt Aufbau', () => {
-    expect(new Set(MARKEN.map(m => m.farbe.toUpperCase())).size).toBe(20);
+    expect(new Set(MARKEN.map(m => m.farbe.toUpperCase())).size).toBe(ANZAHL);
     const kombi = MARKEN.map(m => `${m.design.schrift}|${m.design.buehne}`);
-    expect(new Set(kombi).size).toBe(20);
+    expect(new Set(kombi).size).toBe(ANZAHL);
     // Alle fünf Aufbauten und beide Grundtöne kommen vor.
     expect(new Set(MARKEN.map(m => m.design.buehne)).size).toBe(5);
     expect(MARKEN.some(m => m.design.dunkel)).toBe(true);
+  });
+
+  it('jede gekaufte Domain hat ihre eigene Marke, die genau so heisst (Julian, 13. November)', () => {
+    expect(GEKAUFT).toHaveLength(23);
+    const flach = (s: string) => s.toLowerCase().replace(/ü/g, 'ue').replace(/ö/g, 'oe').replace(/ä/g, 'ae').replace(/[^a-z0-9]/g, '');
+    const marken = GEKAUFT.map(d => markeFuerHost(d));
+    expect(new Set(marken.map(m => m?.id)).size, 'je Domain eine andere Marke').toBe(23);
+    GEKAUFT.forEach((d, i) => expect(flach(marken[i]!.name.join('')), d).toBe(flach(d.replace(/\.ch$/, ''))));
   });
 
   it('nutzt nur Schriften, die es bei Google Fonts gibt', () => {

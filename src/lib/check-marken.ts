@@ -17,7 +17,7 @@
  * den Namen, nicht verschiedene Formulare.
  *
  * Alle Domains hier waren am 7. November laut Registry (rdap.nic.ch:
- * 404) frei; gekauft ist noch keine. Vergeben waren grundstueckwert.ch,
+ * 404) frei; gekauft sind seit dem 13. November 23 (siehe GEKAUFT). Vergeben waren grundstueckwert.ch,
  * meineparzelle.ch und mfhcheck.ch -- darum stehen sie nicht hier.
  */
 // Wer die Seiten betreibt -- gehört ins Impressum, in die Einwilligung und
@@ -119,8 +119,7 @@ const ORT = {
 export const MARKEN: Marke[] = [
   {
     id: 'parzellenchecker',
-    domains: ['parzellenchecker.ch', 'parzellenchecker24.ch', 'parzellen-checker.ch', 'parzellencheck24.ch',
-      'parzellen-check.ch', 'checkmyparzelle.ch', 'checkmyparcel.ch', 'parzelle-pruefen.ch', 'parzellepruefen.ch'],
+    domains: ['parzellenchecker.ch', 'parzellenchecker24.ch', 'parzellen-checker.ch'],
     name: ['Parzellen', 'Checker'], farbe: '#0E5A4E', hell: '#E7F1EE', schwerpunkt: 'parzelle',
     etikett: STANDARD_ETIKETT, aufruf: 'Wissen Sie, was in Ihrem Grundstück steckt?',
     ueber: 'Grundstück & Baupotenzial', titel: 'Was ist auf Ihrer Parzelle möglich?',
@@ -131,7 +130,7 @@ export const MARKEN: Marke[] = [
   },
   {
     id: 'hauschecker',
-    domains: ['hauschecker.ch', 'haus-checker.ch', 'hauswertcheck.ch', 'hauswert-check.ch', 'hauswert24.ch', 'immowert-check.ch'],
+    domains: ['hauschecker.ch', 'haus-checker.ch', 'immowert-check.ch'],
     name: ['Haus', 'Checker'], farbe: '#1F4E8C', hell: '#E8EEF7', schwerpunkt: 'haus',
     etikett: STANDARD_ETIKETT, aufruf: 'Wie viel ist Ihr Haus heute wert?',
     ueber: 'Haus & Liegenschaft', titel: 'Was steckt in Ihrem Haus?',
@@ -141,11 +140,11 @@ export const MARKEN: Marke[] = [
   },
   {
     id: 'wasdarfichbauen',
-    domains: ['wasdarfichbauen.ch', 'was-darf-ich-bauen.ch', 'waskannichbauen.ch', 'was-kann-ich-bauen.ch', 'wieviel-darf-ich-bauen.ch',
-      'baupotenzial-check.ch', 'baupotenzialcheck.ch'],
-    name: ['Was darf ich ', 'bauen?'], farbe: '#9A3B28', hell: '#F6EAE6', schwerpunkt: 'bauen',
+    // Gekauft ist was-kann-ich-bauen.ch (13. November): die Marke heisst wie ihre Domain; die Kennung bleibt für bestehende Leads.
+    domains: ['was-kann-ich-bauen.ch', 'waskannichbauen.ch'],
+    name: ['Was kann ich ', 'bauen?'], farbe: '#9A3B28', hell: '#F6EAE6', schwerpunkt: 'bauen',
     etikett: STANDARD_ETIKETT, aufruf: 'Anbauen, aufstocken oder neu bauen?',
-    ueber: 'Bauzone & Bauregeln', titel: 'Was dürfen Sie auf Ihrem Grundstück bauen?',
+    ueber: 'Bauzone & Bauregeln', titel: 'Was können Sie auf Ihrem Grundstück bauen?',
     satz: 'Bauzone und Parzelle sofort sehen. Was die Gemeinde konkret erlaubt, klären wir für Sie ab.',
     analyse: 'Ihre ausführliche Bauabklärung', vorteile: VORTEILE_PARZELLE,
     design: { buehne: 'mitte', schrift: 'Manrope', muster: 'raster', zeichen: 'linie', radius: 6 },
@@ -194,8 +193,9 @@ export const MARKEN: Marke[] = [
   },
   {
     id: 'reserverechner',
-    domains: ['reserverechner.ch', 'reserve-rechner.ch', 'ausnuetzungsreserve.ch', 'ausnuetzung-check.ch'],
-    name: ['Reserve', 'Rechner'], farbe: '#0F6E7A', hell: '#E3F2F3', schwerpunkt: 'reserve',
+    // Gekauft ist ausnuetzung-check.ch (13. November).
+    domains: ['ausnuetzung-check.ch'],
+    name: ['Ausnützung', 'Check'], farbe: '#0F6E7A', hell: '#E3F2F3', schwerpunkt: 'reserve',
     etikett: STANDARD_ETIKETT, aufruf: 'Reserve, die man kennt, ist Wert, den man nutzen kann.',
     ueber: 'Ausnützung & Reserve', titel: 'Wie viel Reserve steckt in Ihrem Grundstück?',
     satz: 'Die Gemeinde erlaubt oft mehr, als heute steht. Wir rechnen es mit den amtlichen Daten vor, für Ihre Adresse.',
@@ -204,8 +204,9 @@ export const MARKEN: Marke[] = [
   },
   {
     id: 'aufstockcheck',
-    domains: ['aufstockcheck.ch', 'aufstockungscheck.ch', 'aufstockung-check.ch'],
-    name: ['Aufstock', 'Check'], farbe: '#B4441E', hell: '#FBEDE6', schwerpunkt: 'bauen',
+    // Gekauft ist aufstockungscheck.ch (13. November).
+    domains: ['aufstockungscheck.ch', 'aufstockung-check.ch'],
+    name: ['Aufstockungs', 'Check'], farbe: '#B4441E', hell: '#FBEDE6', schwerpunkt: 'bauen',
     etikett: STANDARD_ETIKETT, aufruf: 'Nach oben bauen statt neu kaufen.',
     ueber: 'Aufstocken & Ausbauen', titel: 'Ein Stockwerk mehr auf Ihrem Haus?',
     satz: 'Ob eine Aufstockung erlaubt ist, hängt an Zone und Ausnützung. Prüfen Sie Ihre Parzelle mit den amtlichen Daten.',
@@ -276,17 +277,18 @@ export const MARKEN: Marke[] = [
   },
   {
     id: 'grundstueckrechner',
-    domains: ['grundstueckrechner.ch', 'parzellenrechner.ch'],
-    name: ['Grundstück', 'Rechner'], farbe: '#155E75', hell: '#E2F0F4', schwerpunkt: 'reserve',
+    // Gekauft ist parzellenrechner.ch (13. November).
+    domains: ['parzellenrechner.ch'],
+    name: ['Parzellen', 'Rechner'], farbe: '#155E75', hell: '#E2F0F4', schwerpunkt: 'reserve',
     etikett: STANDARD_ETIKETT, aufruf: 'Ein Rechner, Ihre Zahlen, keine Schätzung ins Blaue.',
-    ueber: 'Rechner für Eigentümer', titel: 'Rechnen Sie nach, was Ihr Grundstück trägt',
+    ueber: 'Rechner für Eigentümer', titel: 'Rechnen Sie nach, was Ihre Parzelle trägt',
     satz: 'Ausnützung einstellen, Reserve sehen: Der Rechner nimmt Fläche und Gebäude direkt aus den amtlichen Daten.',
     analyse: 'Ihre ausführliche Berechnung', vorteile: VORTEILE_PARZELLE,
     design: { buehne: 'mitte', schrift: 'Onest', muster: 'raster', zeichen: 'linie', radius: 10 },
   },
   {
     id: 'bauzonencheck',
-    domains: ['bauzonencheck.ch', 'bauzone-check.ch', 'zonen-check.ch', 'bauzonenrechner.ch'],
+    domains: ['bauzonencheck.ch', 'bauzone-check.ch', 'bauzonenrechner.ch'],
     name: ['Bauzonen', 'Check'], farbe: '#3E4A9E', hell: '#ECEEF9', schwerpunkt: 'bauen',
     etikett: STANDARD_ETIKETT, aufruf: 'Die Zone entscheidet. Kennen Sie Ihre?',
     ueber: 'Zone & Bauregeln', titel: 'In welcher Bauzone liegt Ihr Grundstück?',
@@ -325,6 +327,100 @@ export const MARKEN: Marke[] = [
     analyse: 'Ihre ausführliche Bauabklärung', vorteile: VORTEILE_PARZELLE,
     design: { buehne: 'luftbild', schrift: 'Bricolage Grotesque', muster: 'keins', zeichen: 'punkt', radius: 16, ort: ORT.kuesnacht },
   },
+  // ---------------------------------------------------------------------
+  // Julian, 13. November: 23 Domains gekauft, "baue jetzt je eine Landing
+  // Page für jede Webseite mit den genauen Namen". Wo bisher mehrere
+  // Domains eine Marke teilten, bekommt jede gekaufte Domain ihre eigene:
+  // eigener Name, eigene Farbe, eigener Aufbau -- der Ablauf bleibt gleich.
+  // ---------------------------------------------------------------------
+  {
+    id: 'checkmyparcel',
+    domains: ['checkmyparcel.ch', 'checkmyparzelle.ch'],
+    name: ['CheckMy', 'Parcel'], farbe: '#0B6E4F', hell: '#E4F3EC', schwerpunkt: 'parzelle',
+    etikett: STANDARD_ETIKETT, aufruf: 'Ein Check, und Sie wissen mehr über Ihre Parzelle.',
+    ueber: 'Parzelle prüfen', titel: 'Check my parcel: Was steckt in Ihrem Grundstück?',
+    satz: 'Adresse eingeben und sofort sehen, was die amtliche Vermessung über Ihre Parzelle weiss: Fläche, Zone, Gebäude.',
+    analyse: 'Ihre ausführliche Parzellenanalyse', vorteile: VORTEILE_PARZELLE,
+    design: { buehne: 'mitte', schrift: 'Urbanist', muster: 'kataster', zeichen: 'punkt', radius: 18 },
+  },
+  {
+    id: 'parzellencheck24',
+    domains: ['parzellencheck24.ch'],
+    name: ['ParzellenCheck', '24'], farbe: '#2B5D34', hell: '#E8F1E9', schwerpunkt: 'parzelle',
+    etikett: 'Rund um die Uhr · amtliche Daten · kostenlos', aufruf: 'Jetzt prüfen, nicht irgendwann.',
+    ueber: 'Parzellen-Check', titel: 'Ihre Parzelle in 24 Sekunden geprüft',
+    satz: 'Fläche, Bauzone und Gebäude direkt aus den amtlichen Daten. Tag und Nacht, ohne Anmeldung, für Ihre Adresse.',
+    analyse: 'Ihre ausführliche Parzellenanalyse', vorteile: VORTEILE_PARZELLE,
+    design: { buehne: 'karte', schrift: 'Figtree', muster: 'raster', zeichen: 'raute', radius: 8 },
+  },
+  {
+    id: 'parzellepruefen',
+    domains: ['parzellepruefen.ch', 'parzelle-pruefen.ch'],
+    name: ['Parzelle ', 'prüfen'], farbe: '#6B2E5F', hell: '#F4E9F1', schwerpunkt: 'parzelle',
+    etikett: 'Amtlich · kostenlos · unverbindlich', aufruf: 'Prüfen kostet nichts. Nicht prüfen kann viel kosten.',
+    ueber: 'Parzelle prüfen', titel: 'Prüfen Sie Ihre Parzelle, bevor Sie entscheiden',
+    satz: 'Verkaufen, bauen oder behalten: Die amtlichen Daten zu Ihrer Parzelle sind der erste Schritt, in einer Minute.',
+    analyse: 'Ihre ausführliche Parzellenprüfung', vorteile: VORTEILE_PARZELLE,
+    design: { buehne: 'mitte', schrift: 'Work Sans', muster: 'keins', zeichen: 'linie', radius: 0 },
+  },
+  {
+    id: 'parzellencheck',
+    domains: ['parzellen-check.ch'],
+    name: ['Parzellen', 'Check'], farbe: '#0D5563', hell: '#E2EFF1', schwerpunkt: 'parzelle',
+    etikett: STANDARD_ETIKETT, aufruf: 'Ihre Parzelle, aus der Luft und in Zahlen.',
+    ueber: 'Parzellen-Check', titel: 'Der Parzellen-Check für Ihre Adresse',
+    satz: 'Wir zeigen Ihnen Ihr Grundstück auf dem Luftbild, mit Fläche, Zone und Gebäuden aus den amtlichen Registern.',
+    analyse: 'Ihre ausführliche Parzellenanalyse', vorteile: VORTEILE_PARZELLE,
+    design: { buehne: 'geteilt', schrift: 'Lexend', muster: 'keins', zeichen: 'raute', radius: 12, ort: ORT.kuesnacht },
+  },
+  {
+    id: 'hauswert24',
+    domains: ['hauswert24.ch'],
+    name: ['HausWert', '24'], farbe: '#8C2F39', hell: '#F6E8EA', schwerpunkt: 'haus',
+    etikett: 'Rund um die Uhr · kostenlos · diskret', aufruf: 'Den Wert kennen, bevor andere ihn nennen.',
+    ueber: 'Hauswert', titel: 'Was ist Ihr Haus wert? Jetzt prüfen.',
+    satz: 'Grundstück, Baujahr, Wohnungen und Zone: die Grundlage jeder Schätzung, amtlich und jederzeit für Ihre Adresse.',
+    analyse: 'Ihre persönliche Wertschätzung', vorteile: VORTEILE_WERT,
+    design: { buehne: 'geteilt', schrift: 'Outfit', muster: 'keins', zeichen: 'punkt', radius: 10, ort: ORT.meggen },
+  },
+  {
+    id: 'hauswertcheck',
+    domains: ['hauswertcheck.ch', 'hauswert-check.ch'],
+    name: ['HausWert', 'Check'], farbe: '#3B5323', hell: '#ECF2E5', schwerpunkt: 'haus',
+    etikett: STANDARD_ETIKETT, aufruf: 'Ein Check, eine klare Zahl, kein Druck.',
+    ueber: 'Hauswert-Check', titel: 'Der Wert-Check für Ihr Haus',
+    satz: 'Was die amtlichen Register über Ihr Haus wissen, ist die Grundlage für seinen Wert. Sehen Sie es in Sekunden.',
+    analyse: 'Ihre persönliche Wertschätzung', vorteile: VORTEILE_WERT,
+    design: { buehne: 'karte', schrift: 'Manrope', muster: 'keins', zeichen: 'linie', radius: 14 },
+  },
+  {
+    id: 'baupotenzialcheck',
+    domains: ['baupotenzialcheck.ch', 'baupotenzial-check.ch'],
+    name: ['BauPotenzial', 'Check'], farbe: '#A14716', hell: '#FBEEE5', schwerpunkt: 'reserve',
+    etikett: STANDARD_ETIKETT, aufruf: 'Ungenutztes Potenzial ist verschenkter Wert.',
+    ueber: 'Baupotenzial', titel: 'Wie viel Baupotenzial hat Ihr Grundstück?',
+    satz: 'Oft erlaubt die Gemeinde mehr, als heute steht. Sehen Sie Fläche, Zone und Bebauung Ihrer Parzelle sofort.',
+    analyse: 'Ihre ausführliche Potenzialanalyse', vorteile: VORTEILE_PARZELLE,
+    design: { buehne: 'mitte', schrift: 'Sora', muster: 'kataster', zeichen: 'raute', radius: 6 },
+  },
+  {
+    id: 'zonencheck',
+    domains: ['zonen-check.ch'],
+    name: ['Zonen', 'Check'], farbe: '#4338CA', hell: '#ECEBFB', schwerpunkt: 'bauen',
+    etikett: STANDARD_ETIKETT, aufruf: 'Erst die Zone, dann der Plan.',
+    ueber: 'Zonen-Check', titel: 'Welche Zone gilt für Ihr Grundstück?',
+    satz: 'Die Zone bestimmt, was und wie hoch gebaut werden darf. Prüfen Sie Ihre Adresse mit den amtlichen Daten.',
+    analyse: 'Ihre Abklärung zur Zone', vorteile: VORTEILE_PARZELLE,
+    design: { buehne: 'karte', schrift: 'DM Sans', muster: 'raster', zeichen: 'punkt', radius: 4 },
+  },
+];
+
+/** Die am 13. November gekauften Domains (Hostpoint). Jede hat ihre eigene Marke mit genau ihrem Namen. */
+export const GEKAUFT = [
+  'aufstockungscheck.ch', 'ausbaupotenzial.ch', 'ausnuetzung-check.ch', 'baupotenzialcheck.ch', 'bauzonencheck.ch', 'checkmyparcel.ch',
+  'hauschecker.ch', 'hauswert24.ch', 'hauswertcheck.ch', 'hauswertrechner.ch', 'parzellencheck24.ch', 'parzellenchecker.ch',
+  'parzellenrechner.ch', 'parzellepruefen.ch', 'verdichtungscheck.ch', 'was-kann-ich-bauen.ch', 'zonen-check.ch', 'erbliegenschaft.ch',
+  'parzellenwert.ch', 'landwert24.ch', 'eigentuemercheck.ch', 'parzellen-check.ch', 'baurechner24.ch',
 ];
 
 export const STANDARD_MARKE = MARKEN[0];
