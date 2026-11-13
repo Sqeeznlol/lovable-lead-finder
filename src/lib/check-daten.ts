@@ -67,7 +67,16 @@ export function vorschlagText(roh: string, herkunft: string): string | null {
     return m ? `Parzelle ${m[2]}, ${m[1]}` : t.replace(/\s*\(CH[\d ]+\)$/, '');
   }
   if (/(^|\s)#(\s|$)/.test(t)) return null;
-  return t;
+  // Wie bei Google oder Homegate: Strasse und Nummer, Komma, PLZ und Ort
+  // (Julian, 13. November: "ist doch besser mit , dazwischen").
+  const m = t.match(/^(.*?\S)\s+(\d{4}\s.+)$/);
+  return m ? `${m[1]}, ${m[2]}` : t;
+}
+
+/** Ein Vorschlag in zwei Teile: was kräftig steht (Strasse, Parzelle) und den Ort danach. */
+export function vorschlagTeile(label: string): [string, string | null] {
+  const i = label.indexOf(', ');
+  return i > 0 ? [label.slice(0, i), label.slice(i + 2)] : [label, null];
 }
 
 const zahl = (v: unknown) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));

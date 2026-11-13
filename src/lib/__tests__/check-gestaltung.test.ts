@@ -128,7 +128,10 @@ describe('Vorschläge der Adresssuche', () => {
   it('ohne "#" und ohne lange Kennung (Julian, 8. November)', async () => {
     const { vorschlagText } = await import('@/lib/check-daten');
     expect(vorschlagText('Bahnhofstrasse # <b>3920 Zermatt</b>', 'address')).toBeNull();
-    expect(vorschlagText('Bahnhofstrasse 1 <b>8610 Uster</b>', 'address')).toBe('Bahnhofstrasse 1 8610 Uster');
+    expect(vorschlagText('Bahnhofstrasse 1 <b>8610 Uster</b>', 'address')).toBe('Bahnhofstrasse 1, 8610 Uster');
+    const { vorschlagTeile } = await import('@/lib/check-daten');
+    expect(vorschlagTeile('Lindengarten 1a, 3066 Stettlen')).toEqual(['Lindengarten 1a', '3066 Stettlen']);
+    expect(vorschlagTeile('Parzelle 2725, Fällanden')).toEqual(['Parzelle 2725', 'Fällanden']);
     expect(vorschlagText('<b>Fällanden                                         </b> 2725 (CH 5456 3977 8444)', 'parcel')).toBe('Parzelle 2725, Fällanden');
     expect(vorschlagText('<b>Disentis/Mustér  </b> 1234 (CH 9861 2326 7942)', 'parcel')).toBe('Parzelle 1234, Disentis/Mustér');
   });

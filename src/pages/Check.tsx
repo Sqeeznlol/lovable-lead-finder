@@ -12,8 +12,7 @@ import { zaehlen } from '@/lib/check-zaehlen';
 import { buehnenBild, markenAttribute, markenStil, seiteEinrichten } from '@/lib/check-gestaltung';
 import {
   ANTWORT_TEXT, befundAmOrt, GEBAEUDEART, HEIZUNG, herkunft, leadAngaben, mailOk, nameOk, schweizerNummer, STATUS, vorschlaege,
-  type Antwort, type Befund, type Ort,
-} from '@/lib/check-daten';
+  type Antwort, type Befund, type Ort, vorschlagTeile } from '@/lib/check-daten';
 
 /**
  * Die Check-Seiten für Eigentümer: ParzellenChecker, HausChecker, Was
@@ -283,7 +282,9 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
                 {liste.length > 0 && (
                   <ul className="vorschlaege" role="listbox">
                     {liste.map((v, i) => (
-                      <li key={`${v.label}-${i}`}><button type="button" role="option" aria-selected={i === aktiv} onClick={() => void waehlen(v)}>{v.label}</button></li>
+                      <li key={`${v.label}-${i}`}><button type="button" role="option" aria-selected={i === aktiv} onClick={() => void waehlen(v)}>
+                        {(() => { const [haupt, ort] = vorschlagTeile(v.label); return <><b>{haupt}</b>{ort && <span>, {ort}</span>}</>; })()}
+                      </button></li>
                     ))}
                   </ul>
                 )}
