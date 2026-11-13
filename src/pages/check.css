@@ -269,3 +269,35 @@
 .pc .vorschlaege li{position: relative;}
 .pc .vorschlaege li + li::before{content: ""; position: absolute; left: 14px; right: 14px; top: 0; height: 1px; background: var(--linie); pointer-events: none;}
 .pc .vorschlaege li:hover::before, .pc .vorschlaege li:hover + li::before, .pc .vorschlaege li:has(> [aria-selected="true"])::before, .pc .vorschlaege li:has(> [aria-selected="true"]) + li::before{opacity: 0;}
+/* Ladebild: immer hell wie ein Modelltisch, auch auf dunklen Marken (Julian, 13. November: "mega dunkel"). */
+.pc .ladebild{background:#FFFFFF; color:#14161A; border:1px solid var(--linie); border-radius:var(--r); box-shadow:var(--schatten); overflow:hidden; scroll-margin-top:88px;}
+.pc .ladebild-flaeche{position:relative;}
+.pc .ladebild canvas{display:block; width:100%; height:460px;}
+@media (max-width:640px){.pc .ladebild canvas{height:360px;}}
+.pc .ladebild .schild{position:absolute; transform:translate(-50%,-100%); background:#FFFFFF; color:#14161A; border:1px solid #E4E2DD; border-radius:8px; padding:5px 10px; font-size:13px; font-weight:500; white-space:nowrap; opacity:0; transition:opacity .35s ease, transform .45s cubic-bezier(.22,1,.36,1); pointer-events:none; box-shadow:0 6px 18px rgba(0,0,0,.08); max-width:70vw; overflow:hidden; text-overflow:ellipsis;}
+.pc .ladebild .schild.da{opacity:1; transform:translate(-50%,calc(-100% - 6px));}
+.pc .ladebild .schild.unter{transform:translate(-50%,14px);} .pc .ladebild .schild.unter.da{transform:translate(-50%,8px);}
+.pc .ladebild-zustand{display:grid; justify-items:center; gap:8px; padding:4px 16px 22px; text-align:center;}
+.pc .ladebild .satz{font-size:17px; font-weight:500; min-height:25px; transition:opacity .22s ease, transform .3s cubic-bezier(.22,1,.36,1);}
+.pc .ladebild .satz.weg{opacity:0; transform:translateY(5px);}
+.pc .ladebild .unter-satz{font-size:13px; color:#8D9198; margin-top:-4px;}
+.pc .ladebild .striche{display:flex; gap:6px;}
+.pc .ladebild .striche i{width:26px; height:3px; border-radius:2px; background:#E4E2DD; overflow:hidden;}
+.pc .ladebild .striche b{display:block; height:100%; width:0; background:var(--tisch, var(--marke)); border-radius:2px;}
+@media (prefers-reduced-motion: reduce){.pc .ladebild .schild,.pc .ladebild .satz{transition:none;}}
+/* Was auf der Parzelle gilt */
+.pc dl.recht{margin:0; display:grid;}
+.pc dl.recht > div{display:grid; grid-template-columns:minmax(84px,110px) minmax(0,1fr) auto; gap:2px 12px; align-items:baseline; padding:10px 0; border-top:1px solid var(--linie);}
+.pc dl.recht > div:first-child{border-top:0; padding-top:0;}
+.pc dl.recht dt{font-size:13px; color:var(--grau);}
+.pc dl.recht dd{margin:0; font-weight:500; min-width:0; overflow-wrap:anywhere;}
+.pc dl.recht dd small{display:block; font-weight:400; font-size:13px; color:var(--grau);}
+.pc dl.recht dd a{color:var(--marke); text-underline-offset:3px;}
+.pc dl.recht .q{font-size:12px; color:var(--hell); white-space:nowrap;}
+@media (max-width:440px){.pc dl.recht > div{grid-template-columns:minmax(0,1fr) auto;} .pc dl.recht dd{grid-column:1 / -1; order:3;}}
+.pc dl.recht .punkt{display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:8px; vertical-align:1px; background:var(--marke);}
+.pc dl.recht .punkt.ok{background:#2E8B57;}
+.pc dl.recht .punkt.linie{width:14px; height:0; border-radius:0; background:none; border-top:2px dashed #3D6FB6;}
+.pc .block a.pdf{display:inline-flex; align-items:center; min-height:44px; margin-top:6px; color:var(--marke); font-weight:600; text-underline-offset:3px;}
+.pc .ladebild .schild .kurz{display:none;}
+@media (max-width:560px){.pc .ladebild .schild .lang{display:none;} .pc .ladebild .schild .kurz{display:inline;}}

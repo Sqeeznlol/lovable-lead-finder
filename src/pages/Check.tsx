@@ -10,6 +10,9 @@ import { KATASTER } from '@/lib/check-hintergrund';
 import { useImBild } from '@/lib/im-bild';
 import { zaehlen } from '@/lib/check-zaehlen';
 import { buehnenBild, markenAttribute, markenStil, seiteEinrichten } from '@/lib/check-gestaltung';
+import { gebaeudeLaden, modellAus, parzelleRelativ, rechtLaden, rechtZeilen, zonenKuerzel, type Koerper, type Recht } from '@/lib/check-modell';
+import { Ladebild, type LadebildDaten } from '@/components/check/Ladebild';
+import { FENSTER } from '@/lib/fenster';
 import {
   ANTWORT_TEXT, befundAmOrt, GEBAEUDEART, HEIZUNG, herkunft, leadAngaben, mailOk, nameOk, schweizerNummer, STATUS, vorschlaege,
   type Antwort, type Befund, type Ort, vorschlagTeile } from '@/lib/check-daten';
@@ -74,6 +77,11 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
   const [luftbild, setLuftbild] = useState(true);
   const [az, setAz] = useState(0.6);
   const [recht, setRecht] = useState<'impressum' | 'datenschutz' | null>(null);
+  // Ladebild: Gebäude rundum und Rechtslage (ÖREB) laufen neben dem Befund her.
+  const [gebaeude, setGebaeude] = useState<Koerper[] | 'fehlt' | null>(null);
+  const [rechtslage, setRechtslage] = useState<Recht | 'fehlt' | null>(null);
+  const [bildFertig, setBildFertig] = useState(true);
+  const abfrage = useRef(0);
   const geoeffnet = useRef(0);
   const kartenBox = useRef<HTMLDivElement>(null);
   const karte = useRef<L.Map | null>(null);
@@ -100,7 +108,7 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
 
   // Karte, sobald es ein Ergebnis gibt.
   useEffect(() => {
-    if (!ort || !kartenBox.current || karte.current) return;
+    if (!ort || !bildFertig || !kartenBox.current || karte.current) return;
     const m = L.map(kartenBox.current, { zoomControl: false, maxZoom: 20 });
     L.control.zoom({ position: 'topright' }).addTo(m);
     m.attributionControl.setPrefix('');
@@ -108,7 +116,7 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
       opacity: 0.6, minZoom: 16, maxZoom: 20, attribution: '© Amtliche Vermessung' }).addTo(m);
     karte.current = m;
     return () => { m.remove(); karte.current = null; grund.current = null; umriss.current = null; };
-  }, [ort]);
+  }, [ort, bildFertig]);
 
   useEffect(() => {
     const m = karte.current;
@@ -118,7 +126,7 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
     grund.current = L.tileLayer(`https://wmts.geo.admin.ch/1.0.0/${e.id}/default/current/3857/{z}/{x}/{y}.jpeg`,
       { maxZoom: 20, maxNativeZoom: e.max, attribution: '© swisstopo' }).addTo(m);
     grund.current.bringToBack();
-  }, [luftbild, ort]);
+  }, [luftbild, ort, bildFertig]);
 
   useEffect(() => {
     const m = karte.current;
@@ -132,7 +140,7 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
       umriss.current = L.polygon(ll, { color: marke.farbe, weight: 3, fillColor: marke.farbe, fillOpacity: 0.15 }).addTo(m);
       m.fitBounds(umriss.current.getBounds(), { padding: [70, 70], maxZoom: 19, animate: false });
     }
-  }, [befund, ort, marke]);
+  }, [befund, ort, marke, bildFertig]);
 
   // Fokus noch im Tippen setzen: Nur dann öffnet Safari auf dem iPhone die
   // Tastatur. Danach weich nach oben; preventScroll verhindert den Sprung.
@@ -143,10 +151,20 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
 
   const waehlen = async (v: Ort) => {
     setOrt(v); setText(v.label); setListe([]); setBefund(null); setLaden('laeuft'); setFehler(null);
+    // Wer "Bewegung reduzieren" eingestellt hat, sieht kein Ladebild, nur das Ergebnis.
+    const nr = ++abfrage.current;
+    setGebaeude(null); setRechtslage(null); setBildFertig(leise());
+    gebaeudeLaden(v.e, v.n).then(g => nr === abfrage.current && setGebaeude(g)).catch(() => nr === abfrage.current && setGebaeude('fehlt'));
+    rechtLaden(v.e, v.n).then(rl => nr === abfrage.current && setRechtslage(rl)).catch(() => nr === abfrage.current && setRechtslage('fehlt'));
     if (schritt !== 3) setSchritt(0);
     setTimeout(() => ergebnisRef.current?.scrollIntoView({ behavior: leise() ? 'auto' : 'smooth', block: 'start' }), 60);
     zaehlen(marke.id, domain, 'suche');
-    try { setBefund(await befundAmOrt(v)); setLaden(''); zaehlen(marke.id, domain, 'ergebnis'); } catch { setLaden('fehler'); }
+    try {
+      const b = await befundAmOrt(v);
+      if (nr !== abfrage.current) return;
+      setBefund(b); setLaden(''); zaehlen(marke.id, domain, 'ergebnis');
+      if (!b.teile.length) setBildFertig(true);
+    } catch { if (nr === abfrage.current) { setLaden('fehler'); setBildFertig(true); } }
   };
 
   const oeffnen = () => {
@@ -227,6 +245,29 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
   const anteil = befund?.flaeche && grundfl ? Math.min(100, Math.round((grundfl / befund.flaeche) * 100)) : null;
   const heuteFl = best.reduce((s, h) => s + (h.grundflaeche ?? 0) * (h.geschosse ?? 1), 0);
   const baujahre = best.map(h => h.baujahr).filter((x): x is number => x != null);
+  const ladebild = useMemo<LadebildDaten | null>(() => {
+    if (!ort) return null;
+    const parzelle = befund?.teile.length ? parzelleRelativ(befund, ort.e, ort.n) : null;
+    const m = befund && parzelle && Array.isArray(gebaeude) ? modellAus(gebaeude, parzelle, befund) : null;
+    const auszug = rechtslage && rechtslage !== 'fehlt' ? rechtslage.auszug : null;
+    const haus = befund?.haeuser.find(h => h.status === 1004);
+    return {
+      parzelle,
+      eigene: gebaeude === 'fehlt' ? 'fehlt' : m ? m.eigene : null,
+      nachbarn: m?.nachbarn ?? [],
+      geschosse: m?.geschosse ?? 1,
+      baulinien: rechtslage === 'fehlt' ? 'fehlt' : rechtslage ? (auszug?.baulinien?.linien ?? []).map(l => l.map(([x, y]) => [x - ort.e, y - ort.n])) : null,
+      schilder: {
+        parzelle: befund ? `Parzelle ${befund.nummer ?? ''} · ${n(befund.flaeche)} m²`.replace('Parzelle  ·', 'Grundstück ·') : null,
+        zone: auszug?.zone?.text ?? befund?.zone ?? null,
+        zoneKurz: zonenKuerzel(auszug?.zone?.text),
+        haus: haus ? [haus.geschosse ? `${haus.geschosse} Geschoss${haus.geschosse > 1 ? 'e' : ''}` : null, haus.baujahr ? `Baujahr ${haus.baujahr}` : null].filter(Boolean).join(' · ') || null : null,
+      },
+    };
+  }, [ort, befund, gebaeude, rechtslage]);
+  const zeilen = befund ? rechtZeilen(rechtslage && rechtslage !== 'fehlt' ? rechtslage : null, befund) : [];
+  const pdf = rechtslage && rechtslage !== 'fehlt' ? rechtslage.pdf : null;
+  const zoneAuszug = rechtslage && rechtslage !== 'fehlt' ? rechtslage.auszug?.zone?.text ?? null : null;
   const moeglich = (befund?.flaeche ?? 0) * az;
   // Aufrufleiste auf dem Handy: nur, wenn gerade kein anderer Aufruf im Bild ist.
   const andererAufruf = useImBild('.pc .suche, .pc .aufruf, .pc .rechner, .pc .formular.offen, .pc .danke.sichtbar, .pc .schritte-aufruf', [befund, schritt, recht]);
@@ -327,6 +368,9 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
                   <h2>{befund?.adresse ?? ort.label}</h2>
                 </div>
               </div>
+              {!bildFertig && ladebild && laden !== 'fehler' ? (
+                <Ladebild key={`${ort.e}-${ort.n}`} daten={ladebild} farbe={marke.farbe} onFertig={() => setBildFertig(true)} />
+              ) : (
               <div className="raster">
                 <div className="karte-tafel">
                   <div id="karte" ref={kartenBox} aria-label="Karte mit der Parzelle" />
@@ -344,7 +388,7 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
                       <>
                         <div className="kacheln">
                           <div><small>Grundstücksfläche</small><b>{n(befund.flaeche)} <span>m²</span></b><em>amtlicher Umriss</em></div>
-                          <div><small>Bauzone</small><b>{kurzZone(befund.zone)}</b><em>{befund.zone ?? 'keine Bauzone erfasst'}</em></div>
+                          <div><small>Bauzone</small><b>{zonenKuerzel(zoneAuszug) ?? kurzZone(befund.zone)}</b><em>{zoneAuszug ?? befund.zone ?? 'keine Bauzone erfasst'}</em></div>
                           <div><small>Überbaut</small><b>{anteil != null ? <>{anteil} <span>%</span></> : '–'}</b><em>{grundfl ? `${n(grundfl)} m² Gebäudegrundfläche` : 'kein Gebäude erfasst'}</em></div>
                           <div><small>Ältestes Gebäude</small><b>{baujahre.length ? Math.min(...baujahre) : '–'}</b><em>{best.length} Gebäude laut Register</em></div>
                         </div>
@@ -367,7 +411,23 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
                             </ul>
                           ) : <div className="klein">Auf dieser Parzelle ist kein Gebäude im Register eingetragen.</div>}
                         </div>
-                        <div className="block klein">Quellen: Amtliche Vermessung, Bauzonen Schweiz (ARE), Gebäude- und Wohnungsregister (BFS), abgefragt am {new Date().toLocaleDateString('de-CH')}. Vorprüfung, keine Bewilligungszusage.</div>
+                        <div className="block">
+                          <h3>Was auf der Parzelle gilt</h3>
+                          {rechtslage === null && <div className="klein">Rechtslage wird beim Kanton abgefragt …</div>}
+                          {zeilen.length > 0 && (
+                            <dl className="recht">
+                              {zeilen.map(z => (
+                                <div key={z.titel}>
+                                  <dt>{z.titel}</dt>
+                                  <dd>{z.art && <span className={`punkt ${z.art}`} aria-hidden="true" />}{z.link ? <a href={z.link} target={FENSTER.extern}>{z.wert}</a> : z.wert}{z.zusatz && <small>{z.zusatz}</small>}</dd>
+                                  <span className="q">{z.quelle}</span>
+                                </div>
+                              ))}
+                            </dl>
+                          )}
+                          {pdf && <a className="pdf" href={pdf} target={FENSTER.extern}>Amtlicher ÖREB-Auszug (PDF)</a>}
+                        </div>
+                        <div className="block klein">Quellen: Amtliche Vermessung, Bauzonen Schweiz (ARE), Gebäude- und Wohnungsregister (BFS), ÖREB-Kataster des Kantons, Kulturgüterinventar des Bundes, abgefragt am {new Date().toLocaleDateString('de-CH')}. Vorprüfung, keine Bewilligungszusage.</div>
                       </>
                     )}
                   </div>
@@ -436,6 +496,8 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
                   )}
                 </div>
               </div>
+              )}
+
             </div>
           </section>
         )}
@@ -484,7 +546,7 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
       </footer>
 
       {leiste && (
-        <div className="mobil-aufruf sichtbar"><button type="button" className="knopf marke" onClick={leiste.tun}>{leiste.text}</button></div>
+        <div className={`mobil-aufruf${bildFertig ? ' sichtbar' : ''}`}><button type="button" className="knopf marke" onClick={leiste.tun}>{leiste.text}</button></div>
       )}
     </div>
   );

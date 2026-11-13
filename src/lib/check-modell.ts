@@ -1,0 +1,90 @@
+/**
+ * Daten für das Ladebild und für "Was auf der Parzelle gilt" (Julian,
+ * 13. November: "es soll auch zu sehen sein BZO, Denkmal, Heizung").
+ * Beides kommt über die eigenen Serverfunktionen api/modell und
+ * api/oereb, weil die Kacheln binär sind und rund die Hälfte der
+ * Kantone keinen ÖREB-Abruf aus dem Browser erlaubt.
+ */
+import type { Befund } from '@/lib/check-daten';
+
+export interface Koerper { h: number; r: number[][] }
+export interface Modell { eigene: Koerper[]; nachbarn: Koerper[]; geschosse: number }
+export interface Auszug {
+  stand: string | null; zone: { text: string; anteil: number | null } | null; weitere: string[]; es: string | null;
+  baulinien: { laenge: number; linien: number[][][] } | null; ordnung: { titel: string; url: string } | null;
+  betroffen: { code: string; text: string }[]; nichtBetroffen: { code: string; text: string }[];
+}
+export interface Recht { egrid: string | null; pdf: string | null; auszug: Auszug | null; bund: { kulturgueter: { name: string | null; kategorie: string | null }[] | null } }
+
+async function holen<T>(pfad: string, ms: number, signal?: AbortSignal): Promise<T> {
+  const ab = new AbortController(), t = setTimeout(() => ab.abort(), ms);
+  signal?.addEventListener('abort', () => ab.abort());
+  try { const r = await fetch(pfad, { signal: ab.signal }); if (!r.ok) throw new Error(String(r.status)); return await r.json() as T; } finally { clearTimeout(t); }
+}
+export const gebaeudeLaden = (e: number, n: number, signal?: AbortSignal) =>
+  holen<{ gebaeude: Koerper[] }>(`/api/modell?e=${e.toFixed(1)}&n=${n.toFixed(1)}`, 9000, signal).then(j => j.gebaeude);
+export const rechtLaden = (e: number, n: number, signal?: AbortSignal) =>
+  holen<Recht>(`/api/oereb?e=${e.toFixed(1)}&n=${n.toFixed(1)}`, 25000, signal);
+
+function drin(p: number[], ring: number[][]): boolean {
+  let c = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [a, b] = ring[i], [x, y] = ring[j];
+    if ((b > p[1]) !== (y > p[1]) && p[0] < (x - a) * (p[1] - b) / (y - b) + a) c = !c;
+  }
+  return c;
+}
+const mitte = (r: number[][]) => r.reduce((s, p) => [s[0] + p[0] / r.length, s[1] + p[1] / r.length], [0, 0]);
+
+/** Parzelle relativ zum Punkt der Adresse, wie die Gebäude aus api/modell. */
+export function parzelleRelativ(b: Befund, e: number, n: number): number[][] {
+  const groesster = b.teile.map(t => t[0]).sort((u, v) => v.length - u.length)[0] ?? [];
+  return groesster.map(([x, y]) => [x - e, y - n]);
+}
+
+/** Eigene Gebäude: Mittelpunkt auf der Parzelle. Geschosse aus dem Gebäuderegister, sonst aus der Höhe. */
+export function modellAus(gebaeude: Koerper[], parzelle: number[][], b: Befund): Modell {
+  const eigene = gebaeude.filter(g => drin(mitte(g.r), parzelle));
+  const nachbarn = gebaeude.filter(g => !eigene.includes(g));
+  const ges = b.haeuser.filter(h => h.status === 1004).map(h => h.geschosse ?? 0);
+  const hoch = Math.max(0, ...eigene.map(g => g.h));
+  const geschosse = Math.max(1, Math.min(12, ges.length ? Math.max(...ges) : Math.round(hoch / 3)));
+  return { eigene, nachbarn, geschosse };
+}
+
+export type Zeile = { titel: string; wert: string; zusatz?: string; quelle: string; link?: string; art?: 'ok' | 'linie' | 'zone' };
+
+const ES = (t: string) => { const m = t.match(/stufe\s*(IV|III|II|I)\b/i); return m ? `Empfindlichkeitsstufe ${m[1].toUpperCase()}` : t; };
+const hat = (l: { code: string }[], re: RegExp) => l.some(t => re.test(t.code));
+
+/** Die Zeilen für "Was auf der Parzelle gilt"; nur was abgefragt ist, nichts geschätzt. */
+export function rechtZeilen(r: Recht | null, b: Befund): Zeile[] {
+  const z: Zeile[] = [];
+  const a = r?.auszug, kanton = b.kanton ? `ÖREB-Kataster ${b.kanton}` : 'ÖREB-Kataster';
+  if (a?.zone) z.push({ titel: 'Zone', wert: a.zone.text, zusatz: a.weitere.slice(0, 2).join(' · ') || undefined, quelle: kanton, art: 'zone' });
+  else if (b.zone) z.push({ titel: 'Zone', wert: b.zone, quelle: 'Bauzonen Schweiz', art: 'zone' });
+  if (a?.ordnung) z.push({ titel: 'Bauordnung', wert: a.ordnung.titel, quelle: kanton, link: a.ordnung.url });
+  if (a?.baulinien && a.baulinien.laenge > 0) z.push({ titel: 'Baulinie', wert: `${a.baulinien.laenge} m auf der Parzelle`, quelle: kanton, art: 'linie' });
+  if (a?.es) z.push({ titel: 'Lärm', wert: ES(a.es), quelle: kanton });
+  if (a && hat(a.betroffen, /^ch\.Sicherheitszonenplan$/)) z.push({ titel: 'Flughafen', wert: 'Sicherheitszone eines Flughafens', quelle: 'BAZL' });
+  // Heizung steht schon beim Gebäude; hier nicht doppelt.
+  const kgs = r?.bund.kulturgueter;
+  if (kgs) z.push(kgs.length
+    ? { titel: 'Denkmal', wert: kgs[0].name ?? 'Kulturgut', zusatz: `Kulturgüterinventar des Bundes${kgs[0].kategorie ? `, Kategorie ${kgs[0].kategorie}` : ''}`, quelle: 'Bund' }
+    : { titel: 'Denkmal', wert: 'Kein Kulturgut des Bundes', zusatz: 'kantonale Inventare nicht geprüft', quelle: 'Bund', art: 'ok' });
+  if (a) {
+    if (hat(a.betroffen, /^ch\.BelasteteStandorte/)) z.push({ titel: 'Altlasten', wert: 'Eintrag im Kataster der belasteten Standorte', quelle: kanton });
+    else if (hat(a.nichtBetroffen, /^ch\.BelasteteStandorte/)) z.push({ titel: 'Altlasten', wert: 'Kein Eintrag', quelle: kanton, art: 'ok' });
+    const wasser = /^ch\.(Grundwasserschutz|Gewaesserraum|StatischeWaldgrenzen|Waldabstandslinien)/;
+    const nicht = a.nichtBetroffen.filter(t => wasser.test(t.code)), doch = a.betroffen.filter(t => wasser.test(t.code));
+    if (doch.length) z.push({ titel: 'Wasser, Wald', wert: [...new Set(doch.map(t => t.text))].slice(0, 2).join(' · '), quelle: kanton });
+    else if (nicht.length) z.push({ titel: 'Wasser, Wald', wert: 'Nicht betroffen', zusatz: 'Grundwasserschutz, Gewässerraum, Wald', quelle: kanton, art: 'ok' });
+  }
+  return z;
+}
+
+/** Kurzname der Zone aus dem Auszug: "Wohnzone eingeschossig (W1)" ergibt "W1". */
+export function zonenKuerzel(text: string | null | undefined): string | null {
+  const m = text?.match(/\(([A-ZÄÖÜ][\wÄÖÜäöü./-]{0,9})\)\s*$/) ?? text?.match(/\[([A-ZÄÖÜ][\wÄÖÜäöü./-]{0,9})\]\s*$/);
+  return m ? m[1] : null;
+}
