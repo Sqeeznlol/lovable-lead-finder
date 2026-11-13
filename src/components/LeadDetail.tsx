@@ -6,6 +6,7 @@ import { KNOPF, KNOPF_HAUPT, Marke } from '@/components/rahmen';
 import { luftbildLv95 } from '@/lib/luftbild';
 import { FENSTER } from '@/lib/fenster';
 import { ANTWORT_TEXT } from '@/lib/lead-auswertung';
+import { zusatzAbfragen } from '@/lib/parzelle-zusatz';
 
 /**
  * Ein Lead ganz: wer, welche Liegenschaft, was er will, woher er kam
@@ -24,6 +25,50 @@ const zeile = (titel: string, wert: unknown) =>
       <span className="text-right font-medium">{String(wert)}</span>
     </div>
   );
+
+/**
+ * Weitere amtliche Angaben zur Parzelle (Julian, 13. November: "Altlasten?
+ * irgendwelche Infos zusätzlich?"). Massgebend bleibt der ÖREB-Auszug.
+ */
+function ParzelleZusatz({ egrid, lv95 }: { egrid: string; lv95: number[] }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['parzelle-zusatz', egrid],
+    queryFn: () => zusatzAbfragen(egrid, lv95[0], lv95[1]),
+    staleTime: 60 * 60 * 1000,
+  });
+  return (
+    <section>
+      <h3 className="mb-1 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Weitere amtliche Angaben</h3>
+      {isLoading ? <p className="py-2 text-sm text-muted-foreground">Lädt …</p> : !data ? null : (
+        <>
+          {data.oereb && (
+            <a href={data.oereb.pdf} target={FENSTER.extern}
+               className="mb-2 flex min-h-11 items-center justify-between gap-3 rounded-[3px] border px-3 py-2 text-sm hover:bg-secondary">
+              <span><span className="font-medium">ÖREB-Auszug (PDF)</span><span className="block text-xs text-muted-foreground">Amtlich und verbindlich{data.oereb.stelle ? ` · ${data.oereb.stelle}` : ''}</span></span>
+              <span aria-hidden>↗</span>
+            </a>
+          )}
+          <div className="flex justify-between gap-4 border-b py-2 text-sm">
+            <span className="text-muted-foreground">Belastete Standorte</span>
+            <span className="text-right font-medium">{data.belastet.length ? <Marke art="heiss">{data.belastet.length === 1 ? 'eingetragen' : `${data.belastet.length} Einträge`}</Marke> : 'kein Eintrag'}</span>
+          </div>
+          {data.belastet.map(b => (
+            <div key={b.nummer ?? b.typ} className="border-b py-2 text-sm">
+              <div className="font-medium">{b.typ}{b.nummer ? ` · ${b.nummer}` : ''}</div>
+              <div className="text-muted-foreground">{b.status}{b.behoerde ? ` · ${b.behoerde}` : ''}</div>
+              {b.link && <a href={b.link} target={FENSTER.extern} className="text-xs underline underline-offset-2">Im Kataster ansehen</a>}
+            </div>
+          ))}
+          {zeile('ÖV-Anbindung', data.oev)}
+          {zeile('Radon', data.radon != null ? `${data.radon} % Wahrscheinlichkeit über dem Referenzwert` : null)}
+          {zeile('Erdbeben-Baugrundklasse', data.baugrund)}
+          {zeile('Solarpotenzial Dach', data.solar ? `${data.solar.kwh.toLocaleString('de-CH')} kWh/Jahr auf ${data.solar.flaeche.toLocaleString('de-CH')} m² (${data.solar.eignung})` : null)}
+          <p className="pt-2 text-xs text-muted-foreground">Quellen: ÖREB-Kataster und Kataster der belasteten Standorte der Kantone (geodienste.ch), ARE, BAG, BAFU, BFE. Verbindlich ist der ÖREB-Auszug.</p>
+        </>
+      )}
+    </section>
+  );
+}
 
 type FondsObjekt = { gefaess: string; ort_adresse: string; verkehrswert: number; brutto_rendite: number | null; baujahr: number | null; e: number; n: number };
 
@@ -138,6 +183,8 @@ export function LeadDetail({ lead, onClose, onErledigt, onNotiz }: {
               {zeile('Ältestes Baujahr', a.baujahr)}
               {zeile('Bauprojekt im Register', a.projekt ? 'ja' : null)}
             </section>
+
+            {lv95 && lead.egrid && <ParzelleZusatz egrid={lead.egrid} lv95={lv95} />}
 
             {lv95 && <FondsInDerNaehe lv95={lv95} />}
 
