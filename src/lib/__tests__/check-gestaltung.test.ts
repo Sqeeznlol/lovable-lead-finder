@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import { GEKAUFT, MARKEN, markeFuerHost } from '@/lib/check-marken';
 import { readFileSync } from 'node:fs';
-import { buehnenBild, grundton, markenAttribute, markenStil, schriftAdresse } from '@/lib/check-gestaltung';
+import { buehnenBild, grundton, markenAttribute, markenStil, markenSymbol, schriftAdresse } from '@/lib/check-gestaltung';
 
 // Am 7. November bei fonts.googleapis.com abgefragt: alle mit 400 bis 700.
 const SCHRIFTEN = new Set(['Urbanist', 'Figtree', 'Manrope', 'Sora', 'Public Sans', 'Newsreader', 'Albert Sans', 'Fraunces',
@@ -55,6 +55,16 @@ describe('Marken', () => {
     const marken = GEKAUFT.map(d => markeFuerHost(d));
     expect(new Set(marken.map(m => m?.id)).size, 'je Domain eine andere Marke').toBe(23);
     GEKAUFT.forEach((d, i) => expect(flach(marken[i]!.name.join('')), d).toBe(flach(d.replace(/\.ch$/, ''))));
+  });
+
+  it('jede Marke hat ihr eigenes Symbol im Browser-Tab, in ihrer Farbe (kein Lovable-Herz)', () => {
+    const symbole = MARKEN.map(markenSymbol);
+    expect(new Set(symbole).size).toBe(ANZAHL);
+    for (const [i, m] of MARKEN.entries()) {
+      const svg = decodeURIComponent(symbole[i].replace('data:image/svg+xml,', ''));
+      expect(svg, m.id).toMatch(/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
+      expect(svg, m.id).toContain(m.farbe);
+    }
   });
 
   it('nutzt nur Schriften, die es bei Google Fonts gibt', () => {

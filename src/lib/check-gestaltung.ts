@@ -76,6 +76,22 @@ export function grundton(m: Marke): string {
  * vergrössern wollen. Alle Eingaben haben mindestens 16px, darum zoomt
  * Safari beim Antippen trotzdem nicht. Gibt die Rücknahme zurück.
  */
+/**
+ * Das Zeichen der Marke als Symbol im Browser-Tab, wie oben links im Kopf:
+ * Markenfarbe, darin Raute, Punkt oder Linie. Vorher stand dort das Herz
+ * von Lovable (Julian, 13. November: "kannst du das entfernen?").
+ */
+export function markenSymbol(m: Marke): string {
+  const f = m.farbe, auf = m.aufFarbe ?? '#FFFFFF';
+  const innen = {
+    punkt: `<circle cx="32" cy="32" r="32" fill="${f}"/><circle cx="32" cy="32" r="11" fill="${auf}"/>`,
+    linie: `<rect x="3" y="3" width="58" height="58" rx="10" fill="#FFFFFF" stroke="${f}" stroke-width="6"/><rect x="21" y="21" width="22" height="22" rx="2" fill="none" stroke="${f}" stroke-width="5" transform="rotate(45 32 32)"/>`,
+    raute: `<rect width="64" height="64" rx="16" fill="${f}"/><rect x="21" y="21" width="22" height="22" rx="4" fill="none" stroke="${auf}" stroke-width="5" transform="rotate(45 32 32)"/>`,
+    keins: `<rect width="64" height="64" rx="16" fill="${f}"/>`,
+  }[m.design.zeichen];
+  return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">${innen}</svg>`)}`;
+}
+
 export function seiteEinrichten(m: Marke): () => void {
   schriftLaden(m);
   if (typeof document === 'undefined') return () => {};
@@ -90,7 +106,12 @@ export function seiteEinrichten(m: Marke): () => void {
   const ansicht = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
   const alteAnsicht = ansicht?.content;
   if (ansicht) ansicht.content = 'width=device-width, initial-scale=1, viewport-fit=cover';
+  const symbole = [...document.querySelectorAll<HTMLLinkElement>('link[rel="icon"]')];
+  const alteSymbole = symbole.map(s => s.href);
+  const symbol = markenSymbol(m);
+  symbole.forEach(s => { s.href = symbol; });
   return () => {
+    symbole.forEach((s, i) => { s.href = alteSymbole[i]; });
     html.style.backgroundColor = vorher.hg;
     document.body.style.backgroundColor = vorher.body;
     farben.forEach((f, i) => { f.content = alteFarben[i]; });
