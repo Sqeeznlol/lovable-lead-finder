@@ -67,3 +67,15 @@ describe('Kontakt prüfen', () => {
     expect(nameOk('1234')).toBe(false);
   });
 });
+
+describe('Besucher zählen', () => {
+  it('zählt nur auf echten Marken-Domains, nie auf Vorschau oder localhost', async () => {
+    const { zaehltHier } = await import('@/lib/check-zaehlen');
+    expect(zaehltHier('hauswert24.ch')).toBe(true);
+    expect(zaehltHier('www.zonen-check.ch')).toBe(true);
+    expect(zaehltHier('bauraum-lead-finder-git-akquise-i-nation.vercel.app')).toBe(false);
+    expect(zaehltHier('bauraum-checks.vercel.app')).toBe(false);
+    expect(zaehltHier('localhost')).toBe(false);
+    expect(zaehltHier('127.0.0.1')).toBe(false);
+  });
+});

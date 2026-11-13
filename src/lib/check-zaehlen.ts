@@ -9,6 +9,7 @@
  */
 import { supabase } from '@/integrations/supabase/client';
 import { pixel, type PixelEreignis } from '@/lib/meta-pixel';
+import { markeFuerHost } from '@/lib/check-marken';
 
 export type Ereignis = 'aufruf' | 'suche' | 'ergebnis' | 'rechner' | 'kontakt' | 'lead' | 'ratgeber' | 'ratgeber_klick';
 
@@ -55,9 +56,20 @@ export const PIXEL_FUER: Partial<Record<Ereignis, PixelEreignis>> = {
   aufruf: 'PageView', ratgeber: 'PageView', suche: 'Search', ergebnis: 'ViewContent', rechner: 'InitiateCheckout', lead: 'Lead',
 };
 
+/**
+ * Gezählt wird nur auf einer echten Marken-Domain. Bis zum 13. November
+ * zählten auch die Vercel-Vorschau, localhost und unsere automatischen
+ * Prüfungen als Besucher -- sie trugen die Hauptdomain der Marke ein, und
+ * die Zahlen unter «Leads» waren deshalb falsch (Julian: "stimmen die
+ * Anzahl Besucher?").
+ */
+export function zaehltHier(host: string): boolean {
+  return markeFuerHost(host) !== null;
+}
+
 /** Jeden Schritt einmal je Sitzung und Marke. */
 export function zaehlen(marke: string, domain: string, ereignis: Ereignis): void {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined' || !zaehltHier(window.location.hostname)) return;
   const schluessel = `${marke}|${ereignis}`;
   if (gesendet.has(schluessel)) return;
   gesendet.add(schluessel);
