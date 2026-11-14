@@ -42,12 +42,17 @@ async function json(url: string) {
   return r.ok ? r.json() : null;
 }
 
-async function egridZurAdresse(adresse: string): Promise<string | null> {
+/** Punkt der Adresse in LV95, nur wenn die Adresssuche sie eindeutig trifft. */
+export async function ortZurAdresse(adresse: string): Promise<{ e: number; n: number } | null> {
   const s = await json(`${API}/ech/SearchServer?type=locations&origins=address&limit=3&sr=2056&lang=de&searchText=${encodeURIComponent(adresse)}`);
   const t: Record<string, unknown>[] = (s?.results ?? []).map((r: { attrs?: Record<string, unknown> }) => r.attrs ?? {});
   const w = adresseWaehlen(adresse, t.map(x => String(x.label ?? '')));
   if (!('index' in w)) return null;
-  const [e, n] = [Number(t[w.index].y), Number(t[w.index].x)];
+  return { e: Number(t[w.index].y), n: Number(t[w.index].x) };
+}
+
+/** EGRID der Parzelle unter dem Punkt (amtliche Vermessung der Kantone). */
+export async function egridAmPunkt(e: number, n: number): Promise<string | null> {
   const q = new URLSearchParams({ geometryType: 'esriGeometryPoint', geometry: `${e},${n}`, sr: '2056', tolerance: '0',
     returnGeometry: 'false', layers: 'all:ch.kantone.cadastralwebmap-farbe',
     mapExtent: `${e - 100},${n - 100},${e + 100},${n + 100}`, imageDisplay: '400,400,96', lang: 'de' });
@@ -55,7 +60,12 @@ async function egridZurAdresse(adresse: string): Promise<string | null> {
   return /^CH[0-9A-Z]{12}$/.test(g) ? g : null;
 }
 
-async function nachbarn(egrid: string): Promise<string[]> {
+async function egridZurAdresse(adresse: string): Promise<string | null> {
+  const p = await ortZurAdresse(adresse);
+  return p ? egridAmPunkt(p.e, p.n) : null;
+}
+
+export async function nachbarn(egrid: string): Promise<string[]> {
   const f = new URLSearchParams({ layer: 'ch.kantone.cadastralwebmap-farbe', searchField: 'egris_egrid', searchText: egrid,
     contains: 'false', returnGeometry: 'true', geometryFormat: 'geojson', sr: '2056' });
   const g = (await json(`${API}/all/MapServer/find?${f}`))?.results?.[0]?.geometry;

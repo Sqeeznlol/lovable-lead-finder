@@ -7,8 +7,14 @@
 # (Funktion baugesuche_abgleichen, Migration 20261101220000).
 #
 # Quelle nachgesehen am 1. November: "Baugesuche im Kanton Zürich",
-# Statistisches Amt, täglich, CSV. Nur Zürich -- der Thurgau hat bis
-# 2027 keinen offenen Datensatz (docs/plattform.md).
+# Statistisches Amt, täglich, CSV. Der Thurgau hat bis 2027 keinen
+# offenen Datensatz (docs/plattform.md).
+#
+# Seit dem 14. November zusätzlich die übrigen Kantone aus dem
+# Amtsblattportal (tools/baugesuche_amtsblatt.ts, Quelle 'amtsblatt'):
+# BE, BS, BL, ZG, AR, TI, SZ, SO, SH, NW, OW, VS. Nicht der Aargau
+# (Nutzungsbedingungen verbieten das Einlesen), nicht SG und LU (erst
+# anfragen).
 # =====================================================================
 
 name: Baugesuche
@@ -39,6 +45,49 @@ jobs:
 
       - name: Werkzeuge
         run: sudo apt-get install -y -qq postgresql-client
+
+      # Vor Zürich, damit der Abgleich unten auch diese Gesuche zuordnet.
+      # Fällt das Amtsblattportal aus, lädt Zürich trotzdem; der letzte
+      # Schritt macht den Lauf dann rot.
+      - name: Übrige Kantone (Amtsblattportal)
+        id: amtsblatt
+        if: inputs.nur_abgleich != 'ja'
+        continue-on-error: true
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+          TAGE: ${{ inputs.tage || '3' }}
+        run: |
+          set -euo pipefail
+          [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
+          case "$TAGE" in ''|*[!0-9]*) echo "tage muss eine Zahl sein"; exit 1;; esac
+          { echo '### Amtsblattportal'; echo '```'; npx -y tsx@4.19.2 tools/baugesuche_amtsblatt.ts "$TAGE" /tmp/amtsblatt.csv; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
+          psql "$DB" -v ON_ERROR_STOP=1 -X -q <<'SQL' | tee -a "$GITHUB_STEP_SUMMARY"
+          set statement_timeout = '10min';
+          create temp table neu (
+            fremd_id text, nummer text, publiziert_am date, bfs_nr text, gemeinde text,
+            adresse text, parzelle_nr text, egrid text, bauherrschaft text, beschreibung text,
+            nachbar_egrids text[], publikation_nr text, publikation_id text,
+            einsprache_bis date, publiziert_bis date, quelle_url text, kanton text, e numeric, n numeric
+          );
+          \copy neu from '/tmp/amtsblatt.csv' with (format csv)
+          insert into public.baugesuch
+            (quelle, fremd_id, publiziert_am, kanton, bfs_nr, gemeinde, adresse, parzelle_nr, egrid,
+             bauherrschaft, beschreibung, zustand, nachbar_egrids, geometrie,
+             publikation_nr, publikation_id, einsprache_bis, publiziert_bis, quelle_url)
+          select distinct on (fremd_id)
+                 'amtsblatt', fremd_id, publiziert_am, kanton, bfs_nr, gemeinde, adresse, parzelle_nr, nullif(egrid, ''),
+                 bauherrschaft, beschreibung, 'eingereicht', nachbar_egrids,
+                 case when e is not null then extensions.st_setsrid(extensions.st_makepoint(e, n), 2056) end,
+                 publikation_nr, publikation_id, einsprache_bis, publiziert_bis, quelle_url
+          from neu order by fremd_id
+          on conflict (quelle, fremd_id) do update
+            set egrid = coalesce(excluded.egrid, baugesuch.egrid),
+                nachbar_egrids = coalesce(excluded.nachbar_egrids, baugesuch.nachbar_egrids),
+                geometrie = coalesce(excluded.geometrie, baugesuch.geometrie),
+                einsprache_bis = excluded.einsprache_bis, publiziert_bis = excluded.publiziert_bis;
+          select kanton, count(*) as gesuche, count(egrid) as mit_egrid, max(publiziert_am) as neuestes
+            from public.baugesuch where quelle = 'amtsblatt' group by 1 order by 1;
+          SQL
 
       - name: Laden, ergänzen, abgleichen
         env:
@@ -159,3 +208,9 @@ jobs:
                  max(publiziert_am) as neuestes
           from public.baugesuch;
           SQL
+
+      - name: Amtsblattportal fehlgeschlagen
+        if: steps.amtsblatt.outcome == 'failure'
+        run: |
+          echo "Der Schritt 'Übrige Kantone (Amtsblattportal)' ist fehlgeschlagen; Zürich ist geladen."
+          exit 1
