@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { auszugKurz, dienstBasis, linien, text } from '../../../api/_lib/oereb.js';
 import { gebaeudeAus, kacheln, lv95NachWgs84, wgs84NachLv95 } from '../../../api/_lib/modell.js';
-import { modellAus, rechtZeilen, zonenKuerzel, type Recht } from '@/lib/check-modell';
+import { modellAus, rechtZeilen, zifferAus, zonenKuerzel, type Recht } from '@/lib/check-modell';
 import { weiter, type Tor } from '@/lib/ladebild-zeit';
 import type { Befund } from '@/lib/check-daten';
 import zh from './daten/oereb-zh.json';
@@ -21,6 +21,13 @@ describe('ÖREB-Auszug lesen', () => {
     const r = (legende: string) => ({ Theme: { Code: 'ch.Nutzungsplanung', Text: [{ Language: 'de', Text: 'Nutzungsplanung (kantonal/kommunal)' }] }, LegendText: [{ Language: 'de', Text: legende }], AreaShare: 83, PartInPercent: 100 });
     const a = auszugKurz({ GetExtractByIdResponse: { extract: { RealEstate: { RestrictionOnLandownership: [r('Totalrevision Erschliessungspläne Plan Nr. 11'), r('Zone Altstadt A [ASA]')] } } } }, 0, 0)!;
     expect(a.zone?.text).toBe('Zone Altstadt A [ASA]');
+  });
+  it('Grundnutzung vor überlagernder Zone nach Typcode (Lenzburg, Feldstrasse 5)', () => {
+    const r = (legende: string, TypeCode: string) => ({ Theme: { Code: 'ch.Nutzungsplanung', Text: [{ Language: 'de', Text: 'Nutzungsplanung (kantonal/kommunal)' }] }, LegendText: [{ Language: 'de', Text: legende }], TypeCode, AreaShare: 364, PartInPercent: 100 });
+    const a = auszugKurz({ GetExtractByIdResponse: { extract: { RealEstate: { RestrictionOnLandownership: [
+      r('Kantonaler Nutzungsplan Thermenschutzbereiche', '6124'), r('Quartiererhaltungszone', '692401'), r('Wohnzone W2a [W2a]', '112101')] } } } }, 0, 0)!;
+    expect(a.zone?.text).toBe('Wohnzone W2a [W2a]');
+    expect(a.weitere).toEqual(['Kantonaler Nutzungsplan Thermenschutzbereiche', 'Quartiererhaltungszone']);
   });
   it('Texte und Linien in beiden Schreibweisen (Nidwalden: LocalisedText, GML)', () => {
     expect(text({ LocalisedText: { Language: 'de', Text: 'Grundnutzung Stans' } })).toBe('Grundnutzung Stans');
@@ -65,6 +72,11 @@ describe('Was auf der Parzelle gilt', () => {
   });
   it('ohne Auszug (Luzern, Zug, Solothurn) nur die Zone vom Bund', () => {
     expect(rechtZeilen(null, b).map(x => x.titel)).toEqual(['Zone']);
+  });
+  it('ohne Auszug die Zone aus der Nutzungsplanung des Kantons (Zug, Baarerstrasse 20)', () => {
+    const zif = zifferAus([{ kanton: 'ZG', code: '140301', bezeichnung: 'Kernzone C', abkuerzung: 'KC', ziffer: 2.1, art: 'Ausnützungsziffer', art_kurz: 'az' }]);
+    const z = rechtZeilen(null, b, zif);
+    expect(z.map(x => [x.titel, x.wert, x.quelle])).toEqual([['Zone', 'Kernzone C [KC]', 'Nutzungsplanung Kanton ZG'], ['Erlaubt', 'Ausnützungsziffer 2.1', 'Nutzungsplanung Kanton ZG']]);
   });
   it('Kürzel der Zone', () => {
     expect(zonenKuerzel('Wohnzone eingeschossig (W1)')).toBe('W1');

@@ -51,13 +51,17 @@ export function auszugKurz(json, e, n) {
   const b = liste(re.RestrictionOnLandownership).map(r => ({
     code: String(r.Theme?.Code ?? r.Theme?.code ?? ''), sub: String(r.Theme?.SubCode ?? r.Theme?.subCode ?? ''), thema: text(r.Theme?.Text) ?? '',
     legende: text(r.LegendText) ?? '', flaeche: Number(r.AreaShare ?? NaN), laenge: Number(r.LengthShare ?? NaN),
-    anteil: Number(r.PartInPercent ?? NaN), roh: r,
+    anteil: Number(r.PartInPercent ?? NaN), typ: String(r.TypeCode ?? r.typeCode ?? ''), roh: r,
   }));
   const nutzung = b.filter(r => /nutzungsplanung/i.test(r.code) && Number.isFinite(r.flaeche) && r.flaeche > 0);
   // Pläne, Pflichten und Linien decken oft auch 100 % der Parzelle (Aarau: "Erschliessungspläne",
   // Haldenstein: "Quartierplanpflicht"); die Zone erkennt man am Namen.
+  // Den Ausschlag gibt der Typcode, wo er dem Bundesmodell folgt: Hauptnutzung 11 bis 49 ist
+  // Grundnutzung, 5x bis 9x überlagert. Lenzburg nannte sonst die überlagernde
+  // "Quartiererhaltungszone" (692401) statt "Wohnzone W2a" (112101); Zürich schreibt C110111.
+  const grund = r => /^[A-Z]?[1-4][1-9]\d{2,}$/i.test(r.typ);
   const wertung = r => (ZONE.test(`${r.sub} ${r.thema}`) ? 2 : 0) + (/zone|zona\b|^grundnutzung/i.test(r.legende) ? 4 : 0)
-    - (NEBEN.test(r.legende) ? 8 : 0);
+    - (NEBEN.test(r.legende) ? 8 : 0) + (grund(r) ? 6 : 0);
   const zone = nutzung.slice().sort((u, v) => wertung(v) - wertung(u) || (v.anteil || 0) - (u.anteil || 0))[0] ?? null;
   const weitere = [...new Set(nutzung.filter(r => r !== zone && !/^keine/i.test(r.legende) && !/baulinie/i.test(r.legende)).map(r => r.legende).filter(Boolean))]
     .filter(t => t !== zone?.legende).slice(0, 4);

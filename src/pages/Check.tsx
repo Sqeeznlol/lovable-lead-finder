@@ -317,6 +317,8 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
     return () => { aktiv = false; };
   }, [ort, befund]);
   const ziffern = (rechtslage && rechtslage !== 'fehlt' ? rechtslage.ziffern ?? null : null) ?? zifferKanton;
+  // Ohne Auszug nennt die Nutzungsplanung des Kantons die Zone genauer als der Bund (Zug: "Kernzone C").
+  const zoneText = zoneAuszug ?? (ziffern?.zone ? `${ziffern.zone}${ziffern.kuerzel ? ` [${ziffern.kuerzel}]` : ''}` : null);
   const zeilen = befund ? rechtZeilen(rechtslage && rechtslage !== 'fehlt' ? rechtslage : null, befund, ziffern) : [];
   const azAusPlan = ziffern?.az ?? null;
   const bmzAusPlan = azAusPlan == null ? ziffern?.bmz ?? null : null;
@@ -451,7 +453,7 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
                       <>
                         <div className="kacheln">
                           <div><small>Grundstücksfläche</small><b>{n(befund.flaeche)} <span>m²</span></b><em>amtlicher Umriss</em></div>
-                          <div><small>Bauzone</small><b>{zonenKuerzel(zoneAuszug) ?? kurzZone(befund.zone)}</b><em>{zoneAuszug ?? befund.zone ?? 'keine Bauzone erfasst'}</em></div>
+                          <div><small>Bauzone</small><b>{zonenKuerzel(zoneText) ?? kurzZone(befund.zone)}</b><em>{zoneText ?? befund.zone ?? 'keine Bauzone erfasst'}</em></div>
                           <div><small>Überbaut</small><b>{anteil != null ? <>{anteil} <span>%</span></> : '–'}</b><em>{grundfl ? `${n(grundfl)} m² Gebäudegrundfläche` : 'kein Gebäude erfasst'}</em></div>
                           <div><small>Ältestes Gebäude</small><b>{aeltestesGebaeude ?? '–'}</b><em>{best.length} Gebäude laut Register</em></div>
                         </div>

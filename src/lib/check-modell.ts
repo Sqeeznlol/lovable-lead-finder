@@ -77,6 +77,9 @@ export function rechtZeilen(r: Recht | null, b: Befund, zif: Ziffern | null = r?
   const z: Zeile[] = [];
   const a = r?.auszug, kanton = b.kanton ? `ÖREB-Kataster ${b.kanton}` : 'ÖREB-Kataster';
   if (a?.zone) z.push({ titel: 'Zone', wert: a.zone.text, zusatz: a.weitere.slice(0, 2).join(' · ') || undefined, quelle: kanton, art: 'zone' });
+  // Ohne Auszug (Zug, Luzern, Solothurn liefern kein JSON) kennt die Nutzungsplanung
+  // des Kantons die Zone genauer als die Bundeskategorie: "Kernzone C" statt "Zentrumszonen".
+  else if (zif?.zone) z.push({ titel: 'Zone', wert: zif.kuerzel ? `${zif.zone} [${zif.kuerzel}]` : zif.zone, quelle: zif.quelle, art: 'zone' });
   else if (b.zone) z.push({ titel: 'Zone', wert: b.zone, quelle: 'Bauzonen Schweiz', art: 'zone' });
   const erlaubt = erlaubtText(zif);
   if (erlaubt && zif) z.push({ titel: 'Erlaubt', wert: erlaubt.wert, zusatz: erlaubt.zusatz, quelle: zif.quelle });

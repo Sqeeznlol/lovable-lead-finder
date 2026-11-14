@@ -62,7 +62,8 @@ export default async function handler(req, res) {
       ebene(e, n, 'ch.babs.kulturgueter', 15).catch(() => null), umgebung(e, n).catch(() => null),
     ]);
     const egrid = parzelle[0]?.egris_egrid, basis = dienstBasis(stand[0]?.oereb_webservice);
-    // Ziffern der Zone: heute Zürich (Werte je Zonenfläche); weitere Kantone folgen aus den Downloads von geodienste.ch.
+    // Ziffern der Zone: Zürich hier (WFS je Zonenfläche); AG, ZG, SZ, SO, SH, LU fragt die Seite
+    // selbst in der Tabelle zone_ziffer ab (Downloads von geodienste.ch).
     const ziffern = parzelle[0]?.ak === 'ZH' ? await ziffernZh(e, n).catch(() => null) : null;
     const bund = { kulturgueter: kgs ? kgs.map(a => ({ name: a.beschreibung ?? null, kategorie: a.kgs_kategorie ?? null })) : null };
     let auszug = null;
