@@ -13,7 +13,8 @@ import { BetroffeneParzellen } from '@/components/BetroffeneParzellen';
  * Prüfen. Bisher sah man sie nur, wenn eines ein Portfolio traf (als
  * Gelegenheit); die übrigen lagen unsichtbar in der Datenbank.
  *
- * Quelle: "Baugesuche im Kanton Zürich", Statistisches Amt, täglich.
+ * Quellen: "Baugesuche im Kanton Zürich", Statistisches Amt, und für zwölf
+ * weitere Kantone das Amtsblattportal (Quelle 'amtsblatt', seit 14. November).
  * Der Ablauf läuft täglich 05:23 UTC (06:23 Winterzeit, 07:23 Sommerzeit).
  */
 // Typ und Belege liegen in src/lib/baugesuch-belege.ts, damit die
@@ -33,19 +34,21 @@ const zeit = (s: string) => new Date(s).toLocaleString('de-CH', { day: '2-digit'
  * ganze Jahr geladen ist (rund 6000), zeigten die neuesten 500 unter
  * "Alle" nur einen Teil. Gezählt wird ebenfalls dort, nicht im Browser.
  */
-export function useBaugesuche(tage = 7) {
+export function useBaugesuche(tage = 7, kanton = '') {
   return useQuery({
-    queryKey: ['baugesuche', tage],
+    queryKey: ['baugesuche', tage, kanton],
     queryFn: async () => {
       const ab = tage > 0 ? new Date(Date.now() - tage * 864e5).toISOString().slice(0, 10) : null;
       let q = db().from('baugesuch')
-        .select('id, publiziert_am, gemeinde, adresse, parzelle_nr, egrid, beschreibung, bauherrschaft, parzelle_id, nachbar_egrids, erfasst_am, quelle, publikation_nr, publikation_id, einsprache_bis, publiziert_bis, quelle_url')
+        .select('id, publiziert_am, kanton, gemeinde, adresse, parzelle_nr, egrid, beschreibung, bauherrschaft, parzelle_id, nachbar_egrids, erfasst_am, quelle, publikation_nr, publikation_id, einsprache_bis, publiziert_bis, quelle_url')
         // Proben aus "Auswerten" werden zurückgerollt; sicherheitshalber nie zeigen.
         .neq('quelle', 'probe');
       if (ab) q = q.gte('publiziert_am', ab);
+      if (kanton) q = q.eq('kanton', kanton);
       const zaehle = async (f: (x: any) => any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
         let c = db().from('baugesuch').select('id', { count: 'exact', head: true }).neq('quelle', 'probe');
         if (ab) c = c.gte('publiziert_am', ab);
+        if (kanton) c = c.eq('kanton', kanton);
         const r = await f(c);
         return (r.count as number | null) ?? 0;
       };
@@ -71,6 +74,13 @@ export function useBaugesuche(tage = 7) {
 
 type Sicht = 'alle' | 'bestand' | 'gelegenheit';
 
+// Die Kantone, deren Gesuche der Ablauf "Baugesuche" lädt (tools/baugesuche_amtsblatt.ts und Zürich).
+const KANTON_NAME: Record<string, string> = {
+  ZH: 'Zürich', BE: 'Bern', BS: 'Basel-Stadt', BL: 'Basel-Landschaft', ZG: 'Zug', AR: 'Appenzell Ausserrhoden', TI: 'Tessin',
+  SZ: 'Schwyz', SO: 'Solothurn', SH: 'Schaffhausen', NW: 'Nidwalden', OW: 'Obwalden', VS: 'Wallis',
+};
+const KANTONE = Object.keys(KANTON_NAME).sort((a, b) => KANTON_NAME[a].localeCompare(KANTON_NAME[b], 'de'));
+
 /** Filter als reine Funktion -- getestet in baugesuche.test.ts. */
 export function filtern(gs: Gesuch[], mitGel: Set<string>, sicht: Sicht, tage: number, wort: string, heute = new Date()): Gesuch[] {
   const ab = tage > 0 ? new Date(heute.getTime() - tage * 864e5).toISOString().slice(0, 10) : '';
@@ -87,7 +97,8 @@ export function Baugesuche() {
   const [tageWert, setTageWert] = useUrlWert('zeitraum', '7');
   const tage = Number(tageWert) || 0;
   const setTage = (t: number) => setTageWert(String(t));
-  const { data, isLoading, error } = useBaugesuche(tage);
+  const [kanton, setKanton] = useUrlWert('kanton', '');
+  const { data, isLoading, error } = useBaugesuche(tage, kanton);
   const [sichtWert, setSichtWert] = useUrlWert('sicht', 'alle');
   const sicht = sichtWert as Sicht;
   const setSicht = (s: Sicht) => setSichtWert(s);
@@ -101,7 +112,7 @@ export function Baugesuche() {
   const mitGel = data ? data.gesuche.filter(g => data.mitGelegenheit.has(g.id)).length : 0;
 
   return (
-    <Seite bild={BILD.baugesuche} ueber="Baugesuche · Kanton Zürich · täglich"
+    <Seite bild={BILD.baugesuche} ueber={`Baugesuche · ${kanton ? KANTON_NAME[kanton] ?? kanton : '13 Kantone'} · täglich`}
       titel={data ? `${data.gesamt.toLocaleString('de-CH')} Baugesuche ${zeitraum}` : ' '}
       unter={<>
         Jedes publizierte Gesuch, beim Bund verortet. Trifft eines ein Kundenportfolio oder dessen Nachbarn, entsteht daraus eine Gelegenheit.
@@ -120,6 +131,8 @@ export function Baugesuche() {
           { wert: '3', titel: 'Letzte 3 Tage' }, { wert: '7', titel: 'Letzte 7 Tage' }, { wert: '30', titel: 'Letzte 30 Tage' },
           { wert: '90', titel: 'Letzte 90 Tage' }, { wert: '365', titel: 'Letztes Jahr' }, { wert: '0', titel: 'Alle' },
         ]} />
+        <Auswahl label="Kanton" wert={kanton || 'alle'} setWert={w => setKanton(w === 'alle' ? '' : w)} className="min-w-[170px]"
+                 optionen={[{ wert: 'alle', titel: 'Alle Kantone' }, ...KANTONE.map(k => ({ wert: k, titel: KANTON_NAME[k] }))]} />
         <input value={wort} onChange={e => setWort(e.target.value)} placeholder="Adresse, Gemeinde, Vorhaben, Nummer"
                className={`${FELD} w-full sm:w-auto sm:flex-1 sm:max-w-xs`} />
       </div>
@@ -139,7 +152,7 @@ export function Baugesuche() {
               <button type="button" onClick={() => setOffen(auf ? null : g.id)} aria-expanded={auf}
                       className="flex w-full items-start justify-between gap-4 p-4 text-left sm:p-5">
                 <span className="min-w-0">
-                  <span className="block font-semibold">{g.adresse ?? 'Ohne Adresse'}{g.gemeinde ? `, ${g.gemeinde}` : ''}</span>
+                  <span className="block font-semibold">{g.adresse ?? 'Ohne Adresse'}{g.gemeinde ? `, ${g.gemeinde}` : ''}{g.kanton && !kanton ? ` ${g.kanton}` : ''}</span>
                   <span className={`mt-1 block text-sm text-muted-foreground ${auf ? '' : 'line-clamp-2'}`}>{g.beschreibung ?? '–'}</span>
                   <span className="mt-2 flex flex-wrap gap-1.5">
                     {g.parzelle_id && <Marke art="minze">Im Bestand</Marke>}

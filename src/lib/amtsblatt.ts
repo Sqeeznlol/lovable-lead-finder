@@ -83,12 +83,29 @@ export function punktAus(text: string | null): { e: number; n: number } | null {
   return e > 2480000 && e < 2840000 && n > 1070000 && n < 1300000 ? { e, n } : null;
 }
 
+/**
+ * Wo die Publikation lesbar ist: im Amtsblatt des Kantons, nicht auf
+ * amtsblattportal.ch (dort bleibt die Detailseite leer). Je Mandant geprüft
+ * am 14. November 2026 an einer echten Publikation jeder Rubrik: die Seite
+ * zeigt die Nummer, /api/v1/publications/{id}/pdf liefert %PDF.
+ */
+export const AMTSBLATT: Record<string, string> = {
+  kabbe: 'https://amtsblatt.be.ch', kabda: 'https://epublikation.ch', kabbs: 'https://kantonsblatt.ch', kabbl: 'https://amtsblatt.bl.ch',
+  kabzg: 'https://amtsblatt.zg.ch', kabar: 'https://amtsblatt.ar.ch', kabti: 'https://foglioufficiale.ti.ch', kabsz: 'https://amtsblatt.sz.ch',
+  kabso: 'https://amtsblatt.so.ch', kabsh: 'https://amtsblatt.sh.ch', kabow: 'https://amtsblatt.ow.ch', kabnw: 'https://amtsblatt.nw.ch',
+  kabvs: 'https://amtsblatt.vs.ch',
+};
+export const publikationSeite = (g: Pick<Gesuch, 'id' | 'mandant'>) =>
+  g.mandant && AMTSBLATT[g.mandant] ? `${AMTSBLATT[g.mandant]}/#!/search/publications/detail/${g.id}` : null;
+
 export interface Gesuch {
   id: string; nummer: string | null; datum: string; kanton: string | null; bfs: string | null; gemeinde: string | null;
   strasse: string | null; plz: string | null; ort: string | null; parzelle: string | null; beschreibung: string | null;
   bauherrschaft: string | null; einspracheBis: string | null; publiziertBis: string | null; punkt: { e: number; n: number } | null;
   /** Titel der Publikation; nur zum Suchen, er kann einen Namen enthalten. */
   titel: string | null;
+  /** Herausgeber (primaryTenantCode), bestimmt die Adresse der Publikation. */
+  mandant: string | null;
 }
 
 export function gesuchAus(xml: string): Gesuch | null {
@@ -101,7 +118,7 @@ export function gesuchAus(xml: string): Gesuch | null {
     strasse: null, plz: null, ort: null, parzelle: null, beschreibung: null, bauherrschaft: null,
     einspracheBis: wert(inhalt, 'entryDeadline') ?? wert(inhalt, 'reaction/element/deadline/date'),
     publiziertBis: wert(meta, 'expirationDate')?.slice(0, 10) ?? null, punkt: null,
-    titel: sprache(finde(meta, 'title')),
+    titel: sprache(finde(meta, 'title')), mandant: wert(meta, 'primaryTenantCode'),
   };
   const adresse = (a: Knoten | undefined) => {
     if (!a) return;

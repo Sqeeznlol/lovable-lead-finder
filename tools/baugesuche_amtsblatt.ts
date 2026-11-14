@@ -12,7 +12,7 @@
 // Keine Personendaten: von der Bauherrschaft nur die Rechtsform.
 import { writeFileSync } from 'node:fs';
 import { parallel } from '../src/lib/parallel';
-import { gesuchAus, suchtexte, type Gesuch } from '../src/lib/amtsblatt';
+import { gesuchAus, publikationSeite, suchtexte, type Gesuch } from '../src/lib/amtsblatt';
 import { egridAmPunkt, nachbarn, ortZurAdresse } from './baugesuche_laden';
 
 export const RUBRIKEN = ['BP-BE10', 'AM-DA50', 'BP-BS10', 'BP-BS20', 'BP-BL05', 'BP-ZG10', 'BP-AR10', 'BP-TI10',
@@ -77,7 +77,7 @@ if (process.argv[1]?.endsWith('baugesuche_amtsblatt.ts')) {
     zeilen.push([
       g.id, g.nummer, g.datum, g.bfs, g.gemeinde, g.strasse, g.parzelle, egrid, g.bauherrschaft, g.beschreibung,
       nb.length ? `{${nb.join(',')}}` : null, g.nummer, g.id, g.einspracheBis, g.publiziertBis,
-      `https://amtsblattportal.ch/#!/search/publications/detail/${g.id}`, g.kanton, p?.e ?? null, p?.n ?? null,
+      publikationSeite(g), g.kanton, p?.e ?? null, p?.n ?? null,
     ].map(csvFeld).join(','));
   });
   writeFileSync(aus, zeilen.join('\n') + (zeilen.length ? '\n' : ''));

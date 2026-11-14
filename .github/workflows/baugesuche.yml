@@ -83,7 +83,7 @@ jobs:
           on conflict (quelle, fremd_id) do update
             set egrid = coalesce(excluded.egrid, baugesuch.egrid),
                 nachbar_egrids = coalesce(excluded.nachbar_egrids, baugesuch.nachbar_egrids),
-                geometrie = coalesce(excluded.geometrie, baugesuch.geometrie),
+                geometrie = coalesce(excluded.geometrie, baugesuch.geometrie), quelle_url = excluded.quelle_url,
                 einsprache_bis = excluded.einsprache_bis, publiziert_bis = excluded.publiziert_bis;
           select kanton, count(*) as gesuche, count(egrid) as mit_egrid, max(publiziert_am) as neuestes
             from public.baugesuch where quelle = 'amtsblatt' group by 1 order by 1;

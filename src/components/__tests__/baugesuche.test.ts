@@ -30,6 +30,12 @@ describe('Baugesuche belege', () => {
     expect(b[0].url).toBe('https://amtsblatt.zh.ch/#!/search/publications/detail/002c93ff-b600-4881-a70e-4fd3289e2092');
     expect(b[1].url).toBe('https://amtsblatt.zh.ch/api/v1/publications/002c93ff-b600-4881-a70e-4fd3289e2092/pdf');
   });
+  it('übrige Kantone: Publikation und PDF im Amtsblatt des Kantons, keine Zürcher Links', () => {
+    const b = belege({ ...g('z', '2026-11-11', { publikation_nr: 'BP-BE10-0000009883', publikation_id: '23f27eb5-db81-4493-99b4-249efdb6f992',
+      quelle_url: 'https://amtsblatt.be.ch/#!/search/publications/detail/23f27eb5-db81-4493-99b4-249efdb6f992' }), quelle: 'amtsblatt' });
+    expect(b.map(x => x.url)).toEqual(['https://amtsblatt.be.ch/#!/search/publications/detail/23f27eb5-db81-4493-99b4-249efdb6f992',
+      'https://amtsblatt.be.ch/api/v1/publications/23f27eb5-db81-4493-99b4-249efdb6f992/pdf']);
+  });
   it('ohne Publikation keine erfundenen Links', () => {
     expect(belege(g('y', '2026-10-30'))).toEqual([]);
   });

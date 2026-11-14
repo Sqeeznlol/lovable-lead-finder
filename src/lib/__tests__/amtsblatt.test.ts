@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ersteNummer, gesuchAus, punktAus, suchtexte, xmlLesen } from '../amtsblatt';
+import { ersteNummer, gesuchAus, publikationSeite, punktAus, suchtexte, xmlLesen } from '../amtsblatt';
 
 // Aufbau wie die Publikationen vom 11. bis 13. November 2026, Inhalte erfunden (TEST).
 const bp = `<?xml version='1.0' encoding='UTF-8'?>
@@ -30,6 +30,8 @@ describe('Amtsblattportal', () => {
     expect(g).toMatchObject({ id: 'aaaa-1', kanton: 'ZG', bfs: '1706', gemeinde: 'Oberägeri', strasse: 'Flurweg 26a und 26b', plz: '6315', ort: 'Alosen',
       parzelle: '2360, 2361', beschreibung: 'Neubau Doppeleinfamilienhaus & Garage', bauherrschaft: null, einspracheBis: '2026-12-02', punkt: { e: 2687000, n: 1221000 } });
     expect(JSON.stringify(g)).not.toMatch(/Person/);
+    expect(publikationSeite({ id: 'aaaa-1', mandant: 'kabzg' })).toBe('https://amtsblatt.zg.ch/#!/search/publications/detail/aaaa-1');
+    expect(publikationSeite({ id: 'aaaa-1', mandant: 'kabag' })).toBeNull();
   });
   it('liest allgemeine Elemente (BA): Titel vor Richtext, Rechtsform statt Firmenname', () => {
     const g = gesuchAus(ba)!;
