@@ -88,3 +88,15 @@ describe('Uhr des Ladebilds', () => {
     expect(u).toBeGreaterThan(300);
   });
 });
+
+describe('Baujahr oder Bauperiode', () => {
+  it('ohne Jahr die Periode, Perioden ab ihrem Anfang verglichen', async () => {
+    const { bauzeit, aeltestes } = await import('@/lib/check-daten');
+    expect(bauzeit({ baujahr: 1961, periode: 8014 })).toBe('1961');
+    expect(bauzeit({ baujahr: null, periode: 8013 })).toBe('1946–1960');
+    expect(bauzeit({ baujahr: null, periode: null })).toBeNull();
+    expect(aeltestes([{ baujahr: 1950, periode: 8013 }, { baujahr: null, periode: 8011 }])).toBe('vor 1919');
+    expect(aeltestes([{ baujahr: 1930, periode: 8012 }, { baujahr: null, periode: 8013 }])).toBe('1930');
+    expect(aeltestes([])).toBeNull();
+  });
+});

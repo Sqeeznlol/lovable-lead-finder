@@ -14,7 +14,7 @@ import { gebaeudeLaden, modellAus, parzelleRelativ, rechtLaden, rechtZeilen, zon
 import { Ladebild, type LadebildDaten } from '@/components/check/Ladebild';
 import { FENSTER } from '@/lib/fenster';
 import {
-  ANTWORT_TEXT, befundAmOrt, GEBAEUDEART, HEIZUNG, herkunft, leadAngaben, mailOk, nameOk, schweizerNummer, STATUS, vorschlaege,
+  aeltestes, ANTWORT_TEXT, bauzeit, befundAmOrt, GEBAEUDEART, HEIZUNG, herkunft, leadAngaben, mailOk, nameOk, schweizerNummer, STATUS, vorschlaege,
   type Antwort, type Befund, type Ort, vorschlagTeile } from '@/lib/check-daten';
 
 /**
@@ -244,7 +244,7 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
   const grundfl = best.reduce((s, h) => s + (h.grundflaeche ?? 0), 0);
   const anteil = befund?.flaeche && grundfl ? Math.min(100, Math.round((grundfl / befund.flaeche) * 100)) : null;
   const heuteFl = best.reduce((s, h) => s + (h.grundflaeche ?? 0) * (h.geschosse ?? 1), 0);
-  const baujahre = best.map(h => h.baujahr).filter((x): x is number => x != null);
+  const aeltestesGebaeude = aeltestes(best);
   const ladebild = useMemo<LadebildDaten | null>(() => {
     if (!ort) return null;
     const parzelle = befund?.teile.length ? parzelleRelativ(befund, ort.e, ort.n) : null;
@@ -261,7 +261,7 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
         parzelle: befund ? `Parzelle ${befund.nummer ?? ''} · ${n(befund.flaeche)} m²`.replace('Parzelle  ·', 'Grundstück ·') : null,
         zone: auszug?.zone?.text ?? befund?.zone ?? null,
         zoneKurz: zonenKuerzel(auszug?.zone?.text),
-        haus: haus ? [haus.geschosse ? `${haus.geschosse} Geschoss${haus.geschosse > 1 ? 'e' : ''}` : null, haus.baujahr ? `Baujahr ${haus.baujahr}` : null].filter(Boolean).join(' · ') || null : null,
+        haus: haus ? [haus.geschosse ? `${haus.geschosse} Geschoss${haus.geschosse > 1 ? 'e' : ''}` : null, bauzeit(haus) ? (haus.baujahr ? `Baujahr ${haus.baujahr}` : `Bauperiode ${bauzeit(haus)}`) : null].filter(Boolean).join(' · ') || null : null,
       },
     };
   }, [ort, befund, gebaeude, rechtslage]);
@@ -390,7 +390,7 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
                           <div><small>Grundstücksfläche</small><b>{n(befund.flaeche)} <span>m²</span></b><em>amtlicher Umriss</em></div>
                           <div><small>Bauzone</small><b>{zonenKuerzel(zoneAuszug) ?? kurzZone(befund.zone)}</b><em>{zoneAuszug ?? befund.zone ?? 'keine Bauzone erfasst'}</em></div>
                           <div><small>Überbaut</small><b>{anteil != null ? <>{anteil} <span>%</span></> : '–'}</b><em>{grundfl ? `${n(grundfl)} m² Gebäudegrundfläche` : 'kein Gebäude erfasst'}</em></div>
-                          <div><small>Ältestes Gebäude</small><b>{baujahre.length ? Math.min(...baujahre) : '–'}</b><em>{best.length} Gebäude laut Register</em></div>
+                          <div><small>Ältestes Gebäude</small><b>{aeltestesGebaeude ?? '–'}</b><em>{best.length} Gebäude laut Register</em></div>
                         </div>
                         <div className="block">
                           <h3>Gebäude auf der Parzelle</h3>
@@ -401,7 +401,7 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
                                   <div className="titel">{h.adresse ?? 'Gebäude'} <span className={`chip${h.status === 1001 || h.status === 1002 ? ' projekt' : ''}`}>{h.status ? STATUS[h.status] : ''}</span></div>
                                   <div className="klein">{h.klasse ? GEBAEUDEART[h.klasse] : ''}</div>
                                   <dl>
-                                    <div><dt>Baujahr</dt><dd>{h.baujahr ?? '–'}</dd></div>
+                                    <div><dt>{h.baujahr || !h.periode ? 'Baujahr' : 'Bauperiode'}</dt><dd>{bauzeit(h) ?? '–'}</dd></div>
                                     <div><dt>Geschosse</dt><dd>{h.geschosse ?? '–'}</dd></div>
                                     <div><dt>Wohnungen</dt><dd>{h.wohnungen ?? '–'}</dd></div>
                                     <div><dt>Heizung</dt><dd>{h.energie ? HEIZUNG[h.energie] ?? '–' : '–'}</dd></div>
