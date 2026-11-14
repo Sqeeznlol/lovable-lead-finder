@@ -146,7 +146,7 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
   // Tafel für Eigentümer und Stand mit dem schwarzen Knopf.
   return (
     <Dialog open={!!id} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto rounded border-0 bg-card p-0">
+      <DialogContent className="max-w-6xl overflow-y-auto rounded border-0 bg-card p-0">
         {fehlt && !loading ? (
           <div className="space-y-4 p-8 text-center">
             <DialogTitle className="text-xl">Objekt nicht gefunden</DialogTitle>

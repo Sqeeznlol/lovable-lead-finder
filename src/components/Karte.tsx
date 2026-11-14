@@ -846,7 +846,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
       {/* Obere Leiste: eine Zeile, schwebend über der Karte. */}
       <header className="leiste">
         {onSchliessen && (
-          <button type="button" className="rund" onClick={onSchliessen} title="Zurück zu Aurora">←</button>
+          <button type="button" className="rund" onClick={onSchliessen} title="Zurück zu Aurora" aria-label="Zurück">←</button>
         )}
         <div className="suche">
           <span className="lupe">⌕</span>
