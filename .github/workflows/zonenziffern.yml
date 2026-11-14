@@ -46,8 +46,8 @@ jobs:
             echo '```'
             for k in $KANTONE; do
               case "$k" in AG|ZG|SZ|SO|SH|LU) ;; *) echo "$k: übersprungen (Lizenz nicht frei)"; continue ;; esac
-              kl=$(echo "$k" | tr 'A-Z' 'a-z')
-              curl -sSL --retry 4 -o /tmp/npl.zip "https://geodienste.ch/downloads/interlis/npl_nutzungsplanung/$k/npl_nutzungsplanung_v1_2_${kl}_lv95.zip"
+              # Kantonskürzel gross im Dateinamen (klein antwortet 404, geprüft 14. November 2026); -f bricht bei Fehlern ab.
+              curl -fsSL --retry 4 -o /tmp/npl.zip "https://geodienste.ch/downloads/interlis/npl_nutzungsplanung/$k/npl_nutzungsplanung_v1_2_${k}_lv95.zip"
               rm -rf /tmp/npl && mkdir -p /tmp/npl && unzip -o -q /tmp/npl.zip -d /tmp/npl
               python3 tools/zonen_ziffern.py "$k" /tmp/ziffern.csv $(find /tmp/npl -name '*.xtf')
             done
