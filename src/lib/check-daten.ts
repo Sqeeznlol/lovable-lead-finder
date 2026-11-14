@@ -13,8 +13,11 @@ const API = 'https://api3.geo.admin.ch/rest/services';
 
 export interface Ort { label: string; e: number; n: number }
 
+/** Eine Wohnung laut Gebäuderegister (Felder w… je Gebäude als Listen). */
+export interface Einheit { nr: string | null; stock: number | null; zimmer: number | null; flaeche: number | null; bezeichnung: string | null }
+
 export interface Haus {
-  egid: number; adresse: string | null; status: number | null; klasse: number | null; baujahr: number | null; periode: number | null; erzeuger: number | null; volumen: number | null;
+  egid: number; adresse: string | null; status: number | null; klasse: number | null; baujahr: number | null; periode: number | null; erzeuger: number | null; volumen: number | null; einheiten: Einheit[];
   geschosse: number | null; wohnungen: number | null; grundflaeche: number | null; energie: number | null; kanton: string | null;
 }
 
@@ -108,12 +111,34 @@ export function vorschlagTeile(label: string): [string, string | null] {
 const zahl = (v: unknown) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
 
 /** Gebäude des Registers auf genau dieser Parzelle; abgebrochene und nicht realisierte zählen nicht. */
+/** Bestehende Wohnungen eines Gebäudes, nach Stockwerk; die Felder sind Listen gleicher Länge. */
+export function einheitenAus(a: Record<string, unknown>): Einheit[] {
+  const liste = (k: string) => (Array.isArray(a[k]) ? a[k] as unknown[] : []);
+  const stat = liste('wstat'), aus: Einheit[] = [];
+  for (let i = 0; i < stat.length; i++) {
+    if (Number(stat[i]) !== 3004) continue;
+    const t = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+    aus.push({ nr: t(liste('whgnr')[i]) ?? t(liste('ewid')[i]), stock: zahl(liste('wstwk')[i]), zimmer: zahl(liste('wazim')[i]), flaeche: zahl(liste('warea')[i]), bezeichnung: t(liste('wbez')[i]) });
+  }
+  const rang = (s2: number | null) => (s2 == null ? 999 : s2 >= 3400 ? -(s2 - 3400) : s2 - 3100);
+  return aus.sort((x, y) => rang(x.stock) - rang(y.stock) || (x.flaeche ?? 0) - (y.flaeche ?? 0));
+}
+
+/** Stockwerk laut Codeliste des BFS: 3100 Parterre, 31xx xx. Stock, 34xx xx. Untergeschoss. */
+export function stockText(code: number | null): string | null {
+  if (code == null) return null;
+  if (code === 3100) return 'Parterre';
+  if (code > 3100 && code < 3200) return `${code - 3100}. Stock`;
+  if (code > 3400 && code < 3420) return `${code - 3400}. Untergeschoss`;
+  return null;
+}
+
 export function haeuserAus(attribute: Record<string, unknown>[], egrid: string): Haus[] {
   return attribute
     .filter(a => a.egrid === egrid && ![1007, 1008].includes(Number(a.gstat)))
     .map(a => ({
       egid: Number(a.egid), adresse: typeof a.strname_deinr === 'string' ? a.strname_deinr : null, status: zahl(a.gstat), klasse: zahl(a.gklas),
-      baujahr: zahl(a.gbauj), periode: zahl(a.gbaup), erzeuger: zahl(a.gwaerzh1), volumen: zahl(a.gvol), geschosse: zahl(a.gastw), wohnungen: zahl(a.ganzwhg), grundflaeche: zahl(a.garea), energie: zahl(a.genh1),
+      baujahr: zahl(a.gbauj), periode: zahl(a.gbaup), erzeuger: zahl(a.gwaerzh1), volumen: zahl(a.gvol), einheiten: einheitenAus(a), geschosse: zahl(a.gastw), wohnungen: zahl(a.ganzwhg), grundflaeche: zahl(a.garea), energie: zahl(a.genh1),
       kanton: typeof a.gdekt === 'string' ? a.gdekt : null,
     }))
     // Bestehende zuerst, dann Projekte.

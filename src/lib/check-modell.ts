@@ -6,6 +6,7 @@
  * Kantone keinen ÖREB-Abruf aus dem Browser erlaubt.
  */
 import type { Befund } from '@/lib/check-daten';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface Koerper { h: number; r: number[][] }
 export interface Modell { eigene: Koerper[]; nachbarn: Koerper[]; geschosse: number }
@@ -25,6 +26,8 @@ export interface Ziffern {
   vollgeschosse: number | null; dachgeschosse: number | null; untergeschosse: number | null; attika: number | null;
   gebaeudehoehe: number | null; fassadenhoehe: number | null; fassadenhoehe_giebel: number | null; gesamthoehe: number | null; firsthoehe: number | null;
   wohnanteil: number | null;
+  /** Ziffer ohne genannte Art (Luzern); wird so angezeigt, nicht gedeutet. */
+  unbestimmt?: number | null;
 }
 export interface Recht { egrid: string | null; pdf: string | null; auszug: Auszug | null; bund: { kulturgueter: { name: string | null; kategorie: string | null }[] | null }; umgebung?: Umgebung | null; ziffern?: Ziffern | null }
 
@@ -70,13 +73,13 @@ const ES = (t: string) => { const m = t.match(/stufe\s*(IV|III|II|I)\b/i); retur
 const hat = (l: { code: string }[], re: RegExp) => l.some(t => re.test(t.code));
 
 /** Die Zeilen für "Was auf der Parzelle gilt"; nur was abgefragt ist, nichts geschätzt. */
-export function rechtZeilen(r: Recht | null, b: Befund): Zeile[] {
+export function rechtZeilen(r: Recht | null, b: Befund, zif: Ziffern | null = r?.ziffern ?? null): Zeile[] {
   const z: Zeile[] = [];
   const a = r?.auszug, kanton = b.kanton ? `ÖREB-Kataster ${b.kanton}` : 'ÖREB-Kataster';
   if (a?.zone) z.push({ titel: 'Zone', wert: a.zone.text, zusatz: a.weitere.slice(0, 2).join(' · ') || undefined, quelle: kanton, art: 'zone' });
   else if (b.zone) z.push({ titel: 'Zone', wert: b.zone, quelle: 'Bauzonen Schweiz', art: 'zone' });
-  const erlaubt = erlaubtText(r?.ziffern);
-  if (erlaubt) z.push({ titel: 'Erlaubt', wert: erlaubt.wert, zusatz: erlaubt.zusatz, quelle: r!.ziffern!.quelle });
+  const erlaubt = erlaubtText(zif);
+  if (erlaubt && zif) z.push({ titel: 'Erlaubt', wert: erlaubt.wert, zusatz: erlaubt.zusatz, quelle: zif.quelle });
   if (a?.ordnung) z.push({ titel: 'Bauordnung', wert: a.ordnung.titel, quelle: kanton, link: a.ordnung.url });
   if (a?.baulinien && a.baulinien.laenge > 0) z.push({ titel: 'Baulinie', wert: `${a.baulinien.laenge} m auf der Parzelle`, quelle: kanton, art: 'linie' });
   if (a?.es) z.push({ titel: 'Lärm', wert: ES(a.es), quelle: kanton });
@@ -128,8 +131,31 @@ export function erlaubtText(z: Ziffern | null | undefined): { wert: string; zusa
   const hoehen = [z.gesamthoehe != null ? `Gesamthöhe ${zahl(z.gesamthoehe)} m` : null, z.gebaeudehoehe != null ? `Gebäudehöhe ${zahl(z.gebaeudehoehe)} m` : null,
     z.fassadenhoehe != null ? `Fassadenhöhe ${zahl(z.fassadenhoehe)} m${z.fassadenhoehe_giebel != null ? ` (Giebelseite ${zahl(z.fassadenhoehe_giebel)} m)` : ''}` : null,
     z.gruen != null ? `Grünflächenziffer mind. ${zahl(z.gruen)}` : null].filter(Boolean);
+  if (z.unbestimmt != null) dichte.push(`Nutzungsziffer ${zahl(z.unbestimmt)} (Art im Plan nicht angegeben)`);
   const wert = [...dichte, geschosse].filter(Boolean).join(' · ');
   if (!wert && !hoehen.length) return null;
   return { wert: wert || hoehen.shift()!, zusatz: hoehen.join(' · ') || undefined };
 }
 
+
+type ZifferZeile = { kanton: string; code: string | null; bezeichnung: string | null; abkuerzung: string | null; ziffer: number; art: string | null; art_kurz: string | null };
+const LEER: Omit<Ziffern, 'zone' | 'kuerzel' | 'gemeinde' | 'quelle'> = { az: null, bmz: null, uez: null, gruen: null, frei: null, vollgeschosse: null, dachgeschosse: null,
+  untergeschosse: null, attika: null, gebaeudehoehe: null, fassadenhoehe: null, fassadenhoehe_giebel: null, gesamthoehe: null, firsthoehe: null, wohnanteil: null, unbestimmt: null };
+
+/** Ziffern aus der Nutzungsplanung der Kantone (Tabelle zone_ziffer, geodienste.ch); null wenn keine. */
+export function zifferAus(zeilen: ZifferZeile[]): Ziffern | null {
+  if (!zeilen.length) return null;
+  const z: Ziffern = { ...LEER, zone: zeilen[0].bezeichnung, kuerzel: zeilen[0].abkuerzung, gemeinde: null, quelle: `Nutzungsplanung Kanton ${zeilen[0].kanton}` };
+  for (const x of zeilen) {
+    const v = Number(x.ziffer);
+    if (!(v > 0)) continue;
+    if (x.art_kurz === 'az') z.az ??= v; else if (x.art_kurz === 'bmz') z.bmz ??= v; else if (x.art_kurz === 'uez') z.uez ??= v;
+    else if (x.art_kurz === 'gruen') z.gruen ??= v; else z.unbestimmt ??= v;
+  }
+  return z.az ?? z.bmz ?? z.uez ?? z.gruen ?? z.unbestimmt ? z : null;
+}
+export async function zifferLaden(e: number, n: number): Promise<Ziffern | null> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const r = await (supabase as any).rpc('zone_ziffer_am', { p_e: e, p_n: n });
+  return r.error ? null : zifferAus((r.data ?? []) as ZifferZeile[]);
+}

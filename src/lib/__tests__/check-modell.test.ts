@@ -149,3 +149,25 @@ describe('Was die Zone erlaubt (Zürich)', () => {
     expect(zhZiffernAus('<leer/>')).toBeNull();
   });
 });
+
+describe('Ziffern der Kantone (zone_ziffer)', () => {
+  it('ordnet nach Art, ohne Art bleibt sie unbestimmt', async () => {
+    const { zifferAus, erlaubtText } = await import('@/lib/check-modell');
+    const ag = zifferAus([{ kanton: 'AG', code: '112102', bezeichnung: 'Wohnzone W2', abkuerzung: 'W2', ziffer: 0.65, art: 'max. Ausnützungsziffer', art_kurz: 'az' }]);
+    expect(ag).toMatchObject({ az: 0.65, kuerzel: 'W2', quelle: 'Nutzungsplanung Kanton AG' });
+    const lu = zifferAus([{ kanton: 'LU', code: '1101', bezeichnung: '2-geschossige Wohnzone', abkuerzung: null, ziffer: 0.35, art: null, art_kurz: null }]);
+    expect(lu).toMatchObject({ az: null, unbestimmt: 0.35 });
+    expect(erlaubtText(lu)?.wert).toBe('Nutzungsziffer 0.35 (Art im Plan nicht angegeben)');
+    expect(zifferAus([])).toBeNull();
+  });
+});
+
+describe('Stockwerkeigentum: Wohnungen aus dem Register', () => {
+  it('nur bestehende, nach Stockwerk; Stockwerk lesbar', async () => {
+    const { einheitenAus, stockText } = await import('@/lib/check-daten');
+    const w = einheitenAus({ wstat: [3004, 3004, 3007, 3004], wstwk: [3102, 3100, 3101, 3401], warea: [95, 80, 70, 40], wazim: [4, 3.5, 3, 1], whgnr: ['3', '1', '2', null], wbez: [null, null, null, 'Studio'] });
+    expect(w.map(x => stockText(x.stock))).toEqual(['1. Untergeschoss', 'Parterre', '2. Stock']);
+    expect(w[1]).toMatchObject({ nr: '1', zimmer: 3.5, flaeche: 80 });
+    expect(stockText(3115)).toBe('15. Stock'); expect(stockText(null)).toBeNull();
+  });
+});

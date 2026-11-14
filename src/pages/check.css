@@ -322,3 +322,14 @@
   .pc .block, .pc .kacheln, .pc dl.recht > div{break-inside:avoid;}
   .pc a{text-decoration:none;}
 }
+/* Stockwerkeigentum: Wohnungen des Hauses zum Antippen. */
+.pc .wohnungen{margin-top:12px;}
+.pc .wohnungen ul{list-style:none; margin:8px 0 0; padding:0; display:grid; gap:6px;}
+.pc .haeuser .wohnungen li{padding:0; border-top:0;}
+.pc .wohnungen li button{width:100%; min-height:44px; display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:12px; align-items:center; text-align:left;
+  padding:8px 12px; border:1px solid var(--linie); border-radius:var(--r-klein); background:var(--tafel); cursor:pointer; font-size:15px;}
+.pc .wohnungen li button span:nth-child(n+2){color:var(--grau); font-variant-numeric:tabular-nums; white-space:nowrap;}
+.pc .wohnungen li button[aria-pressed="true"]{border-color:var(--marke); background:var(--marke-hell); color:var(--marke); font-weight:600;}
+.pc .wohnungen li button[aria-pressed="true"] span{color:var(--marke);}
+.pc .wohnungen .mehr{margin-top:6px; min-height:44px; background:none; border:0; padding:0; color:var(--marke); font-weight:600; cursor:pointer;}
+@media print{.pc .wohnungen li button:not([aria-pressed="true"]), .pc .wohnungen .klein, .pc .wohnungen .mehr{display:none !important;}}

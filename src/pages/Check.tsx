@@ -10,11 +10,11 @@ import { KATASTER } from '@/lib/check-hintergrund';
 import { useImBild } from '@/lib/im-bild';
 import { zaehlen } from '@/lib/check-zaehlen';
 import { buehnenBild, markenAttribute, markenStil, seiteEinrichten } from '@/lib/check-gestaltung';
-import { gebaeudeLaden, modellAus, parzelleRelativ, rechtLaden, rechtZeilen, umgebungZeilen, zonenKuerzel, type Koerper, type Recht } from '@/lib/check-modell';
+import { gebaeudeLaden, modellAus, parzelleRelativ, rechtLaden, rechtZeilen, umgebungZeilen, zifferLaden, type Ziffern, zonenKuerzel, type Koerper, type Recht } from '@/lib/check-modell';
 import { Ladebild, type LadebildDaten } from '@/components/check/Ladebild';
 import { FENSTER } from '@/lib/fenster';
 import {
-  aeltestes, ANTWORT_TEXT, linkFuer, ortAusLink, bauzeit, befundAmOrt, heizungText, GEBAEUDEART, herkunft, leadAngaben, mailOk, nameOk, schweizerNummer, STATUS, vorschlaege,
+  aeltestes, ANTWORT_TEXT, stockText, type Einheit, linkFuer, ortAusLink, bauzeit, befundAmOrt, heizungText, GEBAEUDEART, herkunft, leadAngaben, mailOk, nameOk, schweizerNummer, STATUS, vorschlaege,
   type Antwort, type Befund, type Ort, vorschlagTeile } from '@/lib/check-daten';
 
 /**
@@ -185,6 +185,10 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
   }, []);
 
   const [geteilt, setGeteilt] = useState(false);
+  // Stockwerkeigentum: die eigene Wohnung aus dem Register wählen (Julian, 14. November: "Stockwerkeigentum-Check ist top").
+  const [wohnung, setWohnung] = useState<(Einheit & { id: string; egid: number }) | null>(null);
+  const [alleWohnungen, setAlleWohnungen] = useState<number | null>(null);
+  useEffect(() => { setWohnung(null); setAlleWohnungen(null); }, [ort]);
   const teilen = async () => {
     if (!ort) return;
     const url = `${window.location.origin}${window.location.pathname}?${linkFuer(ort)}`;
@@ -238,6 +242,8 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
     if (heuteSchon().length >= 3) { setFehler('Von diesem Gerät sind heute schon mehrere Anfragen eingegangen. Wir melden uns bei Ihnen.'); return; }
     setSendet(true); setFehler(null);
     const angaben = leadAngaben({ marke: marke.id, domain, antwort, befund, herkunft: window.location.search ? herkunft(window.location.search) : {} });
+    // Gewählte Wohnung (Stockwerkeigentum) mitgeben, knapp: die Spalte erlaubt weniger als 8 kB.
+    if (wohnung) angaben.wohnung = { egid: wohnung.egid, stock: stockText(wohnung.stock), zimmer: wohnung.zimmer, flaeche: wohnung.flaeche, nr: wohnung.nr };
     if (document.referrer) angaben.referrer = document.referrer.slice(0, 200);
     if (ort) angaben.lv95 = [Math.round(ort.e), Math.round(ort.n)];
     // Ohne Rückgabe der Zeile: der öffentliche Schlüssel darf einfügen, nicht lesen.
@@ -295,14 +301,23 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
       },
     };
   }, [ort, befund, gebaeude, rechtslage]);
-  const zeilen = befund ? rechtZeilen(rechtslage && rechtslage !== 'fehlt' ? rechtslage : null, befund) : [];
   const pdf = rechtslage && rechtslage !== 'fehlt' ? rechtslage.pdf : null;
   const lage = umgebungZeilen(rechtslage && rechtslage !== 'fehlt' ? rechtslage.umgebung : null);
   const zoneAuszug = rechtslage && rechtslage !== 'fehlt' ? rechtslage.auszug?.zone?.text ?? null : null;
   const moeglich = (befund?.flaeche ?? 0) * az;
   // Was der Zonenplan des Kantons führt (heute Zürich): mit AZ startet der Rechner beim echten Wert,
   // mit nur Baumassenziffer rechnet er in Volumen -- heute aus Umriss mal Höhe von swisstopo.
-  const ziffern = rechtslage && rechtslage !== 'fehlt' ? rechtslage.ziffern ?? null : null;
+  const [zifferKanton, setZifferKanton] = useState<Ziffern | null>(null);
+  // Ausserhalb Zürichs aus der Tabelle zone_ziffer (geodienste.ch), sobald der Kanton bekannt ist.
+  useEffect(() => {
+    setZifferKanton(null);
+    if (!ort || !befund || befund.kanton === 'ZH') return;
+    let aktiv = true;
+    zifferLaden(ort.e, ort.n).then(z => { if (aktiv) setZifferKanton(z); }).catch(() => {});
+    return () => { aktiv = false; };
+  }, [ort, befund]);
+  const ziffern = (rechtslage && rechtslage !== 'fehlt' ? rechtslage.ziffern ?? null : null) ?? zifferKanton;
+  const zeilen = befund ? rechtZeilen(rechtslage && rechtslage !== 'fehlt' ? rechtslage : null, befund, ziffern) : [];
   const azAusPlan = ziffern?.az ?? null;
   const bmzAusPlan = azAusPlan == null ? ziffern?.bmz ?? null : null;
   // Heutiges Volumen nur aus dem Register (GVOL). Umriss mal Höhe von swisstopo war zu grob: die Höhe
@@ -454,6 +469,28 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
                                     <div><dt>Wohnungen</dt><dd>{h.wohnungen ?? '–'}</dd></div>
                                     <div><dt>Heizung</dt><dd>{heizungText(h) ?? '–'}</dd></div>
                                   </dl>
+                                  {h.einheiten.length > 1 && (
+                                    <div className="wohnungen">
+                                      <div className="klein">Gehört Ihnen eine dieser Wohnungen? Antippen, dann bezieht sich Ihre Analyse auf sie.</div>
+                                      <ul>
+                                        {(alleWohnungen === h.egid ? h.einheiten : h.einheiten.slice(0, 6)).map((w, i) => {
+                                          const id = `${h.egid}-${w.nr ?? i}-${w.stock}-${w.flaeche}`;
+                                          return (
+                                            <li key={id}>
+                                              <button type="button" aria-pressed={wohnung?.id === id} onClick={() => setWohnung(wohnung?.id === id ? null : { id, egid: h.egid, ...w })}>
+                                                <span>{stockText(w.stock) ?? w.bezeichnung ?? 'Wohnung'}</span>
+                                                <span>{w.zimmer ? `${String(w.zimmer).replace('.', ',')} Zi.` : ''}</span>
+                                                <span>{w.flaeche ? `${n(w.flaeche)} m²` : ''}</span>
+                                              </button>
+                                            </li>
+                                          );
+                                        })}
+                                      </ul>
+                                      {h.einheiten.length > 6 && alleWohnungen !== h.egid && (
+                                        <button type="button" className="mehr" onClick={() => setAlleWohnungen(h.egid)}>Alle {h.einheiten.length} Wohnungen</button>
+                                      )}
+                                    </div>
+                                  )}
                                 </li>
                               ))}
                             </ul>
