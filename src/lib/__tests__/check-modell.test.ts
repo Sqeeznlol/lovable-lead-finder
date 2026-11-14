@@ -100,3 +100,14 @@ describe('Baujahr oder Bauperiode', () => {
     expect(aeltestes([])).toBeNull();
   });
 });
+
+describe('Heizung: Energiequelle, sonst Wärmeerzeuger', () => {
+  it('unbestimmt mit Wärmepumpe ergibt Wärmepumpe', async () => {
+    const { heizungText } = await import('@/lib/check-daten');
+    expect(heizungText({ energie: 7520, erzeuger: 7434 })).toBe('Gas');
+    expect(heizungText({ energie: 7598, erzeuger: 7410 })).toBe('Wärmepumpe');
+    expect(heizungText({ energie: null, erzeuger: 7460 })).toBe('Wärmetauscher (z. B. Fernwärme)');
+    expect(heizungText({ energie: 7599, erzeuger: 7499 })).toBe('andere');
+    expect(heizungText({ energie: null, erzeuger: null })).toBeNull();
+  });
+});

@@ -14,7 +14,7 @@ import { gebaeudeLaden, modellAus, parzelleRelativ, rechtLaden, rechtZeilen, zon
 import { Ladebild, type LadebildDaten } from '@/components/check/Ladebild';
 import { FENSTER } from '@/lib/fenster';
 import {
-  aeltestes, ANTWORT_TEXT, bauzeit, befundAmOrt, GEBAEUDEART, HEIZUNG, herkunft, leadAngaben, mailOk, nameOk, schweizerNummer, STATUS, vorschlaege,
+  aeltestes, ANTWORT_TEXT, bauzeit, befundAmOrt, heizungText, GEBAEUDEART, herkunft, leadAngaben, mailOk, nameOk, schweizerNummer, STATUS, vorschlaege,
   type Antwort, type Befund, type Ort, vorschlagTeile } from '@/lib/check-daten';
 
 /**
@@ -404,7 +404,7 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
                                     <div><dt>{h.baujahr || !h.periode ? 'Baujahr' : 'Bauperiode'}</dt><dd>{bauzeit(h) ?? '–'}</dd></div>
                                     <div><dt>Geschosse</dt><dd>{h.geschosse ?? '–'}</dd></div>
                                     <div><dt>Wohnungen</dt><dd>{h.wohnungen ?? '–'}</dd></div>
-                                    <div><dt>Heizung</dt><dd>{h.energie ? HEIZUNG[h.energie] ?? '–' : '–'}</dd></div>
+                                    <div><dt>Heizung</dt><dd>{heizungText(h) ?? '–'}</dd></div>
                                   </dl>
                                 </li>
                               ))}

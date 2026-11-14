@@ -14,7 +14,7 @@ const API = 'https://api3.geo.admin.ch/rest/services';
 export interface Ort { label: string; e: number; n: number }
 
 export interface Haus {
-  egid: number; adresse: string | null; status: number | null; klasse: number | null; baujahr: number | null; periode: number | null;
+  egid: number; adresse: string | null; status: number | null; klasse: number | null; baujahr: number | null; periode: number | null; erzeuger: number | null;
   geschosse: number | null; wohnungen: number | null; grundflaeche: number | null; energie: number | null; kanton: string | null;
 }
 
@@ -31,6 +31,22 @@ export const HEIZUNG: Record<number, string> = {
   7520: 'Gas', 7530: 'Heizöl', 7540: 'Holz', 7541: 'Stückholz', 7542: 'Pellets', 7543: 'Holzschnitzel', 7550: 'Abwärme',
   7560: 'Strom', 7570: 'Sonne', 7580: 'Fernwärme', 7581: 'Fernwärme', 7582: 'Fernwärme', 7598: 'unbestimmt', 7599: 'andere',
 };
+/**
+ * Wärmeerzeuger (GWAERZH1), Texte aus der Codeliste des BFS (kodes_codes_codici.csv,
+ * public.madd.bfs.admin.ch). Steht die Energiequelle auf "unbestimmt", ist der Erzeuger fast
+ * immer erfasst (gemessen 14. November 2026, Zug: 42 von 127 Wohngebäuden, meist Wärmepumpe).
+ */
+export const ERZEUGER: Record<number, string> = {
+  7400: 'kein Wärmeerzeuger', 7410: 'Wärmepumpe', 7411: 'Wärmepumpe', 7420: 'Sonnenkollektoren', 7421: 'Sonnenkollektoren',
+  7430: 'Heizkessel', 7431: 'Heizkessel', 7432: 'Heizkessel', 7433: 'Heizkessel', 7434: 'Heizkessel (kondensierend)', 7435: 'Heizkessel (kondensierend)',
+  7436: 'Ofen', 7440: 'Wärmekraftkopplung', 7441: 'Wärmekraftkopplung', 7450: 'Elektro-Zentralheizung', 7451: 'Elektro-Zentralheizung',
+  7452: 'Elektro direkt', 7460: 'Wärmetauscher (z. B. Fernwärme)', 7461: 'Wärmetauscher (z. B. Fernwärme)',
+};
+/** Energiequelle, sonst der Wärmeerzeuger, sonst null. */
+export const heizungText = (h: Pick<Haus, 'energie' | 'erzeuger'>): string | null =>
+  (h.energie && h.energie !== 7598 && h.energie !== 7599 ? HEIZUNG[h.energie] : null) ?? (h.erzeuger ? ERZEUGER[h.erzeuger] ?? null : null)
+  ?? (h.energie === 7599 ? 'andere' : null);
+
 export const STATUS: Record<number, string> = {
   1001: 'projektiert', 1002: 'bewilligt', 1003: 'im Bau', 1004: 'bestehend', 1005: 'nicht nutzbar', 1007: 'abgebrochen', 1008: 'nicht realisiert',
 };
@@ -87,7 +103,7 @@ export function haeuserAus(attribute: Record<string, unknown>[], egrid: string):
     .filter(a => a.egrid === egrid && ![1007, 1008].includes(Number(a.gstat)))
     .map(a => ({
       egid: Number(a.egid), adresse: typeof a.strname_deinr === 'string' ? a.strname_deinr : null, status: zahl(a.gstat), klasse: zahl(a.gklas),
-      baujahr: zahl(a.gbauj), periode: zahl(a.gbaup), geschosse: zahl(a.gastw), wohnungen: zahl(a.ganzwhg), grundflaeche: zahl(a.garea), energie: zahl(a.genh1),
+      baujahr: zahl(a.gbauj), periode: zahl(a.gbaup), erzeuger: zahl(a.gwaerzh1), geschosse: zahl(a.gastw), wohnungen: zahl(a.ganzwhg), grundflaeche: zahl(a.garea), energie: zahl(a.genh1),
       kanton: typeof a.gdekt === 'string' ? a.gdekt : null,
     }))
     // Bestehende zuerst, dann Projekte.
@@ -198,6 +214,7 @@ export function leadAngaben(o: { marke: string; domain: string; antwort: Antwort
     baujahr: baujahre.length ? Math.min(...baujahre) : null,
     // Ohne genaues Jahr wenigstens die Periode, damit der Lead in Pipedrive nicht leer ist.
     bauperiode: baujahre.length ? null : aeltestes(bestehend),
+    heizung: bestehend.map(heizungText).find(Boolean) ?? null,
     projekt: b.haeuser.some(h => h.status === 1001 || h.status === 1002) || null,
     ...o.herkunft,
   };
