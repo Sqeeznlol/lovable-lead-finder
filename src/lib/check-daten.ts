@@ -57,6 +57,16 @@ export const GEBAEUDEART: Record<number, string> = {
   1272: 'Kirche', 1273: 'Denkmal', 1274: 'Hochbau', 1275: 'Unterkunft', 1276: 'Tierhaltung', 1277: 'Pflanzenbau', 1278: 'Landwirtschaft',
 };
 
+/** Link-Teil einer Adresse: ?adresse=…&e=…&n=… (LV95, auf den Meter). */
+export function linkFuer(o: Ort): string {
+  return new URLSearchParams({ adresse: o.label, e: String(Math.round(o.e)), n: String(Math.round(o.n)) }).toString();
+}
+/** Ort aus einem geteilten Link; nur Punkte in der Schweiz. */
+export function ortAusLink(suche: string): Ort | null {
+  const q = new URLSearchParams(suche), e = Number(q.get('e')), n = Number(q.get('n')), label = (q.get('adresse') ?? '').slice(0, 120).trim();
+  return label && e > 2480000 && e < 2840000 && n > 1070000 && n < 1300000 ? { label, e, n } : null;
+}
+
 export async function vorschlaege(text: string, signal?: AbortSignal): Promise<Ort[]> {
   if (text.trim().length < 3) return [];
   const r = await fetch(`${API}/ech/SearchServer?type=locations&origins=address,parcel&limit=6&sr=2056&lang=de&searchText=${encodeURIComponent(text)}`, { signal });

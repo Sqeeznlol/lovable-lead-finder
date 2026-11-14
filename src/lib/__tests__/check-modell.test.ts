@@ -127,3 +127,13 @@ describe('Energie und Lage', () => {
     expect(z.map(x => x.wert)).toEqual(['Kein Wärmenetz im Umkreis von 1,5 km', 'Güteklasse D, geringe Erschliessung', '3 % Wahrscheinlichkeit über dem Referenzwert']);
   });
 });
+
+describe('Teilbarer Link', () => {
+  it('hin und zurück, nur Punkte in der Schweiz', async () => {
+    const { linkFuer, ortAusLink } = await import('@/lib/check-daten');
+    const o = { label: 'Sängglenstrasse 11, 8118 Fällanden', e: 2689693.4, n: 1246995.1 };
+    expect(ortAusLink('?' + linkFuer(o))).toEqual({ label: o.label, e: 2689693, n: 1246995 });
+    expect(ortAusLink('?adresse=x&e=1&n=2')).toBeNull();
+    expect(ortAusLink('?e=2689693&n=1246995')).toBeNull();
+  });
+});

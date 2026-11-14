@@ -14,7 +14,7 @@ import { gebaeudeLaden, modellAus, parzelleRelativ, rechtLaden, rechtZeilen, umg
 import { Ladebild, type LadebildDaten } from '@/components/check/Ladebild';
 import { FENSTER } from '@/lib/fenster';
 import {
-  aeltestes, ANTWORT_TEXT, bauzeit, befundAmOrt, heizungText, GEBAEUDEART, herkunft, leadAngaben, mailOk, nameOk, schweizerNummer, STATUS, vorschlaege,
+  aeltestes, ANTWORT_TEXT, linkFuer, ortAusLink, bauzeit, befundAmOrt, heizungText, GEBAEUDEART, herkunft, leadAngaben, mailOk, nameOk, schweizerNummer, STATUS, vorschlaege,
   type Antwort, type Befund, type Ort, vorschlagTeile } from '@/lib/check-daten';
 
 /**
@@ -151,6 +151,8 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
 
   const waehlen = async (v: Ort) => {
     setOrt(v); setText(v.label); setListe([]); setBefund(null); setLaden('laeuft'); setFehler(null);
+    // Die Adresse kommt in den Link: Teilen und Neu laden zeigen dieselbe Parzelle (Julian, 14. November).
+    try { window.history.replaceState(null, '', `${window.location.pathname}?${linkFuer(v)}${window.location.hash}`); } catch { /* ohne Verlauf geht es auch */ }
     // Wer "Bewegung reduzieren" eingestellt hat, sieht kein Ladebild, nur das Ergebnis.
     const nr = ++abfrage.current;
     setGebaeude(null); setRechtslage(null); setBildFertig(leise());
@@ -166,6 +168,34 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
       if (!b.teile.length) setBildFertig(true);
     } catch { if (nr === abfrage.current) { setLaden('fehler'); setBildFertig(true); } }
   };
+
+  // Im Druck ist der Kartenkasten anders breit; Leaflet muss neu messen, sonst bleibt rechts ein grauer Streifen.
+  useEffect(() => {
+    const neu = () => { const m = karte.current; if (!m) return; m.invalidateSize(); if (umriss.current) m.fitBounds(umriss.current.getBounds(), { padding: [30, 30], maxZoom: 19, animate: false }); };
+    window.addEventListener('beforeprint', neu); window.addEventListener('afterprint', neu);
+    return () => { window.removeEventListener('beforeprint', neu); window.removeEventListener('afterprint', neu); };
+  }, []);
+
+  // Geöffnet über einen geteilten Link: gleich auswerten.
+  useEffect(() => {
+    const v = ortAusLink(window.location.search);
+    if (v) void waehlen(v);
+  // Nur beim ersten Laden.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const [geteilt, setGeteilt] = useState(false);
+  const teilen = async () => {
+    if (!ort) return;
+    const url = `${window.location.origin}${window.location.pathname}?${linkFuer(ort)}`;
+    zaehlen(marke.id, domain, 'teilen');
+    try {
+      if (navigator.share) { await navigator.share({ title: `${marke.name.join('')}: ${ort.label}`, url }); return; }
+      await navigator.clipboard.writeText(url); setGeteilt(true); window.setTimeout(() => setGeteilt(false), 2500);
+    } catch { /* abgebrochen */ }
+  };
+  // Der Bericht ist die Seite selbst, für den Druck aufgeräumt (check.css, @media print).
+  const bericht = () => { zaehlen(marke.id, domain, 'bericht'); window.print(); };
 
   const oeffnen = () => {
     if (!befund) { zurSuche(); return; }
@@ -368,7 +398,14 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
                     : <div className="ueber">Ihre Parzelle</div>}
                   <h2>{befund?.adresse ?? ort.label}</h2>
                 </div>
+                {befund && bildFertig && (
+                  <div className="ergebnis-aktionen">
+                    <button type="button" className="knopf leise" onClick={() => void teilen()}>{geteilt ? 'Link kopiert' : 'Teilen'}</button>
+                    <button type="button" className="knopf leise" onClick={bericht}>Bericht als PDF</button>
+                  </div>
+                )}
               </div>
+              <div className="druck-kopf" aria-hidden="true">{marke.name.join('')} · Bericht vom {new Date().toLocaleDateString('de-CH')} · {domain}</div>
               {!bildFertig && ladebild && laden !== 'fehler' ? (
                 <Ladebild key={`${ort.e}-${ort.n}`} daten={ladebild} farbe={marke.farbe} onFertig={() => setBildFertig(true)} />
               ) : (

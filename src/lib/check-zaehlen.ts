@@ -11,7 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { pixel, type PixelEreignis } from '@/lib/meta-pixel';
 import { markeFuerHost } from '@/lib/check-marken';
 
-export type Ereignis = 'aufruf' | 'suche' | 'ergebnis' | 'rechner' | 'kontakt' | 'lead' | 'ratgeber' | 'ratgeber_klick';
+export type Ereignis = 'aufruf' | 'suche' | 'ergebnis' | 'rechner' | 'kontakt' | 'lead' | 'ratgeber' | 'ratgeber_klick' | 'teilen' | 'bericht';
 
 /** Woher der Besuch kommt: Werbung zuerst, sonst die verweisende Seite. */
 export function quelleAus(suche: string, verweis: string, eigenerHost: string): { quelle: string | null; kampagne: string | null } {
