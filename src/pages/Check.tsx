@@ -300,6 +300,16 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
   const lage = umgebungZeilen(rechtslage && rechtslage !== 'fehlt' ? rechtslage.umgebung : null);
   const zoneAuszug = rechtslage && rechtslage !== 'fehlt' ? rechtslage.auszug?.zone?.text ?? null : null;
   const moeglich = (befund?.flaeche ?? 0) * az;
+  // Was der Zonenplan des Kantons führt (heute Zürich): mit AZ startet der Rechner beim echten Wert,
+  // mit nur Baumassenziffer rechnet er in Volumen -- heute aus Umriss mal Höhe von swisstopo.
+  const ziffern = rechtslage && rechtslage !== 'fehlt' ? rechtslage.ziffern ?? null : null;
+  const azAusPlan = ziffern?.az ?? null;
+  const bmzAusPlan = azAusPlan == null ? ziffern?.bmz ?? null : null;
+  // Heutiges Volumen nur aus dem Register (GVOL). Umriss mal Höhe von swisstopo war zu grob: die Höhe
+  // ist die Firsthöhe, der Umriss schliesst den Dachvorsprung ein (Fällanden: 1'748 statt rund 1'200 m³).
+  const volumenHeute = best.length && best.every(h => h.volumen) ? best.reduce((s2, h) => s2 + (h.volumen ?? 0), 0) : null;
+  useEffect(() => { if (azAusPlan != null) setAz(Math.min(2, Math.max(0.2, azAusPlan))); }, [azAusPlan]);
+  const volumenMoeglich = bmzAusPlan != null && befund?.flaeche ? Math.round(bmzAusPlan * befund.flaeche) : null;
   // Aufrufleiste auf dem Handy: nur, wenn gerade kein anderer Aufruf im Bild ist.
   const andererAufruf = useImBild('.pc .suche, .pc .aufruf, .pc .rechner, .pc .formular.offen, .pc .danke.sichtbar, .pc .schritte-aufruf', [befund, schritt, recht]);
   const leiste = recht || schritt !== 0 || andererAufruf ? null
@@ -532,16 +542,34 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
                       {schritt === 3 && (
                         <>
                           <div className="freigeschaltet"><span>Freigeschaltet. Danke, {kontakt.name.trim().split(/\s+/)[0]}: Ihre ausführliche Analyse folgt innert zwei Arbeitstagen.</span></div>
-                          <div className="zeile-oben"><h3>Ausnützung durchrechnen</h3><span className="wert">AZ {az.toFixed(2)}</span></div>
-                          <p className="klein" style={{ margin: '6px 0 0' }}>Stellen Sie die Ausnützungsziffer Ihrer Zone ein. Den gültigen Wert Ihrer Gemeinde prüfen wir in der Analyse.</p>
-                          <input type="range" min={0.2} max={2} step={0.05} value={az} aria-label="Ausnützungsziffer" onChange={e => setAz(Number(e.target.value))} />
-                          <div className="skala"><span>0.2</span><span>1.0</span><span>2.0</span></div>
-                          <div className="ergebnisse">
-                            <div><small>Möglich</small><b>{n(moeglich)} m²</b></div>
-                            <div><small>Heute ca.</small><b>{n(heuteFl)} m²</b></div>
-                            <div className="plus"><small>Reserve</small><b>{moeglich - heuteFl > 0 ? `+ ${n(moeglich - heuteFl)} m²` : 'keine'}</b></div>
-                          </div>
-                          <div className="fein">Geschossfläche, vereinfacht: Ausnützung mal Grundstücksfläche; heute Grundfläche mal Geschosse laut Register. Richtwert, keine Bewilligungszusage.</div>
+                          {volumenMoeglich != null ? (
+                            <>
+                              <div className="zeile-oben"><h3>Bauvolumen laut Zonenplan</h3><span className="wert">BMZ {bmzAusPlan!.toLocaleString('de-CH')}</span></div>
+                              <p className="klein" style={{ margin: '6px 0 0' }}>Ihre Zone ({ziffern?.kuerzel ?? ziffern?.zone}) begrenzt das Volumen über dem Boden mit der Baumassenziffer {bmzAusPlan!.toLocaleString('de-CH')}.</p>
+                              <div className="ergebnisse">
+                                <div><small>Möglich</small><b>{n(volumenMoeglich)} m³</b></div>
+                                <div><small>Heute</small><b>{volumenHeute != null ? `${n(volumenHeute)} m³` : '–'}</b></div>
+                                <div className="plus"><small>Reserve</small><b>{volumenHeute != null ? (volumenMoeglich - volumenHeute > 0 ? `+ ${n(volumenMoeglich - volumenHeute)} m³` : 'keine') : 'in Analyse'}</b></div>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="zeile-oben"><h3>Ausnützung durchrechnen</h3><span className="wert">AZ {az.toFixed(2)}{azAusPlan != null && az === Math.min(2, Math.max(0.2, azAusPlan)) ? ' laut Zonenplan' : ''}</span></div>
+                              <p className="klein" style={{ margin: '6px 0 0' }}>{azAusPlan != null
+                                ? `Der Zonenplan des Kantons nennt für Ihre Zone (${ziffern?.kuerzel ?? ziffern?.zone}) die Ausnützungsziffer ${azAusPlan.toLocaleString('de-CH')}. Verschieben Sie den Regler, um andere Werte durchzurechnen.`
+                                : 'Stellen Sie die Ausnützungsziffer Ihrer Zone ein. Den gültigen Wert Ihrer Gemeinde prüfen wir in der Analyse.'}</p>
+                              <input type="range" min={0.2} max={2} step={0.05} value={az} aria-label="Ausnützungsziffer" onChange={e => setAz(Number(e.target.value))} />
+                              <div className="skala"><span>0.2</span><span>1.0</span><span>2.0</span></div>
+                              <div className="ergebnisse">
+                                <div><small>Möglich</small><b>{n(moeglich)} m²</b></div>
+                                <div><small>Heute ca.</small><b>{n(heuteFl)} m²</b></div>
+                                <div className="plus"><small>Reserve</small><b>{moeglich - heuteFl > 0 ? `+ ${n(moeglich - heuteFl)} m²` : 'keine'}</b></div>
+                              </div>
+                            </>
+                          )}
+                          <div className="fein">{volumenMoeglich != null
+                            ? `Volumen: Baumassenziffer mal Grundstücksfläche (Zonenplan Kanton Zürich).${volumenHeute != null ? ' Heute: Gebäudevolumen laut Register.' : ' Das heutige Volumen führt das Register für dieses Gebäude nicht; wir messen es in der Analyse.'} Richtwert, keine Bewilligungszusage.`
+                            : 'Geschossfläche, vereinfacht: Ausnützung mal Grundstücksfläche; heute Grundfläche mal Geschosse laut Register. Richtwert, keine Bewilligungszusage.'}</div>
                         </>
                       )}
                     </div>

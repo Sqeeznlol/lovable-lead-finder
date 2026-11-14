@@ -1,5 +1,6 @@
 import { auszugKurz, dienstBasis } from './_lib/oereb.js';
 import { solarAus, waermenetzAus } from './_lib/umgebung.js';
+import { ZH_EBENE, ZH_WFS, zhZiffernAus } from './_lib/ziffern.js';
 
 // ÖREB-Auszug einer Parzelle, gekürzt. Über den Server, weil rund die
 // Hälfte der Kantone keinen Abruf aus dem Browser erlaubt (CORS, gemessen
@@ -28,6 +29,13 @@ async function solar(e, n) {
   return solarAus(((await r.json())?.results ?? []).map(x => x.attributes ?? {}));
 }
 
+async function ziffernZh(e, n) {
+  const q = new URLSearchParams({ SERVICE: 'WFS', VERSION: '2.0.0', REQUEST: 'GetFeature', TYPENAMES: ZH_EBENE,
+    BBOX: `${e - 1},${n - 1},${e + 1},${n + 1},urn:ogc:def:crs:EPSG::2056`, COUNT: '3' });
+  const r = await fetch(`${ZH_WFS}?${q}`, { signal: AbortSignal.timeout(10000) });
+  return r.ok ? zhZiffernAus(await r.text()) : null;
+}
+
 async function umgebung(e, n) {
   const [dach, netze, oev, radon] = await Promise.all([
     solar(e, n).catch(() => null),
@@ -54,6 +62,8 @@ export default async function handler(req, res) {
       ebene(e, n, 'ch.babs.kulturgueter', 15).catch(() => null), umgebung(e, n).catch(() => null),
     ]);
     const egrid = parzelle[0]?.egris_egrid, basis = dienstBasis(stand[0]?.oereb_webservice);
+    // Ziffern der Zone: heute Zürich (Werte je Zonenfläche); weitere Kantone folgen aus den Downloads von geodienste.ch.
+    const ziffern = parzelle[0]?.ak === 'ZH' ? await ziffernZh(e, n).catch(() => null) : null;
     const bund = { kulturgueter: kgs ? kgs.map(a => ({ name: a.beschreibung ?? null, kategorie: a.kgs_kategorie ?? null })) : null };
     let auszug = null;
     if (egrid && basis.startsWith('https://')) {
@@ -71,7 +81,7 @@ export default async function handler(req, res) {
       clearTimeout(t); ab.abort();
     }
     res.setHeader('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=604800');
-    res.status(200).json({ egrid: egrid ?? null, pdf, auszug, bund, umgebung: lage });
+    res.status(200).json({ egrid: egrid ?? null, pdf, auszug, bund, umgebung: lage, ziffern });
   } catch {
     res.status(502).json({ fehler: 'Dienst antwortet nicht' });
   }

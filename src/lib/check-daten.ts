@@ -14,7 +14,7 @@ const API = 'https://api3.geo.admin.ch/rest/services';
 export interface Ort { label: string; e: number; n: number }
 
 export interface Haus {
-  egid: number; adresse: string | null; status: number | null; klasse: number | null; baujahr: number | null; periode: number | null; erzeuger: number | null;
+  egid: number; adresse: string | null; status: number | null; klasse: number | null; baujahr: number | null; periode: number | null; erzeuger: number | null; volumen: number | null;
   geschosse: number | null; wohnungen: number | null; grundflaeche: number | null; energie: number | null; kanton: string | null;
 }
 
@@ -113,7 +113,7 @@ export function haeuserAus(attribute: Record<string, unknown>[], egrid: string):
     .filter(a => a.egrid === egrid && ![1007, 1008].includes(Number(a.gstat)))
     .map(a => ({
       egid: Number(a.egid), adresse: typeof a.strname_deinr === 'string' ? a.strname_deinr : null, status: zahl(a.gstat), klasse: zahl(a.gklas),
-      baujahr: zahl(a.gbauj), periode: zahl(a.gbaup), erzeuger: zahl(a.gwaerzh1), geschosse: zahl(a.gastw), wohnungen: zahl(a.ganzwhg), grundflaeche: zahl(a.garea), energie: zahl(a.genh1),
+      baujahr: zahl(a.gbauj), periode: zahl(a.gbaup), erzeuger: zahl(a.gwaerzh1), volumen: zahl(a.gvol), geschosse: zahl(a.gastw), wohnungen: zahl(a.ganzwhg), grundflaeche: zahl(a.garea), energie: zahl(a.genh1),
       kanton: typeof a.gdekt === 'string' ? a.gdekt : null,
     }))
     // Bestehende zuerst, dann Projekte.

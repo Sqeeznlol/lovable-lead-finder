@@ -19,7 +19,14 @@ export interface Umgebung {
   waermenetz: { name: string | null; betreiber: string | null; telefon: string | null; web: string | null; meter: number } | null;
   oev: string | null; radon: number | null;
 }
-export interface Recht { egrid: string | null; pdf: string | null; auszug: Auszug | null; bund: { kulturgueter: { name: string | null; kategorie: string | null }[] | null }; umgebung?: Umgebung | null }
+export interface Ziffern {
+  zone: string | null; kuerzel: string | null; gemeinde: string | null; quelle: string;
+  az: number | null; bmz: number | null; uez: number | null; gruen: number | null; frei: number | null;
+  vollgeschosse: number | null; dachgeschosse: number | null; untergeschosse: number | null; attika: number | null;
+  gebaeudehoehe: number | null; fassadenhoehe: number | null; fassadenhoehe_giebel: number | null; gesamthoehe: number | null; firsthoehe: number | null;
+  wohnanteil: number | null;
+}
+export interface Recht { egrid: string | null; pdf: string | null; auszug: Auszug | null; bund: { kulturgueter: { name: string | null; kategorie: string | null }[] | null }; umgebung?: Umgebung | null; ziffern?: Ziffern | null }
 
 async function holen<T>(pfad: string, ms: number, signal?: AbortSignal): Promise<T> {
   const ab = new AbortController(), t = setTimeout(() => ab.abort(), ms);
@@ -68,6 +75,8 @@ export function rechtZeilen(r: Recht | null, b: Befund): Zeile[] {
   const a = r?.auszug, kanton = b.kanton ? `ÖREB-Kataster ${b.kanton}` : 'ÖREB-Kataster';
   if (a?.zone) z.push({ titel: 'Zone', wert: a.zone.text, zusatz: a.weitere.slice(0, 2).join(' · ') || undefined, quelle: kanton, art: 'zone' });
   else if (b.zone) z.push({ titel: 'Zone', wert: b.zone, quelle: 'Bauzonen Schweiz', art: 'zone' });
+  const erlaubt = erlaubtText(r?.ziffern);
+  if (erlaubt) z.push({ titel: 'Erlaubt', wert: erlaubt.wert, zusatz: erlaubt.zusatz, quelle: r!.ziffern!.quelle });
   if (a?.ordnung) z.push({ titel: 'Bauordnung', wert: a.ordnung.titel, quelle: kanton, link: a.ordnung.url });
   if (a?.baulinien && a.baulinien.laenge > 0) z.push({ titel: 'Baulinie', wert: `${a.baulinien.laenge} m auf der Parzelle`, quelle: kanton, art: 'linie' });
   if (a?.es) z.push({ titel: 'Lärm', wert: ES(a.es), quelle: kanton });
@@ -107,3 +116,20 @@ export function umgebungZeilen(u: Umgebung | null | undefined): Zeile[] {
   if (u.radon != null) z.push({ titel: 'Radon', wert: `${u.radon} % Wahrscheinlichkeit über dem Referenzwert`, quelle: 'BAG', art: u.radon < 10 ? 'ok' : undefined });
   return z;
 }
+
+const zahl = (x: number) => x.toLocaleString('de-CH', { maximumFractionDigits: 2 });
+/** "Baumassenziffer 1,2 · 1 Vollgeschoss + 1 Dachgeschoss", darunter die Höhen; nur was der Zonenplan führt. */
+export function erlaubtText(z: Ziffern | null | undefined): { wert: string; zusatz?: string } | null {
+  if (!z) return null;
+  const dichte = [z.az != null ? `Ausnützungsziffer ${zahl(z.az)}` : null, z.bmz != null ? `Baumassenziffer ${zahl(z.bmz)}` : null,
+    z.uez != null ? `Überbauungsziffer ${zahl(z.uez)}` : null].filter(Boolean);
+  const geschosse = z.vollgeschosse != null ? [`${z.vollgeschosse} Vollgeschoss${z.vollgeschosse === 1 ? '' : 'e'}`,
+    z.dachgeschosse ? `${z.dachgeschosse} Dachgeschoss${z.dachgeschosse === 1 ? '' : 'e'}` : null, z.attika ? 'Attika' : null].filter(Boolean).join(' + ') : null;
+  const hoehen = [z.gesamthoehe != null ? `Gesamthöhe ${zahl(z.gesamthoehe)} m` : null, z.gebaeudehoehe != null ? `Gebäudehöhe ${zahl(z.gebaeudehoehe)} m` : null,
+    z.fassadenhoehe != null ? `Fassadenhöhe ${zahl(z.fassadenhoehe)} m${z.fassadenhoehe_giebel != null ? ` (Giebelseite ${zahl(z.fassadenhoehe_giebel)} m)` : ''}` : null,
+    z.gruen != null ? `Grünflächenziffer mind. ${zahl(z.gruen)}` : null].filter(Boolean);
+  const wert = [...dichte, geschosse].filter(Boolean).join(' · ');
+  if (!wert && !hoehen.length) return null;
+  return { wert: wert || hoehen.shift()!, zusatz: hoehen.join(' · ') || undefined };
+}
+

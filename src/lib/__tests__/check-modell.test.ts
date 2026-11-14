@@ -137,3 +137,15 @@ describe('Teilbarer Link', () => {
     expect(ortAusLink('?e=2689693&n=1246995')).toBeNull();
   });
 });
+
+describe('Was die Zone erlaubt (Zürich)', () => {
+  it('liest Ziffern, Prozent wird zu Bruch', async () => {
+    const { zhZiffernAus } = await import('../../../api/_lib/ziffern.js');
+    const f = (felder: Record<string, string>) => `<ms:ogd-0156_arv_basis_np_gn_zonenflaeche_f>${Object.entries(felder).map(([k, v]) => `<ms:${k}>${v}</ms:${k}>`).join('')}</ms:ogd-0156_arv_basis_np_gn_zonenflaeche_f>`;
+    expect(zhZiffernAus(f({ typ_gde_abkuerzung: 'W1', baumassenziffer_max: '1.2', vollgeschosse_max: '1', fassadenhoehe: '4.5' })))
+      .toMatchObject({ kuerzel: 'W1', bmz: 1.2, vollgeschosse: 1, fassadenhoehe: 4.5, az: null });
+    expect(zhZiffernAus(f({ typ_gde_abkuerzung: 'W3/70G', ausnuetzungsziffer_max: '70', vollgeschosse_max: '3' }))).toMatchObject({ az: 0.7, vollgeschosse: 3 });
+    expect(zhZiffernAus(f({ typ_gde_abkuerzung: 'X' }))).toBeNull();
+    expect(zhZiffernAus('<leer/>')).toBeNull();
+  });
+});
