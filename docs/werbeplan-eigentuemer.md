@@ -35,6 +35,23 @@ laufen Seiten im Stil eines Magazins. Daraus folgt:
    wäre Altersausrichtung über einen Umweg, und die verbietet Meta in
    der Sonderkategorie.
 
+## 0b. Wo wir werben (Stand 14. November)
+
+| Kanal | Wen er erreicht | Rolle | Start |
+|---|---|---|---|
+| Facebook und Instagram | rund 5,9 Mio. Konten in der Schweiz, davon rund 8,5 % über 65 (NapoleonCat, Juni bis August 2026, Schätzung aus Metas Werbewerkzeug) | Hauptkanal: Ratgeber 60+ und Check-Anzeigen | Woche 1 |
+| Google Suche | wer selbst nach "was darf ich bauen", "ausnützungsziffer berechnen", "liegenschaft geerbt" sucht | klein, nur wenig umkämpfte Fragen | Woche 1 |
+| Retargeting (Meta, Google) | wer eine Adresse geprüft und nichts hinterlassen hat | zweite Anzeige "Ihre Analyse ist noch offen" | Woche 2 |
+| Zeitlupe (Pro Senectute) | 46'776 Exemplare, rund 112'000 Leser, 10 Ausgaben (Mediadaten 2026) | Test mit einer Ratgeber-Anzeige, Link auf den Artikel | nach Offerte |
+| Zürcher Hauseigentümer (HEV Zürich) | 57'056 Exemplare, WEMF 2025, monatlich | Test, nur Hauseigentümer | nach Offerte |
+| HEV Schweiz und kantonale HEV-Blätter | Hauseigentümer schweizweit | erst Mediadaten anfragen, Preise nicht öffentlich | später |
+| Gemeinde-Seiten bei Google | wer "bauzone Uster" oder ähnlich sucht | gratis, wächst langsam | sobald gebaut |
+
+Print-Preise stehen nicht in den öffentlichen Auszügen; Offerten bei
+Zeitlupe (Fachmedien) und HEV Zürich anfragen, bevor wir budgetieren.
+Jede Print-Anzeige bekommt eine eigene kurze Adresse
+(z. B. hauschecker.ch/zeitlupe), damit die Leads zuordenbar sind.
+
 ## 1. Woran wir messen
 
 | Stufe | Messgrösse |
@@ -271,6 +288,10 @@ Käufer für einen solchen Zugang bezahlen -- dasselbe könnten wir
 Fondsleitungen wie Helvetica anbieten, mit unserem Bestand als Vorsprung.
 
 ## Quellen
+
+- NapoleonCat, Facebook-Nutzer Schweiz 2026: https://napoleoncat.com/stats/facebook-users-in-switzerland/
+- Zeitlupe, Mediadaten 2026: https://zeitlupe.ch/app/uploads/2025/11/zeitlupe-Mediadaten-online-print-2026.pdf
+- HEV Zürich, Mediadaten 2026: https://www.hev-zuerich.ch/hubfs/ZHE%20Mediadaten%202026-1.pdf
 
 - Meta, Werbung für Wohnraum, Länder und was dazu zählt (abgerufen 7.11.2026): https://www.facebook.com/business/help/1198401317374558
 - Meta, Einschränkungen der Zielgruppen (abgerufen 7.11.2026): https://www.facebook.com/business/help/2220749868045706
