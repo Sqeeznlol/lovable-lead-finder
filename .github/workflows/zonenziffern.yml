@@ -1,0 +1,102 @@
+name: Zonenziffern
+
+# Füllt die Tabelle `zone_ziffer` (Migration 20261114110000_zone_ziffer.sql)
+# aus der Nutzungsplanung der Kantone auf geodienste.ch (INTERLIS, MGDM 73.1
+# v1.2): jede Zonenfläche mit Nutzungsziffer, als Umriss. Nur Kantone mit
+# freier Lizenz. Ersetzt den Inhalt ganz, in einer Transaktion.
+# Vor dem Schreiben wird die Grösse der Datenbank geprüft.
+# Ausgegeben werden nur Zählungen -- das Protokoll ist öffentlich.
+
+on:
+  workflow_dispatch:
+    inputs:
+      schritt:
+        description: 'probe = nur zählen, schreiben = Tabelle füllen'
+        required: true
+        default: 'probe'
+        type: choice
+        options: [probe, schreiben]
+      kantone:
+        description: 'Kantone, mit Leerzeichen getrennt'
+        required: false
+        default: 'AG ZG SZ SO SH LU'
+      grenze_mb:
+        description: 'Nicht schreiben, wenn die Datenbank grösser ist (MB)'
+        required: false
+        default: '1000'
+
+jobs:
+  zonenziffern:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Werkzeuge
+        run: sudo apt-get install -y -qq postgresql-client unzip >/dev/null
+
+      - name: Pakete holen und lesen
+        env:
+          KANTONE: ${{ inputs.kantone }}
+        run: |
+          set -euo pipefail
+          : > /tmp/ziffern.csv
+          {
+            echo "### Zonenflächen mit Ziffer"
+            echo '```'
+            for k in $KANTONE; do
+              case "$k" in AG|ZG|SZ|SO|SH|LU) ;; *) echo "$k: übersprungen (Lizenz nicht frei)"; continue ;; esac
+              kl=$(echo "$k" | tr 'A-Z' 'a-z')
+              curl -sSL --retry 4 -o /tmp/npl.zip "https://geodienste.ch/downloads/interlis/npl_nutzungsplanung/$k/npl_nutzungsplanung_v1_2_${kl}_lv95.zip"
+              rm -rf /tmp/npl && mkdir -p /tmp/npl && unzip -o -q /tmp/npl.zip -d /tmp/npl
+              python3 tools/zonen_ziffern.py "$k" /tmp/ziffern.csv $(find /tmp/npl -name '*.xtf')
+            done
+            echo "Zeilen gesamt: $(wc -l < /tmp/ziffern.csv)"
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Schreiben
+        if: inputs.schritt == 'schreiben'
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+          GRENZE_MB: ${{ inputs.grenze_mb }}
+        run: |
+          set -euo pipefail
+          [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
+          case "${GRENZE_MB:-}" in ''|*[!0-9]*) GRENZE_MB=1000 ;; esac
+          psql "$DB" -X -q -v ON_ERROR_STOP=1 -v grenze="$GRENZE_MB" >> "$GITHUB_STEP_SUMMARY" 2>&1 <<'SQL'
+          set statement_timeout = '20min';
+          select (pg_database_size(current_database())/1024/1024)::int as mb \gset
+          select :mb >= :grenze as voll \gset
+          \if :voll
+            \echo 'ABBRUCH: Datenbank bei' :mb 'MB, Grenze' :grenze 'MB.'
+            \quit
+          \endif
+          \echo '### Schreiben'
+          \echo '```'
+          \echo 'Datenbank vorher:' :mb 'MB'
+          begin;
+          create temp table z (kanton text, code text, bezeichnung text, abkuerzung text, ziffer numeric, art text, wkt text) on commit drop;
+          \copy z from '/tmp/ziffern.csv' with (format csv)
+          truncate public.zone_ziffer;
+          -- Vereinfacht auf einen halben Meter: für die Frage "welche Zone hier" reicht das, und die Tabelle bleibt klein.
+          insert into public.zone_ziffer (kanton, code, bezeichnung, abkuerzung, ziffer, art, art_kurz, geom)
+          select kanton, nullif(code, ''), nullif(bezeichnung, ''), nullif(abkuerzung, ''), ziffer, nullif(art, ''),
+                 case when art ~* 'baumasse' then 'bmz'
+                      when art ~* 'ausn(ü|u|ue)tzung|^\s*(max\.?\s*)?az\y' then 'az'
+                      when art ~* '(ü|ue|u)berba|^\s*(max\.?\s*)?(üz|uez)\y' then 'uez'
+                      when art ~* 'geschossfl|^\s*(max\.?\s*)?gfz\y' then 'gfz'
+                      when art ~* 'gr(ü|ue)nfl' then 'gruen' end,
+                 extensions.st_multi(extensions.st_collectionextract(extensions.st_makevalid(
+                   extensions.st_simplifypreservetopology(extensions.st_geomfromtext(wkt, 2056), 0.5)), 3))
+            from z;
+          delete from public.zone_ziffer where extensions.st_isempty(geom);
+          commit;
+          vacuum analyze public.zone_ziffer;
+          select kanton, count(*) as flaechen, count(art_kurz) as mit_art from public.zone_ziffer group by 1 order by 1;
+          select art_kurz, count(*) from public.zone_ziffer group by 1 order by 2 desc;
+          select pg_size_pretty(pg_total_relation_size('public.zone_ziffer')) as tabelle,
+                 (pg_database_size(current_database())/1024/1024)::int as datenbank_mb;
+          \echo '```'
+          SQL
+          cat "$GITHUB_STEP_SUMMARY"
