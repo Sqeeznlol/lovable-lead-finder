@@ -39,12 +39,22 @@ export function Karte3DSeite({ onSchliessen }: { onSchliessen?: () => void }) {
     // Nur Punkte in der Schweiz annehmen; sonst der Start.
     return lat > 45.7 && lat < 47.9 && lon > 5.9 && lon < 10.6 ? { lat, lon } : START;
   }, [p, objekt, latW, lonW]);
+  // Direkt geöffnet (Lesezeichen, App auf dem Startbildschirm) gibt es keinen Schritt zurück;
+  // react-router zählt die eigenen Schritte in history.state.idx.
+  const zurueck = () => {
+    if (onSchliessen) { onSchliessen(); return; }
+    if ((window.history.state as { idx?: number } | null)?.idx) navigate(-1); else navigate('/', { replace: true });
+  };
   const markiert = useMemo(() => (p?.egrid ? [{ egrid: p.egrid, farbe: '#3D45F5', titel: p.address ?? undefined }] : []), [p]);
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background">
-      <div className="flex h-14 shrink-0 items-center gap-2 border-b bg-background px-2 pt-[env(safe-area-inset-top)] sm:px-4">
-        <button type="button" onClick={() => (onSchliessen ? onSchliessen() : navigate(-1))} aria-label="Zurück"
+      {/* Die Höhe kommt zum Abstand der Statusleiste dazu, nicht davon weg: Als App auf dem
+          iPhone blieben sonst 9 px, die Karte lag über "Zurück" und "2D" (Julian, 14. November:
+          "ich kann nicht mehr weg von dieser Ansicht"). */}
+      <div className="shrink-0 border-b bg-background pt-[env(safe-area-inset-top)]">
+      <div className="flex h-14 items-center gap-2 px-2 sm:px-4">
+        <button type="button" onClick={zurueck} aria-label="Zurück"
                 className="grid h-11 w-11 place-items-center rounded-[3px] hover:bg-secondary"><ArrowLeft className="h-5 w-5" /></button>
         <span className="min-w-0 flex-1 leading-tight">
           <span className="block truncate font-semibold">{p?.address ?? (objekt ? 'Objekt wird gesucht …' : '3D-Karte')}</span>
@@ -52,6 +62,7 @@ export function Karte3DSeite({ onSchliessen }: { onSchliessen?: () => void }) {
         </span>
         <button type="button" onClick={() => navigate('/karte')}
                 className="inline-flex h-11 items-center gap-2 rounded-[3px] border bg-card px-3 text-sm hover:bg-secondary"><Karte2D className="h-4 w-4" /> 2D</button>
+      </div>
       </div>
       <div className="min-h-0 flex-1">
         {/* Ein gesuchter Ort kommt in die Adresse: Neu laden und Teilen zeigen dieselbe Stelle. */}

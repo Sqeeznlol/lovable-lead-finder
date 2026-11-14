@@ -283,7 +283,8 @@ export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende,
     const v = viewer.current;
     if (!v || kataster.current) return;
     kataster.current = new ImageryLayer(new UrlTemplateImageryProvider({
-      url: KATASTER_URL, rectangle: SCHWEIZ, maximumLevel: 19, credit: '© Kantone',
+      // Stufe 20 gibt es beim Kataster (gemessen 14. November 2026); mit 19 waren Linien und Nummern nah unscharf.
+      url: KATASTER_URL, rectangle: SCHWEIZ, maximumLevel: 20, credit: '© Kantone',
     }), { minimumTerrainLevel: 15, alpha: 0.45 });
     v.imageryLayers.add(kataster.current);
     v.scene.requestRender();
@@ -922,7 +923,7 @@ export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende,
       <Suche3D onWahl={ortWaehlen} />
       <div className="flex max-w-full gap-1.5 overflow-x-auto no-scrollbar">
         {/* Foto ohne Schlüssel: intern als Hinweis, was fehlt; Fondsleitungen sehen den Chip gar nicht. */}
-        {FAERBUNGEN.filter(f => faerbungen.includes(f.wert) && (intern || f.wert !== 'reserve') && (f.wert !== 'foto' || FOTO_MOEGLICH || intern)).map(f => (
+        {FAERBUNGEN.filter(f => faerbungen.includes(f.wert) && (intern || f.wert !== 'reserve') && (f.wert !== 'foto' || FOTO_MOEGLICH)).map(f => (
           <button key={f.wert} type="button" className={chip(faerbung === f.wert)} aria-pressed={faerbung === f.wert}
                   onClick={() => { if (f.wert === 'foto') setFotoHinweis(null); setFaerbung(f.wert); }}>
             {f.wert === 'foto' && fotoLaden ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}{f.titel}
