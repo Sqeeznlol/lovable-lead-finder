@@ -1,4 +1,5 @@
 import { auszugKurz, dienstBasis } from './_lib/oereb.js';
+import { solarAus, waermenetzAus } from './_lib/umgebung.js';
 
 // ÖREB-Auszug einer Parzelle, gekürzt. Über den Server, weil rund die
 // Hälfte der Kantone keinen Abruf aus dem Browser erlaubt (CORS, gemessen
@@ -9,11 +10,37 @@ import { auszugKurz, dienstBasis } from './_lib/oereb.js';
 // Umweg zu beliebigen Servern.
 const API = 'https://api3.geo.admin.ch/rest/services';
 
-async function ebene(e, n, layer, toleranz = 0) {
-  const q = new URLSearchParams({ geometryType: 'esriGeometryPoint', geometry: `${e},${n}`, sr: '2056', tolerance: String(toleranz), returnGeometry: 'false',
-    layers: `all:${layer}`, mapExtent: `${e - 100},${n - 100},${e + 100},${n + 100}`, imageDisplay: '400,400,96', lang: 'de' });
+// Toleranz in Metern: Ausschnitt und Bild sind so gewählt, dass ein Bildpunkt ein Meter ist.
+async function treffer(e, n, layer, toleranz = 0, geometrie = false) {
+  const w = Math.max(100, toleranz + 50);
+  const q = new URLSearchParams({ geometryType: 'esriGeometryPoint', geometry: `${e},${n}`, sr: '2056', tolerance: String(toleranz), returnGeometry: String(geometrie),
+    geometryFormat: 'geojson', layers: `all:${layer}`, mapExtent: `${e - w},${n - w},${e + w},${n + w}`, imageDisplay: `${2 * w},${2 * w},96`, lang: 'de' });
   const r = await fetch(`${API}/all/MapServer/identify?${q}`, { signal: AbortSignal.timeout(8000) });
-  return ((await r.json())?.results ?? []).map(x => x.attributes ?? x.properties ?? {});
+  return (await r.json())?.results ?? [];
+}
+const ebene = async (e, n, layer, toleranz = 0) => (await treffer(e, n, layer, toleranz)).map(x => x.attributes ?? x.properties ?? {});
+
+async function solar(e, n) {
+  const id = (await ebene(e, n, 'ch.bfe.solarenergie-eignung-daecher', 10))[0]?.building_id;
+  if (!id) return null;
+  const q = new URLSearchParams({ layer: 'ch.bfe.solarenergie-eignung-daecher', searchField: 'building_id', searchText: String(id), contains: 'false', returnGeometry: 'false' });
+  const r = await fetch(`${API}/all/MapServer/find?${q}`, { signal: AbortSignal.timeout(8000) });
+  return solarAus(((await r.json())?.results ?? []).map(x => x.attributes ?? {}));
+}
+
+async function umgebung(e, n) {
+  const [dach, netze, oev, radon] = await Promise.all([
+    solar(e, n).catch(() => null),
+    treffer(e, n, 'ch.bfe.thermische-netze', 1500, true).catch(() => []),
+    ebene(e, n, 'ch.are.gueteklassen_oev').catch(() => []),
+    ebene(e, n, 'ch.bag.radonkarte').catch(() => []),
+  ]);
+  const prozent = Number(radon[0]?.probability_prozent);
+  return {
+    solar: dach, waermenetz: waermenetzAus(netze, e, n),
+    oev: typeof oev[0]?.klasse_de === 'string' ? oev[0].klasse_de : null,
+    radon: radon.length && Number.isFinite(prozent) ? prozent : null,
+  };
 }
 
 export default async function handler(req, res) {
@@ -22,9 +49,9 @@ export default async function handler(req, res) {
   try {
     // Kulturgüter (KGS) als Punkte, darum 15 m Toleranz; geprüft an der Kirche Elgg. Das ISOS
     // liefert am Punkt nichts (Elgg, 13. November 2026) und taugt für eine Parzelle nicht.
-    const [parzelle, stand, kgs] = await Promise.all([
+    const [parzelle, stand, kgs, lage] = await Promise.all([
       ebene(e, n, 'ch.kantone.cadastralwebmap-farbe'), ebene(e, n, 'ch.swisstopo-vd.stand-oerebkataster'),
-      ebene(e, n, 'ch.babs.kulturgueter', 15).catch(() => null),
+      ebene(e, n, 'ch.babs.kulturgueter', 15).catch(() => null), umgebung(e, n).catch(() => null),
     ]);
     const egrid = parzelle[0]?.egris_egrid, basis = dienstBasis(stand[0]?.oereb_webservice);
     const bund = { kulturgueter: kgs ? kgs.map(a => ({ name: a.beschreibung ?? null, kategorie: a.kgs_kategorie ?? null })) : null };
@@ -44,7 +71,7 @@ export default async function handler(req, res) {
       clearTimeout(t); ab.abort();
     }
     res.setHeader('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=604800');
-    res.status(200).json({ egrid: egrid ?? null, pdf, auszug, bund });
+    res.status(200).json({ egrid: egrid ?? null, pdf, auszug, bund, umgebung: lage });
   } catch {
     res.status(502).json({ fehler: 'Dienst antwortet nicht' });
   }

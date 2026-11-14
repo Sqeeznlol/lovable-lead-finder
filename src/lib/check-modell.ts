@@ -14,7 +14,12 @@ export interface Auszug {
   baulinien: { laenge: number; linien: number[][][] } | null; ordnung: { titel: string; url: string } | null;
   betroffen: { code: string; text: string }[]; nichtBetroffen: { code: string; text: string }[];
 }
-export interface Recht { egrid: string | null; pdf: string | null; auszug: Auszug | null; bund: { kulturgueter: { name: string | null; kategorie: string | null }[] | null } }
+export interface Umgebung {
+  solar: { kwh: number; flaeche: number; eignung: string } | null;
+  waermenetz: { name: string | null; betreiber: string | null; telefon: string | null; web: string | null; meter: number } | null;
+  oev: string | null; radon: number | null;
+}
+export interface Recht { egrid: string | null; pdf: string | null; auszug: Auszug | null; bund: { kulturgueter: { name: string | null; kategorie: string | null }[] | null }; umgebung?: Umgebung | null }
 
 async function holen<T>(pfad: string, ms: number, signal?: AbortSignal): Promise<T> {
   const ab = new AbortController(), t = setTimeout(() => ab.abort(), ms);
@@ -87,4 +92,18 @@ export function rechtZeilen(r: Recht | null, b: Befund): Zeile[] {
 export function zonenKuerzel(text: string | null | undefined): string | null {
   const m = text?.match(/\(([A-ZÄÖÜ][\wÄÖÜäöü./-]{0,9})\)\s*$/) ?? text?.match(/\[([A-ZÄÖÜ][\wÄÖÜäöü./-]{0,9})\]\s*$/);
   return m ? m[1] : null;
+}
+
+const tausend = (x: number) => Math.round(x).toLocaleString('de-CH');
+/** Energie und Lage: nur was der Bund für diese Stelle führt. */
+export function umgebungZeilen(u: Umgebung | null | undefined): Zeile[] {
+  if (!u) return [];
+  const z: Zeile[] = [];
+  if (u.solar) z.push({ titel: 'Solardach', wert: `${u.solar.eignung} geeignet`, zusatz: `bis ${tausend(u.solar.kwh)} kWh Strom im Jahr auf ${tausend(u.solar.flaeche)} m² Dach`, quelle: 'BFE' });
+  // Die Wärmenetze sind Standorte der Zentralen, kein Versorgungsgebiet: darum nur "in der Nähe".
+  if (u.waermenetz) z.push({ titel: 'Fernwärme', wert: `${u.waermenetz.name ?? 'Wärmenetz'}, rund ${tausend(Math.round(u.waermenetz.meter / 10) * 10)} m entfernt`, zusatz: u.waermenetz.betreiber ? `Betreiber: ${u.waermenetz.betreiber}` : undefined, quelle: 'BFE', link: u.waermenetz.web ?? undefined });
+  else z.push({ titel: 'Fernwärme', wert: 'Kein Wärmenetz im Umkreis von 1,5 km', quelle: 'BFE' });
+  if (u.oev) z.push({ titel: 'ÖV', wert: u.oev.replace(/^([A-D]) - /, 'Güteklasse $1, ').replace(/Erschliessung$/, 'Erschliessung'), quelle: 'ARE' });
+  if (u.radon != null) z.push({ titel: 'Radon', wert: `${u.radon} % Wahrscheinlichkeit über dem Referenzwert`, quelle: 'BAG', art: u.radon < 10 ? 'ok' : undefined });
+  return z;
 }

@@ -10,7 +10,7 @@ import { KATASTER } from '@/lib/check-hintergrund';
 import { useImBild } from '@/lib/im-bild';
 import { zaehlen } from '@/lib/check-zaehlen';
 import { buehnenBild, markenAttribute, markenStil, seiteEinrichten } from '@/lib/check-gestaltung';
-import { gebaeudeLaden, modellAus, parzelleRelativ, rechtLaden, rechtZeilen, zonenKuerzel, type Koerper, type Recht } from '@/lib/check-modell';
+import { gebaeudeLaden, modellAus, parzelleRelativ, rechtLaden, rechtZeilen, umgebungZeilen, zonenKuerzel, type Koerper, type Recht } from '@/lib/check-modell';
 import { Ladebild, type LadebildDaten } from '@/components/check/Ladebild';
 import { FENSTER } from '@/lib/fenster';
 import {
@@ -267,6 +267,7 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
   }, [ort, befund, gebaeude, rechtslage]);
   const zeilen = befund ? rechtZeilen(rechtslage && rechtslage !== 'fehlt' ? rechtslage : null, befund) : [];
   const pdf = rechtslage && rechtslage !== 'fehlt' ? rechtslage.pdf : null;
+  const lage = umgebungZeilen(rechtslage && rechtslage !== 'fehlt' ? rechtslage.umgebung : null);
   const zoneAuszug = rechtslage && rechtslage !== 'fehlt' ? rechtslage.auszug?.zone?.text ?? null : null;
   const moeglich = (befund?.flaeche ?? 0) * az;
   // Aufrufleiste auf dem Handy: nur, wenn gerade kein anderer Aufruf im Bild ist.
@@ -427,7 +428,21 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
                           )}
                           {pdf && <a className="pdf" href={pdf} target={FENSTER.extern}>Amtlicher ÖREB-Auszug (PDF)</a>}
                         </div>
-                        <div className="block klein">Quellen: Amtliche Vermessung, Bauzonen Schweiz (ARE), Gebäude- und Wohnungsregister (BFS), ÖREB-Kataster des Kantons, Kulturgüterinventar des Bundes, abgefragt am {new Date().toLocaleDateString('de-CH')}. Vorprüfung, keine Bewilligungszusage.</div>
+                        {lage.length > 0 && (
+                          <div className="block">
+                            <h3>Energie und Lage</h3>
+                            <dl className="recht">
+                              {lage.map(z => (
+                                <div key={z.titel}>
+                                  <dt>{z.titel}</dt>
+                                  <dd>{z.art && <span className={`punkt ${z.art}`} aria-hidden="true" />}{z.link ? <a href={z.link} target={FENSTER.extern}>{z.wert}</a> : z.wert}{z.zusatz && <small>{z.zusatz}</small>}</dd>
+                                  <span className="q">{z.quelle}</span>
+                                </div>
+                              ))}
+                            </dl>
+                          </div>
+                        )}
+                        <div className="block klein">Quellen: Amtliche Vermessung, Bauzonen Schweiz (ARE), Gebäude- und Wohnungsregister (BFS), ÖREB-Kataster des Kantons, Kulturgüterinventar, Solarkataster und Wärmenetze (BFE), ÖV-Güteklassen (ARE), Radonkarte (BAG), abgefragt am {new Date().toLocaleDateString('de-CH')}. Vorprüfung, keine Bewilligungszusage.</div>
                       </>
                     )}
                   </div>

@@ -111,3 +111,19 @@ describe('Heizung: Energiequelle, sonst Wärmeerzeuger', () => {
     expect(heizungText({ energie: null, erzeuger: null })).toBeNull();
   });
 });
+
+describe('Energie und Lage', () => {
+  it('Solar ab «gut», sonst beste vorhandene Klasse; Wärmenetz das nächste', async () => {
+    const { solarAus, waermenetzAus } = await import('../../../api/_lib/umgebung.js');
+    expect(solarAus([{ klasse: 2, flaeche: 129.4, stromertrag: 18871 }, { klasse: 2, flaeche: 88.8, stromertrag: 13150, klasse_text: 'Mittel##x' }])).toEqual({ kwh: 32021, flaeche: 218, eignung: 'Mittel' });
+    expect(solarAus([{ klasse: 4, flaeche: 50, stromertrag: 9000, klasse_text: 'Sehr gut##' }, { klasse: 1, flaeche: 30, stromertrag: 100 }])).toEqual({ kwh: 9000, flaeche: 50, eignung: 'Sehr gut' });
+    expect(solarAus([])).toBeNull();
+    const netz = waermenetzAus([{ geometry: { coordinates: [100, 0] }, properties: { name: 'Fern' } }, { geometry: { coordinates: [30, 40] }, properties: { name: 'Nah', operator: 'EWB' } }], 0, 0);
+    expect(netz).toMatchObject({ name: 'Nah', betreiber: 'EWB', meter: 50 });
+  });
+  it('Zeilen: ohne Netz klar gesagt, ÖV lesbar', async () => {
+    const { umgebungZeilen } = await import('@/lib/check-modell');
+    const z = umgebungZeilen({ solar: null, waermenetz: null, oev: 'D - geringe Erschliessung', radon: 3 });
+    expect(z.map(x => x.wert)).toEqual(['Kein Wärmenetz im Umkreis von 1,5 km', 'Güteklasse D, geringe Erschliessung', '3 % Wahrscheinlichkeit über dem Referenzwert']);
+  });
+});
