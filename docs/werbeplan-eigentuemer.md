@@ -1,7 +1,7 @@
 # Werbeplan: Eigentümer-Leads über die Check-Seiten
 
-Stand 7. November 2026. Für Julian und Tim. Ziel: Eigentümer in Zürich,
-Zug, Luzern und Thurgau prüfen ihre Parzelle auf einer unserer
+Stand 7. November 2026. Für Julian und Tim. Ziel: Eigentümer in der
+ganzen Schweiz prüfen ihre Parzelle auf einer unserer
 Check-Seiten (ParzellenChecker, HausChecker, ...) und hinterlassen ihren
 Kontakt. Jeder Lead landet mit Domain, Anzeige und Antworten in Bauraum.
 
@@ -60,18 +60,46 @@ kosten in der Schweiz CHF 30 bis 150 (geteilt), 150 bis 400 (exklusiv,
 vorqualifiziert), 400 bis 750 (Premium); 70 bis 80 % werden kein Mandat
 (RealAdvisor 2026, Marktbeobachtung).
 
-## 2. Regionen und Reihenfolge
+## 2. Regionen und Reihenfolge: die ganze Schweiz (Stand 14. November)
 
-1. **Zürich und Thurgau zuerst.** Dort kennt unser Bestand jede Parzelle
-   mit Zone, Ausnützung und Reserve. Die "ausführliche Analyse", die wir
-   versprechen, können wir am selben Tag liefern.
-2. **Zug und Luzern ab Woche 3.** Hohe Werte, viel Verdichtungsdruck,
-   aber die Analyse ist dort Handarbeit, bis der Bestand den Kanton kennt.
+Julian, 14. November: "das ist alles auf die schweiz bezogen". Der Plan
+gilt darum für alle Kantone. Was der Check heute je Region liefert,
+nachgesehen am 14. November auf parzellencheck24.ch:
 
-Je Kanton eigene Kampagnen, damit die Kosten je heissem Lead pro Kanton
-sichtbar werden. Ratgeber-Anzeigen und Google auf Gemeinden oder PLZ
-genau; Check-Anzeigen auf Facebook nur Kanton oder Stadt mit mindestens
-17 km Radius.
+| Region | Kantone | Check heute | Ausnützungsziffer | Sprache der Seite |
+|---|---|---|---|---|
+| Deutschschweiz A | ZH, AG, ZG, SZ, SO, SH, LU | Zone, Gebäude, Baujahr, Rechtslage | ja (Zonenplan) | passt |
+| Deutschschweiz B | BE, BS, BL, SG, TG, AR, AI, GL, GR, NW, OW, UR | Zone, Gebäude, Baujahr, Rechtslage | nein, Rechner von Hand | passt |
+| Romandie | GE, VD, NE, JU, FR, VS (franz.), Jura bernois | Zone, Gebäude, Baujahr (Lausanne geprüft) | nein | fehlt: Französisch |
+| Tessin | TI, Südbünden | Zone, Gebäude, Baujahr (Lugano geprüft) | nein | fehlt: Italienisch |
+
+Reihenfolge:
+
+1. **Woche 1 bis 2: Deutschschweiz A.** Dort steht die Ausnützungsziffer
+   schon im Ergebnis; das Versprechen "was darf ich bauen" halten wir
+   ohne Handarbeit. Eine Kampagne je Kanton.
+2. **Ab Woche 3: Deutschschweiz B** dazu, als eine Kampagne je
+   Grossregion (Bern, Basel, Ostschweiz, Zentralschweiz, Graubünden).
+   Die Analyse ist hier Handarbeit, bis die Regeldatenbank den Kanton
+   kennt.
+3. **Romandie und Tessin erst mit eigener Seite**: Check und Ratgeber auf
+   Französisch und Italienisch, mit Domains in der Sprache (welche frei
+   sind, vorher bei rdap.nic.ch nachsehen). Eine deutsche Seite auf eine
+   französische Anzeige kostet Geld und bringt keine Leads.
+
+Ratgeber-Anzeigen auf Kanton oder PLZ genau. Check-Anzeigen auf Facebook
+(Sonderkategorie Wohnraum) gehen in der ganzen Schweiz nur auf Land,
+Kanton oder Stadt mit mindestens 17 km Radius; schweizweit heisst dort:
+Land Schweiz, getrennt nach Sprache der Anzeige.
+
+Budget je Region und Woche (Annahme, nach Woche 2 nach Kosten je heissem
+Lead verschieben):
+
+| Woche | Deutschschweiz A | Deutschschweiz B | Romandie | Tessin | Je Woche |
+|---|---|---|---|---|---|
+| 1 und 2 | CHF 500 | -- | -- | -- | CHF 500 |
+| 3 bis 6 | CHF 600 | CHF 400 | -- | -- | CHF 1'000 |
+| ab Seite FR/IT | nach Ergebnis | nach Ergebnis | CHF 300 | CHF 100 | |
 
 ## 3. Welche Seiten live gehen
 
@@ -120,13 +148,13 @@ zurückspielen (Data Manager API).
 
 ### Ratgeber-Anzeigen (keine Sonderkategorie)
 
-- **Ziel:** ZH und TG über PLZ-Listen, Alter 60+, alle Geschlechter.
+- **Ziel:** je Region aus Abschnitt 2 (Kanton oder PLZ), Alter 60+, alle Geschlechter.
 - **Bild:** ein Einfamilienhaus mit Garten aus der Region, ruhig, ohne
   Text im Bild.
 - **Text:** "Die Kinder sind ausgezogen, das Haus ist geblieben. Fünf
   Wege, die Eigentümer haben, und was man dafür wissen muss."
 - **Knopf:** "Mehr dazu". Ziel ist der Artikel, nicht der Check.
-- **Link:** `hauschecker.ch/ratgeber/haus-zu-gross?utm_source=facebook&utm_campaign=zh-60plus`
+- **Link:** `hauschecker.ch/ratgeber/haus-zu-gross?utm_source=facebook&utm_campaign=ch-a-60plus`
 - Weitere Artikel nach demselben Muster: geerbte Liegenschaft,
   Ausnützung einfach erklärt, Garten als Bauland.
 
@@ -160,8 +188,8 @@ der Schweiz CPM CHF 4 bis 15. Daraus als Startannahme:
 
 | Woche | Facebook Ratgeber | Facebook Check | Google | Je Woche |
 |---|---|---|---|---|
-| 1 und 2 | ZH, TG: CHF 300 | ZH, TG: CHF 100 | ZH, TG: CHF 100 | CHF 500 |
-| 3 bis 6 | ZH, TG, ZG, LU: CHF 500 | CHF 300 | CHF 200 | CHF 1'000 |
+| 1 und 2 | Deutschschweiz A: CHF 300 | CHF 100 | CHF 100 | CHF 500 |
+| 3 bis 6 | Deutschschweiz A und B: CHF 500 | CHF 300 | CHF 200 | CHF 1'000 |
 
 Zusammen rund CHF 5'000 für sechs Wochen. Nach Woche 6 entscheiden:
 Kanäle mit Kosten je heissem Lead unter dem Kaufpreis eines exklusiven
@@ -222,7 +250,7 @@ Fehlt noch:
    Mail- oder SMS-Dienst (Konto bei Julian).
 5. Cookie-Banner und Pixel, sobald die Werbekonten stehen.
 6. Weitere Ratgeber-Artikel (Erbe, Ausnützung, Garten als Bauland).
-7. Französische Fassung für die Romandie, falls gewollt.
+7. Französische und italienische Fassung (Check, Ratgeber, Domains) für Romandie und Tessin.
 
 ## 10. Markt: parzellencheck.ch (Stand 7. November)
 
