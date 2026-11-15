@@ -2,6 +2,34 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
+import fs from "fs";
+import { ARTIKEL } from "./src/lib/ratgeber";
+import { datei, markenSeite, MARKEN_LIVE, robots, sitemap } from "./src/lib/seo-marken";
+
+// Je Check-Marke eine eigene HTML-Datei mit Titel, Beschreibung und Text,
+// dazu robots.txt und sitemap.xml (src/lib/seo-marken.ts). Am 15. November
+// sah Google auf allen 23 Domains nur den Kopf der internen App.
+function markenSeiten() {
+  return {
+    name: "marken-seiten",
+    apply: "build" as const,
+    closeBundle() {
+      const aus = path.resolve(__dirname, "dist");
+      const index = fs.readFileSync(path.join(aus, "index.html"), "utf8");
+      const stand = new Date().toISOString().slice(0, 10);
+      const schreiben = (rel: string, inhalt: string) => {
+        fs.mkdirSync(path.dirname(path.join(aus, rel)), { recursive: true });
+        fs.writeFileSync(path.join(aus, rel), inhalt);
+      };
+      for (const m of MARKEN_LIVE) {
+        schreiben(datei.seite(m), markenSeite(index, m));
+        for (const a of ARTIKEL) schreiben(datei.artikel(m, a), markenSeite(index, m, a));
+        schreiben(datei.sitemap(m), sitemap(m, stand));
+        schreiben(datei.robots(m), robots(m));
+      }
+    },
+  };
+}
 
 // Welcher Stand ausgeliefert wurde, steht sonst nirgends: der Name des
 // Buendels haengt am Inhalt, und der haengt auch an den Umgebungs-
@@ -22,7 +50,7 @@ export default defineConfig(({ mode }) => ({
       overlay: false,
     },
   },
-  plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+  plugins: [react(), mode === "development" && componentTagger(), markenSeiten()].filter(Boolean),
   define: {
     __FASSUNG__: JSON.stringify(fassung),
   },

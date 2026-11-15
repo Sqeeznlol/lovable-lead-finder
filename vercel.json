@@ -2,6 +2,926 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     {
+      "source": "/robots.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellenchecker\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellenchecker/robots.txt"
+    },
+    {
+      "source": "/sitemap.xml",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellenchecker\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellenchecker/sitemap.xml"
+    },
+    {
+      "source": "/ratgeber/haus-zu-gross",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellenchecker\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellenchecker/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/((?!assets/|api/|marken/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellenchecker\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellenchecker/index.html"
+    },
+    {
+      "source": "/robots.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(hauschecker\\.ch)"
+        }
+      ],
+      "destination": "/marken/hauschecker/robots.txt"
+    },
+    {
+      "source": "/sitemap.xml",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(hauschecker\\.ch)"
+        }
+      ],
+      "destination": "/marken/hauschecker/sitemap.xml"
+    },
+    {
+      "source": "/ratgeber/haus-zu-gross",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(hauschecker\\.ch)"
+        }
+      ],
+      "destination": "/marken/hauschecker/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/((?!assets/|api/|marken/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(hauschecker\\.ch)"
+        }
+      ],
+      "destination": "/marken/hauschecker/index.html"
+    },
+    {
+      "source": "/robots.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(was-kann-ich-bauen\\.ch)"
+        }
+      ],
+      "destination": "/marken/wasdarfichbauen/robots.txt"
+    },
+    {
+      "source": "/sitemap.xml",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(was-kann-ich-bauen\\.ch)"
+        }
+      ],
+      "destination": "/marken/wasdarfichbauen/sitemap.xml"
+    },
+    {
+      "source": "/ratgeber/haus-zu-gross",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(was-kann-ich-bauen\\.ch)"
+        }
+      ],
+      "destination": "/marken/wasdarfichbauen/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/((?!assets/|api/|marken/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(was-kann-ich-bauen\\.ch)"
+        }
+      ],
+      "destination": "/marken/wasdarfichbauen/index.html"
+    },
+    {
+      "source": "/robots.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(ausbaupotenzial\\.ch)"
+        }
+      ],
+      "destination": "/marken/ausbaupotenzial/robots.txt"
+    },
+    {
+      "source": "/sitemap.xml",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(ausbaupotenzial\\.ch)"
+        }
+      ],
+      "destination": "/marken/ausbaupotenzial/sitemap.xml"
+    },
+    {
+      "source": "/ratgeber/haus-zu-gross",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(ausbaupotenzial\\.ch)"
+        }
+      ],
+      "destination": "/marken/ausbaupotenzial/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/((?!assets/|api/|marken/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(ausbaupotenzial\\.ch)"
+        }
+      ],
+      "destination": "/marken/ausbaupotenzial/index.html"
+    },
+    {
+      "source": "/robots.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(erbliegenschaft\\.ch)"
+        }
+      ],
+      "destination": "/marken/erbliegenschaft/robots.txt"
+    },
+    {
+      "source": "/sitemap.xml",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(erbliegenschaft\\.ch)"
+        }
+      ],
+      "destination": "/marken/erbliegenschaft/sitemap.xml"
+    },
+    {
+      "source": "/ratgeber/haus-zu-gross",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(erbliegenschaft\\.ch)"
+        }
+      ],
+      "destination": "/marken/erbliegenschaft/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/((?!assets/|api/|marken/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(erbliegenschaft\\.ch)"
+        }
+      ],
+      "destination": "/marken/erbliegenschaft/index.html"
+    },
+    {
+      "source": "/robots.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(ausnuetzung-check\\.ch)"
+        }
+      ],
+      "destination": "/marken/reserverechner/robots.txt"
+    },
+    {
+      "source": "/sitemap.xml",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(ausnuetzung-check\\.ch)"
+        }
+      ],
+      "destination": "/marken/reserverechner/sitemap.xml"
+    },
+    {
+      "source": "/ratgeber/haus-zu-gross",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(ausnuetzung-check\\.ch)"
+        }
+      ],
+      "destination": "/marken/reserverechner/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/((?!assets/|api/|marken/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(ausnuetzung-check\\.ch)"
+        }
+      ],
+      "destination": "/marken/reserverechner/index.html"
+    },
+    {
+      "source": "/robots.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(aufstockungscheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/aufstockcheck/robots.txt"
+    },
+    {
+      "source": "/sitemap.xml",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(aufstockungscheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/aufstockcheck/sitemap.xml"
+    },
+    {
+      "source": "/ratgeber/haus-zu-gross",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(aufstockungscheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/aufstockcheck/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/((?!assets/|api/|marken/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(aufstockungscheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/aufstockcheck/index.html"
+    },
+    {
+      "source": "/robots.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(verdichtungscheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/verdichtungscheck/robots.txt"
+    },
+    {
+      "source": "/sitemap.xml",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(verdichtungscheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/verdichtungscheck/sitemap.xml"
+    },
+    {
+      "source": "/ratgeber/haus-zu-gross",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(verdichtungscheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/verdichtungscheck/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/((?!assets/|api/|marken/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(verdichtungscheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/verdichtungscheck/index.html"
+    },
+    {
+      "source": "/robots.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellenwert\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellenwert/robots.txt"
+    },
+    {
+      "source": "/sitemap.xml",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellenwert\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellenwert/sitemap.xml"
+    },
+    {
+      "source": "/ratgeber/haus-zu-gross",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellenwert\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellenwert/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/((?!assets/|api/|marken/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellenwert\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellenwert/index.html"
+    },
+    {
+      "source": "/robots.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(landwert24\\.ch)"
+        }
+      ],
+      "destination": "/marken/landwert24/robots.txt"
+    },
+    {
+      "source": "/sitemap.xml",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(landwert24\\.ch)"
+        }
+      ],
+      "destination": "/marken/landwert24/sitemap.xml"
+    },
+    {
+      "source": "/ratgeber/haus-zu-gross",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(landwert24\\.ch)"
+        }
+      ],
+      "destination": "/marken/landwert24/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/((?!assets/|api/|marken/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(landwert24\\.ch)"
+        }
+      ],
+      "destination": "/marken/landwert24/index.html"
+    },
+    {
+      "source": "/robots.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(hauswertrechner\\.ch)"
+        }
+      ],
+      "destination": "/marken/hauswertrechner/robots.txt"
+    },
+    {
+      "source": "/sitemap.xml",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(hauswertrechner\\.ch)"
+        }
+      ],
+      "destination": "/marken/hauswertrechner/sitemap.xml"
+    },
+    {
+      "source": "/ratgeber/haus-zu-gross",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(hauswertrechner\\.ch)"
+        }
+      ],
+      "destination": "/marken/hauswertrechner/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/((?!assets/|api/|marken/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(hauswertrechner\\.ch)"
+        }
+      ],
+      "destination": "/marken/hauswertrechner/index.html"
+    },
+    {
+      "source": "/robots.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellenrechner\\.ch)"
+        }
+      ],
+      "destination": "/marken/grundstueckrechner/robots.txt"
+    },
+    {
+      "source": "/sitemap.xml",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellenrechner\\.ch)"
+        }
+      ],
+      "destination": "/marken/grundstueckrechner/sitemap.xml"
+    },
+    {
+      "source": "/ratgeber/haus-zu-gross",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellenrechner\\.ch)"
+        }
+      ],
+      "destination": "/marken/grundstueckrechner/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/((?!assets/|api/|marken/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellenrechner\\.ch)"
+        }
+      ],
+      "destination": "/marken/grundstueckrechner/index.html"
+    },
+    {
+      "source": "/robots.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(bauzonencheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/bauzonencheck/robots.txt"
+    },
+    {
+      "source": "/sitemap.xml",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(bauzonencheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/bauzonencheck/sitemap.xml"
+    },
+    {
+      "source": "/ratgeber/haus-zu-gross",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(bauzonencheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/bauzonencheck/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/((?!assets/|api/|marken/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(bauzonencheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/bauzonencheck/index.html"
+    },
+    {
+      "source": "/robots.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(eigentuemercheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/eigentuemercheck/robots.txt"
+    },
+    {
+      "source": "/sitemap.xml",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(eigentuemercheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/eigentuemercheck/sitemap.xml"
+    },
+    {
+      "source": "/ratgeber/haus-zu-gross",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(eigentuemercheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/eigentuemercheck/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/((?!assets/|api/|marken/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(eigentuemercheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/eigentuemercheck/index.html"
+    },
+    {
+      "source": "/robots.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(baurechner24\\.ch)"
+        }
+      ],
+      "destination": "/marken/baurechner24/robots.txt"
+    },
+    {
+      "source": "/sitemap.xml",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(baurechner24\\.ch)"
+        }
+      ],
+      "destination": "/marken/baurechner24/sitemap.xml"
+    },
+    {
+      "source": "/ratgeber/haus-zu-gross",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(baurechner24\\.ch)"
+        }
+      ],
+      "destination": "/marken/baurechner24/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/((?!assets/|api/|marken/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(baurechner24\\.ch)"
+        }
+      ],
+      "destination": "/marken/baurechner24/index.html"
+    },
+    {
+      "source": "/robots.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(checkmyparcel\\.ch)"
+        }
+      ],
+      "destination": "/marken/checkmyparcel/robots.txt"
+    },
+    {
+      "source": "/sitemap.xml",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(checkmyparcel\\.ch)"
+        }
+      ],
+      "destination": "/marken/checkmyparcel/sitemap.xml"
+    },
+    {
+      "source": "/ratgeber/haus-zu-gross",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(checkmyparcel\\.ch)"
+        }
+      ],
+      "destination": "/marken/checkmyparcel/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/((?!assets/|api/|marken/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(checkmyparcel\\.ch)"
+        }
+      ],
+      "destination": "/marken/checkmyparcel/index.html"
+    },
+    {
+      "source": "/robots.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellencheck24\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellencheck24/robots.txt"
+    },
+    {
+      "source": "/sitemap.xml",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellencheck24\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellencheck24/sitemap.xml"
+    },
+    {
+      "source": "/ratgeber/haus-zu-gross",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellencheck24\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellencheck24/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/((?!assets/|api/|marken/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellencheck24\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellencheck24/index.html"
+    },
+    {
+      "source": "/robots.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellepruefen\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellepruefen/robots.txt"
+    },
+    {
+      "source": "/sitemap.xml",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellepruefen\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellepruefen/sitemap.xml"
+    },
+    {
+      "source": "/ratgeber/haus-zu-gross",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellepruefen\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellepruefen/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/((?!assets/|api/|marken/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellepruefen\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellepruefen/index.html"
+    },
+    {
+      "source": "/robots.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellen-check\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellencheck/robots.txt"
+    },
+    {
+      "source": "/sitemap.xml",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellen-check\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellencheck/sitemap.xml"
+    },
+    {
+      "source": "/ratgeber/haus-zu-gross",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellen-check\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellencheck/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/((?!assets/|api/|marken/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellen-check\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellencheck/index.html"
+    },
+    {
+      "source": "/robots.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(hauswert24\\.ch)"
+        }
+      ],
+      "destination": "/marken/hauswert24/robots.txt"
+    },
+    {
+      "source": "/sitemap.xml",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(hauswert24\\.ch)"
+        }
+      ],
+      "destination": "/marken/hauswert24/sitemap.xml"
+    },
+    {
+      "source": "/ratgeber/haus-zu-gross",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(hauswert24\\.ch)"
+        }
+      ],
+      "destination": "/marken/hauswert24/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/((?!assets/|api/|marken/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(hauswert24\\.ch)"
+        }
+      ],
+      "destination": "/marken/hauswert24/index.html"
+    },
+    {
+      "source": "/robots.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(hauswertcheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/hauswertcheck/robots.txt"
+    },
+    {
+      "source": "/sitemap.xml",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(hauswertcheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/hauswertcheck/sitemap.xml"
+    },
+    {
+      "source": "/ratgeber/haus-zu-gross",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(hauswertcheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/hauswertcheck/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/((?!assets/|api/|marken/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(hauswertcheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/hauswertcheck/index.html"
+    },
+    {
+      "source": "/robots.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(baupotenzialcheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/baupotenzialcheck/robots.txt"
+    },
+    {
+      "source": "/sitemap.xml",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(baupotenzialcheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/baupotenzialcheck/sitemap.xml"
+    },
+    {
+      "source": "/ratgeber/haus-zu-gross",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(baupotenzialcheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/baupotenzialcheck/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/((?!assets/|api/|marken/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(baupotenzialcheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/baupotenzialcheck/index.html"
+    },
+    {
+      "source": "/robots.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(zonen-check\\.ch)"
+        }
+      ],
+      "destination": "/marken/zonencheck/robots.txt"
+    },
+    {
+      "source": "/sitemap.xml",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(zonen-check\\.ch)"
+        }
+      ],
+      "destination": "/marken/zonencheck/sitemap.xml"
+    },
+    {
+      "source": "/ratgeber/haus-zu-gross",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(zonen-check\\.ch)"
+        }
+      ],
+      "destination": "/marken/zonencheck/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/((?!assets/|api/|marken/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(zonen-check\\.ch)"
+        }
+      ],
+      "destination": "/marken/zonencheck/index.html"
+    },
+    {
       "source": "/((?!assets/|api/).*)",
       "destination": "/index.html"
     }
