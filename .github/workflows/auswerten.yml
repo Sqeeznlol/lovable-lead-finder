@@ -62,6 +62,7 @@ on:
           - baugesuch-lage # Wie viele Baugesuche je Kanton einen Punkt haben (für den Umkreis im Check, nur Zählungen)
           - fonds-zahlen # Nach dem Wegräumen der erfundenen Fonds: was übrig ist (nur Zählungen)
           - umrisse      # Wie viele Parzellen je Kanton einen Umriss und einen Punkt haben (nur Zählungen)
+          - machbarkeit  # Ob machbarkeit_grundlage für echte Parzellen plausible Flächen liefert (nur Zahlen)
           - besucher     # Ob die Zahlen unter «Leads» stimmen: Besucher je Domain und Tag, Leads gegen Anfragen, Bots (nur Zählungen)
       egrid:
         description: 'Nur für "objekt": die EGRID, z.B. CH707709971116'
@@ -879,6 +880,33 @@ jobs:
               select count(*) as gebaeude, count(*) filter (where klasse between 1110 and 1130) as wohngebaeude,
                      count(*) filter (where klasse between 1110 and 1130 and heizung_energie in (7520, 7530) and baujahr < 1980) as wohn_fossil_vor1980
               from gebaeude;"
+          elif [ "$FRAGE" = "machbarkeit" ]; then
+            # Die Funktion hinter der Machbarkeitsstudie, an echten Parzellen: je Kanton
+            # 200 bebaute Parzellen mit Umriss. Erwartet: Fläche des Umrisses nahe an der
+            # amtlichen Fläche, bebaubare Fläche bei 5 m kleiner als bei 0 m, nie negativ.
+            frage "machbarkeit_grundlage an je 200 bebauten Parzellen" "
+              set local statement_timeout = '5min';
+              with probe as (
+                select p.id, p.kanton, p.area
+                  from (select id, kanton, area, row_number() over (partition by kanton order by id) as nr
+                          from public.properties
+                         where geometrie is not null and area between 300 and 3000 and gebaeude_anzahl > 0) p
+                 where nr <= 200
+              ), r as (
+                select kanton, area,
+                       public.machbarkeit_grundlage(id, 5) as m5,
+                       public.machbarkeit_grundlage(id, 0) as m0
+                  from probe
+              )
+              select kanton, count(*) as parzellen,
+                     round(avg((m5->>'flaeche_umriss')::numeric / nullif(area, 0)), 3) as umriss_zu_amtlich,
+                     round(avg((m0->>'bebaubar_m2')::numeric / nullif((m0->>'flaeche_umriss')::numeric, 0)), 3) as bebaubar_bei_0m,
+                     round(avg((m5->>'bebaubar_m2')::numeric / nullif((m5->>'flaeche_umriss')::numeric, 0)), 3) as bebaubar_bei_5m,
+                     count(*) filter (where (m5->>'bebaubar_m2')::numeric = 0) as bei_5m_nichts_bebaubar,
+                     count(*) filter (where m5->'punkt' is not null and m5->'umriss' is not null) as mit_punkt_und_umriss,
+                     round(avg(jsonb_array_length(m5->'gebaeude')), 2) as gebaeude_im_mittel,
+                     round(avg((m5->>'nachbarn')::numeric), 1) as nachbarn_im_mittel
+                from r group by 1 order by 1;"
           elif [ "$FRAGE" = "besucher" ]; then
             # Julian, 15. November: "stimmen die analytics?" Der Reiter Leads
             # zählt Sitzungen aus check_ereignis (check_trichter) und Zeilen
