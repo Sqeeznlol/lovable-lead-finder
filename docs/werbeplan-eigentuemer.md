@@ -77,7 +77,7 @@ kosten in der Schweiz CHF 30 bis 150 (geteilt), 150 bis 400 (exklusiv,
 vorqualifiziert), 400 bis 750 (Premium); 70 bis 80 % werden kein Mandat
 (RealAdvisor 2026, Marktbeobachtung).
 
-## 2. Regionen und Reihenfolge: die ganze Schweiz (Stand 14. November)
+## 2. Regionen und Reihenfolge: die Deutschschweiz (Stand 15. November)
 
 Julian, 14. November: "das ist alles auf die schweiz bezogen". Der Plan
 gilt darum für alle Kantone. Was der Check heute je Region liefert,
@@ -87,8 +87,6 @@ nachgesehen am 14. November auf parzellencheck24.ch:
 |---|---|---|---|---|
 | Deutschschweiz A | ZH, AG, ZG, SZ, SO, SH, LU | Zone, Gebäude, Baujahr, Rechtslage | ja (Zonenplan) | passt |
 | Deutschschweiz B | BE, BS, BL, SG, TG, AR, AI, GL, GR, NW, OW, UR | Zone, Gebäude, Baujahr, Rechtslage | nein, Rechner von Hand | passt |
-| Romandie | GE, VD, NE, JU, FR, VS (franz.), Jura bernois | Zone, Gebäude, Baujahr (Lausanne geprüft) | nein | fehlt: Französisch |
-| Tessin | TI, Südbünden | Zone, Gebäude, Baujahr (Lugano geprüft) | nein | fehlt: Italienisch |
 
 Reihenfolge:
 
@@ -99,24 +97,21 @@ Reihenfolge:
    Grossregion (Bern, Basel, Ostschweiz, Zentralschweiz, Graubünden).
    Die Analyse ist hier Handarbeit, bis die Regeldatenbank den Kanton
    kennt.
-3. **Romandie und Tessin erst mit eigener Seite**: Check und Ratgeber auf
-   Französisch und Italienisch, mit Domains in der Sprache (welche frei
-   sind, vorher bei rdap.nic.ch nachsehen). Eine deutsche Seite auf eine
-   französische Anzeige kostet Geld und bringt keine Leads.
+3. **Nur Deutschschweiz.** Julian, 15. November: "das weg machen wollen
+   nur deutsch". Keine Seiten und keine Anzeigen auf Französisch oder
+   Italienisch; Anzeigen nur in deutschsprachigen Kantonen und Gemeinden.
 
 Ratgeber-Anzeigen auf Kanton oder PLZ genau. Check-Anzeigen auf Facebook
 (Sonderkategorie Wohnraum) gehen in der ganzen Schweiz nur auf Land,
-Kanton oder Stadt mit mindestens 17 km Radius; schweizweit heisst dort:
-Land Schweiz, getrennt nach Sprache der Anzeige.
+Kanton oder Stadt mit mindestens 17 km Radius, nur deutschsprachige Kantone.
 
 Budget je Region und Woche (Annahme, nach Woche 2 nach Kosten je heissem
 Lead verschieben):
 
-| Woche | Deutschschweiz A | Deutschschweiz B | Romandie | Tessin | Je Woche |
-|---|---|---|---|---|---|
-| 1 und 2 | CHF 500 | -- | -- | -- | CHF 500 |
-| 3 bis 6 | CHF 600 | CHF 400 | -- | -- | CHF 1'000 |
-| ab Seite FR/IT | nach Ergebnis | nach Ergebnis | CHF 300 | CHF 100 | |
+| Woche | Deutschschweiz A | Deutschschweiz B | Je Woche |
+|---|---|---|---|
+| 1 und 2 | CHF 500 | -- | CHF 500 |
+| 3 bis 6 | CHF 600 | CHF 400 | CHF 1'000 |
 
 ## 3. Welche Seiten live gehen
 
@@ -267,7 +262,6 @@ Fehlt noch:
    Mail- oder SMS-Dienst (Konto bei Julian).
 5. Cookie-Banner und Pixel, sobald die Werbekonten stehen.
 6. Weitere Ratgeber-Artikel (Erbe, Ausnützung, Garten als Bauland).
-7. Französische und italienische Fassung (Check, Ratgeber, Domains) für Romandie und Tessin.
 
 ## 10. Markt: parzellencheck.ch (Stand 7. November)
 
