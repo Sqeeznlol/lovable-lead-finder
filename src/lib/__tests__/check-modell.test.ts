@@ -183,3 +183,17 @@ describe('Stockwerkeigentum: Wohnungen aus dem Register', () => {
     expect(stockText(3115)).toBe('15. Stock'); expect(stockText(null)).toBeNull();
   });
 });
+
+describe('Heizungs-Check', () => {
+  const haus = (energie: number) => ({ status: 1004, energie, erzeuger: null, baujahr: 1975, periode: null }) ;
+  const u = { solar: null, waermenetz: null, oev: null, radon: null };
+  it('Rat zum Ersatz nur bei Öl und Gas; kein Widerspruch bei Fernwärme (Thalwil)', async () => {
+    const { heizungZeilen } = await import('@/lib/heizung');
+    const oel = heizungZeilen({ haeuser: [haus(7530)] } as never, u);
+    expect(oel.find(z => z.titel === 'Heizung')).toMatchObject({ wert: 'Heizöl', zusatz: 'fossil: Ersatz und Förderung prüfen' });
+    expect(oel.find(z => z.titel === 'Fernwärme')?.zusatz).toBe('eher Wärmepumpe oder Holz');
+    const fern = heizungZeilen({ haeuser: [haus(7580)] } as never, u);
+    expect(fern.find(z => z.titel === 'Heizung')).toMatchObject({ wert: 'Fernwärme', art: 'ok' });
+    expect(fern.find(z => z.titel === 'Fernwärme')).toMatchObject({ wert: 'Keine Heizzentrale im Umkreis von 1,5 km', zusatz: undefined });
+  });
+});

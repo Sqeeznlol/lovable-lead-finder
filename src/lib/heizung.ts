@@ -30,13 +30,17 @@ export function heizungZeilen(b: Befund | null, u: Umgebung | null): Zeile[] {
   const mitHeizung = best.find(h => heizungText(h)) ?? null;
   const z: Zeile[] = [];
   const text = mitHeizung ? heizungText(mitHeizung) : null;
+  const fossil = !!mitHeizung && FOSSIL.has(mitHeizung.energie ?? 0);
   z.push(text
     ? { titel: 'Heizung', wert: text, zusatz: mitHeizung && FOSSIL.has(mitHeizung.energie ?? 0) ? 'fossil: Ersatz und Förderung prüfen' : undefined, quelle: 'Gebäuderegister', art: mitHeizung && FOSSIL.has(mitHeizung.energie ?? 0) ? undefined : 'ok' }
     : { titel: 'Heizung', wert: 'Im Register nicht angegeben', quelle: 'Gebäuderegister' });
   const alt = aeltestes(best);
   if (alt) z.push({ titel: 'Baujahr', wert: mitHeizung && bauzeit(mitHeizung) ? String(bauzeit(mitHeizung)) : alt, quelle: 'Gebäuderegister' });
   if (u?.waermenetz) z.push({ titel: 'Fernwärme', wert: `${u.waermenetz.name ?? 'Wärmenetz'}, rund ${Math.round(u.waermenetz.meter / 10) * 10} m entfernt`, zusatz: u.waermenetz.betreiber ? `Anschluss beim Betreiber anfragen: ${u.waermenetz.betreiber}` : undefined, quelle: 'BFE', link: u.waermenetz.web ?? undefined });
-  else if (u) z.push({ titel: 'Fernwärme', wert: 'Kein Wärmenetz im Umkreis von 1,5 km', zusatz: 'eher Wärmepumpe oder Holz', quelle: 'BFE' });
+  // Das BFE führt die Standorte der Heizzentralen, nicht die Leitungen: ein Haus kann
+  // Fernwärme beziehen, ohne dass eine Zentrale in 1,5 km steht (Thalwil, Seestrasse 147,
+  // am 15. November gesehen). Darum kein Rat, wo das Register schon nicht-fossil zeigt.
+  else if (u) z.push({ titel: 'Fernwärme', wert: 'Keine Heizzentrale im Umkreis von 1,5 km', zusatz: fossil ? 'eher Wärmepumpe oder Holz' : undefined, quelle: 'BFE' });
   if (u?.solar) z.push({ titel: 'Solardach', wert: `${u.solar.eignung} geeignet`, zusatz: `bis ${u.solar.kwh.toLocaleString('de-CH')} kWh im Jahr, passt zur Wärmepumpe`, quelle: 'BFE' });
   return z;
 }
