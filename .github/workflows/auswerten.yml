@@ -58,6 +58,7 @@ on:
           - amtsblatt    # Welche Adresse im Amtsblattportal ein Baugesuch zeigt
           - dicht        # Ob der öffentliche Schlüssel noch etwas lesen kann und die Funktionen Fremde abweisen (nur Codes)
           - gelegenheiten-tempo # Wie lange die Liste der Gelegenheiten als angemeldetes Konto braucht (nur Zahlen)
+          - besucher     # Ob die Zahlen unter «Leads» stimmen: Besucher je Domain und Tag, Leads gegen Anfragen, Bots (nur Zählungen)
       egrid:
         description: 'Nur für "objekt": die EGRID, z.B. CH707709971116'
         required: false
@@ -797,6 +798,48 @@ jobs:
           \echo '```'
           SQL
 
+          elif [ "$FRAGE" = "besucher" ]; then
+            # Julian, 15. November: "stimmen die analytics?" Der Reiter Leads
+            # zählt Sitzungen aus check_ereignis (check_trichter) und Zeilen
+            # aus anfrage. Hier dieselben Daten roh, ohne Namen oder Nummern.
+            frage "Ereignisse je Domain, 30 Tage (Sitzungen, erste und letzte Zeit)" "
+              select domain, marke, count(*) as ereignisse, count(distinct sitzung) as sitzungen,
+                     count(distinct sitzung) filter (where ereignis = 'aufruf') as besucher,
+                     count(distinct sitzung) filter (where ereignis = 'lead') as leads,
+                     min(zeit)::date as erste, max(zeit)::date as letzte
+              from check_ereignis where zeit > now() - interval '30 days'
+              group by 1, 2 order by sitzungen desc;"
+            frage "Besucher je Tag, 30 Tage" "
+              select zeit::date as tag, count(distinct sitzung) filter (where ereignis = 'aufruf') as besucher,
+                     count(distinct sitzung) filter (where ereignis = 'suche') as suche,
+                     count(distinct sitzung) filter (where ereignis = 'lead') as leads,
+                     count(distinct sitzung) filter (where ereignis = 'ratgeber') as ratgeber
+              from check_ereignis where zeit > now() - interval '30 days' group by 1 order by 1;"
+            frage "Quelle und Gerät der Besucher, 30 Tage" "
+              select coalesce(quelle, 'direkt') as quelle, geraet, count(distinct sitzung) as besucher
+              from check_ereignis where ereignis = 'aufruf' and zeit > now() - interval '30 days'
+              group by 1, 2 order by 3 desc limit 25;"
+            frage "Auffällige Sitzungen: Schritte ohne Aufruf, sehr viele Ereignisse" "
+              with s as (select sitzung, count(*) as n, bool_or(ereignis = 'aufruf') as mit_aufruf,
+                                bool_or(ereignis = 'ratgeber') as ratgeber, count(distinct marke) as marken
+                         from check_ereignis where zeit > now() - interval '30 days' group by 1)
+              select count(*) as sitzungen,
+                     count(*) filter (where not mit_aufruf and not ratgeber) as ohne_aufruf,
+                     count(*) filter (where n > 20) as mehr_als_20_ereignisse,
+                     count(*) filter (where marken > 1) as mehrere_marken,
+                     count(*) filter (where sitzung = 'ohnespeicher0') as ohne_speicher
+              from s;"
+            frage "Leads: Zähler gegen Tabelle anfrage, je Tag (30 Tage)" "
+              with z as (select zeit::date as tag, count(distinct sitzung) as gezaehlt
+                         from check_ereignis where ereignis = 'lead' and zeit > now() - interval '30 days' group by 1),
+                   a as (select erstellt_am::date as tag, count(*) as anfragen,
+                                count(*) filter (where name ~* 'test' or angaben->>'quelle' = 'test') as davon_test,
+                                count(*) filter (where angaben ? 'marke') as von_check_seiten
+                         from anfrage where erstellt_am > now() - interval '30 days' group by 1)
+              select coalesce(z.tag, a.tag) as tag, coalesce(gezaehlt, 0) as lead_gezaehlt,
+                     coalesce(anfragen, 0) as anfragen, coalesce(davon_test, 0) as davon_test,
+                     coalesce(von_check_seiten, 0) as von_check_seiten
+              from z full join a on a.tag = z.tag order by 1;"
           elif [ "$FRAGE" = "gelegenheiten-tempo" ]; then
             # Julian (1. November): die Seite blieb bei "wird geladen" mit
             # lauter Nullen. Gemessen wird die Abfrage der Seite so, wie
