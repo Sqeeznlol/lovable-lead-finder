@@ -26,7 +26,7 @@ export default function Ratgeber({ marke: vorgabe }: { marke?: Marke }) {
   const artikel = artikelNachSlug(slug);
   // Ohne utm-Kennung, sonst zählte der Datenschutz-Klick als Besuch aus dem Ratgeber.
   const datenschutz = `${aufMarkenDomain ? '/' : `/check/${marke.id}`}#datenschutz`;
-  const ziel = zumCheck({ aufMarkenDomain, markeId: marke.id, suche: window.location.search, slug: artikel?.slug ?? 'unbekannt' });
+  const ziel = zumCheck({ aufMarkenDomain, markeId: marke.id, suche: window.location.search, slug: artikel?.slug ?? 'unbekannt', heizung: artikel?.ziel === 'heizung' });
 
   useEffect(() => {
     document.title = artikel ? `${artikel.titel} | ${marke.name.join('')}` : marke.name.join('');

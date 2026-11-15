@@ -15,6 +15,10 @@ describe('Ratgeber', () => {
     // Eine Anzeige mit eigenem utm_content behält ihn.
     const c = new URL(zumCheck({ aufMarkenDomain: true, markeId: 'x', suche: '?utm_content=bild-uster', slug: 'haus-zu-gross' }), 'https://x.ch');
     expect(c.searchParams.get('utm_content')).toBe('bild-uster');
+
+    // Der Heizungsartikel führt zum Heizungs-Check.
+    expect(new URL(zumCheck({ aufMarkenDomain: true, markeId: 'x', suche: '', slug: 'h', heizung: true }), 'https://x.ch').pathname).toBe('/heizung');
+    expect(new URL(zumCheck({ aufMarkenDomain: false, markeId: 'x', suche: '', slug: 'h', heizung: true }), 'https://x.ch').pathname).toBe('/check/x/heizung');
   });
 
   it('jeder Artikel hat eine eindeutige Adresse, Quellen und einen Kasten zum Check', () => {

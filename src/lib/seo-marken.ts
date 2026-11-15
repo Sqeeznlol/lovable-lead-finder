@@ -88,7 +88,7 @@ export function markenSeite(indexHtml: string, m: Marke, a?: Artikel, pfad?: str
   const stil = 'style="font-family:system-ui,sans-serif;max-width:40rem;margin:3rem auto;padding:0 1rem;line-height:1.5;color:#222"';
   const grund = a
     ? `<main ${stil}><p>${esc(a.rubrik)}</p><h1>${esc(a.titel)}</h1><p>${esc(a.lead)}</p>${a.abschnitte.map(x => `<h2>${esc(x.titel)}</h2>${x.absaetze.map(p => `<p>${esc(p)}</p>`).join('')}`).join('')}</main>`
-    : `<main ${stil}><p>${esc(m.etikett)}</p><h1>${esc(m.titel)}</h1><p>${esc(m.satz)}</p><ul>${m.vorteile.map(v => `<li>${esc(v)}</li>`).join('')}</ul>${opt.links ? `<ul>${opt.links.map(l => `<li><a href="${esc(l.href)}">${esc(l.text)}</a></li>`).join('')}</ul>` : ''}<p>${esc(m.aufruf)}</p>${opt.ausfuehrlich ? ausfuehrlicherText() : ''}<p><a href="/ratgeber/${ARTIKEL[0].slug}">Ratgeber: ${esc(ARTIKEL[0].titel)}</a></p></main>`;
+    : `<main ${stil}><p>${esc(m.etikett)}</p><h1>${esc(m.titel)}</h1><p>${esc(m.satz)}</p><ul>${m.vorteile.map(v => `<li>${esc(v)}</li>`).join('')}</ul>${opt.links ? `<ul>${opt.links.map(l => `<li><a href="${esc(l.href)}">${esc(l.text)}</a></li>`).join('')}</ul>` : ''}<p>${esc(m.aufruf)}</p>${opt.ausfuehrlich ? ausfuehrlicherText() : ''}<h2>Ratgeber</h2><ul>${ARTIKEL.map(x => `<li><a href="/ratgeber/${x.slug}">${esc(x.titel)}</a></li>`).join('')}</ul></main>`;
   return indexHtml
     // Alles, was index.html über die interne App sagt, fällt weg.
     .replace(/<title>[\s\S]*?<\/title>/, '')
