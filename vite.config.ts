@@ -27,6 +27,11 @@ function markenSeiten() {
         schreiben(datei.sitemap(m), sitemap(m, stand));
         schreiben(datei.robots(m), robots(m));
       }
+      // Eine index.html im Wurzelordner liefert Vercel für "/" aus, bevor
+      // irgendeine Umleitung greift (live gemessen am 15. November: "/"
+      // trug den Kopf der App, alle anderen Pfade den der Marke). Darum
+      // heisst die allgemeine Seite app.html; vercel.json zeigt dorthin.
+      fs.renameSync(path.join(aus, "index.html"), path.join(aus, "app.html"));
     },
   };
 }

@@ -923,7 +923,7 @@
     },
     {
       "source": "/((?!assets/|api/).*)",
-      "destination": "/index.html"
+      "destination": "/app.html"
     }
   ],
   "headers": [

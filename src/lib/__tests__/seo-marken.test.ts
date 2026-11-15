@@ -10,6 +10,8 @@ describe('Was Google von den Check-Seiten sieht', () => {
   it('vercel.json enthält die Umleitungen je Marke (sonst: npx tsx tools/vercel-marken.ts)', () => {
     const v = JSON.parse(readFileSync('vercel.json', 'utf8'));
     expect(v.rewrites.slice(0, vercelUmleitungen().length)).toEqual(vercelUmleitungen());
+    // Die allgemeine Seite heisst im Bau app.html (vite.config.ts), sonst gewinnt "/" gegen jede Umleitung.
+    expect(v.rewrites.at(-1).destination).toBe('/app.html');
   });
   it('jede gekaufte Domain hat ihre Seite', () => {
     for (const d of GEKAUFT) expect(MARKEN_LIVE).toContain(markeFuerHost(d));
