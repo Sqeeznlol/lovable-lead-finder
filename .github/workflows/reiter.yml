@@ -1,0 +1,54 @@
+# =====================================================================
+# Reiter prüfen
+# =====================================================================
+# Meldet sich wie ein Mensch an der echten Seite an und klickt jeden
+# Reiter durch, auf dem iPhone und am Computer (tools/reiter-pruefen.cjs).
+# Rot heisst: ein Reiter bricht, eine Abfrage wird abgelehnt, eine Seite
+# ragt über den Rand oder zeigt "NaN" statt einer Zahl.
+#
+# Warum ein Ablauf und kein Blick von Hand: bis zum 15. November war
+# kein Reiter je mit echten Daten durchgeklickt worden. Was hier läuft,
+# läuft nach jedem ausgelieferten Stand und jeden Morgen von selbst.
+#
+# Das Protokoll ist öffentlich. Ausgegeben werden darum nur Zahlen,
+# Tabellennamen und Fehlertexte des Programms -- keine Inhalte, keine
+# Bildschirmfotos.
+# =====================================================================
+
+name: Reiter prüfen
+
+on:
+  workflow_dispatch:
+  # Nach jedem Stand, der wirklich auf der Seite steht.
+  workflow_run:
+    workflows: ['Was ist live']
+    types: [completed]
+  schedule:
+    - cron: '20 5 * * 1-5'
+
+concurrency:
+  group: reiter
+  cancel-in-progress: true
+
+jobs:
+  reiter:
+    # Ist der Stand gar nicht live, gibt es hier nichts zu prüfen.
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Browser einrichten
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/pruefung && cd /tmp/pruefung
+          npm init -y >/dev/null
+          npm install --silent playwright@1.57.0
+          npx playwright install --with-deps chromium >/dev/null
+
+      - name: Jeden Reiter öffnen
+        env:
+          KONTO_AUI: ${{ secrets.KONTO_AUI }}
+          NODE_PATH: /tmp/pruefung/node_modules
+        run: node tools/reiter-pruefen.cjs

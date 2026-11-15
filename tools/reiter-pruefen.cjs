@@ -1,0 +1,134 @@
+/**
+ * Klickt jeden Reiter von Aurora durch, auf dem iPhone und am Computer,
+ * und meldet, was dabei bricht: Fehler im Programm, Abfragen, die die
+ * Datenbank ablehnt, Seiten, die über den Rand ragen, und Text wie
+ * "NaN" oder "undefined", der nur bei einem Rechenfehler sichtbar wird.
+ *
+ * Warum: bis zum 15. November war kein einziger Reiter je mit echten
+ * Daten durchgeklickt worden -- geprüft wurde mit Attrappen, und auf
+ * der Seite selbst nur, ob der neue Stand ausgeliefert ist. "Nie
+ * raten, immer nachsehen" heisst hier: die echte Seite, angemeldet,
+ * jeden Reiter.
+ *
+ * Ausgegeben werden nur Zahlen, Tabellennamen und Fehlertexte des
+ * Programms -- nie Inhalte der Seite, und keine Bildschirmfotos: das
+ * Protokoll ist öffentlich, die Daten sind es nicht.
+ *
+ * Aufruf:  KONTO_AUI=... node tools/reiter-pruefen.cjs
+ *          ADRESSE=http://127.0.0.1:8080 ATTRAPPE=1 node tools/reiter-pruefen.cjs
+ * Mit ATTRAPPE=1 antwortet eine leere Datenbank (für die Prüfung vor
+ * dem Ausliefern; dann zeigt sich, ob leere Zustände halten).
+ */
+const { chromium, devices } = require('playwright');
+const fs = require('fs');
+
+const ADRESSE = (process.env.ADRESSE || 'https://www.wohntraums.life').replace(/\/$/, '');
+const ATTRAPPE = process.env.ATTRAPPE === '1';
+const REITER = ['', 'leads', 'zentrale', 'karte', 'gelegenheiten', 'baugesuche', 'leadlisten', 'auswertung',
+  'nachbarschaft', 'arrondierung', 'kalender', 'karte3d', 'admin', 'fonds'];
+const GERAETE = [
+  { name: 'iPhone', einstellung: devices['iPhone 13'] },
+  { name: 'Computer', einstellung: { viewport: { width: 1440, height: 900 } } },
+];
+// Sichtbarer Text, der nur bei einem Fehler erscheint.
+const MERKMALE = [/\bNaN\b/, /\bundefined\b/, /\[object Object\]/, /Something went wrong/i, /Unerwarteter Fehler/i];
+
+const b64 = o => Buffer.from(JSON.stringify(o)).toString('base64url');
+
+async function attrappe(seite) {
+  const jwt = `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ sub: 'u1', exp: Math.floor(Date.now() / 1000) + 3600, role: 'authenticated' })}.x`;
+  const user = { id: 'u1', email: 'aui@wohntraums.life', aud: 'authenticated', role: 'authenticated', app_metadata: {}, user_metadata: {}, created_at: new Date().toISOString() };
+  const kopf = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*', 'access-control-expose-headers': 'content-range', 'content-range': '*/0' };
+  await seite.route(/supabase\.co/, r => {
+    const u = r.request().url();
+    const js = body => r.fulfill({ status: 200, contentType: 'application/json', headers: kopf, body: JSON.stringify(body) });
+    if (r.request().method() === 'OPTIONS') return js({});
+    if (u.includes('/auth/v1/token')) return js({ access_token: jwt, token_type: 'bearer', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, refresh_token: 'r', user });
+    if (u.includes('/auth/v1/user')) return js(user);
+    // Kein Fondskonto: sonst leitet die Seite alles nach /fonds um.
+    if (u.includes('/rpc/ist_fondsmanager')) return js(false);
+    // Ein leeres Universum hat trotzdem seine Form.
+    if (u.includes('/rpc/fonds_universum')) return js({ gesellschaft: null, mandant: null, fonds: [], punkte: [], kanten: [], potenziale: [] });
+    // Eine einzelne Zeile verlangt: es gibt keine.
+    if ((r.request().headers()['accept'] || '').includes('vnd.pgrst.object')) return js(null);
+    return js([]);
+  });
+}
+
+async function pruefen(browser, geraet, zeilen) {
+  const ctx = await browser.newContext(geraet.einstellung);
+  await ctx.addInitScript(() => { try { sessionStorage.setItem('bauraum-install-hint-dismissed', '1'); } catch { /* gleichgültig */ } });
+  const seite = await ctx.newPage();
+  let fehler = [], abgelehnt = [];
+  seite.on('pageerror', e => fehler.push(String(e.message).slice(0, 160)));
+  seite.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|net::ERR|favicon/i.test(m.text())) fehler.push('Konsole: ' + m.text().split('\n')[0].replace(/\?[^\s]*/g, '').slice(0, 160)); });
+  seite.on('response', r => {
+    const u = r.url();
+    if (r.status() >= 400 && /supabase\.co\/(rest|functions|auth)/.test(u)) {
+      // Nur Tabelle oder Funktion und der Code -- nie die Bedingungen der Abfrage.
+      abgelehnt.push(`${u.split('/v1/')[1]?.split('?')[0] ?? '?'} ${r.status()}`);
+    }
+  });
+  // Die 3D-Karte startet mit Fotokacheln von Google, und die werden je
+  // Aufruf abgerechnet. Eine Prüfung darf nichts kosten: gesperrt.
+  await seite.route(/tile\.googleapis\.com/, r => r.abort());
+  if (ATTRAPPE) await attrappe(seite);
+
+  await seite.goto(ADRESSE + '/', { waitUntil: 'domcontentloaded' });
+  await seite.waitForTimeout(1500);
+  if (await seite.locator('#passwort').count()) {
+    await seite.fill('#passwort', ATTRAPPE ? 'x' : (process.env.KONTO_AUI || ''));
+    await seite.click('button[type=submit]');
+    await seite.waitForSelector('#passwort', { state: 'detached', timeout: 20000 }).catch(() => {});
+  }
+  if (await seite.locator('#passwort').count()) {
+    zeilen.push({ geraet: geraet.name, reiter: '(Anmeldung)', ms: 0, fehler: ['Anmeldung fehlgeschlagen'], abgelehnt, breite: 0, merkmale: [], leer: false });
+    await ctx.close();
+    return;
+  }
+
+  for (const r of REITER) {
+    fehler = []; abgelehnt = [];
+    const start = Date.now();
+    await seite.goto(`${ADRESSE}/${r}`, { waitUntil: 'domcontentloaded' });
+    // Bis die Abfragen fertig sind; die Karten laden Kacheln ohne Ende, darum mit Frist.
+    await seite.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    const ms = Date.now() - start;
+    await seite.waitForTimeout(800);
+    const stand = await seite.evaluate(() => {
+      const text = document.body.innerText || '';
+      return {
+        breite: Math.max(0, document.documentElement.scrollWidth - window.innerWidth),
+        text,
+        // Eine Seite ohne Überschrift und fast ohne Text ist nicht geladen.
+        leer: text.trim().length < 40,
+      };
+    });
+    zeilen.push({
+      geraet: geraet.name, reiter: r || 'cockpit', ms, fehler: [...new Set(fehler)], abgelehnt: [...new Set(abgelehnt)],
+      breite: stand.breite, merkmale: MERKMALE.filter(m => m.test(stand.text)).map(m => m.source.replace(/\\b/g, '')), leer: stand.leer,
+    });
+  }
+  await ctx.close();
+}
+
+(async () => {
+  if (!ATTRAPPE && !process.env.KONTO_AUI) { console.error('Secret KONTO_AUI fehlt.'); process.exit(1); }
+  const browser = await chromium.launch(process.env.CHROMIUM ? { executablePath: process.env.CHROMIUM } : {});
+  const zeilen = [];
+  for (const g of GERAETE) await pruefen(browser, g, zeilen);
+  await browser.close();
+
+  const schlecht = z => z.fehler.length || z.abgelehnt.length || z.breite > 1 || z.merkmale.length || z.leer;
+  const aus = [`### Reiter von Aurora (${ATTRAPPE ? 'leere Attrappe' : 'echte Daten'}, ${ADRESSE})`, '',
+    '| Gerät | Reiter | geladen in | Fehler | abgelehnte Abfragen | über den Rand | auffälliger Text |', '|---|---|---:|---|---|---:|---|'];
+  for (const z of zeilen) {
+    aus.push(`| ${z.geraet} | ${z.reiter} | ${(z.ms / 1000).toFixed(1)} s | ${z.fehler.join('<br>') || '–'}${z.leer ? ' Seite leer' : ''} | ${z.abgelehnt.join(', ') || '–'} | ${z.breite > 1 ? z.breite + ' px' : '–'} | ${z.merkmale.join(', ') || '–'} |`);
+  }
+  const n = zeilen.filter(schlecht).length;
+  aus.push('', n ? `**${n} von ${zeilen.length} Ansichten auffällig.**` : `Alle ${zeilen.length} Ansichten sauber.`);
+  const text = aus.join('\n');
+  console.log(text);
+  if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, text + '\n');
+  process.exit(n ? 1 : 0);
+})();

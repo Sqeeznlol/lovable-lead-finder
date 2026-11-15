@@ -30,7 +30,12 @@ export interface Universum {
 export async function universumLaden(team: string | null): Promise<Universum> {
   const r = await db().rpc('fonds_universum', { p_team: team });
   if (r.error) throw r.error;
-  return r.data as Universum;
+  // Eine Antwort ohne die erwarteten Listen (etwa nach einer geänderten
+  // Funktion) liess die Seite weiss werden. Als Fehler gemeldet, zeigt
+  // sie stattdessen "lässt sich nicht laden".
+  const d = r.data as Universum | null;
+  if (!d || !Array.isArray(d.fonds) || !Array.isArray(d.punkte)) throw new Error('Die Fondsdaten kamen unvollständig an.');
+  return { ...d, kanten: d.kanten ?? [], potenziale: d.potenziale ?? [] };
 }
 
 /**

@@ -168,7 +168,11 @@ export default function Index() {
 
   return (
     <div className="flex min-h-safe-screen bg-background">
-      <PropertyDetailDialog id={parzelle} onClose={parzelleZu} />
+      {/* Ein Fehler in der Objektansicht darf nicht die ganze Seite weiss
+          werden lassen (gemessen mit tools/reiter-pruefen.cjs). */}
+      <Auffang key={parzelle ?? 'zu'} bereich="Die Objektansicht">
+        <PropertyDetailDialog id={parzelle} onClose={parzelleZu} />
+      </Auffang>
 
       {/* Schmale Leiste nur mit Symbolen, wie in der Vorlage (DESIGN.md):
           der aktive Punkt als schwarzes Quadrat. Der Name steht beim
