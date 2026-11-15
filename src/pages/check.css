@@ -333,3 +333,6 @@
 .pc .wohnungen li button[aria-pressed="true"] span{color:var(--marke);}
 .pc .wohnungen .mehr{margin-top:6px; min-height:44px; background:none; border:0; padding:0; color:var(--marke); font-weight:600; cursor:pointer;}
 @media print{.pc .wohnungen li button:not([aria-pressed="true"]), .pc .wohnungen .klein, .pc .wohnungen .mehr{display:none !important;}}
+/* Fusszeile mit "Mehr" (Heizungs-Check, Ratgeber): drei Spalten, Links so gross wie die Knöpfe daneben. */
+@media (min-width: 800px){.pc footer .huelle{grid-template-columns: 2fr 1fr 1fr;}}
+.pc footer a{color: inherit; text-decoration: underline; text-underline-offset: 3px; display: inline-flex; align-items: center; min-height: 44px;}

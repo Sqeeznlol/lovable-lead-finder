@@ -11,6 +11,7 @@
 // nackte Adresse dorthin weiter (am 15. November gemessen, 308).
 import { GEKAUFT, MARKEN, type Marke } from './check-marken';
 import { ARTIKEL, type Artikel } from './ratgeber';
+import { HEIZUNG_TEXT } from './heizung-text';
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -41,8 +42,9 @@ export function beschreibung(m: Marke, a?: Artikel): string {
  * #root, den React beim Start ersetzt. Ohne JavaScript sieht Google so
  * Titel, Satz und Vorteile der Marke statt einer leeren Seite.
  */
-export function markenSeite(indexHtml: string, m: Marke, a?: Artikel): string {
-  const url = a ? `${RATGEBER_HEIMAT}/ratgeber/${a.slug}` : `${hauptadresse(m)}/`;
+export function markenSeite(indexHtml: string, m: Marke, a?: Artikel, pfad?: string): string {
+  // Ratgeber und Heizungs-Check sind auf allen Domains gleich: eine Hauptfassung für Google.
+  const url = a ? `${RATGEBER_HEIMAT}/ratgeber/${a.slug}` : pfad ? `${RATGEBER_HEIMAT}${pfad}` : `${hauptadresse(m)}/`;
   const t = esc(titel(m, a)), d = esc(beschreibung(m, a));
   const kopf = [
     `<title>${t}</title>`,
@@ -75,16 +77,20 @@ export function markenSeite(indexHtml: string, m: Marke, a?: Artikel): string {
 
 export function sitemap(m: Marke, stand: string): string {
   // Artikel nur in der Sitemap ihrer Hauptfassung.
-  const urls = [`${hauptadresse(m)}/`, ...(hauptadresse(m) === RATGEBER_HEIMAT ? ARTIKEL.map(a => `${RATGEBER_HEIMAT}/ratgeber/${a.slug}`) : [])];
+  const urls = [`${hauptadresse(m)}/`, ...(hauptadresse(m) === RATGEBER_HEIMAT ? [`${RATGEBER_HEIMAT}/heizung`, ...ARTIKEL.map(a => `${RATGEBER_HEIMAT}/ratgeber/${a.slug}`)] : [])];
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map(u => `  <url><loc>${u}</loc><lastmod>${stand}</lastmod></url>`).join('\n')}\n</urlset>\n`;
 }
 export function robots(m: Marke): string {
   return `User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: ${hauptadresse(m)}/sitemap.xml\n`;
 }
 
+/** Der Heizungs-Check einer Marke: ihre Gestaltung, die Texte des Heizungs-Checks. */
+export const heizungsMarke = (m: Marke): Marke => ({ ...m, ...HEIZUNG_TEXT });
+
 /** Ablage der erzeugten Dateien im Bau (dist/). */
 export const datei = {
   seite: (m: Marke) => `marken/${m.id}/index.html`,
+  heizung: (m: Marke) => `marken/${m.id}/heizung.html`,
   artikel: (m: Marke, a: Artikel) => `marken/${m.id}/ratgeber/${a.slug}.html`,
   sitemap: (m: Marke) => `marken/${m.id}/sitemap.xml`,
   robots: (m: Marke) => `marken/${m.id}/robots.txt`,
@@ -98,6 +104,7 @@ export function vercelUmleitungen() {
       { source: '/robots.txt', has: host, destination: `/${datei.robots(m)}` },
       { source: '/sitemap.xml', has: host, destination: `/${datei.sitemap(m)}` },
       ...ARTIKEL.map(a => ({ source: `/ratgeber/${a.slug}`, has: host, destination: `/${datei.artikel(m, a)}` })),
+      { source: '/heizung', has: host, destination: `/${datei.heizung(m)}` },
       { source: '/((?!assets/|api/|marken/).*)', has: host, destination: `/${datei.seite(m)}` },
     ];
   });

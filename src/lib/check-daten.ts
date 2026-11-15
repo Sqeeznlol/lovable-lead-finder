@@ -202,14 +202,14 @@ export function ueberbauung(b: Pick<Befund, 'flaeche' | 'haeuser'>): { flaeche: 
 
 // ------------------------------------------------------------------ Lead
 export type Eigentum = 'allein' | 'gemeinsam' | 'erbengemeinschaft' | 'vertretung' | 'nein';
-export type Absicht = 'verkaufen' | 'bauen' | 'wert' | 'informieren';
+export type Absicht = 'verkaufen' | 'bauen' | 'wert' | 'informieren' | 'ersetzen';
 export type Zeitraum = '12' | '36' | 'offen';
 export interface Antwort { eigentuemer: Eigentum | null; absicht: Absicht | null; zeitraum: Zeitraum | null }
 
 export const ANTWORT_TEXT = {
   eigentuemer: { allein: 'Ja, allein', gemeinsam: 'Ja, gemeinsam mit anderen', erbengemeinschaft: 'Ja, als Erbengemeinschaft',
     vertretung: 'Nein, ich vertrete den Eigentümer', nein: 'Nein' } as Record<Eigentum, string>,
-  absicht: { verkaufen: 'Verkaufen', bauen: 'Bauen, aus- oder umbauen', wert: 'Den Wert kennen', informieren: 'Nur informieren' } as Record<Absicht, string>,
+  absicht: { verkaufen: 'Verkaufen', bauen: 'Bauen, aus- oder umbauen', wert: 'Den Wert kennen', informieren: 'Nur informieren' } as Partial<Record<Absicht, string>>,
   zeitraum: { 12: 'In den nächsten 12 Monaten', 36: 'In 1 bis 3 Jahren', offen: 'Noch offen' } as Record<Zeitraum, string>,
 };
 
@@ -220,7 +220,8 @@ export const ANTWORT_TEXT = {
  */
 export function prioritaet(a: Antwort): 'heiss' | 'warm' | 'normal' {
   const eigen = a.eigentuemer != null && a.eigentuemer !== 'nein';
-  if (eigen && (a.absicht === 'verkaufen' || a.absicht === 'bauen') && a.zeitraum === '12') return 'heiss';
+  // Heizungsersatz innert eines Jahres ist so dringend wie Verkaufen oder Bauen (Heizungs-Check).
+  if (eigen && (a.absicht === 'verkaufen' || a.absicht === 'bauen' || a.absicht === 'ersetzen') && a.zeitraum === '12') return 'heiss';
   if (eigen && a.absicht != null && a.absicht !== 'informieren') return 'warm';
   return 'normal';
 }

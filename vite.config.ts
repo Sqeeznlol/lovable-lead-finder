@@ -4,7 +4,7 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 import fs from "fs";
 import { ARTIKEL } from "./src/lib/ratgeber";
-import { datei, markenSeite, MARKEN_LIVE, robots, sitemap } from "./src/lib/seo-marken";
+import { datei, heizungsMarke, markenSeite, MARKEN_LIVE, robots, sitemap } from "./src/lib/seo-marken";
 
 // Je Check-Marke eine eigene HTML-Datei mit Titel, Beschreibung und Text,
 // dazu robots.txt und sitemap.xml (src/lib/seo-marken.ts). Am 15. November
@@ -23,6 +23,7 @@ function markenSeiten() {
       };
       for (const m of MARKEN_LIVE) {
         schreiben(datei.seite(m), markenSeite(index, m));
+        schreiben(datei.heizung(m), markenSeite(index, heizungsMarke(m), undefined, "/heizung"));
         for (const a of ARTIKEL) schreiben(datei.artikel(m, a), markenSeite(index, m, a));
         schreiben(datei.sitemap(m), sitemap(m, stand));
         schreiben(datei.robots(m), robots(m));

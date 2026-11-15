@@ -29,7 +29,8 @@ describe('Anmeldung', () => {
     // ganze Seite, sonst /check zur Vorschau. Dürfen wie die Anfrage-Seite
     // nur einfügen (Test unten).
     // Der Ratgeber (/ratgeber/<slug>) liest und schreibt gar nichts.
-    expect(offen).toEqual(['/ratgeber/:artikel Ratgeber', '* Check', '/check Check', '/check/:marke Check', '/check/:marke/ratgeber/:artikel Ratgeber',
+    // Der Heizungs-Check (/heizung) ist die Check-Seite mit anderen Texten.
+    expect(offen).toEqual(['/ratgeber/:artikel Ratgeber', '/heizung Check', '* Check', '/check Check', '/check/:marke Check', '/check/:marke/ratgeber/:artikel Ratgeber', '/check/:marke/heizung Check',
       '/bewertung Anfrage', '/potenzial Anfrage', '/investor Anfrage']);
   });
 
@@ -41,7 +42,7 @@ describe('Anmeldung', () => {
   });
 
   it('die Check-Seiten lesen nichts aus der Datenbank, sie fügen nur ein', () => {
-    for (const datei of ['src/pages/Check.tsx', 'src/lib/check-daten.ts', 'src/lib/check-marken.ts']) {
+    for (const datei of ['src/pages/Check.tsx', 'src/lib/check-daten.ts', 'src/lib/check-marken.ts', 'src/lib/heizung.ts', 'src/lib/heizung-text.ts']) {
       const s = readFileSync(datei, 'utf8');
       expect(s).not.toMatch(/\.select\(|\.rpc\(|\.update\(|\.delete\(|\.upsert\(/);
     }

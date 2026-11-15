@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { GEKAUFT, markeFuerHost } from '@/lib/check-marken';
 import { ARTIKEL } from '@/lib/ratgeber';
-import { hauptadresse, markenSeite, MARKEN_LIVE, RATGEBER_HEIMAT, sitemap, vercelUmleitungen } from '@/lib/seo-marken';
+import { hauptadresse, heizungsMarke, markenSeite, MARKEN_LIVE, RATGEBER_HEIMAT, sitemap, vercelUmleitungen } from '@/lib/seo-marken';
 
 const index = readFileSync('index.html', 'utf8').replace('<div id="root"></div>', '<div id="root"></div>');
 
@@ -32,5 +32,9 @@ describe('Was Google von den Check-Seiten sieht', () => {
     expect(sitemap(m, '2026-11-15')).not.toContain('/ratgeber/');
     const heim = MARKEN_LIVE.find(x => hauptadresse(x) === RATGEBER_HEIMAT)!;
     expect(sitemap(heim, '2026-11-15')).toContain(`/ratgeber/${ARTIKEL[0].slug}`);
+    expect(sitemap(heim, '2026-11-15')).toContain(`${RATGEBER_HEIMAT}/heizung`);
+    const h = markenSeite(index, heizungsMarke(m), undefined, '/heizung');
+    expect(h).toContain(`href="${RATGEBER_HEIMAT}/heizung"`);
+    expect(h).toContain('<h1>Ihre Heizung ersetzen?');
   });
 });

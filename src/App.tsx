@@ -57,6 +57,7 @@ const App = () => (
             {CHECK_MARKE ? (
               <Routes>
                 <Route path="/ratgeber/:artikel" element={<Ratgeber marke={CHECK_MARKE} />} />
+                <Route path="/heizung" element={<Check marke={CHECK_MARKE} modus="heizung" />} />
                 <Route path="*" element={<Check marke={CHECK_MARKE} />} />
               </Routes>
             ) : (
@@ -65,6 +66,7 @@ const App = () => (
               <Route path="/check" element={<Check />} />
               <Route path="/check/:marke" element={<Check />} />
               <Route path="/check/:marke/ratgeber/:artikel" element={<Ratgeber />} />
+              <Route path="/check/:marke/heizung" element={<Check modus="heizung" />} />
               {/* Die drei Anfrage-Seiten können nur eine Anfrage einfügen,
                   nichts lesen (Migration 20261101240000_anfrage.sql im
                   Repository der Webseite). */}

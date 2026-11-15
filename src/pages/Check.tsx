@@ -10,6 +10,8 @@ import { KATASTER } from '@/lib/check-hintergrund';
 import { useImBild } from '@/lib/im-bild';
 import { zaehlen } from '@/lib/check-zaehlen';
 import { buehnenBild, markenAttribute, markenStil, seiteEinrichten } from '@/lib/check-gestaltung';
+import { ARTIKEL } from '@/lib/ratgeber';
+import { ABSICHT_HEIZUNG, FOERDERUNG, HEIZUNG_TEXT, heizungZeilen } from '@/lib/heizung';
 import { gebaeudeLaden, modellAus, parzelleRelativ, rechtLaden, rechtZeilen, umgebungZeilen, zifferLaden, type Ziffern, zonenKuerzel, type Koerper, type Recht } from '@/lib/check-modell';
 import { Ladebild, type LadebildDaten } from '@/components/check/Ladebild';
 import { FENSTER } from '@/lib/fenster';
@@ -51,10 +53,14 @@ const FRAGEN: [string, string][] = [
 
 type Feld = 'name' | 'email' | 'telefon';
 
-export default function Check({ marke: vorgabe }: { marke?: Marke }) {
+export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?: 'heizung' }) {
   const { marke: markeId } = useParams();
   // Auf einer Marken-Domain entscheidet der Hostname, sonst /check/:marke (Vorschau auf unserer Domain).
-  const marke = useMemo(() => vorgabe ?? markeFuerHost(window.location.hostname) ?? markeNachId(markeId) ?? STANDARD_MARKE, [vorgabe, markeId]);
+  // Der Heizungs-Check (/heizung) trägt dieselbe Marke mit eigenen Texten.
+  const marke = useMemo(() => {
+    const m = vorgabe ?? markeFuerHost(window.location.hostname) ?? markeNachId(markeId) ?? STANDARD_MARKE;
+    return modus === 'heizung' ? { ...m, ...HEIZUNG_TEXT } : m;
+  }, [vorgabe, markeId, modus]);
   const domain = useMemo(() => {
     const h = window.location.hostname.replace(/^www\./, '');
     return marke.domains.includes(h) ? h : marke.domains[0];
@@ -242,6 +248,7 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
     if (heuteSchon().length >= 3) { setFehler('Von diesem Gerät sind heute schon mehrere Anfragen eingegangen. Wir melden uns bei Ihnen.'); return; }
     setSendet(true); setFehler(null);
     const angaben = leadAngaben({ marke: marke.id, domain, antwort, befund, herkunft: window.location.search ? herkunft(window.location.search) : {} });
+    if (modus === 'heizung') angaben.thema = 'heizung';
     // Gewählte Wohnung (Stockwerkeigentum) mitgeben, knapp: die Spalte erlaubt weniger als 8 kB.
     if (wohnung) angaben.wohnung = { egid: wohnung.egid, stock: stockText(wohnung.stock), zimmer: wohnung.zimmer, flaeche: wohnung.flaeche, nr: wohnung.nr };
     if (document.referrer) angaben.referrer = document.referrer.slice(0, 200);
@@ -302,7 +309,10 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
     };
   }, [ort, befund, gebaeude, rechtslage]);
   const pdf = rechtslage && rechtslage !== 'fehlt' ? rechtslage.pdf : null;
-  const lage = umgebungZeilen(rechtslage && rechtslage !== 'fehlt' ? rechtslage.umgebung : null);
+  // Im Heizungs-Check stehen Fernwärme und Solardach schon unter "Ihre Heizung"; nichts doppelt.
+  const lage = umgebungZeilen(rechtslage && rechtslage !== 'fehlt' ? rechtslage.umgebung : null)
+    .filter(z => modus !== 'heizung' || (z.titel !== 'Fernwärme' && z.titel !== 'Solardach'));
+  const heizung = modus === 'heizung' ? heizungZeilen(befund, rechtslage && rechtslage !== 'fehlt' ? rechtslage.umgebung : null) : [];
   const zoneAuszug = rechtslage && rechtslage !== 'fehlt' ? rechtslage.auszug?.zone?.text ?? null : null;
   const moeglich = (befund?.flaeche ?? 0) * az;
   // Was der Zonenplan des Kantons führt (heute Zürich): mit AZ startet der Rechner beim echten Wert,
@@ -498,6 +508,21 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
                             </ul>
                           ) : <div className="klein">Auf dieser Parzelle ist kein Gebäude im Register eingetragen.</div>}
                         </div>
+                        {heizung.length > 0 && (
+                          <div className="block">
+                            <h3>Ihre Heizung</h3>
+                            <dl className="recht">
+                              {heizung.map(z => (
+                                <div key={z.titel}>
+                                  <dt>{z.titel}</dt>
+                                  <dd>{z.art && <span className={`punkt ${z.art}`} aria-hidden="true" />}{z.link ? <a href={z.link} target={FENSTER.extern}>{z.wert}</a> : z.wert}{z.zusatz && <small>{z.zusatz}</small>}</dd>
+                                  <span className="q">{z.quelle}</span>
+                                </div>
+                              ))}
+                            </dl>
+                            {FOERDERUNG.map(f => <a key={f.url} className="pdf" href={f.url} target={FENSTER.extern}>{f.text}</a>)}
+                          </div>
+                        )}
                         <div className="block">
                           <h3>Was auf der Parzelle gilt</h3>
                           {rechtslage === null && <div className="klein">Rechtslage wird beim Kanton abgefragt …</div>}
@@ -555,7 +580,7 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
                             <>
                               <div className="frage-nr">Frage {frage + 1} von 3</div>
                               {frage === 0 && <><div className="frage">Sind Sie Eigentümer/in dieser Liegenschaft?</div>{wahl('eigentuemer', ANTWORT_TEXT.eigentuemer)}</>}
-                              {frage === 1 && <><div className="frage">Was beschäftigt Sie?</div>{wahl('absicht', ANTWORT_TEXT.absicht)}</>}
+                              {frage === 1 && <><div className="frage">Was beschäftigt Sie?</div>{wahl('absicht', modus === 'heizung' ? ABSICHT_HEIZUNG : ANTWORT_TEXT.absicht as Record<string, string>)}</>}
                               {frage === 2 && <><div className="frage">Bis wann?</div>{wahl('zeitraum', ANTWORT_TEXT.zeitraum)}</>}
                               <button type="button" className="zurueck" onClick={() => (frage > 0 ? setFrage(frage - 1) : setSchritt(0))}>Zurück</button>
                             </>
@@ -656,6 +681,12 @@ export default function Check({ marke: vorgabe }: { marke?: Marke }) {
       <footer>
         <div className="huelle">
           <div><span className="wortmarke">{wortmarke}</span><p>{marke.name.join('')} ist ein Angebot von {BETREIBER}. Amtliche Daten, persönlich geprüft.</p></div>
+          {/* Weitere Einstiege; ohne Link fand sie weder ein Besucher noch Google (15. November). */}
+          <div><h4>Mehr</h4><ul>
+            {modus !== 'heizung' && <li><a href={markeFuerHost(window.location.hostname) ? '/heizung' : `/check/${marke.id}/heizung`}>Heizungs-Check</a></li>}
+            {modus === 'heizung' && <li><a href={markeFuerHost(window.location.hostname) ? '/' : `/check/${marke.id}`}>Grundstück prüfen</a></li>}
+            {ARTIKEL.map(a => <li key={a.slug}><a href={markeFuerHost(window.location.hostname) ? `/ratgeber/${a.slug}` : `/check/${marke.id}/ratgeber/${a.slug}`}>Ratgeber: {a.titel.split('.')[0]}</a></li>)}
+          </ul></div>
           <div><h4>Rechtliches</h4><ul>
             <li><button type="button" onClick={() => { setRecht('impressum'); window.scrollTo({ top: 0 }); }}>Impressum</button></li>
             <li><button type="button" onClick={() => { setRecht('datenschutz'); window.scrollTo({ top: 0 }); }}>Datenschutz</button></li>

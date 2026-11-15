@@ -32,6 +32,16 @@
       "destination": "/marken/parzellenchecker/ratgeber/haus-zu-gross.html"
     },
     {
+      "source": "/heizung",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellenchecker\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellenchecker/heizung.html"
+    },
+    {
       "source": "/((?!assets/|api/|marken/).*)",
       "has": [
         {
@@ -70,6 +80,16 @@
         }
       ],
       "destination": "/marken/hauschecker/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/heizung",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(hauschecker\\.ch)"
+        }
+      ],
+      "destination": "/marken/hauschecker/heizung.html"
     },
     {
       "source": "/((?!assets/|api/|marken/).*)",
@@ -112,6 +132,16 @@
       "destination": "/marken/wasdarfichbauen/ratgeber/haus-zu-gross.html"
     },
     {
+      "source": "/heizung",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(was-kann-ich-bauen\\.ch)"
+        }
+      ],
+      "destination": "/marken/wasdarfichbauen/heizung.html"
+    },
+    {
       "source": "/((?!assets/|api/|marken/).*)",
       "has": [
         {
@@ -150,6 +180,16 @@
         }
       ],
       "destination": "/marken/ausbaupotenzial/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/heizung",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(ausbaupotenzial\\.ch)"
+        }
+      ],
+      "destination": "/marken/ausbaupotenzial/heizung.html"
     },
     {
       "source": "/((?!assets/|api/|marken/).*)",
@@ -192,6 +232,16 @@
       "destination": "/marken/erbliegenschaft/ratgeber/haus-zu-gross.html"
     },
     {
+      "source": "/heizung",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(erbliegenschaft\\.ch)"
+        }
+      ],
+      "destination": "/marken/erbliegenschaft/heizung.html"
+    },
+    {
       "source": "/((?!assets/|api/|marken/).*)",
       "has": [
         {
@@ -230,6 +280,16 @@
         }
       ],
       "destination": "/marken/reserverechner/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/heizung",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(ausnuetzung-check\\.ch)"
+        }
+      ],
+      "destination": "/marken/reserverechner/heizung.html"
     },
     {
       "source": "/((?!assets/|api/|marken/).*)",
@@ -272,6 +332,16 @@
       "destination": "/marken/aufstockcheck/ratgeber/haus-zu-gross.html"
     },
     {
+      "source": "/heizung",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(aufstockungscheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/aufstockcheck/heizung.html"
+    },
+    {
       "source": "/((?!assets/|api/|marken/).*)",
       "has": [
         {
@@ -310,6 +380,16 @@
         }
       ],
       "destination": "/marken/verdichtungscheck/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/heizung",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(verdichtungscheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/verdichtungscheck/heizung.html"
     },
     {
       "source": "/((?!assets/|api/|marken/).*)",
@@ -352,6 +432,16 @@
       "destination": "/marken/parzellenwert/ratgeber/haus-zu-gross.html"
     },
     {
+      "source": "/heizung",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellenwert\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellenwert/heizung.html"
+    },
+    {
       "source": "/((?!assets/|api/|marken/).*)",
       "has": [
         {
@@ -390,6 +480,16 @@
         }
       ],
       "destination": "/marken/landwert24/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/heizung",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(landwert24\\.ch)"
+        }
+      ],
+      "destination": "/marken/landwert24/heizung.html"
     },
     {
       "source": "/((?!assets/|api/|marken/).*)",
@@ -432,6 +532,16 @@
       "destination": "/marken/hauswertrechner/ratgeber/haus-zu-gross.html"
     },
     {
+      "source": "/heizung",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(hauswertrechner\\.ch)"
+        }
+      ],
+      "destination": "/marken/hauswertrechner/heizung.html"
+    },
+    {
       "source": "/((?!assets/|api/|marken/).*)",
       "has": [
         {
@@ -470,6 +580,16 @@
         }
       ],
       "destination": "/marken/grundstueckrechner/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/heizung",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellenrechner\\.ch)"
+        }
+      ],
+      "destination": "/marken/grundstueckrechner/heizung.html"
     },
     {
       "source": "/((?!assets/|api/|marken/).*)",
@@ -512,6 +632,16 @@
       "destination": "/marken/bauzonencheck/ratgeber/haus-zu-gross.html"
     },
     {
+      "source": "/heizung",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(bauzonencheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/bauzonencheck/heizung.html"
+    },
+    {
       "source": "/((?!assets/|api/|marken/).*)",
       "has": [
         {
@@ -550,6 +680,16 @@
         }
       ],
       "destination": "/marken/eigentuemercheck/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/heizung",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(eigentuemercheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/eigentuemercheck/heizung.html"
     },
     {
       "source": "/((?!assets/|api/|marken/).*)",
@@ -592,6 +732,16 @@
       "destination": "/marken/baurechner24/ratgeber/haus-zu-gross.html"
     },
     {
+      "source": "/heizung",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(baurechner24\\.ch)"
+        }
+      ],
+      "destination": "/marken/baurechner24/heizung.html"
+    },
+    {
       "source": "/((?!assets/|api/|marken/).*)",
       "has": [
         {
@@ -630,6 +780,16 @@
         }
       ],
       "destination": "/marken/checkmyparcel/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/heizung",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(checkmyparcel\\.ch)"
+        }
+      ],
+      "destination": "/marken/checkmyparcel/heizung.html"
     },
     {
       "source": "/((?!assets/|api/|marken/).*)",
@@ -672,6 +832,16 @@
       "destination": "/marken/parzellencheck24/ratgeber/haus-zu-gross.html"
     },
     {
+      "source": "/heizung",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellencheck24\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellencheck24/heizung.html"
+    },
+    {
       "source": "/((?!assets/|api/|marken/).*)",
       "has": [
         {
@@ -710,6 +880,16 @@
         }
       ],
       "destination": "/marken/parzellepruefen/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/heizung",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellepruefen\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellepruefen/heizung.html"
     },
     {
       "source": "/((?!assets/|api/|marken/).*)",
@@ -752,6 +932,16 @@
       "destination": "/marken/parzellencheck/ratgeber/haus-zu-gross.html"
     },
     {
+      "source": "/heizung",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellen-check\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellencheck/heizung.html"
+    },
+    {
       "source": "/((?!assets/|api/|marken/).*)",
       "has": [
         {
@@ -790,6 +980,16 @@
         }
       ],
       "destination": "/marken/hauswert24/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/heizung",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(hauswert24\\.ch)"
+        }
+      ],
+      "destination": "/marken/hauswert24/heizung.html"
     },
     {
       "source": "/((?!assets/|api/|marken/).*)",
@@ -832,6 +1032,16 @@
       "destination": "/marken/hauswertcheck/ratgeber/haus-zu-gross.html"
     },
     {
+      "source": "/heizung",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(hauswertcheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/hauswertcheck/heizung.html"
+    },
+    {
       "source": "/((?!assets/|api/|marken/).*)",
       "has": [
         {
@@ -872,6 +1082,16 @@
       "destination": "/marken/baupotenzialcheck/ratgeber/haus-zu-gross.html"
     },
     {
+      "source": "/heizung",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(baupotenzialcheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/baupotenzialcheck/heizung.html"
+    },
+    {
       "source": "/((?!assets/|api/|marken/).*)",
       "has": [
         {
@@ -910,6 +1130,16 @@
         }
       ],
       "destination": "/marken/zonencheck/ratgeber/haus-zu-gross.html"
+    },
+    {
+      "source": "/heizung",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(zonen-check\\.ch)"
+        }
+      ],
+      "destination": "/marken/zonencheck/heizung.html"
     },
     {
       "source": "/((?!assets/|api/|marken/).*)",
