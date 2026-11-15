@@ -67,9 +67,42 @@ export function zaehltHier(host: string): boolean {
   return markeFuerHost(host) !== null;
 }
 
+/**
+ * Suchmaschinen, Vorschau-Dienste und Scanner, die JavaScript ausführen.
+ * Am 15. November gemessen (Auswerten: besucher): 795 "Besucher" in drei
+ * Tagen, gleichmässig auf alle 23 Domains, fast alle direkt und nur 8 mit
+ * einer Suche -- ohne eine einzige Anzeige. Julian: "stimmen die analytics?"
+ */
+const BOT = /bot|crawl|spider|slurp|headless|lighthouse|preview|facebookexternalhit|embedly|scan|python|curl|wget|httpclient|phantom|puppeteer|playwright/i;
+export function istBot(ua: string, webdriver: boolean): boolean {
+  return webdriver || BOT.test(ua);
+}
+
+// Ein Aufruf zählt erst, wenn ein Mensch etwas tut: tippen, klicken,
+// scrollen oder eine Taste drücken. Wer die Seite nur lädt, ist kein Besucher.
+const LEBENSZEICHEN = ['pointerdown', 'touchstart', 'keydown', 'scroll', 'wheel'] as const;
+const NACH_BEWEGUNG: ReadonlySet<Ereignis> = new Set(['aufruf', 'ratgeber']);
+let bewegt = false;
+const warten: (() => void)[] = [];
+function nachBewegung(f: () => void): void {
+  if (bewegt) return f();
+  if (!warten.length) {
+    const los = () => {
+      if (bewegt) return;
+      bewegt = true;
+      LEBENSZEICHEN.forEach(e => window.removeEventListener(e, los));
+      warten.splice(0).forEach(g => g());
+    };
+    LEBENSZEICHEN.forEach(e => window.addEventListener(e, los, { passive: true }));
+  }
+  warten.push(f);
+}
+
 /** Jeden Schritt einmal je Sitzung und Marke. */
 export function zaehlen(marke: string, domain: string, ereignis: Ereignis): void {
   if (typeof window === 'undefined' || !zaehltHier(window.location.hostname)) return;
+  if (istBot(navigator.userAgent ?? '', navigator.webdriver === true)) return;
+  if (NACH_BEWEGUNG.has(ereignis) && !bewegt) { nachBewegung(() => zaehlen(marke, domain, ereignis)); return; }
   const schluessel = `${marke}|${ereignis}`;
   if (gesendet.has(schluessel)) return;
   gesendet.add(schluessel);

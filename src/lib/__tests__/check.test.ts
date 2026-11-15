@@ -75,6 +75,11 @@ describe('Besucher zählen', () => {
     expect(zaehltHier('www.zonen-check.ch')).toBe(true);
     expect(zaehltHier('bauraum-lead-finder-git-akquise-i-nation.vercel.app')).toBe(false);
     expect(zaehltHier('bauraum-checks.vercel.app')).toBe(false);
+    const { istBot } = await import('@/lib/check-zaehlen');
+    expect(istBot('Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)', false)).toBe(true);
+    expect(istBot('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0 Safari/537.36', false)).toBe(true);
+    expect(istBot('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1', false)).toBe(false);
+    expect(istBot('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)', true)).toBe(true);
     expect(zaehltHier('localhost')).toBe(false);
     expect(zaehltHier('127.0.0.1')).toBe(false);
   });
