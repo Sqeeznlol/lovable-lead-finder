@@ -28,3 +28,11 @@ describe('Cookie-Zustimmung', () => {
     expect(zustimmung()).toBeNull();
   });
 });
+
+describe('Meta-Pixel', () => {
+  it('lädt nur nach «Einverstanden»', async () => {
+    const quelle = (await import('node:fs')).readFileSync('src/lib/meta-pixel.ts', 'utf8');
+    // Die einzige öffentliche Funktion prüft die Zustimmung, bevor sie lädt.
+    expect(quelle).toMatch(/export function pixel[\s\S]*?!darfWerben\(\)\) return;[\s\S]*?laden\(/);
+  });
+});

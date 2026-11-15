@@ -6,7 +6,7 @@
  * Kantone keinen ÖREB-Abruf aus dem Browser erlaubt.
  */
 import type { Befund } from '@/lib/check-daten';
-import { supabase } from '@/integrations/supabase/client';
+import { datenbank } from './datenbank';
 
 export interface Koerper { h: number; r: number[][] }
 export interface Modell { eigene: Koerper[]; nachbarn: Koerper[]; geschosse: number }
@@ -158,7 +158,7 @@ export function zifferAus(zeilen: ZifferZeile[]): Ziffern | null {
   return z.az ?? z.bmz ?? z.uez ?? z.gruen ?? z.unbestimmt ? z : null;
 }
 export async function zifferLaden(e: number, n: number): Promise<Ziffern | null> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const r = await (supabase as any).rpc('zone_ziffer_am', { p_e: e, p_n: n });
+   
+  const r = await (await datenbank()).rpc('zone_ziffer_am', { p_e: e, p_n: n });
   return r.error ? null : zifferAus((r.data ?? []) as ZifferZeile[]);
 }

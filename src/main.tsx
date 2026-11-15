@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import { benenneEigenenTab } from "@/lib/fenster";
-import App from "./App.tsx";
+import { lazy, Suspense } from "react";
+import { markeFuerHost } from "@/lib/check-marken";
 import "./index.css";
 import { FASSUNG } from "./lib/fassung";
 import { neuLadenEinmal } from "./lib/neue-fassung";
@@ -20,4 +21,10 @@ window.addEventListener("vite:preloadError", (e) => {
   if (neuLadenEinmal()) e.preventDefault();
 });
 
-createRoot(document.getElementById("root")!).render(<App />);
+// Auf einer Marken-Domain nur der schlanke Einstieg (CheckApp), sonst die ganze App.
+const marke = markeFuerHost(window.location.hostname);
+const App = lazy(() => import("./App.tsx"));
+const CheckApp = lazy(() => import("./CheckApp.tsx"));
+createRoot(document.getElementById("root")!).render(
+  <Suspense fallback={null}>{marke ? <CheckApp marke={marke} /> : <App />}</Suspense>,
+);

@@ -5,7 +5,7 @@
 // Ehrlich bleiben: Die Daten beginnen je Kanton verschieden; liegt der
 // Beginn weniger als ein Jahr zurück, nennt der Satz das Datum. Ist der
 // Kanton nicht erfasst (seit = null), zeigt der Check nichts.
-import { supabase } from '@/integrations/supabase/client';
+import { datenbank } from './datenbank';
 import type { Zeile } from './check-modell';
 
 export interface Umkreis {
@@ -40,7 +40,7 @@ export function umkreisZeilen(u: Umkreis | null): Zeile[] {
 
 /** Die einzige Datenbankfrage der Nachbarschaft: Zählungen im Umkreis von 300 m. */
 export async function umkreisLaden(e: number, n: number, kanton: string): Promise<Umkreis | null> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const r = await (supabase as any).rpc('baugesuche_umkreis', { p_e: e, p_n: n, p_kanton: kanton, p_meter: 300 });
+   
+  const r = await (await datenbank()).rpc('baugesuche_umkreis', { p_e: e, p_n: n, p_kanton: kanton, p_meter: 300 });
   return r.error ? null : (r.data as Umkreis | null);
 }

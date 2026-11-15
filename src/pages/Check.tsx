@@ -5,10 +5,9 @@ import { DATENQUELLEN, FRAGEN, SCHRITTE } from '@/lib/check-inhalt';
 import { preisZeilen, type Preise } from '@/lib/preise';
 import { umkreisLaden, umkreisSatz, umkreisZeilen, type Umkreis } from '@/lib/umkreis';
 import { useParams } from 'react-router-dom';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import type L from 'leaflet';
 import './check.css';
-import { supabase } from '@/integrations/supabase/client';
+import { datenbank } from '@/lib/datenbank';
 import { lv95NachWgs84 } from '@/lib/koordinaten';
 import { BETREIBER, markeFuerHost, markeNachId, STANDARD_MARKE, type Marke } from '@/lib/check-marken';
 import { KATASTER } from '@/lib/check-hintergrund';
@@ -101,6 +100,12 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
   const abfrage = useRef(0);
   const geoeffnet = useRef(0);
   const kartenBox = useRef<HTMLDivElement>(null);
+  // Die Karte (Leaflet, rund 40 KB) erst laden, wenn es ein Ergebnis gibt (Tempo, 15. November).
+  const [Lm, setLm] = useState<typeof L | null>(null);
+  useEffect(() => {
+    if (!ort || Lm) return;
+    void Promise.all([import('leaflet'), import('leaflet/dist/leaflet.css')]).then(([m]) => setLm(() => m.default));
+  }, [ort, Lm]);
   const karte = useRef<L.Map | null>(null);
   const grund = useRef<L.TileLayer | null>(null);
   const umriss = useRef<L.Polygon | null>(null);
@@ -125,39 +130,39 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
 
   // Karte, sobald es ein Ergebnis gibt.
   useEffect(() => {
-    if (!ort || !bildFertig || !kartenBox.current || karte.current) return;
-    const m = L.map(kartenBox.current, { zoomControl: false, maxZoom: 20 });
-    L.control.zoom({ position: 'topright' }).addTo(m);
+    if (!Lm || !ort || !bildFertig || !kartenBox.current || karte.current) return;
+    const m = Lm.map(kartenBox.current, { zoomControl: false, maxZoom: 20 });
+    Lm.control.zoom({ position: 'topright' }).addTo(m);
     m.attributionControl.setPrefix('');
-    L.tileLayer.wms('https://wms.geo.admin.ch/', { layers: 'ch.kantone.cadastralwebmap-farbe', format: 'image/png', transparent: true,
+    Lm.tileLayer.wms('https://wms.geo.admin.ch/', { layers: 'ch.kantone.cadastralwebmap-farbe', format: 'image/png', transparent: true,
       opacity: 0.6, minZoom: 16, maxZoom: 20, attribution: '© Amtliche Vermessung' }).addTo(m);
     karte.current = m;
     return () => { m.remove(); karte.current = null; grund.current = null; umriss.current = null; };
-  }, [ort, bildFertig]);
+  }, [Lm, ort, bildFertig]);
 
   useEffect(() => {
     const m = karte.current;
-    if (!m) return;
+    if (!m || !Lm) return;
     const e = luftbild ? { id: 'ch.swisstopo.swissimage', max: 20 } : { id: 'ch.swisstopo.pixelkarte-grau', max: 19 };
     grund.current?.remove();
-    grund.current = L.tileLayer(`https://wmts.geo.admin.ch/1.0.0/${e.id}/default/current/3857/{z}/{x}/{y}.jpeg`,
+    grund.current = Lm.tileLayer(`https://wmts.geo.admin.ch/1.0.0/${e.id}/default/current/3857/{z}/{x}/{y}.jpeg`,
       { maxZoom: 20, maxNativeZoom: e.max, attribution: '© swisstopo' }).addTo(m);
     grund.current.bringToBack();
-  }, [luftbild, ort, bildFertig]);
+  }, [Lm, luftbild, ort, bildFertig]);
 
   useEffect(() => {
     const m = karte.current;
-    if (!m || !ort) return;
+    if (!m || !ort || !Lm) return;
     m.invalidateSize();
     const w = lv95NachWgs84(ort.e, ort.n);
     if (!befund) { m.setView([w.lat, w.lon], 18, { animate: false }); return; }
     umriss.current?.remove();
     if (befund.teile.length) {
       const ll = befund.teile.map(t => t.map(r => r.map(([e, nn]) => { const p = lv95NachWgs84(e, nn); return [p.lat, p.lon] as [number, number]; })));
-      umriss.current = L.polygon(ll, { color: marke.farbe, weight: 3, fillColor: marke.farbe, fillOpacity: 0.15 }).addTo(m);
+      umriss.current = Lm.polygon(ll, { color: marke.farbe, weight: 3, fillColor: marke.farbe, fillOpacity: 0.15 }).addTo(m);
       m.fitBounds(umriss.current.getBounds(), { padding: [70, 70], maxZoom: 19, animate: false });
     }
-  }, [befund, ort, marke, bildFertig]);
+  }, [Lm, befund, ort, marke, bildFertig]);
 
   // Fokus noch im Tippen setzen: Nur dann öffnet Safari auf dem iPhone die
   // Tastatur. Danach weich nach oben; preventScroll verhindert den Sprung.
@@ -265,8 +270,8 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
     if (document.referrer) angaben.referrer = document.referrer.slice(0, 200);
     if (ort) angaben.lv95 = [Math.round(ort.e), Math.round(ort.n)];
     // Ohne Rückgabe der Zeile: der öffentliche Schlüssel darf einfügen, nicht lesen.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase as any).from('anfrage').insert({
+     
+    const { error } = await (await datenbank()).from('anfrage').insert({
       art: 'potenzial', name: kontakt.name.trim().replace(/\s+/g, ' ').slice(0, 120),
       email: kontakt.email.trim(), telefon: schweizerNummer(kontakt.telefon),
       adresse: befund.adresse.slice(0, 200), egrid: befund.egrid, angaben, einwilligung: true,

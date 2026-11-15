@@ -7,7 +7,7 @@
  * Fehler werden verschluckt: Fehlt die Tabelle oder ist das Netz weg,
  * darf die Seite nicht darunter leiden.
  */
-import { supabase } from '@/integrations/supabase/client';
+import { datenbank } from './datenbank';
 import { pixel, type PixelEreignis } from '@/lib/meta-pixel';
 import { markeFuerHost } from '@/lib/check-marken';
 
@@ -110,8 +110,8 @@ export function zaehlen(marke: string, domain: string, ereignis: Ereignis): void
   if (p) pixel(p, { content_name: domain, content_category: marke });
   const { quelle, kampagne } = sitzungsQuelle();
   const geraet = window.matchMedia?.('(max-width: 999px)').matches ? 'handy' : 'computer';
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  void (supabase as any).from('check_ereignis')
-    .insert({ marke, domain: domain.slice(0, 100), ereignis, sitzung: sitzung(), quelle, kampagne, geraet })
+   
+  void datenbank().then(db => db.from('check_ereignis')
+    .insert({ marke, domain: domain.slice(0, 100), ereignis, sitzung: sitzung(), quelle, kampagne, geraet }))
     .then(() => undefined, () => undefined);
 }

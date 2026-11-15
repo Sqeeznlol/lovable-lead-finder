@@ -8,7 +8,12 @@
  * Vercel. Ohne sie lädt nichts: keine Anfrage an Meta.
  *
  * Gesendet werden nur Ereignisse, keine Namen, Adressen oder Nummern.
+ *
+ * Nur nach «Einverstanden» im Cookie-Hinweis (darfWerben, zustimmung.ts):
+ * der Hinweis verspricht es, und ohne diese Sperre hätte das Pixel ab dem
+ * Eintragen der ID ohne Zustimmung geladen (gefunden am 15. November).
  */
+import { darfWerben } from './zustimmung';
 export const PIXEL_ID: string | undefined = import.meta.env.VITE_META_PIXEL_ID || undefined;
 
 type Fbq = ((...a: unknown[]) => void) & { callMethod?: (...a: unknown[]) => void; queue: unknown[]; loaded: boolean; version: string; push: unknown };
@@ -37,7 +42,7 @@ function laden(id: string): void {
 
 /** Ein Ereignis an Meta; ohne Pixel-ID tut es nichts. */
 export function pixel(ereignis: PixelEreignis, daten?: Record<string, string | number>): void {
-  if (!PIXEL_ID || typeof window === 'undefined') return;
+  if (!PIXEL_ID || typeof window === 'undefined' || !darfWerben()) return;
   laden(PIXEL_ID);
   (window as unknown as { fbq: Fbq }).fbq('track', ereignis, daten ?? {});
 }
