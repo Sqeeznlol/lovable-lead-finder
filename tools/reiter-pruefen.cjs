@@ -133,7 +133,9 @@ async function pruefen(browser, geraet, zeilen) {
         ergebnis = /Möglich sind rund/.test(t) ? 'rechenbar' : /Nicht rechenbar/.test(t) ? 'nicht rechenbar (mit Begründung)' : /liess sich nicht laden/.test(t) ? 'Grundlage lädt nicht' : 'keine Antwort';
         ergebnis += ` · Umriss ${/Umriss laut Amtlicher Vermessung/.test(t) ? 'ja' : 'nein'} · Zonenplan ${/amtlich · Zonenplan des Kantons/.test(t) ? 'amtlich' : 'aus der eigenen Liste'}`;
         if (MERKMALE.some(m => m.test(t))) ergebnis += ' · auffälliger Text';
-      } else ergebnis = 'Knopf «Rechnen» fehlt';
+      // Kein Fehler: die Seite kann einen Stand zeigen, der die Studie noch
+      // nicht kennt (am 15. November stand die Auslieferung über Nacht).
+      } else ergebnis = 'nicht rechenbar: dieser Stand der Seite kennt die Machbarkeit noch nicht';
     }
     const gut = /^(rechenbar|nicht rechenbar)/.test(ergebnis) && !/auffälliger Text/.test(ergebnis);
     zeilen.push({ geraet: geraet.name, reiter: 'objekt und machbarkeit', ms: Date.now() - start, fehler: [...new Set(fehler)].concat(gut ? [] : [ergebnis]),
