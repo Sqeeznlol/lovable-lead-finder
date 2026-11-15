@@ -123,6 +123,7 @@ export function Leads() {
                         {a.prioritaet === 'heiss' && <Marke art="heiss">heiss</Marke>}
                         {a.prioritaet === 'warm' && <Marke art="violett">warm</Marke>}
                         <Marke>{String(a.domain ?? a.marke ?? 'Anfrage')}</Marke>
+                        {a.thema === 'heizung' && <Marke>Heizungs-Check</Marke>}
                         {(a.utm_source || a.fbclid || a.gclid) && <Marke>{String(a.utm_source ?? (a.fbclid ? 'facebook' : 'google'))}</Marke>}
                       </div>
                       <div className="text-sm">{l.adresse ?? '–'}{a.flaeche ? ` · ${a.flaeche} m²` : ''}{a.zone ? ` · ${a.zone}` : ''}{wohnungText(a.wohnung) ? ` · Wohnung ${wohnungText(a.wohnung)}` : ''}</div>

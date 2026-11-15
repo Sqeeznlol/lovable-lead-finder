@@ -198,6 +198,7 @@ export function LeadDetail({ lead, onClose, onErledigt, onNotiz, onNachfass }: {
             <section>
               <h3 className="mb-1 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Was die Person will</h3>
               {zeile('Eigentümer', ANTWORT_TEXT.eigentuemer[String(a.eigentuemer)])}
+              {zeile('Einstieg', a.thema === 'heizung' ? 'Heizungs-Check' : null)}
               {zeile('Absicht', ANTWORT_TEXT.absicht[String(a.absicht)])}
               {zeile('Zeitraum', ANTWORT_TEXT.zeitraum[String(a.zeitraum)])}
               {zeile('Priorität', a.prioritaet)}
