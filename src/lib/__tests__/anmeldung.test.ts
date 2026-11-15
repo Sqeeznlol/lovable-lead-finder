@@ -51,6 +51,13 @@ describe('Anmeldung', () => {
     expect(seite).toMatch(/\.from\('anfrage'\)\.insert\(/);
   });
 
+  it('die Nachbarschaft fragt nur Zählungen ab', () => {
+    // Die öffentliche Funktion baugesuche_umkreis gibt nur Zahlen nach Art zurück, keine Adressen.
+    const s = readFileSync('src/lib/umkreis.ts', 'utf8');
+    expect(s.match(/\.rpc\('(\w+)'/g)).toEqual([".rpc('baugesuche_umkreis'"]);
+    expect(s).not.toMatch(/\.from\(|\.select\(|\.insert\(|\.update\(|\.delete\(/);
+  });
+
   it('der Ratgeber berührt die Datenbank nicht', () => {
     for (const datei of ['src/pages/Ratgeber.tsx', 'src/lib/ratgeber.ts']) {
       const s = readFileSync(datei, 'utf8');

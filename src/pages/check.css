@@ -357,3 +357,4 @@
 .pc:has(.cookie) .mobil-aufruf{display: none;}
 @media print{.pc .cookie{display: none;}}
 .pc .preis-knopf{width:100%; min-height:48px; margin-top:14px;}
+.pc .nachbar-satz{margin:0 0 12px; font-weight:500; line-height:1.45;}

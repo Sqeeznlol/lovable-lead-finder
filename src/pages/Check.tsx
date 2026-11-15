@@ -3,6 +3,7 @@ import { CookieHinweis } from '@/components/CookieHinweis';
 import { setzeZustimmung } from '@/lib/zustimmung';
 import { DATENQUELLEN, FRAGEN, SCHRITTE } from '@/lib/check-inhalt';
 import { preisZeilen, type Preise } from '@/lib/preise';
+import { umkreisLaden, umkreisSatz, umkreisZeilen, type Umkreis } from '@/lib/umkreis';
 import { useParams } from 'react-router-dom';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -336,6 +337,17 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
     zifferLaden(ort.e, ort.n).then(z => { if (aktiv) setZifferKanton(z); }).catch(() => {});
     return () => { aktiv = false; };
   }, [ort, befund]);
+  // Baugesuche im Umkreis von 300 m (nur Zählungen, baugesuche_umkreis).
+  const [umkreis, setUmkreis] = useState<Umkreis | null>(null);
+  useEffect(() => {
+    setUmkreis(null);
+    if (!ort || !befund?.kanton) return;
+    let aktiv = true;
+    umkreisLaden(ort.e, ort.n, befund.kanton).then(u => { if (aktiv) setUmkreis(u); }).catch(() => {});
+    return () => { aktiv = false; };
+  }, [ort, befund]);
+  const nachbarSatz = umkreisSatz(umkreis);
+  const nachbar = umkreisZeilen(umkreis);
   const ziffern = (rechtslage && rechtslage !== 'fehlt' ? rechtslage.ziffern ?? null : null) ?? zifferKanton;
   // Ohne Auszug nennt die Nutzungsplanung des Kantons die Zone genauer als der Bund (Zug: "Kernzone C").
   const zoneText = zoneAuszug ?? (ziffern?.zone ? `${ziffern.zone}${ziffern.kuerzel ? ` [${ziffern.kuerzel}]` : ''}` : null);
@@ -579,6 +591,22 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
                           )}
                           {pdf && <a className="pdf" href={pdf} target={FENSTER.extern}>Amtlicher ÖREB-Auszug (PDF)</a>}
                         </div>
+                        {nachbarSatz && (
+                          <div className="block">
+                            <h3>In Ihrer Nachbarschaft</h3>
+                            <p className="nachbar-satz">{nachbarSatz}</p>
+                            {nachbar.length > 0 && (
+                              <dl className="recht">
+                                {nachbar.map(z => (
+                                  <div key={z.titel}>
+                                    <dt>{z.titel}</dt>
+                                    <dd>{z.wert}</dd>
+                                  </div>
+                                ))}
+                              </dl>
+                            )}
+                          </div>
+                        )}
                         {preis.length > 0 && gemeindePreise && (
                           <div className="block">
                             <h3>Preise in {gemeindePreise.name}</h3>
@@ -606,7 +634,7 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
                             </dl>
                           </div>
                         )}
-                        <div className="block klein">Quellen: Amtliche Vermessung, Bauzonen Schweiz (ARE), Gebäude- und Wohnungsregister (BFS), ÖREB-Kataster des Kantons, Kulturgüterinventar, Solarkataster und Wärmenetze (BFE), ÖV-Güteklassen (ARE), Radonkarte (BAG){gemeindePreise ? `, Immobilienpreise: ${preise?.quellen[gemeindePreise.k] ?? ''}` : ''}, abgefragt am {new Date().toLocaleDateString('de-CH')}. Vorprüfung, keine Bewilligungszusage.</div>
+                        <div className="block klein">Quellen: Amtliche Vermessung, Bauzonen Schweiz (ARE), Gebäude- und Wohnungsregister (BFS), ÖREB-Kataster des Kantons, Kulturgüterinventar, Solarkataster und Wärmenetze (BFE), ÖV-Güteklassen (ARE), Radonkarte (BAG){nachbarSatz ? ', Baugesuche aus den Amtsblättern und vom Kanton Zürich' : ''}{gemeindePreise ? `, Immobilienpreise: ${preise?.quellen[gemeindePreise.k] ?? ''}` : ''}, abgefragt am {new Date().toLocaleDateString('de-CH')}. Vorprüfung, keine Bewilligungszusage.</div>
                       </>
                     )}
                   </div>
