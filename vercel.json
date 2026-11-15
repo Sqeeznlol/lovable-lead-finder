@@ -142,6 +142,26 @@
       "destination": "/marken/wasdarfichbauen/heizung.html"
     },
     {
+      "source": "/gemeinden",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(was-kann-ich-bauen\\.ch)"
+        }
+      ],
+      "destination": "/marken/wasdarfichbauen/gemeinden.html"
+    },
+    {
+      "source": "/gemeinde/:ort",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(was-kann-ich-bauen\\.ch)"
+        }
+      ],
+      "destination": "/marken/wasdarfichbauen/gemeinde/:ort.html"
+    },
+    {
       "source": "/((?!assets/|api/|marken/).*)",
       "has": [
         {

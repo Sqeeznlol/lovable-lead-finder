@@ -12,6 +12,7 @@
 import { GEKAUFT, MARKEN, type Marke } from './check-marken';
 import { ARTIKEL, type Artikel } from './ratgeber';
 import { HEIZUNG_TEXT } from './heizung-text';
+import { GEMEINDE_DOMAIN, GEMEINDE_HEIMAT, kennzahlen, satz as gemeindeSatz, titel as gemeindeTitel, type Gemeinde } from './gemeinde-seiten';
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -42,9 +43,9 @@ export function beschreibung(m: Marke, a?: Artikel): string {
  * #root, den React beim Start ersetzt. Ohne JavaScript sieht Google so
  * Titel, Satz und Vorteile der Marke statt einer leeren Seite.
  */
-export function markenSeite(indexHtml: string, m: Marke, a?: Artikel, pfad?: string): string {
+export function markenSeite(indexHtml: string, m: Marke, a?: Artikel, pfad?: string, opt: { basis?: string; links?: { href: string; text: string }[] } = {}): string {
   // Ratgeber und Heizungs-Check sind auf allen Domains gleich: eine Hauptfassung für Google.
-  const url = a ? `${RATGEBER_HEIMAT}/ratgeber/${a.slug}` : pfad ? `${RATGEBER_HEIMAT}${pfad}` : `${hauptadresse(m)}/`;
+  const url = a ? `${RATGEBER_HEIMAT}/ratgeber/${a.slug}` : pfad ? `${opt.basis ?? RATGEBER_HEIMAT}${pfad}` : `${hauptadresse(m)}/`;
   const t = esc(titel(m, a)), d = esc(beschreibung(m, a));
   const kopf = [
     `<title>${t}</title>`,
@@ -63,7 +64,7 @@ export function markenSeite(indexHtml: string, m: Marke, a?: Artikel, pfad?: str
   const stil = 'style="font-family:system-ui,sans-serif;max-width:40rem;margin:3rem auto;padding:0 1rem;line-height:1.5;color:#222"';
   const grund = a
     ? `<main ${stil}><p>${esc(a.rubrik)}</p><h1>${esc(a.titel)}</h1><p>${esc(a.lead)}</p>${a.abschnitte.map(x => `<h2>${esc(x.titel)}</h2>${x.absaetze.map(p => `<p>${esc(p)}</p>`).join('')}`).join('')}</main>`
-    : `<main ${stil}><p>${esc(m.etikett)}</p><h1>${esc(m.titel)}</h1><p>${esc(m.satz)}</p><ul>${m.vorteile.map(v => `<li>${esc(v)}</li>`).join('')}</ul><p>${esc(m.aufruf)}</p><p><a href="/ratgeber/${ARTIKEL[0].slug}">Ratgeber: ${esc(ARTIKEL[0].titel)}</a></p></main>`;
+    : `<main ${stil}><p>${esc(m.etikett)}</p><h1>${esc(m.titel)}</h1><p>${esc(m.satz)}</p><ul>${m.vorteile.map(v => `<li>${esc(v)}</li>`).join('')}</ul>${opt.links ? `<ul>${opt.links.map(l => `<li><a href="${esc(l.href)}">${esc(l.text)}</a></li>`).join('')}</ul>` : ''}<p>${esc(m.aufruf)}</p><p><a href="/ratgeber/${ARTIKEL[0].slug}">Ratgeber: ${esc(ARTIKEL[0].titel)}</a></p></main>`;
   return indexHtml
     // Alles, was index.html über die interne App sagt, fällt weg.
     .replace(/<title>[\s\S]*?<\/title>/, '')
@@ -75,13 +76,26 @@ export function markenSeite(indexHtml: string, m: Marke, a?: Artikel, pfad?: str
     .replace(/<div id="root"><\/div>/, `<div id="root">${grund}</div>`);
 }
 
-export function sitemap(m: Marke, stand: string): string {
-  // Artikel nur in der Sitemap ihrer Hauptfassung.
-  const urls = [`${hauptadresse(m)}/`, ...(hauptadresse(m) === RATGEBER_HEIMAT ? [`${RATGEBER_HEIMAT}/heizung`, ...ARTIKEL.map(a => `${RATGEBER_HEIMAT}/ratgeber/${a.slug}`)] : [])];
+export function sitemap(m: Marke, stand: string, gemeinden: Gemeinde[] = []): string {
+  // Artikel, Heizungs-Check und Gemeinden nur in der Sitemap ihrer Hauptfassung.
+  const urls = [`${hauptadresse(m)}/`, ...(hauptadresse(m) === RATGEBER_HEIMAT ? [`${RATGEBER_HEIMAT}/heizung`, ...ARTIKEL.map(a => `${RATGEBER_HEIMAT}/ratgeber/${a.slug}`)] : []),
+    ...(hauptadresse(m) === GEMEINDE_HEIMAT && gemeinden.length ? [`${GEMEINDE_HEIMAT}/gemeinden`, ...gemeinden.map(g => `${GEMEINDE_HEIMAT}/gemeinde/${g.slug}`)] : [])];
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map(u => `  <url><loc>${u}</loc><lastmod>${stand}</lastmod></url>`).join('\n')}\n</urlset>\n`;
 }
 export function robots(m: Marke): string {
   return `User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: ${hauptadresse(m)}/sitemap.xml\n`;
+}
+
+/** Eine Gemeinde-Seite: Gestaltung der Marke, Titel, Satz und Zahlen der Gemeinde. */
+export function gemeindeSeite(indexHtml: string, m: Marke, g: Gemeinde): string {
+  const gm: Marke = { ...m, etikett: `${g.ort} · Kanton ${g.kanton}`, titel: gemeindeTitel(g), satz: gemeindeSatz(g),
+    vorteile: kennzahlen(g).map(k => `${k.titel}: ${k.wert} (${k.zusatz})`) };
+  return markenSeite(indexHtml, gm, undefined, `/gemeinde/${g.slug}`, { basis: GEMEINDE_HEIMAT });
+}
+export function gemeindenSeite(indexHtml: string, m: Marke, liste: Gemeinde[]): string {
+  const gm: Marke = { ...m, etikett: 'Gemeinden', titel: 'Bauen in Ihrer Gemeinde',
+    satz: 'Baugesuche und Gebäude je Gemeinde, aus den amtlichen Daten.', vorteile: [] };
+  return markenSeite(indexHtml, gm, undefined, '/gemeinden', { basis: GEMEINDE_HEIMAT, links: liste.map(g => ({ href: `/gemeinde/${g.slug}`, text: `${g.ort} (${g.kanton})` })) });
 }
 
 /** Der Heizungs-Check einer Marke: ihre Gestaltung, die Texte des Heizungs-Checks. */
@@ -91,6 +105,8 @@ export const heizungsMarke = (m: Marke): Marke => ({ ...m, ...HEIZUNG_TEXT });
 export const datei = {
   seite: (m: Marke) => `marken/${m.id}/index.html`,
   heizung: (m: Marke) => `marken/${m.id}/heizung.html`,
+  gemeinde: (m: Marke, g: Gemeinde) => `marken/${m.id}/gemeinde/${g.slug}.html`,
+  gemeinden: (m: Marke) => `marken/${m.id}/gemeinden.html`,
   artikel: (m: Marke, a: Artikel) => `marken/${m.id}/ratgeber/${a.slug}.html`,
   sitemap: (m: Marke) => `marken/${m.id}/sitemap.xml`,
   robots: (m: Marke) => `marken/${m.id}/robots.txt`,
@@ -105,6 +121,11 @@ export function vercelUmleitungen() {
       { source: '/sitemap.xml', has: host, destination: `/${datei.sitemap(m)}` },
       ...ARTIKEL.map(a => ({ source: `/ratgeber/${a.slug}`, has: host, destination: `/${datei.artikel(m, a)}` })),
       { source: '/heizung', has: host, destination: `/${datei.heizung(m)}` },
+      // Gemeinde-Seiten nur auf ihrer Domain; anderswo zeigt die App sie ohne eigenen Kopf.
+      ...(m.domains.includes(GEMEINDE_DOMAIN) ? [
+        { source: '/gemeinden', has: host, destination: `/marken/${m.id}/gemeinden.html` },
+        { source: '/gemeinde/:ort', has: host, destination: `/marken/${m.id}/gemeinde/:ort.html` },
+      ] : []),
       { source: '/((?!assets/|api/|marken/).*)', has: host, destination: `/${datei.seite(m)}` },
     ];
   });

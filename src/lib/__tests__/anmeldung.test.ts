@@ -30,7 +30,7 @@ describe('Anmeldung', () => {
     // nur einfügen (Test unten).
     // Der Ratgeber (/ratgeber/<slug>) liest und schreibt gar nichts.
     // Der Heizungs-Check (/heizung) ist die Check-Seite mit anderen Texten.
-    expect(offen).toEqual(['/ratgeber/:artikel Ratgeber', '/heizung Check', '* Check', '/check Check', '/check/:marke Check', '/check/:marke/ratgeber/:artikel Ratgeber', '/check/:marke/heizung Check',
+    expect(offen).toEqual(['/ratgeber/:artikel Ratgeber', '/heizung Check', '/gemeinde/:ort Check', '/gemeinden Check', '* Check', '/check Check', '/check/:marke Check', '/check/:marke/ratgeber/:artikel Ratgeber', '/check/:marke/heizung Check',
       '/bewertung Anfrage', '/potenzial Anfrage', '/investor Anfrage']);
   });
 
@@ -42,7 +42,7 @@ describe('Anmeldung', () => {
   });
 
   it('die Check-Seiten lesen nichts aus der Datenbank, sie fügen nur ein', () => {
-    for (const datei of ['src/pages/Check.tsx', 'src/lib/check-daten.ts', 'src/lib/check-marken.ts', 'src/lib/heizung.ts', 'src/lib/heizung-text.ts']) {
+    for (const datei of ['src/pages/Check.tsx', 'src/lib/check-daten.ts', 'src/lib/check-marken.ts', 'src/lib/heizung.ts', 'src/lib/heizung-text.ts', 'src/lib/gemeinde-seiten.ts']) {
       const s = readFileSync(datei, 'utf8');
       expect(s).not.toMatch(/\.select\(|\.rpc\(|\.update\(|\.delete\(|\.upsert\(/);
     }

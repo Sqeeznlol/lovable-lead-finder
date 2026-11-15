@@ -38,3 +38,31 @@ describe('Was Google von den Check-Seiten sieht', () => {
     expect(h).toContain('<h1>Ihre Heizung ersetzen?');
   });
 });
+
+describe('Gemeinde-Seiten', () => {
+  const zahlen = [
+    { bfs: 198, name: 'Uster', kanton: 'ZH', n365: 153, n90: 50, seit: '2025-11-15', arten: { neubau: 31, umbau: 43, waermepumpe: 18, solar: 13, abbruch: 22 }, wohnbauten: { n: 5005, vor1980: 2504, fossil: 3521 } },
+    { bfs: 1508, name: 'Oberdorf (NW)', kanton: 'NW', n365: 6, n90: 6, seit: '2026-10-14', arten: { neubau: 1, umbau: 2, waermepumpe: 0, solar: 1, abbruch: 0 }, wohnbauten: null },
+    { bfs: 2869, name: 'Oberdorf (BL)', kanton: 'BL', n365: 5, n90: 5, seit: '2026-10-14', arten: { neubau: 0, umbau: 1, waermepumpe: 0, solar: 0, abbruch: 0 }, wohnbauten: null },
+  ];
+  it('Adressen ohne Doppel, Texte nur mit vorhandenen Zahlen, ehrlicher Zeitraum', async () => {
+    const { mitAdressen, satz, kennzahlen } = await import('@/lib/gemeinde-seiten');
+    const g = mitAdressen(zahlen);
+    expect(g.map(x => x.slug)).toEqual(['uster', 'oberdorf-nw', 'oberdorf-bl']);
+    const heute = new Date('2026-11-15T12:00:00Z');
+    expect(satz(g[0], heute)).toBe("In Uster wurden in den letzten zwölf Monaten 153 Baugesuche publiziert, 50 davon in den letzten drei Monaten. 50 % der 5'005 Wohngebäude sind vor 1980 gebaut. Prüfen Sie, was auf Ihrem Grundstück möglich ist.");
+    expect(satz(g[1], heute)).toBe('In Oberdorf wurden seit dem 14. Oktober 2026 6 Baugesuche publiziert. Prüfen Sie, was auf Ihrem Grundstück möglich ist.');
+    expect(kennzahlen(g[1], heute).map(k => k.titel)).not.toContain('Wohngebäude');
+  });
+  it('feste Seite mit Hauptadresse auf was-kann-ich-bauen.ch und Umleitung nur dort', async () => {
+    const { mitAdressen, GEMEINDE_HEIMAT } = await import('@/lib/gemeinde-seiten');
+    const { gemeindeSeite } = await import('@/lib/seo-marken');
+    const m = markeFuerHost('was-kann-ich-bauen.ch')!;
+    const html = gemeindeSeite(index, m, mitAdressen(zahlen)[0]);
+    expect(html).toContain(`<link rel="canonical" href="${GEMEINDE_HEIMAT}/gemeinde/uster" />`);
+    expect(html).toContain('<h1>Bauen in Uster: Bauzone, Ausnützung und Baugesuche</h1>');
+    const r = vercelUmleitungen().filter(x => x.source === '/gemeinde/:ort');
+    expect(r).toHaveLength(1);
+    expect(r[0].destination).toBe(`/marken/${m.id}/gemeinde/:ort.html`);
+  });
+});

@@ -4,7 +4,8 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 import fs from "fs";
 import { ARTIKEL } from "./src/lib/ratgeber";
-import { datei, heizungsMarke, markenSeite, MARKEN_LIVE, robots, sitemap } from "./src/lib/seo-marken";
+import { datei, gemeindenSeite, gemeindeSeite, heizungsMarke, markenSeite, MARKEN_LIVE, robots, sitemap } from "./src/lib/seo-marken";
+import { GEMEINDE_DOMAIN, mitAdressen, type GemeindeZahlen } from "./src/lib/gemeinde-seiten";
 
 // Je Check-Marke eine eigene HTML-Datei mit Titel, Beschreibung und Text,
 // dazu robots.txt und sitemap.xml (src/lib/seo-marken.ts). Am 15. November
@@ -17,6 +18,9 @@ function markenSeiten() {
       const aus = path.resolve(__dirname, "dist");
       const index = fs.readFileSync(path.join(aus, "index.html"), "utf8");
       const stand = new Date().toISOString().slice(0, 10);
+      // Die Zahlen je Gemeinde schreibt der Ablauf "Gemeinden" (Repository der Webseite).
+      const gemeindenDatei = path.resolve(__dirname, "public/gemeinden.json");
+      const gemeinden = fs.existsSync(gemeindenDatei) ? mitAdressen(JSON.parse(fs.readFileSync(gemeindenDatei, "utf8")) as GemeindeZahlen[]) : [];
       const schreiben = (rel: string, inhalt: string) => {
         fs.mkdirSync(path.dirname(path.join(aus, rel)), { recursive: true });
         fs.writeFileSync(path.join(aus, rel), inhalt);
@@ -25,7 +29,12 @@ function markenSeiten() {
         schreiben(datei.seite(m), markenSeite(index, m));
         schreiben(datei.heizung(m), markenSeite(index, heizungsMarke(m), undefined, "/heizung"));
         for (const a of ARTIKEL) schreiben(datei.artikel(m, a), markenSeite(index, m, a));
-        schreiben(datei.sitemap(m), sitemap(m, stand));
+        const heimat = m.domains.includes(GEMEINDE_DOMAIN);
+        if (heimat) {
+          for (const g of gemeinden) schreiben(datei.gemeinde(m, g), gemeindeSeite(index, m, g));
+          if (gemeinden.length) schreiben(datei.gemeinden(m), gemeindenSeite(index, m, gemeinden));
+        }
+        schreiben(datei.sitemap(m), sitemap(m, stand, heimat ? gemeinden : []));
         schreiben(datei.robots(m), robots(m));
       }
       // Eine index.html im Wurzelordner liefert Vercel für "/" aus, bevor

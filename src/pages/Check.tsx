@@ -11,6 +11,7 @@ import { useImBild } from '@/lib/im-bild';
 import { zaehlen } from '@/lib/check-zaehlen';
 import { buehnenBild, markenAttribute, markenStil, seiteEinrichten } from '@/lib/check-gestaltung';
 import { ARTIKEL } from '@/lib/ratgeber';
+import { kennzahlen as gemeindeKennzahlen, mitAdressen, QUELLE as GEMEINDE_QUELLE, satz as gemeindeSatz, titel as gemeindeTitel, type Gemeinde, type GemeindeZahlen, GEMEINDE_DOMAIN } from '@/lib/gemeinde-seiten';
 import { ABSICHT_HEIZUNG, FOERDERUNG, HEIZUNG_TEXT, heizungZeilen } from '@/lib/heizung';
 import { gebaeudeLaden, modellAus, parzelleRelativ, rechtLaden, rechtZeilen, umgebungZeilen, zifferLaden, type Ziffern, zonenKuerzel, type Koerper, type Recht } from '@/lib/check-modell';
 import { Ladebild, type LadebildDaten } from '@/components/check/Ladebild';
@@ -53,14 +54,24 @@ const FRAGEN: [string, string][] = [
 
 type Feld = 'name' | 'email' | 'telefon';
 
-export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?: 'heizung' }) {
-  const { marke: markeId } = useParams();
+export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?: 'heizung' | 'gemeinde' | 'gemeinden' }) {
+  const { marke: markeId, ort: ortSlug } = useParams();
+  // Gemeinde-Seiten: die Zahlen schreibt der Ablauf "Gemeinden" nach /gemeinden.json (gemeinde-seiten.ts).
+  const [gemeinden, setGemeinden] = useState<Gemeinde[] | null>(null);
+  useEffect(() => {
+    if (modus !== 'gemeinde' && modus !== 'gemeinden') return;
+    fetch('/gemeinden.json').then(r => (r.ok ? r.json() : [])).then((d: GemeindeZahlen[]) => setGemeinden(mitAdressen(d))).catch(() => setGemeinden([]));
+  }, [modus]);
+  const gemeinde = modus === 'gemeinde' ? gemeinden?.find(g => g.slug === ortSlug) ?? null : null;
   // Auf einer Marken-Domain entscheidet der Hostname, sonst /check/:marke (Vorschau auf unserer Domain).
   // Der Heizungs-Check (/heizung) trägt dieselbe Marke mit eigenen Texten.
   const marke = useMemo(() => {
     const m = vorgabe ?? markeFuerHost(window.location.hostname) ?? markeNachId(markeId) ?? STANDARD_MARKE;
-    return modus === 'heizung' ? { ...m, ...HEIZUNG_TEXT } : m;
-  }, [vorgabe, markeId, modus]);
+    if (modus === 'heizung') return { ...m, ...HEIZUNG_TEXT };
+    if (gemeinde) return { ...m, etikett: `${gemeinde.ort} · Kanton ${gemeinde.kanton}`, titel: gemeindeTitel(gemeinde), satz: gemeindeSatz(gemeinde) };
+    if (modus === 'gemeinden') return { ...m, etikett: 'Gemeinden', titel: 'Bauen in Ihrer Gemeinde', satz: 'Baugesuche und Gebäude je Gemeinde, aus den amtlichen Daten. Wählen Sie Ihre Gemeinde oder prüfen Sie direkt Ihre Adresse.' };
+    return m;
+  }, [vorgabe, markeId, modus, gemeinde]);
   const domain = useMemo(() => {
     const h = window.location.hostname.replace(/^www\./, '');
     return marke.domains.includes(h) ? h : marke.domains[0];
@@ -423,6 +434,28 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
           </div>
         </section>
 
+        {gemeinde && (
+          <section className="abschnitt-gross gemeinde-zahlen">
+            <div className="huelle">
+              <div className="ueber">{gemeinde.ort} in Zahlen</div>
+              <dl className="zahlen">
+                {gemeindeKennzahlen(gemeinde).map(k => <div key={k.titel}><dt>{k.titel}</dt><dd>{k.wert}</dd><small>{k.zusatz}</small></div>)}
+              </dl>
+              <p className="klein">{GEMEINDE_QUELLE}</p>
+            </div>
+          </section>
+        )}
+        {modus === 'gemeinden' && gemeinden && (
+          <section className="abschnitt-gross gemeinde-liste">
+            <div className="huelle">
+              {[...new Set(gemeinden.map(g => g.kanton))].map(k => (
+                <div key={k}><h3>Kanton {k}</h3>
+                  <ul>{gemeinden.filter(g => g.kanton === k).map(g => <li key={g.slug}><a href={`/gemeinde/${g.slug}`}>{g.ort}</a></li>)}</ul>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
         <div className="quellenband"><div className="huelle"><b>Daten aus:</b><span>Amtliche Vermessung</span><span>Bauzonen Schweiz (ARE)</span><span>Gebäude- und Wohnungsregister (BFS)</span><span>Luftbilder swisstopo</span></div></div>
 
         {ort && (
@@ -685,6 +718,7 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
           <div><h4>Mehr</h4><ul>
             {modus !== 'heizung' && <li><a href={markeFuerHost(window.location.hostname) ? '/heizung' : `/check/${marke.id}/heizung`}>Heizungs-Check</a></li>}
             {modus === 'heizung' && <li><a href={markeFuerHost(window.location.hostname) ? '/' : `/check/${marke.id}`}>Grundstück prüfen</a></li>}
+            {markeFuerHost(window.location.hostname)?.domains.includes(GEMEINDE_DOMAIN) && <li><a href="/gemeinden">Bauen in Ihrer Gemeinde</a></li>}
             {ARTIKEL.map(a => <li key={a.slug}><a href={markeFuerHost(window.location.hostname) ? `/ratgeber/${a.slug}` : `/check/${marke.id}/ratgeber/${a.slug}`}>Ratgeber: {a.titel.split('.')[0]}</a></li>)}
           </ul></div>
           <div><h4>Rechtliches</h4><ul>

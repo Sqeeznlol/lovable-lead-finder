@@ -336,3 +336,16 @@
 /* Fusszeile mit "Mehr" (Heizungs-Check, Ratgeber): drei Spalten, Links so gross wie die Knöpfe daneben. */
 @media (min-width: 800px){.pc footer .huelle{grid-template-columns: 2fr 1fr 1fr;}}
 .pc footer a{color: inherit; text-decoration: underline; text-underline-offset: 3px; display: inline-flex; align-items: center; min-height: 44px;}
+
+/* Gemeinde-Seiten: Zahlen der Gemeinde ohne Kästchen, Liste der Gemeinden in Spalten. */
+.pc .gemeinde-zahlen{padding: 48px 0;}
+.pc .gemeinde-zahlen .zahlen{display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 24px 20px; margin: 18px 0 14px;}
+@media (min-width: 800px){.pc .gemeinde-zahlen .zahlen{grid-template-columns: repeat(4, minmax(0,1fr));}}
+.pc .gemeinde-zahlen dt{font-size: 14px; color: var(--grau);}
+.pc .gemeinde-zahlen dd{margin: 2px 0 0; font-size: 32px; font-weight: 600; letter-spacing: -0.02em;}
+.pc .gemeinde-zahlen small{font-size: 13px; color: var(--hell);}
+.pc .gemeinde-liste .huelle{display: grid; gap: 28px;}
+@media (min-width: 800px){.pc .gemeinde-liste .huelle{grid-template-columns: repeat(3, minmax(0,1fr));}}
+.pc .gemeinde-liste h3{font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--hell); margin: 0 0 6px;}
+.pc .gemeinde-liste ul{list-style: none; margin: 0; padding: 0;}
+.pc .gemeinde-liste a{display: flex; align-items: center; min-height: 44px; color: var(--tinte); border-bottom: 1px solid var(--linie); text-decoration: none;}

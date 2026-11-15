@@ -58,6 +58,8 @@ const App = () => (
               <Routes>
                 <Route path="/ratgeber/:artikel" element={<Ratgeber marke={CHECK_MARKE} />} />
                 <Route path="/heizung" element={<Check marke={CHECK_MARKE} modus="heizung" />} />
+                <Route path="/gemeinde/:ort" element={<Check marke={CHECK_MARKE} modus="gemeinde" />} />
+                <Route path="/gemeinden" element={<Check marke={CHECK_MARKE} modus="gemeinden" />} />
                 <Route path="*" element={<Check marke={CHECK_MARKE} />} />
               </Routes>
             ) : (
