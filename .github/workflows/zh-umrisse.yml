@@ -1,0 +1,259 @@
+# =====================================================================
+# Zürcher Umrisse
+# =====================================================================
+# Gemessen am 15. November (Auswerten/umrisse): 394'917 Zürcher
+# Parzellen, 0 mit Umriss, 399 mit Punkt. Ohne Umriss gibt es in Zürich
+# keine Nachbarn, keine Parzelle auf der Karte, keine Arrondierung aus
+# dem eigenen Bestand und keine Machbarkeitsstudie. Der Thurgau hat
+# alle.
+#
+# Bis dahin fehlte der Platz (bei 1107 MB schaltete Supabase auf
+# nur-lesen). Seit Supabase Pro passt es: der Thurgau braucht 406 Bytes
+# je Umriss (Auswerten/groessen), Zürich also einige hundert MB samt
+# Index und Nachbarschaft.
+#
+# Der Ablauf
+#   1. holt die Umrisse aus dem WFS des Kantons (tools/av_zh_umrisse.py),
+#   2. schreibt sie in properties.geometrie -- nur, wo noch keiner steht,
+#      in Stücken, mit VACUUM dazwischen: jede Änderung legt eine neue
+#      Fassung der ganzen Zeile an, und ohne Aufräumen wüchse die
+#      Tabelle um jede alte Fassung,
+#   3. setzt je Parzelle einen Punkt (parzelle_punkt), wo keiner steht,
+#   4. rechnet die Nachbarschaft in Stapeln (nachbarschaft_rechnen).
+#
+# Jeder Schritt nimmt nur, was noch offen ist; ein abgebrochener Lauf
+# wird einfach wiederholt. Vor jedem Stück wird die Grösse gemessen.
+# Ausgegeben werden nur Zahlen.
+# =====================================================================
+
+name: Zürcher Umrisse
+
+on:
+  workflow_dispatch:
+    inputs:
+      schritt:
+        description: 'Was ausgeführt werden soll'
+        required: true
+        default: 'probe'
+        type: choice
+        options:
+          - probe       # Holen und zählen, was sich zuordnen liesse; nichts schreiben
+          - schreiben   # Umrisse schreiben, dann Punkte und Nachbarschaft
+          - nachbarn    # Nur Punkte und Nachbarschaft (nach einem Abbruch)
+      quelllauf:
+        description: 'Nummer eines früheren Laufs, dessen Umrissdatei wiederverwendet wird'
+        required: false
+        default: ''
+      seiten:
+        description: 'Nur für die Probe: höchstens so viele Seiten zu 2000 holen (0 = alle)'
+        required: false
+        default: '0'
+      grenze_mb:
+        description: 'Abbrechen, wenn die Datenbank so gross ist (MB)'
+        required: false
+        default: '4000'
+
+jobs:
+  umrisse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    env:
+      PGOPTIONS: "-c search_path=public,extensions"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Werkzeuge
+        run: sudo apt-get install -y -qq postgresql-client
+
+      - name: Umrisse holen
+        if: ${{ inputs.schritt != 'nachbarn' && inputs.quelllauf == '' }}
+        env:
+          SEITEN: ${{ inputs.seiten }}
+          SCHRITT: ${{ inputs.schritt }}
+        run: |
+          set -euo pipefail
+          # Geschrieben wird immer alles; eine Teilmenge gibt es nur zur Probe.
+          if [ "$SCHRITT" = "probe" ] && [ "${SEITEN:-0}" != "0" ]; then
+            python3 tools/av_zh_umrisse.py /tmp/umrisse.csv "$SEITEN" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            python3 tools/av_zh_umrisse.py /tmp/umrisse.csv | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+          ls -lh /tmp/umrisse.csv
+
+      - name: Umrisse aus früherem Lauf holen
+        if: ${{ inputs.schritt != 'nachbarn' && inputs.quelllauf != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: umrisse-zh
+          path: /tmp
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.quelllauf }}
+          repository: ${{ github.repository }}
+
+      # Das Holen dauert rund eine Stunde; bricht das Schreiben ab,
+      # muss es nicht wiederholt werden.
+      - name: Umrissdatei aufbewahren
+        if: ${{ inputs.schritt != 'nachbarn' && inputs.quelllauf == '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: umrisse-zh
+          path: /tmp/umrisse.csv
+          retention-days: 14
+          compression-level: 6
+
+      - name: Abgleichen
+        if: ${{ inputs.schritt != 'nachbarn' }}
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
+          # Nur die EGRID in eine Sitzungstabelle: zählen, was sich zuordnen liesse.
+          python3 - <<'PY'
+          import csv
+          csv.field_size_limit(10**9)
+          with open('/tmp/umrisse.csv', newline='') as f, open('/tmp/egrid.csv', 'w') as g:
+              r = csv.reader(f); next(r)
+              for wkt, egrid in r:
+                  g.write(f'{egrid},{len(wkt)}\n')
+          PY
+          psql "$DB" -v ON_ERROR_STOP=1 -X -q \
+            -c "set statement_timeout = '10min';" \
+            -c "create temp table e (egrid text, zeichen int);" \
+            -c "\copy e from '/tmp/egrid.csv' with (format csv)" \
+            -c "create index on e (egrid); analyze e;" \
+            -c "select count(*) as umrisse_geholt, round(avg(zeichen)) as zeichen_im_mittel, max(zeichen) as laengster from e;" \
+            -c "select count(*) filter (where p.id is not null) as im_bestand,
+                       count(*) filter (where p.id is not null and p.geometrie is null) as noch_ohne_umriss,
+                       count(*) filter (where p.id is null) as nicht_im_bestand
+                  from e left join public.properties p on p.egrid = e.egrid;" \
+            -c "select count(*) as zh_parzellen, count(geometrie) as mit_umriss,
+                       count(*) filter (where egrid is not null and not exists (select 1 from e where e.egrid = p.egrid)) as ohne_umriss_in_der_quelle
+                  from public.properties p where kanton = 'ZH';" \
+            2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Umrisse schreiben
+        if: ${{ inputs.schritt == 'schreiben' }}
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+          GRENZE_MB: ${{ inputs.grenze_mb }}
+        run: |
+          set -euo pipefail
+          GRENZE_MB=${GRENZE_MB:-4000}
+          megabyte() { psql "$DB" -X -q -t -A -c "select (pg_database_size(current_database())/1024/1024)::int;"; }
+          echo "Datenbank vorher: $(megabyte) MB" | tee -a "$GITHUB_STEP_SUMMARY"
+
+          rm -f /tmp/teil_*
+          # Zeilen sind einzeilig (WKT enthält keinen Umbruch), darum darf split zählen.
+          tail -n +2 /tmp/umrisse.csv | split -l 2000 -a 4 - /tmp/teil_
+          stuecke=$(ls /tmp/teil_* | wc -l)
+          echo "Stücke zu je 2000: $stuecke" | tee -a "$GITHUB_STEP_SUMMARY"
+
+          gesamt=0; nummer=0; abbruch=0
+          for f in /tmp/teil_*; do
+            nummer=$(( nummer + 1 ))
+            mb=$(megabyte)
+            if [ "$mb" -ge "$GRENZE_MB" ]; then
+              echo "ABBRUCH vor Stück $nummer: Datenbank bei ${mb} MB, Grenze ${GRENZE_MB} MB. Der nächste Lauf macht weiter." | tee -a "$GITHUB_STEP_SUMMARY"
+              abbruch=1; break
+            fi
+            # ST_MakeValid: ein sich selbst schneidender Umriss liesse später
+            # ST_Touches scheitern. Übrig bleiben nur Flächen (Art 3).
+            n=$(psql "$DB" -v ON_ERROR_STOP=1 -X -q -t -A \
+              -c "set statement_timeout = '10min';" \
+              -c "create temp table eingang (wkt text, egrid text);" \
+              -c "\copy eingang(wkt, egrid) from '$f' with (format csv)" \
+              -c "
+                with kand as (
+                  select e.egrid, ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_GeomFromText(e.wkt, 2056)), 3)) as g
+                    from eingang e
+                    join public.properties p on p.egrid = e.egrid
+                   where p.geometrie is null
+                ), gesetzt as (
+                  update public.properties p
+                     set geometrie        = k.g,
+                         geometrie_quelle = 'AV ZH (maps.zh.ch)',
+                         geometrie_stand  = now()
+                    from kand k
+                   where k.egrid = p.egrid and not ST_IsEmpty(k.g)
+                  returning 1
+                )
+                select count(*) from gesetzt;")
+            gesamt=$(( gesamt + n ))
+            if [ $(( nummer % 10 )) -eq 0 ]; then
+              psql "$DB" -X -q -c "vacuum public.properties;"
+              echo "  Stück $nummer/$stuecke -- $gesamt geschrieben, Datenbank $(megabyte) MB"
+            fi
+          done
+          psql "$DB" -X -q -c "vacuum analyze public.properties;"
+          echo "Geschrieben: $gesamt" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Datenbank nach den Umrissen: $(megabyte) MB" | tee -a "$GITHUB_STEP_SUMMARY"
+          [ "$abbruch" -eq 0 ] || exit 1
+
+      - name: Punkte und Nachbarschaft
+        if: ${{ inputs.schritt == 'schreiben' || inputs.schritt == 'nachbarn' }}
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+          GRENZE_MB: ${{ inputs.grenze_mb }}
+        run: |
+          set -euo pipefail
+          [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
+          GRENZE_MB=${GRENZE_MB:-4000}
+          megabyte() { psql "$DB" -X -q -t -A -c "select (pg_database_size(current_database())/1024/1024)::int;"; }
+
+          # Ein Punkt je Parzelle, sicher innerhalb des Umrisses (die Mitte
+          # eines L-förmigen Grundstücks läge sonst beim Nachbarn).
+          echo "### Punkte" | tee -a "$GITHUB_STEP_SUMMARY"
+          while :; do
+            n=$(psql "$DB" -v ON_ERROR_STOP=1 -X -q -t -A \
+              -c "set statement_timeout = '10min';" \
+              -c "with neu as (
+                    insert into public.parzelle_punkt (parzelle_id, e, n, quelle)
+                    select p.id, round(ST_X(pt)::numeric, 1), round(ST_Y(pt)::numeric, 1), 'umriss'
+                      from (select id, ST_PointOnSurface(geometrie) as pt
+                              from public.properties p
+                             where geometrie is not null
+                               and not exists (select 1 from public.parzelle_punkt pp where pp.parzelle_id = p.id)
+                             limit 20000) p
+                    on conflict (parzelle_id) do nothing
+                    returning 1)
+                  select count(*) from neu;")
+            [ "$n" -gt 0 ] || break
+            echo "  $n Punkte gesetzt"
+          done
+          psql "$DB" -X -q -c "select count(*) as punkte from public.parzelle_punkt;" | tee -a "$GITHUB_STEP_SUMMARY"
+
+          echo "### Nachbarschaft, in Stapeln" | tee -a "$GITHUB_STEP_SUMMARY"
+          parzellen=0; paare=0; runde=0
+          while :; do
+            mb=$(megabyte)
+            if [ "$mb" -ge "$GRENZE_MB" ]; then
+              echo "ABBRUCH: Datenbank bei ${mb} MB, Grenze ${GRENZE_MB} MB. Der nächste Lauf macht weiter." | tee -a "$GITHUB_STEP_SUMMARY"
+              break
+            fi
+            zeile=$(psql "$DB" -v ON_ERROR_STOP=1 -X -q -t -A \
+              -c "set statement_timeout = '15min';" \
+              -c "select bearbeitet || '|' || paare from public.nachbarschaft_rechnen('ZH', 2000);")
+            b=${zeile%%|*}; pz=${zeile##*|}
+            [ "$b" -gt 0 ] || break
+            parzellen=$(( parzellen + b )); paare=$(( paare + pz )); runde=$(( runde + 1 ))
+            if [ $(( runde % 10 )) -eq 0 ]; then
+              # nachbarn_stand ändert jede Zeile noch einmal: aufräumen.
+              psql "$DB" -X -q -c "vacuum public.properties;"
+              echo "  $parzellen Parzellen, $paare Paare, Datenbank ${mb} MB"
+            fi
+          done
+          psql "$DB" -X -q -c "vacuum analyze public.properties;" -c "analyze public.nachbarschaft;"
+          echo "Parzellen gerechnet: $parzellen, Paare: $paare" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Stand
+        if: always()
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          psql "$DB" -X -q \
+            -c "select coalesce(kanton, '(leer)') as kanton, count(*) as parzellen, count(geometrie) as mit_umriss,
+                       count(nachbarn_stand) as nachbarn_gerechnet from public.properties group by 1 order by 2 desc;" \
+            -c "select count(*) as paare, count(distinct parzelle_id) as parzellen from public.nachbarschaft;" \
+            -c "select (pg_database_size(current_database())/1024/1024)::int as datenbank_mb;" \
+            2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
