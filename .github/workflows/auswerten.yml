@@ -59,6 +59,7 @@ on:
           - dicht        # Ob der öffentliche Schlüssel noch etwas lesen kann und die Funktionen Fremde abweisen (nur Codes)
           - gelegenheiten-tempo # Wie lange die Liste der Gelegenheiten als angemeldetes Konto braucht (nur Zahlen)
           - groessen     # Wie gross Datenbank und die grössten Tabellen sind (vor jedem Laden)
+          - baugesuch-lage # Wie viele Baugesuche je Kanton einen Punkt haben (für den Umkreis im Check, nur Zählungen)
           - besucher     # Ob die Zahlen unter «Leads» stimmen: Besucher je Domain und Tag, Leads gegen Anfragen, Bots (nur Zählungen)
       egrid:
         description: 'Nur für "objekt": die EGRID, z.B. CH707709971116'
@@ -805,6 +806,21 @@ jobs:
           explain (analyze, buffers, costs off, timing on) select id, address, gemeinde, plz, parzelle, plot_number, egrid, owner_phone, bfs_nr, kanton, zone, ausnuetzung, area, gebaeudeflaeche, geschosse, baujahr, owner_name, eigentuemer_name, hnf_delta, marge_chf, preselection_status from properties where ausgeschlossen = false and kanton = 'ZH' and hnf_delta is not null order by hnf_delta desc nulls last limit 1000;
           \echo '```'
           SQL
+
+          elif [ "$FRAGE" = "baugesuch-lage" ]; then
+            # Der Check zeigt Baugesuche im Umkreis (15. November). Das geht nur
+            # mit Punkt; hier steht je Kanton, wie viele einen haben.
+            frage "Baugesuche je Kanton, letzte 12 Monate, mit und ohne Punkt" "
+              select coalesce(kanton, '(leer)') as kanton, quelle, count(*) as gesuche,
+                     count(geometrie) as mit_punkt,
+                     count(*) filter (where egrid is not null) as mit_egrid,
+                     count(*) filter (where parzelle_id is not null) as mit_parzelle
+              from public.baugesuch where publiziert_am > current_date - 365 and quelle <> 'probe'
+              group by 1, 2 order by 1, 2;"
+            frage "Wie dicht: Gesuche im Umkreis von 300 m um 5 Punkte mit Gesuch (Stichprobe, nur Zahlen)" "
+              with p as (select geometrie from public.baugesuch where geometrie is not null and publiziert_am > current_date - 365 order by random() limit 5)
+              select (select count(*) from public.baugesuch b where b.publiziert_am > current_date - 365 and st_dwithin(b.geometrie, p.geometrie, 300)) as im_umkreis
+              from p;"
 
           elif [ "$FRAGE" = "groessen" ]; then
             frage "Datenbank und grösste Tabellen" "
