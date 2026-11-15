@@ -10,7 +10,12 @@
 -- Kantonen die meisten). Die Zürcher Gesuche haben keinen (7'300 ohne),
 -- aber 7'212 hängen an einer Parzelle; dort zählt der Umriss der Parzelle.
 -- Der Radius ist auf 1 km begrenzt, damit niemand die Tabelle abgrast.
-create or replace function public.baugesuche_umkreis(p_e double precision, p_n double precision, p_meter integer default 300)
+--
+-- Die Daten beginnen je Kanton verschieden (ZH ein Jahr, Amtsblatt seit
+-- dem ersten Lauf, AG/LU/SG gar nicht). Darum gibt die Funktion für den
+-- Kanton der Adresse 'seit' zurück, oder null, wenn er nicht erfasst ist:
+-- dann zeigt der Check nichts statt «0 Baugesuche».
+create or replace function public.baugesuche_umkreis(p_e double precision, p_n double precision, p_kanton text, p_meter integer default 300)
 returns json
 language sql stable security definer set search_path = public, extensions as $$
   with punkt as (
@@ -39,9 +44,9 @@ language sql stable security definer set search_path = public, extensions as $$
     'waermepumpe', count(*) filter (where beschreibung ~* 'w(ä|ae)rmepumpe'),
     'solar', count(*) filter (where beschreibung ~* 'photovoltaik|pv-anlage|solaranlage|solarpanel'),
     'abbruch', count(*) filter (where beschreibung ~* 'abbruch'),
-    'seit', (select min(publiziert_am) from public.baugesuch where quelle <> 'probe' and publiziert_am > current_date - 365))
+    'seit', (select min(publiziert_am) from public.baugesuch where kanton = p_kanton and quelle <> 'probe' and publiziert_am > current_date - 365))
   from treffer
   where exists (select 1 from punkt);
 $$;
-revoke all on function public.baugesuche_umkreis(double precision, double precision, integer) from public;
-grant execute on function public.baugesuche_umkreis(double precision, double precision, integer) to anon, authenticated;
+revoke all on function public.baugesuche_umkreis(double precision, double precision, text, integer) from public;
+grant execute on function public.baugesuche_umkreis(double precision, double precision, text, integer) to anon, authenticated;
