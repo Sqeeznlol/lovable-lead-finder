@@ -8,6 +8,9 @@ import { FENSTER } from '@/lib/fenster';
 import { ANTWORT_TEXT, bodenText, wohnungText } from '@/lib/lead-auswertung';
 import { zusatzAbfragen } from '@/lib/parzelle-zusatz';
 import { mailLink, naechsterSchritt, STUFEN } from '@/lib/nachfass';
+import { useParzelleZuEgrid } from '@/lib/egrid';
+import { useUrlSetzen } from '@/hooks/use-url-wert';
+import { BaugesucheParzelle } from '@/components/BaugesucheParzelle';
 
 /**
  * Ein Lead ganz: wer, welche Liegenschaft, was er will, woher er kam
@@ -78,6 +81,25 @@ type FondsObjekt = { gefaess: string; ort_adresse: string; verkehrswert: number;
  * Liegenschaften regulierter Gefässe im Umkreis (Tabelle fonds_liegenschaft,
  * aus den Jahresberichten): wer hier schon hält, kauft hier eher wieder.
  */
+/** Der Sprung vom Lead in die Objektansicht: Zone, Reserve, Eigentümer, Gespräche, Nachbarn. */
+function ObjektImBestand({ egrid, schliessen }: { egrid: string | null; schliessen: () => void }) {
+  const { data: id, isLoading } = useParzelleZuEgrid(egrid);
+  const setzen = useUrlSetzen();
+  if (!egrid || isLoading) return null;
+  if (!id) return <p className="py-2 text-sm text-muted-foreground">Nicht im Bestand von Aurora (Zürich und Thurgau).</p>;
+  return (
+    <button type="button" className={`${KNOPF} mt-2`} onClick={() => { schliessen(); setzen({ parzelle: id }); }}>
+      Objekt in Aurora öffnen
+    </button>
+  );
+}
+
+function BaugesucheLead({ egrid }: { egrid: string }) {
+  const { data: id, isLoading } = useParzelleZuEgrid(egrid);
+  if (isLoading) return null;
+  return <BaugesucheParzelle parzelleId={id ?? null} egrid={egrid} />;
+}
+
 function FondsInDerNaehe({ lv95 }: { lv95: number[] }) {
   const R = 2000;
   const { data } = useQuery({
@@ -210,6 +232,7 @@ export function LeadDetail({ lead, onClose, onErledigt, onNotiz, onNachfass }: {
               {zeile('Gemeinde', a.gemeinde && a.kanton ? `${a.gemeinde} (${a.kanton})` : a.gemeinde)}
               {zeile('Parzelle', a.parzelle)}
               {zeile('EGRID', lead.egrid)}
+              <ObjektImBestand egrid={lead.egrid} schliessen={onClose} />
               {zeile('Grundstück', a.flaeche ? `${Number(a.flaeche).toLocaleString('de-CH')} m²` : null)}
               {/* Fläche mal Baulandpreis der Gemeinde (amtliche Statistik ZH, BL); keine Schätzung. */}
               {zeile('Boden-Richtwert', bodenText(a) ? `${bodenText(a)!.replace('Boden rund ', 'rund ')} (${Number(a.landpreis_m2).toLocaleString('de-CH')} CHF/m²)` : null)}
@@ -224,6 +247,9 @@ export function LeadDetail({ lead, onClose, onErledigt, onNotiz, onNachfass }: {
             </section>
 
             {lv95 && lead.egrid && <ParzelleZusatz egrid={lead.egrid} lv95={lv95} />}
+
+            {/* Baut hier jemand, oder nebenan? Derselbe Baustein wie in der Objektansicht. */}
+            {lead.egrid && <BaugesucheLead egrid={lead.egrid} />}
 
             {lv95 && <FondsInDerNaehe lv95={lv95} />}
 

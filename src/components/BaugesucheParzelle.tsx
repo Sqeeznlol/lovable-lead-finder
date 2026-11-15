@@ -20,14 +20,16 @@ const datum = (s: string) => new Date(s + 'T00:00:00').toLocaleDateString('de-CH
  * Nachbar heisst: die EGRID dieser Parzelle steht in den Nachbarn, die
  * der Ablauf "Baugesuche" zum Gesuch beim Bund geholt hat.
  */
-export function BaugesucheParzelle({ parzelleId, egrid }: { parzelleId: string; egrid: string | null }) {
+export function BaugesucheParzelle({ parzelleId, egrid }: { parzelleId: string | null; egrid: string | null }) {
   const { data, isLoading } = useQuery({
     queryKey: ['baugesuche', 'parzelle', parzelleId, egrid],
     queryFn: async () => {
-      const bedingung = [`parzelle_id.eq.${parzelleId}`];
+      // Ohne Parzelle im Bestand (Lead ausserhalb ZH/TG) genügt die EGRID.
+      const bedingung = parzelleId ? [`parzelle_id.eq.${parzelleId}`] : [];
       // EGRID enthalten nur Buchstaben und Ziffern; geprüft, weil sie in
       // die Filterzeile eingesetzt wird.
       if (egrid && /^[A-Z0-9]+$/.test(egrid)) bedingung.push(`egrid.eq.${egrid}`, `nachbar_egrids.cs.{${egrid}}`);
+      if (!bedingung.length) return [] as Gesuch[];
       const r = await db().from('baugesuch')
         .select('id, publiziert_am, gemeinde, adresse, parzelle_nr, egrid, beschreibung, bauherrschaft, parzelle_id, nachbar_egrids, erfasst_am, quelle, publikation_nr, publikation_id, einsprache_bis, quelle_url')
         .or(bedingung.join(','))
@@ -39,7 +41,7 @@ export function BaugesucheParzelle({ parzelleId, egrid }: { parzelleId: string; 
     staleTime: 5 * 60 * 1000,
   });
 
-  const hier = (g: Gesuch) => g.parzelle_id === parzelleId || (!!egrid && g.egrid === egrid);
+  const hier = (g: Gesuch) => (!!parzelleId && g.parzelle_id === parzelleId) || (!!egrid && g.egrid === egrid);
   const liste = data ?? [];
 
   return (

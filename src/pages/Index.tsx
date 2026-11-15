@@ -2,7 +2,9 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { Building2, X, Shield, Share, Plus, Map, Target, BarChart3, Gauge, HardHat, MoreHorizontal, Briefcase, LogOut, Orbit, CalendarDays, Inbox, Combine, Flame } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { KontoMenu } from '@/components/KontoMenu';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { toast } from '@/hooks/use-toast';
+import { useParzelleZuEgrid } from '@/lib/egrid';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { PropertyDetailDialog } from '@/components/PropertyDetailDialog';
@@ -115,6 +117,16 @@ export default function Index() {
   // über ?parzelle=..., damit auch sie "Zurück" kennt.
   const [parzelle] = useUrlWert('parzelle');
   const parzelleZu = useSchliessen('parzelle');
+  // ?egrid=... öffnet dieselbe Objektansicht: aufgelöst und durch ?parzelle= ersetzt.
+  const [egridWert] = useUrlWert('egrid');
+  const [, setSuche] = useSearchParams();
+  const egridAufloesung = useParzelleZuEgrid(egridWert);
+  useEffect(() => {
+    if (!egridWert || egridAufloesung.isLoading) return;
+    const id = egridAufloesung.data;
+    setSuche(alt => { const neu = new URLSearchParams(alt); neu.delete('egrid'); if (id) neu.set('parzelle', id); return neu; }, { replace: true });
+    if (!id) toast({ title: 'Diese Parzelle ist nicht im Bestand', description: 'Aurora führt Zürich und Thurgau.' });
+  }, [egridWert, egridAufloesung.isLoading, egridAufloesung.data, setSuche]);
   const [mehrAuf, setMehrAuf] = useState(false);
   const { current: kantonJetzt } = useCanton();
   const [wisch, setWisch] = useState<{ x: number; y: number } | null>(null);
