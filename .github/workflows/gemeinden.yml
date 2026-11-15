@@ -57,9 +57,10 @@ jobs:
                    count(*) filter (where beschreibung ~* 'w(ä|ae)rmepumpe') as waermepumpe,
                    count(*) filter (where beschreibung ~* 'photovoltaik|pv-anlage|solaranlage|solarpanel') as solar,
                    count(*) filter (where beschreibung ~* 'abbruch') as abbruch,
-                   -- Französisch oder italienisch: Füllwörter, die im Deutschen als Wort nicht vorkommen.
-                   -- Der erste Filter nach Fachwörtern liess Sion, Martigny, Monthey durch (15. November).
-                   count(*) filter (where beschreibung ~* '\m(de|du|des|et|la|les|pour|avec|d''un|d''une|di|della|del|per|con|nuova)\M') as fremd
+                   -- Französisch: Wörter, die es im Deutschen nicht gibt. "des", "la", "di" fielen weg,
+                   -- sie schlossen Basel, Menzingen und Otelfingen aus (15. November). Italienisch
+                   -- braucht keinen Filter: das Tessin ist ganz ausgenommen.
+                   count(*) filter (where beschreibung ~* '\m(de|du|et|les|pour|avec|d''un|d''une|d''une)\M') as fremd
             from public.baugesuch
             where quelle <> 'probe' and publiziert_am > current_date - 365
               and kanton is not null and kanton <> 'TI' and bfs_nr ~ '^\d+$' and gemeinde is not null
