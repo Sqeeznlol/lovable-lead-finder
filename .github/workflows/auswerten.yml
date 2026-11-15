@@ -58,6 +58,7 @@ on:
           - amtsblatt    # Welche Adresse im Amtsblattportal ein Baugesuch zeigt
           - dicht        # Ob der öffentliche Schlüssel noch etwas lesen kann und die Funktionen Fremde abweisen (nur Codes)
           - gelegenheiten-tempo # Wie lange die Liste der Gelegenheiten als angemeldetes Konto braucht (nur Zahlen)
+          - groessen     # Wie gross Datenbank und die grössten Tabellen sind (vor jedem Laden)
           - besucher     # Ob die Zahlen unter «Leads» stimmen: Besucher je Domain und Tag, Leads gegen Anfragen, Bots (nur Zählungen)
       egrid:
         description: 'Nur für "objekt": die EGRID, z.B. CH707709971116'
@@ -798,6 +799,16 @@ jobs:
           \echo '```'
           SQL
 
+          elif [ "$FRAGE" = "groessen" ]; then
+            frage "Datenbank und grösste Tabellen" "
+              select (pg_database_size(current_database())/1024/1024)::int as datenbank_mb;
+              select c.relname as tabelle, (pg_total_relation_size(c.oid)/1024/1024)::int as mb, c.reltuples::bigint as zeilen_ca
+              from pg_class c join pg_namespace n on n.oid = c.relnamespace
+              where n.nspname = 'public' and c.relkind = 'r' order by pg_total_relation_size(c.oid) desc limit 15;"
+            frage "Gebäude je Kanton (über die Parzelle)" "
+              select count(*) as gebaeude, count(*) filter (where klasse between 1110 and 1130) as wohngebaeude,
+                     count(*) filter (where klasse between 1110 and 1130 and heizung_energie in (7520, 7530) and baujahr < 1980) as wohn_fossil_vor1980
+              from gebaeude;"
           elif [ "$FRAGE" = "besucher" ]; then
             # Julian, 15. November: "stimmen die analytics?" Der Reiter Leads
             # zählt Sitzungen aus check_ereignis (check_trichter) und Zeilen
