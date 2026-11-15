@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useUrlSetzen } from '@/hooks/use-url-wert';
+import { useUrlSetzen, useUrlWert } from '@/hooks/use-url-wert';
 import { sicher } from '@/lib/html';
 import { Auswahl } from '@/components/Auswahl';
 import L from 'leaflet';
@@ -657,6 +657,20 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
     // Aus Liste, Portfolio oder Nachbarliste: die Karte soll dorthin.
     void umrissNachholen(id, z.egrid, true);
   }
+
+  // /karte?zeige=<Kennung>: aus der Objektansicht direkt auf die Parzelle
+  // (Julian, 15. November: "verknüpfe"). Gewartet wird, bis die Karte
+  // steht -- zoom ist erst nach dem Aufbau grösser als null -- und jede
+  // Kennung wird nur einmal geöffnet, sonst spränge die Karte bei jedem
+  // Verschieben zurück.
+  const [zeige] = useUrlWert('zeige');
+  const gezeigt = useRef<string | null>(null);
+  useEffect(() => {
+    if (!zeige || zoom <= 0 || !karte.current || gezeigt.current === zeige) return;
+    gezeigt.current = zeige;
+    void oeffnePerId(zeige);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- oeffnePerId ist bei jedem Zeichnen neu; ausgelöst wird nur durch die Adresse
+  }, [zeige, zoom]);
 
   // ---------------------------------------------- Portfolio
   // Violett, weil die Margen-Farben grün bis gelb sind und Rot die

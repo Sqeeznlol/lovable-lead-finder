@@ -13,7 +13,7 @@ import { WeitereParzellen } from '@/components/WeitereParzellen';
 import { protokolliere } from '@/lib/protokoll';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ExternalLink, MapPin, Phone, Save, Loader2, Archive, Box } from 'lucide-react';
+import { ExternalLink, Map as KartenSymbol, MapPin, Phone, Save, Loader2, Archive, Box } from 'lucide-react';
 import { KNOPF, KNOPF_HAUPT, Marke } from '@/components/rahmen';
 import { zoneKurzform } from '@/lib/potential';
 import { supabase } from '@/integrations/supabase/client';
@@ -208,6 +208,8 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
                     aus Adresse und Ort lässt er sich immer bilden. */}
                 {/* Haus, Dach, Höhe, Heizung und Zone in 3D (Karte3D). */}
                 <button type="button" className={KNOPF} onClick={() => navigate(`/karte3d?objekt=${data.id}`)}><Box className="h-4 w-4" /> 3D</button>
+                {/* Die Parzelle auf der eigenen Karte, mit Umriss, Zone und Nachbarn. */}
+                {data.egrid && <button type="button" className={KNOPF} onClick={() => navigate(`/karte?zeige=${data.id}`)}><KartenSymbol className="h-4 w-4" /> Karte</button>}
                 <a className={KNOPF} href={data.google_maps_url || `https://www.google.com/maps/search/?api=1&query=${suche}`} target={FENSTER.karte}><MapPin className="h-4 w-4" /> Maps</a>
                 <a className={KNOPF} href={`https://www.google.com/maps/search/?api=1&query=${suche}&basemap=satellite`} target={FENSTER.karte}><MapPin className="h-4 w-4" /> Satellit</a>
                 {data.gis_url && <a className={KNOPF} href={data.gis_url} target={FENSTER.portal}><ExternalLink className="h-4 w-4" /> GIS</a>}
