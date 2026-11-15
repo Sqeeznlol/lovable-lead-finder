@@ -77,6 +77,11 @@ Handy-Fassung. Gebaut wird mit `<Seite>` aus `src/components/rahmen.tsx`.
   * Akquise und Pipedrive braucht Julian nicht mehr (15. November: «die
     Akquise und Pipedrive brauche ich nicht mehr»): nichts mehr daran
     bauen, keine Verbindungen nach Pipedrive.
+  * Nicht fragen, was als Nächstes kommt (15. November: «wieso immer was
+    als nächstes ... mach alle verbesserungen die dir einfallen ... ohne
+    widerrede»): die offene Liste selber abarbeiten, das Wichtigste
+    zuerst, und erst am Schluss berichten. Gefragt wird nur, was allein
+    Julian liefern kann (Zugangsdaten, Geld, Angaben zur Firma).
   * Zahlen nur, wenn sie Menschen zählen (15. November: "stimmen die
     analytics?"): Besucher erst nach Tippen oder Scrollen, Bots nie,
     Tests nie. Nachprüfen mit Auswerten «besucher».

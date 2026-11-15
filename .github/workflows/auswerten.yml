@@ -867,6 +867,14 @@ jobs:
               select c.relname as tabelle, (pg_total_relation_size(c.oid)/1024/1024)::int as mb, c.reltuples::bigint as zeilen_ca
               from pg_class c join pg_namespace n on n.oid = c.relnamespace
               where n.nspname = 'public' and c.relkind = 'r' order by pg_total_relation_size(c.oid) desc limit 15;"
+            # Vor dem Laden der Zürcher Umrisse: wie viel Platz brauchen die
+            # Thurgauer? Daraus lässt sich Zürich hochrechnen statt schätzen.
+            frage "Umrisse je Kanton: Anzahl und Platz" "
+              set local statement_timeout = '10min';
+              select coalesce(kanton, '(leer)') as kanton, count(*) as parzellen, count(geometrie) as mit_umriss,
+                     (coalesce(sum(pg_column_size(geometrie)), 0)/1024/1024)::int as umriss_mb,
+                     (avg(pg_column_size(geometrie)))::int as bytes_je_umriss
+                from public.properties group by 1 order by 2 desc;"
             frage "Gebäude je Kanton (über die Parzelle)" "
               select count(*) as gebaeude, count(*) filter (where klasse between 1110 and 1130) as wohngebaeude,
                      count(*) filter (where klasse between 1110 and 1130 and heizung_energie in (7520, 7530) and baujahr < 1980) as wohn_fossil_vor1980
