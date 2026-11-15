@@ -1,36 +1,48 @@
 # =====================================================================
-# Zürcher Umrisse
+# Umrisse laden
 # =====================================================================
 # Gemessen am 15. November (Auswerten/umrisse): 394'917 Zürcher
-# Parzellen, 0 mit Umriss, 399 mit Punkt. Ohne Umriss gibt es in Zürich
-# keine Nachbarn, keine Parzelle auf der Karte, keine Arrondierung aus
-# dem eigenen Bestand und keine Machbarkeitsstudie. Der Thurgau hat
-# alle.
+# Parzellen, 0 mit Umriss, 399 mit Punkt. Ohne Umriss gibt es keine
+# Nachbarn, keine Parzelle auf der Karte, keine Arrondierung aus dem
+# eigenen Bestand und keine Machbarkeitsstudie. Der Thurgau hat alle.
 #
 # Bis dahin fehlte der Platz (bei 1107 MB schaltete Supabase auf
 # nur-lesen). Seit Supabase Pro passt es: der Thurgau braucht 406 Bytes
 # je Umriss (Auswerten/groessen), Zürich also einige hundert MB samt
 # Index und Nachbarschaft.
 #
+# Quelle ist der WFS der Amtlichen Vermessung bei geodienste.ch, nicht
+# der Dienst des Kantons: maps.zh.ch antwortet einem GitHub-Runner
+# nicht (Lauf 1, Zeitüberschreitung beim Verbindungsaufbau).
+# geodienste.ch führt 21 Kantone hinter einer Adresse; der Ablauf
+# taugt darum für jeden davon.
+#
 # Der Ablauf
-#   1. holt die Umrisse aus dem WFS des Kantons (tools/av_zh_umrisse.py),
+#   1. holt die Umrisse (tools/umrisse_laden.py),
 #   2. schreibt sie in properties.geometrie -- nur, wo noch keiner steht,
 #      in Stücken, mit VACUUM dazwischen: jede Änderung legt eine neue
 #      Fassung der ganzen Zeile an, und ohne Aufräumen wüchse die
 #      Tabelle um jede alte Fassung,
 #   3. setzt je Parzelle einen Punkt (parzelle_punkt), wo keiner steht,
-#   4. rechnet die Nachbarschaft in Stapeln (nachbarschaft_rechnen).
+#   4. rechnet die Nachbarschaft in Stapeln (nachbarschaft_rechnen) --
+#      für alles, was offen ist: im Thurgau war sie erst für 65'993 von
+#      137'209 Parzellen gerechnet (der Lauf vom 31. Oktober brach an
+#      der Platzgrenze ab).
 #
 # Jeder Schritt nimmt nur, was noch offen ist; ein abgebrochener Lauf
 # wird einfach wiederholt. Vor jedem Stück wird die Grösse gemessen.
 # Ausgegeben werden nur Zahlen.
 # =====================================================================
 
-name: Zürcher Umrisse
+name: Umrisse laden
 
 on:
   workflow_dispatch:
     inputs:
+      kanton:
+        description: 'Kantonskürzel, z.B. ZH (geodienste.ch muss ihn freigegeben haben)'
+        required: true
+        default: 'ZH'
       schritt:
         description: 'Was ausgeführt werden soll'
         required: true
@@ -45,7 +57,7 @@ on:
         required: false
         default: ''
       seiten:
-        description: 'Nur für die Probe: höchstens so viele Seiten zu 2000 holen (0 = alle)'
+        description: 'Nur für die Probe: höchstens so viele Seiten zu 5000 holen (0 = alle)'
         required: false
         default: '0'
       grenze_mb:
@@ -68,15 +80,16 @@ jobs:
       - name: Umrisse holen
         if: ${{ inputs.schritt != 'nachbarn' && inputs.quelllauf == '' }}
         env:
+          KANTON: ${{ inputs.kanton }}
           SEITEN: ${{ inputs.seiten }}
           SCHRITT: ${{ inputs.schritt }}
         run: |
           set -euo pipefail
           # Geschrieben wird immer alles; eine Teilmenge gibt es nur zur Probe.
           if [ "$SCHRITT" = "probe" ] && [ "${SEITEN:-0}" != "0" ]; then
-            python3 tools/av_zh_umrisse.py /tmp/umrisse.csv "$SEITEN" | tee -a "$GITHUB_STEP_SUMMARY"
+            python3 tools/umrisse_laden.py "$KANTON" /tmp/umrisse.csv "$SEITEN" | tee -a "$GITHUB_STEP_SUMMARY"
           else
-            python3 tools/av_zh_umrisse.py /tmp/umrisse.csv | tee -a "$GITHUB_STEP_SUMMARY"
+            python3 tools/umrisse_laden.py "$KANTON" /tmp/umrisse.csv | tee -a "$GITHUB_STEP_SUMMARY"
           fi
           ls -lh /tmp/umrisse.csv
 
@@ -84,19 +97,18 @@ jobs:
         if: ${{ inputs.schritt != 'nachbarn' && inputs.quelllauf != '' }}
         uses: actions/download-artifact@v4
         with:
-          name: umrisse-zh
+          name: umrisse-${{ inputs.kanton }}
           path: /tmp
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ inputs.quelllauf }}
           repository: ${{ github.repository }}
 
-      # Das Holen dauert rund eine Stunde; bricht das Schreiben ab,
-      # muss es nicht wiederholt werden.
+      # Bricht das Schreiben ab, muss nicht noch einmal geholt werden.
       - name: Umrissdatei aufbewahren
         if: ${{ inputs.schritt != 'nachbarn' && inputs.quelllauf == '' }}
         uses: actions/upload-artifact@v4
         with:
-          name: umrisse-zh
+          name: umrisse-${{ inputs.kanton }}
           path: /tmp/umrisse.csv
           retention-days: 14
           compression-level: 6
@@ -105,9 +117,11 @@ jobs:
         if: ${{ inputs.schritt != 'nachbarn' }}
         env:
           DB: ${{ secrets.SUPABASE_DB_URL }}
+          KANTON: ${{ inputs.kanton }}
         run: |
           set -euo pipefail
           [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
+          case "$KANTON" in [A-Z][A-Z]) ;; *) echo "Kanton als Kürzel, z.B. ZH."; exit 1 ;; esac
           # Nur die EGRID in eine Sitzungstabelle: zählen, was sich zuordnen liesse.
           python3 - <<'PY'
           import csv
@@ -127,9 +141,9 @@ jobs:
                        count(*) filter (where p.id is not null and p.geometrie is null) as noch_ohne_umriss,
                        count(*) filter (where p.id is null) as nicht_im_bestand
                   from e left join public.properties p on p.egrid = e.egrid;" \
-            -c "select count(*) as zh_parzellen, count(geometrie) as mit_umriss,
+            -c "select count(*) as parzellen_im_kanton, count(geometrie) as mit_umriss,
                        count(*) filter (where egrid is not null and not exists (select 1 from e where e.egrid = p.egrid)) as ohne_umriss_in_der_quelle
-                  from public.properties p where kanton = 'ZH';" \
+                  from public.properties p where kanton = '$KANTON';" \
             2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Umrisse schreiben
@@ -172,7 +186,7 @@ jobs:
                 ), gesetzt as (
                   update public.properties p
                      set geometrie        = k.g,
-                         geometrie_quelle = 'AV ZH (maps.zh.ch)',
+                         geometrie_quelle = 'geodienste.ch AV',
                          geometrie_stand  = now()
                     from kand k
                    where k.egrid = p.egrid and not ST_IsEmpty(k.g)
@@ -233,7 +247,7 @@ jobs:
             fi
             zeile=$(psql "$DB" -v ON_ERROR_STOP=1 -X -q -t -A \
               -c "set statement_timeout = '15min';" \
-              -c "select bearbeitet || '|' || paare from public.nachbarschaft_rechnen('ZH', 2000);")
+              -c "select bearbeitet || '|' || paare from public.nachbarschaft_rechnen(null, 2000);")
             b=${zeile%%|*}; pz=${zeile##*|}
             [ "$b" -gt 0 ] || break
             parzellen=$(( parzellen + b )); paare=$(( paare + pz )); runde=$(( runde + 1 ))
