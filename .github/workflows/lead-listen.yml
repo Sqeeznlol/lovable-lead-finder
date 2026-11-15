@@ -68,8 +68,9 @@ jobs:
           set -euo pipefail
           [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
           case "${GRENZE_MB:-}" in ''|*[!0-9]*) GRENZE_MB=1060 ;; esac
-          # Grob geschätzt: in der Datenbank rund doppelt so gross wie die CSV (Zürich: 11 MB CSV).
-          GROESSE=$(( $(du -m /tmp/leads.csv | cut -f1) * 2 ))
+          # Gemessen am 15. November: 162'360 Gebäude (ZH AG LU ZG SZ, rund 21 MB CSV) ergaben
+          # 25 MB Tabelle samt Indizes. Mit Reserve: CSV mal 1,3.
+          GROESSE=$(( $(du -m /tmp/leads.csv | cut -f1) * 13 / 10 + 1 ))
           psql "$DB" -X -q -v ON_ERROR_STOP=1 -v grenze="$GRENZE_MB" -v neu="$GROESSE" >> "$GITHUB_STEP_SUMMARY" 2>&1 <<'SQL'
           set statement_timeout = '20min';
           select (pg_database_size(current_database())/1024/1024)::int as mb \gset
