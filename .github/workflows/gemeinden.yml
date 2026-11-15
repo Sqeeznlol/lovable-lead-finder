@@ -42,7 +42,12 @@ jobs:
           [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
           psql "$DB" -X -q -v ON_ERROR_STOP=1 -At > /tmp/gemeinden.json <<'SQL'
           set statement_timeout = '10min';
-          with g as (
+          -- Ab wann es Daten gibt: Zürich ein Jahr, die übrigen Kantone erst seit dem ersten
+          -- Lauf (das Amtsblattportal liefert ältere Gesuche nicht mehr, gemessen 15. November).
+          with seit as (
+            select kanton, min(publiziert_am) as seit from public.baugesuch where quelle <> 'probe' group by 1
+          ),
+          g as (
             select kanton, bfs_nr,
                    mode() within group (order by gemeinde) as name,
                    count(*) as n365,
@@ -52,7 +57,9 @@ jobs:
                    count(*) filter (where beschreibung ~* 'w(ä|ae)rmepumpe') as waermepumpe,
                    count(*) filter (where beschreibung ~* 'photovoltaik|pv-anlage|solaranlage|solarpanel') as solar,
                    count(*) filter (where beschreibung ~* 'abbruch') as abbruch,
-                   count(*) filter (where beschreibung ~* '\m(construction|transformation|d(é|e)molition|agrandissement|r(é|e)novation|costruzione|demolizione|ristrutturazione|nuova)\M') as fremd
+                   -- Französisch oder italienisch: Füllwörter, die im Deutschen als Wort nicht vorkommen.
+                   -- Der erste Filter nach Fachwörtern liess Sion, Martigny, Monthey durch (15. November).
+                   count(*) filter (where beschreibung ~* '\m(de|du|des|et|la|les|pour|avec|d''un|d''une|di|della|del|per|con|nuova)\M') as fremd
             from public.baugesuch
             where quelle <> 'probe' and publiziert_am > current_date - 365
               and kanton is not null and kanton <> 'TI' and bfs_nr ~ '^\d+$' and gemeinde is not null
@@ -68,13 +75,14 @@ jobs:
           )
           select coalesce(json_agg(json_build_object(
                    'bfs', g.bfs_nr::int, 'name', g.name, 'kanton', g.kanton, 'n365', g.n365, 'n90', g.n90,
+                   'seit', greatest(s.seit, current_date - 365),
                    'arten', json_build_object('neubau', g.neubau, 'umbau', g.umbau, 'waermepumpe', g.waermepumpe, 'solar', g.solar, 'abbruch', g.abbruch),
                    'wohnbauten', case when h.n is null then null else json_build_object('n', h.n, 'vor1980', h.vor1980, 'fossil', h.fossil) end)
                  order by g.kanton, g.name), '[]'::json)
-          from g left join h on h.bfs_nr = g.bfs_nr and g.kanton = 'ZH'
+          from g join seit s on s.kanton = g.kanton left join h on h.bfs_nr = g.bfs_nr and g.kanton = 'ZH'
           where g.n365 >= 5 and g.fremd * 3 < g.n365;
           SQL
-          python3 -c "import json;d=json.load(open('/tmp/gemeinden.json'));import collections;print('Gemeinden:',len(d));print(dict(collections.Counter(x['kanton'] for x in d)));print('mit Wohnbauten:',sum(1 for x in d if x['wohnbauten']))" | tee -a "$GITHUB_STEP_SUMMARY"
+          python3 -c "import json;d=json.load(open('/tmp/gemeinden.json'));import collections;print('Gemeinden:',len(d));print(dict(collections.Counter(x['kanton'] for x in d)));print('mit Wohnbauten:',sum(1 for x in d if x['wohnbauten']));print('VS:',[x['name'] for x in d if x['kanton']=='VS'])" | tee -a "$GITHUB_STEP_SUMMARY"
           {
             echo '### Codes der Gebäudeklasse 1110 bis 1130 (gwr_kode)'
             echo '```'
