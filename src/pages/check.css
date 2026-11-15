@@ -349,3 +349,11 @@
 .pc .gemeinde-liste h3{font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--hell); margin: 0 0 6px;}
 .pc .gemeinde-liste ul{list-style: none; margin: 0; padding: 0;}
 .pc .gemeinde-liste a{display: flex; align-items: center; min-height: 44px; color: var(--tinte); border-bottom: 1px solid var(--linie); text-decoration: none;}
+/* Cookie-Hinweis: unten, über der mobilen Leiste; solange er offen ist, ruht die Leiste. */
+.pc .cookie{position: fixed; z-index: 960; left: 16px; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); max-width: 560px; margin: 0 auto; background: var(--tafel); border: 1px solid var(--linie); border-radius: var(--r); box-shadow: 0 12px 40px rgba(18,22,28,.16); padding: 18px; display: grid; gap: 14px;}
+.pc .cookie p{margin: 0; font-size: 15px; line-height: 1.5; color: var(--grau);}
+.pc .cookie .verweis{background: none; border: 0; padding: 0; color: var(--tinte); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; font: inherit;}
+.pc .cookie .knoepfe{display: grid; grid-template-columns: 1fr 1fr; gap: 8px;}
+.pc .cookie .knopf{min-height: 48px; width: 100%;}
+.pc:has(.cookie) .mobil-aufruf{display: none;}
+@media print{.pc .cookie{display: none;}}

@@ -1,4 +1,6 @@
 import { useEffect, useMemo } from 'react';
+import { CookieHinweis } from '@/components/CookieHinweis';
+import { setzeZustimmung } from '@/lib/zustimmung';
 import { useParams } from 'react-router-dom';
 import './check.css';
 import { BETREIBER, markeFuerHost, markeNachId, STANDARD_MARKE, type Marke } from '@/lib/check-marken';
@@ -22,6 +24,8 @@ export default function Ratgeber({ marke: vorgabe }: { marke?: Marke }) {
   const aufMarkenDomain = !!markeFuerHost(window.location.hostname);
   const marke = useMemo(() => vorgabe ?? markeFuerHost(window.location.hostname) ?? markeNachId(markeId) ?? STANDARD_MARKE, [vorgabe, markeId]);
   const artikel = artikelNachSlug(slug);
+  // Ohne utm-Kennung, sonst zählte der Datenschutz-Klick als Besuch aus dem Ratgeber.
+  const datenschutz = `${aufMarkenDomain ? '/' : `/check/${marke.id}`}#datenschutz`;
   const ziel = zumCheck({ aufMarkenDomain, markeId: marke.id, suche: window.location.search, slug: artikel?.slug ?? 'unbekannt' });
 
   useEffect(() => {
@@ -62,9 +66,14 @@ export default function Ratgeber({ marke: vorgabe }: { marke?: Marke }) {
         <div className="huelle">
           <div><span className="wortmarke">{wortmarke}</span>
             <p>Ein Ratgeber von {BETREIBER}. Wir begleiten Eigentümer bei Verkauf und Entwicklung von Liegenschaften und kaufen auch selbst.</p></div>
+          <div><h4>Rechtliches</h4><ul>
+            <li><a href={datenschutz}>Datenschutz</a></li>
+            <li><button type="button" onClick={() => setzeZustimmung(null)}>Cookie-Einstellungen</button></li>
+          </ul></div>
           <div className="unten">Dieser Ratgeber ersetzt keine Rechts- oder Steuerberatung.</div>
         </div>
       </footer>
+      <CookieHinweis datenschutz={() => { window.location.href = datenschutz; }} />
     </div>
   );
 }

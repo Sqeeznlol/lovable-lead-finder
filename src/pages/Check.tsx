@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { CookieHinweis } from '@/components/CookieHinweis';
+import { setzeZustimmung } from '@/lib/zustimmung';
 import { useParams } from 'react-router-dom';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -93,7 +95,8 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
   const [fehler, setFehler] = useState<string | null>(null);
   const [luftbild, setLuftbild] = useState(true);
   const [az, setAz] = useState(0.6);
-  const [recht, setRecht] = useState<'impressum' | 'datenschutz' | null>(null);
+  // Der Ratgeber verlinkt mit #datenschutz direkt auf den Text.
+  const [recht, setRecht] = useState<'impressum' | 'datenschutz' | null>(() => window.location.hash === '#datenschutz' ? 'datenschutz' : null);
   // Ladebild: Gebäude rundum und Rechtslage (ÖREB) laufen neben dem Befund her.
   const [gebaeude, setGebaeude] = useState<Koerper[] | 'fehlt' | null>(null);
   const [rechtslage, setRechtslage] = useState<Recht | 'fehlt' | null>(null);
@@ -371,7 +374,12 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
           <h2>{recht === 'impressum' ? 'Impressum' : 'Datenschutz'}</h2>
           {recht === 'impressum'
             ? <p>{marke.name.join('')} ist ein Angebot von {BETREIBER}. Firmenname, Postadresse, E-Mail und UID werden hier ergänzt.</p>
-            : <p>Wir speichern die Angaben, die Sie im Formular machen (Vorname, Name, E-Mail, Telefon, Adresse der Liegenschaft und Ihre Antworten), um Ihnen die Berechnung und Analyse zu erstellen und Sie zu Ihrer Liegenschaft zu kontaktieren. An Dritte geben wir sie nicht weiter. Die angezeigten Grundstücksdaten stammen von geo.admin.ch. Für unsere Werbung auf Facebook und Instagram nutzen wir das Meta-Pixel von Meta Platforms Ireland: Es meldet Meta, dass jemand die Seite besucht, eine Adresse gesucht oder eine Anfrage gesendet hat, ohne Ihre Angaben aus dem Formular. Meta kann dies mit einem Konto bei Facebook oder Instagram verbinden. Die vollständige Datenschutzerklärung mit Verantwortlichem, Auftragsbearbeitern und Ländern wird mit den Angaben zum Betreiber ergänzt.</p>}
+            : <>
+                <p>Wir speichern die Angaben, die Sie im Formular machen (Vorname, Name, E-Mail, Telefon, Adresse der Liegenschaft und Ihre Antworten), um Ihnen die Berechnung und Analyse zu erstellen und Sie zu Ihrer Liegenschaft zu kontaktieren. An Dritte geben wir sie nicht weiter.</p>
+                <p>Grundstücksdaten und Karten laden wir von geo.admin.ch (Bund), die Schriften von Google Fonts. Dabei sehen diese Dienste Ihre IP-Adresse.</p>
+                <p>Besuche zählen wir anonym und ohne Cookie: mit einer zufälligen Nummer im Speicher dieses Browserfensters, die beim Schliessen verfällt. Werbe-Cookies und Messpunkte von Werbeplattformen (Meta, Google) setzen wir nur, wenn Sie im Cookie-Hinweis zustimmen. Ihre Wahl ändern Sie jederzeit unten unter «Cookie-Einstellungen».</p>
+                <p>Die vollständige Datenschutzerklärung mit Verantwortlichem, Auftragsbearbeitern und Ländern wird mit den Angaben zum Betreiber ergänzt.</p>
+              </>}
           <button type="button" className="knopf" onClick={() => setRecht(null)}>Zurück</button>
         </main>
       ) : (
@@ -724,11 +732,13 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
           <div><h4>Rechtliches</h4><ul>
             <li><button type="button" onClick={() => { setRecht('impressum'); window.scrollTo({ top: 0 }); }}>Impressum</button></li>
             <li><button type="button" onClick={() => { setRecht('datenschutz'); window.scrollTo({ top: 0 }); }}>Datenschutz</button></li>
+            <li><button type="button" onClick={() => setzeZustimmung(null)}>Cookie-Einstellungen</button></li>
           </ul></div>
                     <div className="unten">Vorprüfung auf Grundlage amtlicher Daten, keine Bewilligungszusage und keine Verkehrswertschätzung.</div>
         </div>
       </footer>
 
+      <CookieHinweis datenschutz={() => { setRecht('datenschutz'); window.scrollTo({ top: 0 }); }} />
       {leiste && (
         <div className={`mobil-aufruf${bildFertig ? ' sichtbar' : ''}`}><button type="button" className="knopf marke" onClick={leiste.tun}>{leiste.text}</button></div>
       )}
