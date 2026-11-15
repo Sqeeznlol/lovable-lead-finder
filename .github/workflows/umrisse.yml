@@ -257,7 +257,9 @@ jobs:
               echo "  $parzellen Parzellen, $paare Paare, Datenbank ${mb} MB"
             fi
           done
-          psql "$DB" -X -q -c "vacuum analyze public.properties;" -c "analyze public.nachbarschaft;"
+          # Mit VACUUM, nicht nur ANALYZE: erst dann zählt die Datenbank über
+          # den Index statt über die Tabelle (daten_stand, Reiter Auswertung).
+          psql "$DB" -X -q -c "vacuum analyze public.properties;" -c "vacuum analyze public.nachbarschaft;" -c "vacuum analyze public.parzelle_punkt;"
           echo "Parzellen gerechnet: $parzellen, Paare: $paare" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Stand
