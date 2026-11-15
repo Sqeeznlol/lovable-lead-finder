@@ -817,6 +817,14 @@ jobs:
                      count(*) filter (where parzelle_id is not null) as mit_parzelle
               from public.baugesuch where publiziert_am > current_date - 365 and quelle <> 'probe'
               group by 1, 2 order by 1, 2;"
+            frage "Zürcher Gesuche: Parzelle mit Umriss?" "
+              select count(*) as gesuche, count(p.id) as mit_parzelle, count(p.geometrie) as parzelle_mit_umriss,
+                     min(b.publiziert_am) as erstes, max(b.publiziert_am) as letztes
+              from public.baugesuch b left join public.properties p on p.id = b.parzelle_id
+              where b.kanton = 'ZH' and b.quelle <> 'probe';"
+            frage "Uster: Gesuche je Monat (Kontrolle des Beginns)" "
+              select to_char(publiziert_am, 'YYYY-MM') as monat, count(*) from public.baugesuch
+              where kanton = 'ZH' and quelle <> 'probe' group by 1 order by 1;"
             frage "Wie dicht: Gesuche im Umkreis von 300 m um 5 Punkte mit Gesuch (Stichprobe, nur Zahlen)" "
               with p as (select geometrie from public.baugesuch where geometrie is not null and publiziert_am > current_date - 365 order by random() limit 5)
               select (select count(*) from public.baugesuch b where b.publiziert_am > current_date - 365 and st_dwithin(b.geometrie, p.geometrie, 300)) as im_umkreis
