@@ -136,7 +136,7 @@ describe('Energie und Lage', () => {
   it('Zeilen: ohne Netz klar gesagt, ÖV lesbar', async () => {
     const { umgebungZeilen } = await import('@/lib/check-modell');
     const z = umgebungZeilen({ solar: null, waermenetz: null, oev: 'D - geringe Erschliessung', radon: 3 });
-    expect(z.map(x => x.wert)).toEqual(['Kein Wärmenetz im Umkreis von 1,5 km', 'Güteklasse D, geringe Erschliessung', '3 % Wahrscheinlichkeit über dem Referenzwert']);
+    expect(z.map(x => x.wert)).toEqual(['Keine Heizzentrale im Umkreis von 1,5 km', 'Güteklasse D, geringe Erschliessung', '3 % Wahrscheinlichkeit über dem Referenzwert']);
   });
 });
 
