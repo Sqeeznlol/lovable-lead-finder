@@ -1,0 +1,12 @@
+-- =====================================================================
+-- Besucherzählung der Check-Seiten zurücksetzen
+-- =====================================================================
+-- Julian, 15. November: "setzte das zurück, damit das clean ist und ich
+-- weiss woher die leute kommen". Bis 09:27 UTC zählte jeder Seitenaufruf,
+-- auch von Programmen (Auswerten «besucher»: 797 Sitzungen, davon 8 mit
+-- einer Suche, alle direkt eingetippt; die 3 Leads darunter sind die
+-- TEST-Anfragen). Seit dem Stand 658ad6b der Akquise (live 09:26:52 UTC)
+-- zählt ein Besuch erst nach Tippen oder Scrollen, Bots nie.
+--
+-- Gelöscht wird nur die Zählung, nicht die Anfragen (Leads).
+delete from public.check_ereignis where zeit < '2026-11-15 09:27:00+00';
