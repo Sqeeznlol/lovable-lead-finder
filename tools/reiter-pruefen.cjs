@@ -19,7 +19,10 @@
  * Mit ATTRAPPE=1 antwortet eine leere Datenbank (für die Prüfung vor
  * dem Ausliefern; dann zeigt sich, ob leere Zustände halten).
  */
-const { chromium, devices } = require('playwright');
+// Auf dem Runner steht nur der Kern ohne eigenen Browser (CHROMIUM zeigt
+// dann auf den installierten Chrome).
+let pw; try { pw = require('playwright'); } catch { pw = require('playwright-core'); }
+const { chromium, devices } = pw;
 const fs = require('fs');
 
 const ADRESSE = (process.env.ADRESSE || 'https://www.wohntraums.life').replace(/\/$/, '');

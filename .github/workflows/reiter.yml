@@ -42,10 +42,15 @@ jobs:
       - name: Browser einrichten
         run: |
           set -euo pipefail
+          # Der Chrome des Runners: Playwright 1.57 kann für Ubuntu 26.04
+          # keinen eigenen Browser einrichten (Lauf vom 15. November).
+          chrome=$(command -v google-chrome || command -v chromium-browser || command -v chromium || true)
+          [ -n "$chrome" ] || { echo "Kein Chrome auf dem Runner."; exit 1; }
+          "$chrome" --version
+          echo "CHROMIUM=$chrome" >> "$GITHUB_ENV"
           mkdir -p /tmp/pruefung && cd /tmp/pruefung
           npm init -y >/dev/null
-          npm install --silent playwright@1.57.0
-          npx playwright install --with-deps chromium >/dev/null
+          npm install --silent playwright-core@1.57.0
 
       - name: Jeden Reiter öffnen
         env:
