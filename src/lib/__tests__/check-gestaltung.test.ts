@@ -4,10 +4,11 @@
  * dem genauen Namen -- seither 28 Marken). Eine neue Marke soll nicht unbemerkt unlesbar,
  * doppelt oder mit einer Schrift kommen, die es nicht gibt.
  */
+import { existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { GEKAUFT, MARKEN, markeFuerHost } from '@/lib/check-marken';
 import { readFileSync } from 'node:fs';
-import { buehnenBild, grundton, markenAttribute, markenStil, markenSymbol, schriftAdresse } from '@/lib/check-gestaltung';
+import { buehnenBild, buehnenBildQuelle, grundton, markenAttribute, markenStil, markenSymbol, schriftAdresse } from '@/lib/check-gestaltung';
 
 // Am 7. November bei fonts.googleapis.com abgefragt: alle mit 400 bis 700.
 const SCHRIFTEN = new Set(['Urbanist', 'Figtree', 'Manrope', 'Sora', 'Public Sans', 'Newsreader', 'Albert Sans', 'Fraunces',
@@ -93,7 +94,9 @@ describe('Marken', () => {
         const [e, n] = m.design.ort;
         expect(e).toBeGreaterThan(2485000); expect(e).toBeLessThan(2834000);
         expect(n).toBeGreaterThan(1075000); expect(n).toBeLessThan(1296000);
-        expect(buehnenBild(m)).toMatch(/^https:\/\/wms\.geo\.admin\.ch\/.*LAYERS=ch\.swisstopo\.swissimage/);
+        expect(buehnenBildQuelle(m)).toMatch(/^https:\/\/wms\.geo\.admin\.ch\/.*LAYERS=ch\.swisstopo\.swissimage/);
+        // Die Bilder liegen im Repository; fehlt eins, zeigt die Bühne nichts (python3 -I tools/buehnenbilder.py).
+        for (const b of [800, 1600] as const) expect(existsSync(`public${buehnenBild(m, b)}`), `${m.id} ${b}`).toBe(true);
       } else {
         expect(buehnenBild(m)).toBeNull();
       }

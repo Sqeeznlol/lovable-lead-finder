@@ -11,6 +11,7 @@
 // nackte Adresse dorthin weiter (am 15. November gemessen, 308).
 import { BETREIBER, GEKAUFT, MARKEN, type Marke } from './check-marken';
 import { DATENQUELLEN, FRAGEN, SCHRITTE } from './check-inhalt';
+import { buehnenBild, schriftAdresse } from './check-gestaltung';
 import { ARTIKEL, type Artikel } from './ratgeber';
 import { HEIZUNG_TEXT } from './heizung-text';
 import { GEMEINDE_DOMAIN, GEMEINDE_HEIMAT, kennzahlen, satz as gemeindeSatz, titel as gemeindeTitel, type Gemeinde } from './gemeinde-seiten';
@@ -83,6 +84,13 @@ export function markenSeite(indexHtml: string, m: Marke, a?: Artikel, pfad?: str
     `<meta name="twitter:title" content="${t}" />`,
     `<meta name="twitter:description" content="${d}" />`,
     ldSkript(strukturiert(m, url, a, opt.ausfuehrlich)),
+    // Tempo (Lighthouse Handy, 15. November): Schrift der Marke ohne Warten auf JavaScript und
+    // ohne das Zeichnen aufzuhalten; das Bühnenbild als grösstes Element mit Vorrang.
+    `<link rel="stylesheet" href="${esc(schriftAdresse(m))}" media="print" onload="this.media='all'" />`,
+    ...(!a && buehnenBild(m) ? [
+      `<link rel="preload" as="image" href="${buehnenBild(m, 800)}" type="image/webp" media="(max-width: 999px)" fetchpriority="high" />`,
+      `<link rel="preload" as="image" href="${buehnenBild(m)}" type="image/webp" media="(min-width: 1000px)" fetchpriority="high" />`,
+    ] : []),
   ].join('\n    ');
   // Schlicht gesetzt, damit der Text beim Laden nicht roh aufblitzt; React ersetzt ihn.
   const stil = 'style="font-family:system-ui,sans-serif;max-width:40rem;margin:3rem auto;padding:0 1rem;line-height:1.5;color:#222"';
@@ -92,6 +100,7 @@ export function markenSeite(indexHtml: string, m: Marke, a?: Artikel, pfad?: str
   return indexHtml
     // Alles, was index.html über die interne App sagt, fällt weg.
     .replace(/<title>[\s\S]*?<\/title>/, '')
+    .replace(/\s*<link id="pc-grundschrift"[^>]*>/, m.design.schrift === 'Urbanist' || m.design.titelSchrift === 'Urbanist' ? '$&' : '')
     .replace(/\s*<meta name="robots"[^>]*>/, '')
     .replace(/\s*<meta name="description"[^>]*>/, '')
     .replace(/\s*<meta (property|name)="(og|twitter):(title|description|type|site_name|url|locale)"[^>]*>/g, '')

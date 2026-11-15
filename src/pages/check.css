@@ -358,3 +358,5 @@
 @media print{.pc .cookie{display: none;}}
 .pc .preis-knopf{width:100%; min-height:48px; margin-top:14px;}
 .pc .nachbar-satz{margin:0 0 12px; font-weight:500; line-height:1.45;}
+/* Auf dem Handy das kleine Luftbild (80 statt 250 KB, tools/buehnenbilder.py). */
+@media (max-width: 999px){.pc[data-buehne="luftbild"] .buehne, .pc[data-buehne="geteilt"] .foto{background-image: var(--luftbild-klein, var(--luftbild));}}

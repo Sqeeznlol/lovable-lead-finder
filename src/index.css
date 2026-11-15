@@ -1,6 +1,7 @@
 /* Eine Schriftfamilie (DESIGN.md): Urbanist, geometrisch wie in der
-   Vorlage. 300 für grosse Zahlen, 500 für Titel. */
-@import url('https://fonts.googleapis.com/css2?family=Urbanist:wght@300;400;500;600;700&display=swap');
+   Vorlage. 300 für grosse Zahlen, 500 für Titel. Geladen in index.html,
+   nicht hier: als @import hielt sie das erste Zeichnen auf (Lighthouse
+   15. November: 720 ms blockiert). */
 
 @tailwind base;
 @tailwind components;

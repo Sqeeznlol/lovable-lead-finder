@@ -6,8 +6,8 @@
  * zu zeichnen (check-gestaltung.test.ts).
  */
 import type { CSSProperties } from 'react';
-import type { Marke } from '@/lib/check-marken';
-import { luftbildLv95 } from '@/lib/luftbild';
+import type { Marke } from './check-marken';
+import { luftbildLv95 } from './luftbild';
 
 // Ersatz, falls Google Fonts nicht lädt: die Seite bleibt lesbar.
 const ERSATZ = "system-ui, -apple-system, 'Segoe UI', sans-serif";
@@ -25,11 +25,20 @@ export function schriftAdresse(m: Marke): string {
   return `https://fonts.googleapis.com/css2?${teile.join('&')}&display=swap`;
 }
 
-/** Luftbild der Bühne, wenn die Gestaltung eines verlangt. */
-export function buehnenBild(m: Marke): string | null {
+/** Woher das Luftbild der Bühne stammt (WMS des Bundes); tools/buehnenbilder.py holt es einmal. */
+export function buehnenBildQuelle(m: Marke): string | null {
   const d = m.design;
   if (!d.ort || (d.buehne !== 'luftbild' && d.buehne !== 'geteilt')) return null;
   return luftbildLv95(d.ort[0], d.ort[1], 700, 1600);
+}
+
+/**
+ * Das Luftbild der Bühne von der eigenen Domain, als WebP. Live vom WMS war es
+ * 507 von 873 KB der Startseite und das grösste Element (Lighthouse Handy,
+ * 15. November: 7.4 s bis es stand). Handy 800 px, Computer 1600 px.
+ */
+export function buehnenBild(m: Marke, breite: 800 | 1600 = 1600): string | null {
+  return buehnenBildQuelle(m) ? `/buehne/${m.id}-${breite}.webp` : null;
 }
 
 export function markenStil(m: Marke): CSSProperties {
@@ -47,7 +56,7 @@ export function markenStil(m: Marke): CSSProperties {
   // ein Wert hier ginge ihm vor und machte die Seite hell.
   if (d.papier && !d.dunkel) v['--papier'] = d.papier;
   const bild = buehnenBild(m);
-  if (bild) v['--luftbild'] = `url("${bild}")`;
+  if (bild) { v['--luftbild'] = `url("${bild}")`; v['--luftbild-klein'] = `url("${buehnenBild(m, 800)}")`; }
   return v as CSSProperties;
 }
 
