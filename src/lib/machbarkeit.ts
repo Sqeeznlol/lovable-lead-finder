@@ -87,6 +87,18 @@ export interface Eingabe {
   bebaubarM2: number | null;
   zone: ZonenRegeln | null;
   gebaeude: Gebaeude[];
+  /**
+   * Woher die Gebäude stammen. register: Gebäuderegister des Bundes.
+   * liste: aus der eigenen Liste der Parzelle (Fläche und Geschosse).
+   */
+  bestandQuelle?: 'register' | 'liste';
+  /**
+   * Ob das Register für diesen Kanton ganz geladen ist. Nur dann heisst
+   * "kein Gebäude gefunden" auch "unbebaut" -- gemessen am 15. November:
+   * die Gebäudetabelle führt Zürich, im Thurgau fand sie bei 200
+   * bebauten Parzellen kein einziges Gebäude.
+   */
+  registerVollstaendig?: boolean;
   annahmen: Annahmen;
 }
 
@@ -203,6 +215,7 @@ export function studieRechnen(e: Eingabe): Studie {
   const ausgenuetzt = gfBestand != null && gfNeu > 0 ? gfBestand / gfNeu : null;
 
   // ---- was es wert ist
+  const unbekannt = gfBestand == null && (e.gebaeude.length > 0 || e.registerVollstaendig === false);
   const varianten: Variante[] = [];
   {
     const erloes = hnfNeu * a.erloes;
@@ -210,7 +223,8 @@ export function studieRechnen(e: Eingabe): Studie {
     const land = erloes - kosten - erloes * a.marge;
     varianten.push({
       titel: gfBestand ? 'Ersatzneubau' : 'Neubau',
-      text: gfBestand ? 'Bestand abbrechen und das Mögliche neu bauen.' : 'Das Mögliche auf dem unbebauten Grundstück.',
+      text: gfBestand ? 'Bestand abbrechen und das Mögliche neu bauen.'
+        : unbekannt ? 'Das Mögliche neu bauen. Der Bestand ist nicht bekannt, ein Abbruch nicht eingerechnet.' : 'Das Mögliche auf dem unbebauten Grundstück.',
       gf: gfNeu, hnf: hnfNeu, wohnungen, kosten, erloes,
       ergebnis: land, ergebnisTitel: 'Bleibt für das Land', jeM2: land / flaeche,
     });
@@ -255,10 +269,13 @@ export function studieRechnen(e: Eingabe): Studie {
       { titel: 'Wohnungen', wert: `rund ${de(wohnungen)}`, art: 'annahme', quelle: `je ${de(a.wohnungM2)} m² Hauptnutzfläche` },
     ) },
     { titel: 'Was heute steht', zeilen: gfBestand != null ? zeilen(
-      { titel: 'Geschossfläche Bestand', wert: m2(gfBestand), art: 'berechnet', quelle: 'Gebäuderegister: Grundfläche × Geschosse' },
+      { titel: 'Geschossfläche Bestand', wert: m2(gfBestand), art: e.bestandQuelle === 'liste' ? 'annahme' : 'berechnet',
+        quelle: e.bestandQuelle === 'liste' ? 'eigene Liste: Gebäudefläche × Geschosse' : 'Gebäuderegister: Grundfläche × Geschosse' },
       { titel: 'Ausgenützt', wert: `${de(Math.round(ausgenuetzt! * 100))} %`, art: 'berechnet', quelle: 'Bestand ÷ mögliche Geschossfläche' },
       { titel: 'Reserve', wert: m2(reserve!), art: 'berechnet', quelle: 'mögliche Geschossfläche minus Bestand' },
-    ) : zeilen({ titel: 'Bestand', wert: e.gebaeude.length ? 'Flächen fehlen im Register' : 'kein Gebäude im Register', art: 'amtlich', quelle: 'Gebäuderegister' }) },
+    ) : zeilen(e.gebaeude.length ? { titel: 'Bestand', wert: 'Flächen fehlen im Register', art: 'amtlich', quelle: 'Gebäuderegister' }
+      : e.registerVollstaendig === false ? { titel: 'Bestand', wert: 'nicht bekannt', art: 'annahme', quelle: 'Das Gebäuderegister ist für diesen Kanton nicht geladen' }
+      : { titel: 'Bestand', wert: 'kein Gebäude im Register', art: 'amtlich', quelle: 'Gebäuderegister' }) },
   ];
 
   // ---- was offen bleibt
@@ -269,6 +286,7 @@ export function studieRechnen(e: Eingabe): Studie {
   if (!ziffer) pruefen.push('Die Zone nennt keine Ziffer (häufig in Kern- und Zentrumszonen): dort entscheiden Gestaltungsvorschriften und der Einzelfall.');
   if (z.quelle !== 'kanton') pruefen.push('Die Angaben zur Zone stammen aus der eigenen Liste, nicht aus dem Zonenplan des Kantons.');
   if (bauzone) pruefen.push('Die Parzelle liegt nur zum Teil in der Bauzone.');
+  if (unbekannt) pruefen.push('Der Bestand ist nicht bekannt: ob und was heute steht, ist nicht eingerechnet.');
   if (ausgenuetzt != null && ausgenuetzt > 1) pruefen.push('Der Bestand ist grösser als heute erlaubt (Besitzstand): ein Neubau dürfte kleiner ausfallen.');
   if (pos(z.wohnanteilMin)) pruefen.push(`Mindestens ${de(z.wohnanteilMin!)} % Wohnanteil vorgeschrieben.`);
   pruefen.push('Gestaltungsplan, Baulinien, Gewässerraum, Lärm, Ortsbild und Denkmal: im Kataster der Eigentumsbeschränkungen nachsehen.');

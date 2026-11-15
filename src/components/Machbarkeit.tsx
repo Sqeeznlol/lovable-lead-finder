@@ -21,7 +21,11 @@ import { drucken } from '@/lib/drucken';
 interface Parzelle {
   id: string; address?: string | null; gemeinde?: string | null; kanton?: string | null; area?: number | null; bfs_nr?: string | number | null;
   zone?: string | null; ausnuetzung?: number | string | null; vollgeschosse_zulaessig?: number | null; egrid?: string | null;
+  gebaeudeflaeche?: number | null; geschosse?: number | null; baujahr?: number | null; wohnungen?: number | null;
 }
+
+/** Kantone, für die das Gebäuderegister ganz in der Datenbank steht (Tabelle gebaeude). */
+const REGISTER_GELADEN = ['ZH'];
 
 const ART: Record<Art, string> = { amtlich: 'amtlich', berechnet: 'berechnet', annahme: 'Annahme' };
 const de = (n: number, stellen = 0) => n.toLocaleString('de-CH', { maximumFractionDigits: stellen });
@@ -87,12 +91,18 @@ export function Machbarkeit({ parzelle }: { parzelle: Parzelle }) {
   const liste = useMemo(() => zoneAusBestand(parzelle), [parzelle]);
   const wartetAufZone = parzelle.kanton === 'ZH' && !!punkt && amtlich.isLoading;
   const zone = amtlich.data ?? liste?.regeln ?? null;
+  // Bestand: das Register, wo es geladen ist; sonst was die eigene Liste zur Parzelle weiss.
+  const ausRegister = grundlage.data?.gebaeude ?? [];
+  const ausListe = !ausRegister.length && parzelle.gebaeudeflaeche && parzelle.geschosse
+    ? [{ grundflaeche: parzelle.gebaeudeflaeche, geschosse: parzelle.geschosse, baujahr: parzelle.baujahr ?? null, wohnungen: parzelle.wohnungen ?? null }] : null;
   const studie = useMemo(() => studieRechnen({
     flaeche: parzelle.area ?? grundlage.data?.flaeche_umriss ?? null,
     bauzoneM2: amtlich.data ? null : liste?.bauzoneM2,
     bebaubarM2: grundlage.data?.umriss_da ? grundlage.data.bebaubar_m2 : null,
-    zone, gebaeude: grundlage.data?.gebaeude ?? [], annahmen,
-  }), [parzelle.area, grundlage.data, amtlich.data, liste, zone, annahmen]);
+    zone, gebaeude: ausListe ?? ausRegister, bestandQuelle: ausListe ? 'liste' : 'register',
+    registerVollstaendig: REGISTER_GELADEN.includes(parzelle.kanton ?? ''), annahmen,
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- ausListe und ausRegister folgen aus parzelle und grundlage.data
+  }), [parzelle, grundlage.data, amtlich.data, liste, zone, annahmen]);
   const bild = useMemo(() => (grundlage.data ? zeichnung(grundlage.data) : null), [grundlage.data]);
 
   if (!auf) {

@@ -89,6 +89,20 @@ describe('Machbarkeit', () => {
     expect(studieRechnen(eingabe({ zone: zone({}) })).rechenbar).toBe(false);
   });
 
+  // Gemessen am 15. November: die Gebäudetabelle führt nur Zürich.
+  it('ohne geladenes Register heisst kein Gebäude nicht unbebaut', () => {
+    const zh = studieRechnen(eingabe({ registerVollstaendig: true }));
+    expect(zh.abschnitte.at(-1)!.zeilen[0]).toMatchObject({ wert: 'kein Gebäude im Register', art: 'amtlich' });
+    expect(zh.varianten[0].text).toMatch(/unbebauten/);
+    const tg = studieRechnen(eingabe({ registerVollstaendig: false }));
+    expect(tg.abschnitte.at(-1)!.zeilen[0]).toMatchObject({ wert: 'nicht bekannt', art: 'annahme' });
+    expect(tg.varianten[0].text).toMatch(/nicht bekannt/);
+    expect(tg.pruefen.some(p => p.startsWith('Der Bestand ist nicht bekannt'))).toBe(true);
+    const liste = studieRechnen(eingabe({ registerVollstaendig: false, bestandQuelle: 'liste', gebaeude: [{ grundflaeche: 120, geschosse: 2, baujahr: 1970, wohnungen: 1 }] }));
+    expect(liste.gfBestand).toBe(240);
+    expect(liste.abschnitte.at(-1)!.zeilen[0]).toMatchObject({ art: 'annahme', quelle: 'eigene Liste: Gebäudefläche × Geschosse' });
+  });
+
   it('jede Zahl trägt ihre Herkunft; Zonen aus der eigenen Liste gelten nicht als amtlich', () => {
     const amt = studieRechnen(eingabe({}));
     const alle = amt.abschnitte.flatMap(a => a.zeilen);

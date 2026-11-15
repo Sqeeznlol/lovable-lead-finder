@@ -48,7 +48,12 @@ Dazu:
   Vollgeschosse dazu (Faktor 0.66 eines Vollgeschosses). Bei der
   Baumassenziffer ist es im Volumen schon enthalten.
 - **Bestand.** Grundfläche mal Geschosse je Gebäude, aus dem
-  Gebäuderegister. Daraus Reserve und Ausnützung in Prozent.
+  Gebäuderegister. Daraus Reserve und Ausnützung in Prozent. Das
+  Register ist nur für Zürich ganz geladen: anderswo nimmt die Studie
+  Gebäudefläche und Geschosse aus der eigenen Liste (als Annahme
+  gekennzeichnet) oder sagt, dass der Bestand nicht bekannt ist.
+  Gemessen am 15. November an je 200 bebauten Parzellen: Zürich 1.09
+  Gebäude je Parzelle, Thurgau 0.
 - **Zwei Varianten.** Ersatzneubau (was nach Erlös, Baukosten, Abbruch
   und Marge des Entwicklers für das Land bleibt) und Aufstocken oder
   Anbauen (nur die Reserve).
@@ -101,6 +106,12 @@ jede dieser Zahlen als Annahme.
    einem Punkt im Innern der Parzelle.
 
 ## Wie sie geprüft wird, bevor sie an Kunden geht
+
+Die Grundlage aus der Datenbank ist an echten Parzellen gemessen
+(Auswerten «machbarkeit», je 200 bebaute Parzellen in Zürich und im
+Thurgau): die Fläche des Umrisses trifft die amtliche Fläche genau
+(Verhältnis 1.000), bei 5 m Grenzabstand bleiben im Mittel 30 % der
+Parzelle bebaubar, und bei jeder sechsten bis siebten bleibt nichts.
 
 Die Rechnung selbst ist mit von Hand nachgerechneten Fällen getestet
 (13 Tests). Ob sie die Wirklichkeit trifft, zeigt erst der Vergleich
