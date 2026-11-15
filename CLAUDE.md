@@ -51,6 +51,20 @@ taugt als Merkmal nicht -- er hängt auch an den Umgebungsvariablen.
 Das ganze Vorgehen steht in `docs/morgen.md` unter
 "Wie gepusht und ausgeliefert wird".
 
+### Pushes bündeln
+
+Vercel liefert höchstens hundert Mal am Tag aus, und am Repository
+hängen die Webseite und die Check-Seiten. Am 15. November gingen 70
+Pushes hinein (48 auf `main`, 22 auf `akquise`); ab 21:21 blieb die
+Seite acht Commits zurück stehen, und «Was ist live» wurde rot.
+
+  * Ein Push je abgeschlossene Sache, nicht je Zwischenschritt. Lokal
+    committen, prüfen, dann einmal pushen.
+  * Abläufe, Werkzeuge und Unterlagen kosten denselben Bau wie die
+    Seite: zusammen mit der Arbeit pushen, zu der sie gehören.
+  * Bleibt die Seite stehen: nicht weiterpushen. In Vercel bringt
+    *Promote to Production* einen gebauten Stand live, ohne Kontingent.
+
 ## Gestaltung
 
 Wie die Seite aussieht, steht in `DESIGN.md` -- vor jeder Arbeit an der
