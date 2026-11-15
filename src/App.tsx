@@ -8,7 +8,6 @@ import { ThemeProvider } from "@/hooks/use-theme";
 import { CantonProvider } from "@/hooks/use-canton";
 import { AuthProvider } from "@/hooks/use-auth";
 import { Torwaechter } from "@/components/Torwaechter";
-import { Auffang } from "@/components/Auffang";
 const Index = lazy(() => import("./pages/Index.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 const FondsSeite = lazy(() => import("./pages/Fonds.tsx"));
@@ -43,10 +42,8 @@ const App = () => (
             <Routes>
               {/* Wohntraums, die Oberfläche für Fondsleitungen: eigene
                   Adresse, eigene Anmeldung. */}
-              {/* Mit Auffang: antwortet die Datenbank unerwartet, stand hier
-                  eine weisse Seite -- ausgerechnet vor den Kunden. */}
-              <Route path="/fonds" element={<Auffang bereich="Wohntraums"><FondsSeite /></Auffang>} />
-              <Route path="/fonds/:bereich" element={<Auffang bereich="Wohntraums"><FondsSeite /></Auffang>} />
+              <Route path="/fonds" element={<FondsSeite />} />
+              <Route path="/fonds/:bereich" element={<FondsSeite />} />
               <Route path="*" element={
                 <Torwaechter>
                   <Suspense fallback={<div className="min-h-screen bg-background" />}>
