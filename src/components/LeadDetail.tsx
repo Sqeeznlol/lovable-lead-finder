@@ -5,8 +5,9 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { KNOPF, KNOPF_HAUPT, Marke } from '@/components/rahmen';
 import { luftbildLv95 } from '@/lib/luftbild';
 import { FENSTER } from '@/lib/fenster';
-import { ANTWORT_TEXT } from '@/lib/lead-auswertung';
+import { ANTWORT_TEXT, wohnungText } from '@/lib/lead-auswertung';
 import { zusatzAbfragen } from '@/lib/parzelle-zusatz';
+import { mailLink, naechsterSchritt, STUFEN } from '@/lib/nachfass';
 
 /**
  * Ein Lead ganz: wer, welche Liegenschaft, was er will, woher er kam
@@ -16,6 +17,7 @@ import { zusatzAbfragen } from '@/lib/parzelle-zusatz';
 export type Lead = {
   id: string; name: string; email: string | null; telefon: string | null; adresse: string | null; egrid: string | null;
   angaben: Record<string, unknown>; erstellt_am: string; bearbeitet: boolean; bemerkung: string | null;
+  nachfass_stufe?: number | null; nachfass_am?: string | null;
 };
 
 const zeile = (titel: string, wert: unknown) =>
@@ -116,8 +118,37 @@ function FondsInDerNaehe({ lv95 }: { lv95: number[] }) {
   );
 }
 
-export function LeadDetail({ lead, onClose, onErledigt, onNotiz }: {
+function Nachfassen({ lead, onWeiter }: { lead: Lead; onWeiter: (l: Lead) => Promise<void> }) {
+  const [laeuft, setLaeuft] = useState(false);
+  const s = naechsterSchritt(lead);
+  const stufe = Number(lead.nachfass_stufe ?? 0);
+  return (
+    <section className="space-y-2">
+      <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Nachfassen</h3>
+      <ol className="space-y-1 text-sm">
+        {STUFEN.map((x, i) => (
+          <li key={x.kurz} className={`flex justify-between gap-3 border-b py-2 last:border-0 ${i < stufe ? 'text-muted-foreground line-through' : ''}`}>
+            <span>{x.kurz}: {x.titel}</span>
+            {i === stufe && s && <span className={s.jetzt ? 'font-medium' : 'text-muted-foreground'}>{s.jetzt ? 'fällig' : `ab ${s.faellig.toLocaleDateString('de-CH')}`}</span>}
+            {i < stufe && <span>erledigt</span>}
+          </li>
+        ))}
+      </ol>
+      {s ? (
+        <div className="grid grid-cols-2 gap-2">
+          {lead.email ? <a className={s.jetzt ? KNOPF_HAUPT : KNOPF} href={mailLink(lead.email, s)}>Mail «{s.titel}»</a> : <span className="text-sm text-muted-foreground">Keine E-Mail, bitte anrufen.</span>}
+          <button type="button" className={KNOPF} disabled={laeuft} onClick={async () => { setLaeuft(true); await onWeiter(lead); setLaeuft(false); }}>
+            {laeuft ? 'Speichert …' : 'Schritt erledigt'}
+          </button>
+        </div>
+      ) : <p className="text-sm text-muted-foreground">{lead.bearbeitet ? 'Lead ist erledigt.' : 'Alle Schritte erledigt.'}</p>}
+    </section>
+  );
+}
+
+export function LeadDetail({ lead, onClose, onErledigt, onNotiz, onNachfass }: {
   lead: Lead | null; onClose: () => void; onErledigt: (l: Lead) => void; onNotiz: (l: Lead, text: string) => Promise<void>;
+  onNachfass: (l: Lead) => Promise<void>;
 }) {
   const [notiz, setNotiz] = useState('');
   const [speichert, setSpeichert] = useState(false);
@@ -154,6 +185,8 @@ export function LeadDetail({ lead, onClose, onErledigt, onNotiz }: {
               </a>
             )}
 
+            <Nachfassen lead={lead} onWeiter={onNachfass} />
+
             <section>
               <h3 className="mb-1 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Kontakt</h3>
               {zeile('Name', lead.name)}
@@ -180,6 +213,9 @@ export function LeadDetail({ lead, onClose, onErledigt, onNotiz }: {
               {zeile('Zone', a.zone)}
               {zeile('Gebäude', a.gebaeude)}
               {zeile('Wohnungen', a.wohnungen)}
+              {zeile('Gewählte Wohnung', wohnungText(a.wohnung))}
+              {zeile('Heizung', a.heizung)}
+              {zeile('Bauperiode', a.bauperiode)}
               {zeile('Ältestes Baujahr', a.baujahr)}
               {zeile('Bauprojekt im Register', a.projekt ? 'ja' : null)}
             </section>

@@ -4,7 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Abschnitt, KNOPF, Leer, LISTE, Marke, Reiter, Seite } from '@/components/rahmen';
 import { BILD } from '@/lib/luftbild';
 import { LeadDetail, type Lead } from '@/components/LeadDetail';
-import { ANTWORT_TEXT, gesamt, istTest, prozent, quellen, SCHRITT_TEXT, SCHRITTE, trichterJeSeite, type TrichterZeile } from '@/lib/lead-auswertung';
+import { naechsterSchritt } from '@/lib/nachfass';
+import { ANTWORT_TEXT, gesamt, istTest, wohnungText, prozent, quellen, SCHRITT_TEXT, SCHRITTE, trichterJeSeite, type TrichterZeile } from '@/lib/lead-auswertung';
 
 /**
  * Alle Leads der Check-Seiten in einer Liste, dazu die Zahlen je Webseite
@@ -35,7 +36,7 @@ export function Leads() {
     queryKey: ['check-leads', tage],
     queryFn: async (): Promise<Lead[]> => {
       const { data, error } = await db.from('anfrage')
-        .select('id, name, email, telefon, adresse, egrid, angaben, erstellt_am, bearbeitet, bemerkung')
+        .select('id, name, email, telefon, adresse, egrid, angaben, erstellt_am, bearbeitet, bemerkung, nachfass_stufe, nachfass_am')
         .gte('erstellt_am', von).order('erstellt_am', { ascending: false }).limit(500);
       if (error) throw error;
       return data ?? [];
@@ -59,11 +60,16 @@ export function Leads() {
   const alle = (leads.data ?? []).filter(l => mitTest || !istTest(l));
   const offen = (leads.data ?? []).find(l => l.id === offenId) ?? null;
   const liste = alle.filter(l => !nurOffen || !l.bearbeitet);
+  const faellig = alle.filter(l => naechsterSchritt(l)?.jetzt).length;
   const heiss = alle.filter(l => l.angaben?.prioritaet === 'heiss' && !l.bearbeitet).length;
 
   const erledigt = async (l: Lead) => {
     await db.from('anfrage').update({ bearbeitet: !l.bearbeitet }).eq('id', l.id);
     void qc.invalidateQueries({ queryKey: ['check-leads'] });
+  };
+  const nachfass = async (l: Lead) => {
+    await db.from('anfrage').update({ nachfass_stufe: Math.min(3, Number(l.nachfass_stufe ?? 0) + 1), nachfass_am: new Date().toISOString() }).eq('id', l.id);
+    await qc.invalidateQueries({ queryKey: ['check-leads'] });
   };
   const notiz = async (l: Lead, text: string) => {
     await db.from('anfrage').update({ bemerkung: text.trim() || null }).eq('id', l.id);
@@ -85,6 +91,7 @@ export function Leads() {
       </>}
       kennzahlen={[
         { titel: `Leads ${tage} Tage`, wert: String(alle.length), marke: heiss ? <Marke art="heiss">{heiss} heiss offen</Marke> : undefined },
+        { titel: 'Nachfassen fällig', wert: String(faellig) },
         { titel: 'Besucher', wert: trichter.data ? String(summe.aufruf) : '–' },
         { titel: 'Abschluss', wert: trichter.data ? prozent(summe.aufruf ? summe.lead / summe.aufruf : null) : '–' },
         { titel: 'Webseiten mit Besuch', wert: trichter.data ? String(t.filter(m => m.werte.aufruf).length) : '–' },
@@ -118,7 +125,8 @@ export function Leads() {
                         <Marke>{String(a.domain ?? a.marke ?? 'Anfrage')}</Marke>
                         {(a.utm_source || a.fbclid || a.gclid) && <Marke>{String(a.utm_source ?? (a.fbclid ? 'facebook' : 'google'))}</Marke>}
                       </div>
-                      <div className="text-sm">{l.adresse ?? '–'}{a.flaeche ? ` · ${a.flaeche} m²` : ''}{a.zone ? ` · ${a.zone}` : ''}</div>
+                      <div className="text-sm">{l.adresse ?? '–'}{a.flaeche ? ` · ${a.flaeche} m²` : ''}{a.zone ? ` · ${a.zone}` : ''}{wohnungText(a.wohnung) ? ` · Wohnung ${wohnungText(a.wohnung)}` : ''}</div>
+                      {(() => { const s = naechsterSchritt(l); return s ? <div className={`text-sm ${s.jetzt ? 'font-medium' : 'text-muted-foreground'}`}>{s.kurz}: {s.titel}{s.jetzt ? ' – fällig' : ` ab ${s.faellig.toLocaleDateString('de-CH')}`}</div> : null; })()}
                       {antwort && <div className="text-sm text-muted-foreground">{antwort}</div>}
                       <div className="flex flex-wrap gap-x-4 text-sm">
                         {l.telefon && <a className="underline underline-offset-2" href={`tel:${l.telefon.replace(/\s/g, '')}`}>{l.telefon}</a>}
@@ -191,7 +199,7 @@ export function Leads() {
           )}
       </Abschnitt>
 
-      <LeadDetail lead={offen} onClose={() => setOffenId(null)} onErledigt={l => void erledigt(l)} onNotiz={notiz} />
+      <LeadDetail lead={offen} onClose={() => setOffenId(null)} onErledigt={l => void erledigt(l)} onNotiz={notiz} onNachfass={nachfass} />
 
       {q.length > 0 && (
         <Abschnitt titel="Woher die Besucher kommen">

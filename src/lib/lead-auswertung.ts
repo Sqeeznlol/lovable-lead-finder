@@ -56,6 +56,13 @@ export function istTest(l: { name?: string | null; angaben?: Record<string, unkn
   return /\btest\b/i.test(l.name ?? '') || String(l.angaben?.quelle ?? '').toLowerCase() === 'test';
 }
 
+/** Die Wohnung, die der Eigentümer auf der Check-Seite angetippt hat (Stockwerkeigentum). */
+export function wohnungText(w: unknown): string | null {
+  if (!w || typeof w !== 'object') return null;
+  const x = w as { stock?: string; zimmer?: number; flaeche?: number; nr?: string };
+  return [x.stock, x.zimmer ? `${String(x.zimmer).replace('.', ',')} Zi.` : null, x.flaeche ? `${x.flaeche} m²` : null, x.nr ? `Nr. ${x.nr}` : null].filter(Boolean).join(' · ') || null;
+}
+
 export const prozent = (x: number | null) => (x == null ? '–' : `${(x * 100).toFixed(x < 0.1 ? 1 : 0)} %`);
 
 /** Die Antworten aus dem Fragebogen der Check-Seiten, wie sie im Lead stehen. */
