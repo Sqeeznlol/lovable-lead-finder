@@ -396,8 +396,15 @@ jobs:
                       where r.oid = any (p.polroles))
               order by 1, 2;"
 
+            # Mit den Rechten von anon und authenticated: ohne Zeilenschutz
+            # entscheidet allein das Recht, wer liest oder schreibt.
             frage "Tabellen ohne eingeschalteten Zeilenschutz" "
-              select c.relname as tabelle
+              select c.relname as tabelle,
+                     pg_size_pretty(pg_total_relation_size(c.oid)) as groesse,
+                     concat_ws(',', case when has_table_privilege('anon', c.oid, 'select') then 'lesen' end,
+                                    case when has_table_privilege('anon', c.oid, 'insert,update,delete') then 'schreiben' end) as anon,
+                     concat_ws(',', case when has_table_privilege('authenticated', c.oid, 'select') then 'lesen' end,
+                                    case when has_table_privilege('authenticated', c.oid, 'insert,update,delete') then 'schreiben' end) as angemeldet
               from pg_class c
               join pg_namespace n on n.oid = c.relnamespace
               where n.nspname = 'public' and c.relkind = 'r'
