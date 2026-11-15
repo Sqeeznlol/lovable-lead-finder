@@ -53,7 +53,7 @@ jobs:
           {
             echo "### Typen"
             echo "Zeilen: $(wc -l < /tmp/types.ts) (vorher $(wc -l < src/integrations/supabase/types.ts))"
-            echo "Tabellen und Sichten mit Zeilentyp: $(grep -c '^        Row: {' /tmp/types.ts) (vorher $(grep -c '^        Row: {' src/integrations/supabase/types.ts))"
+            echo "Tabellen und Sichten mit Zeilentyp: $(grep -c 'Row: {' /tmp/types.ts) (vorher $(grep -c 'Row: {' src/integrations/supabase/types.ts))"
           } | tee -a "$GITHUB_STEP_SUMMARY"
           cp /tmp/types.ts src/integrations/supabase/types.ts
 
