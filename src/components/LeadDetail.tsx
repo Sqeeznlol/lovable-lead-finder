@@ -136,7 +136,7 @@ function Nachfassen({ lead, onWeiter }: { lead: Lead; onWeiter: (l: Lead) => Pro
       </ol>
       {s ? (
         <div className="grid grid-cols-2 gap-2">
-          {lead.email ? <a className={s.jetzt ? KNOPF_HAUPT : KNOPF} href={mailLink(lead.email, s)}>Mail «{s.titel}»</a> : <span className="text-sm text-muted-foreground">Keine E-Mail, bitte anrufen.</span>}
+          {lead.email ? <a className={s.jetzt ? KNOPF_HAUPT : KNOPF} href={mailLink(lead.email, s)}>Mail öffnen</a> : <span className="text-sm text-muted-foreground">Keine E-Mail, bitte anrufen.</span>}
           <button type="button" className={KNOPF} disabled={laeuft} onClick={async () => { setLaeuft(true); await onWeiter(lead); setLaeuft(false); }}>
             {laeuft ? 'Speichert …' : 'Schritt erledigt'}
           </button>
