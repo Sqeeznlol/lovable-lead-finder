@@ -1,3 +1,4 @@
+import { drucken } from '@/lib/drucken';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, FileSpreadsheet, Printer, Trash2 } from 'lucide-react';
@@ -225,18 +226,8 @@ export function kennzahlenVon(d: Eintrag[]) {
   };
 }
 
-/**
- * Drucken bzw. als PDF sichern. Der Dateiname des PDF ist der Titel der
- * Seite -- darum für den Druck der Name, den man eingegeben hat, danach
- * wieder der alte.
- */
-export function pdfDrucken(name: string) {
-  const alt = document.title;
-  document.title = name.trim() || 'Gebäude';
-  const zurueck = () => { document.title = alt; window.removeEventListener('afterprint', zurueck); };
-  window.addEventListener('afterprint', zurueck);
-  window.print();
-}
+/** Unter dem alten Namen, für die Merkliste selbst. */
+export const pdfDrucken = (name: string) => drucken(name || 'Gebäude');
 
 /**
  * Wie weit man bei einem Gebäude der Liste ist (Spalte stand in

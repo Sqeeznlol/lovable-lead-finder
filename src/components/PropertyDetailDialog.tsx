@@ -19,6 +19,7 @@ import { zoneKurzform } from '@/lib/potential';
 import { supabase } from '@/integrations/supabase/client';
 import { BaugesucheParzelle } from '@/components/BaugesucheParzelle';
 import { Bezuege } from '@/components/Bezuege';
+import { Machbarkeit } from '@/components/Machbarkeit';
 import { heizungBeschreiben, useGwrKodes, useParzellenGebaeude } from '@/lib/parzelle-gebaeude';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
@@ -222,6 +223,9 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
 
               {/* Kunde, Gelegenheit, Lead, Fonds: von hier aus erreichbar. */}
               <Bezuege parzelleId={data.id} egrid={data.egrid} />
+
+              {/* Was hier Platz hat und was es wert ist; rechnet erst auf Wunsch. */}
+              <Machbarkeit parzelle={data} />
 
               <div className="space-y-1.5">
                 <h3 className="text-lg">Notizen</h3>

@@ -51,3 +51,18 @@ jobs:
           git commit -q -m "Preise je Gemeinde aufgefrischt (Ablauf Preise)"
           git push -q origin HEAD:akquise
           echo "Geschrieben und gepusht." >> "$GITHUB_STEP_SUMMARY"
+
+      # Aurora braucht dieselben Preise für die Machbarkeitsstudie: was
+      # nach der Rechnung für das Land bleibt, steht dort neben dem, was
+      # in der Gemeinde bezahlt wurde.
+      - name: In die Webseite schreiben
+        run: |
+          set -euo pipefail
+          cp akquise/public/preise.json public/preise.json
+          if git diff --quiet -- public/preise.json; then echo "Webseite: unverändert." >> "$GITHUB_STEP_SUMMARY"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/preise.json
+          git commit -q -m "Preise je Gemeinde aufgefrischt (Ablauf Preise)"
+          git push -q origin HEAD:main
+          echo "Webseite: geschrieben und gepusht." >> "$GITHUB_STEP_SUMMARY"

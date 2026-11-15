@@ -5,7 +5,7 @@ import { KNOPF, KNOPF_HAUPT, Leer } from '@/components/rahmen';
 import { BILD } from '@/lib/luftbild';
 import { HEIZ_GRUPPEN, heizGruppe } from '@/lib/karte3d';
 import { ANLAESSE, ZUSTAENDE } from '@/hooks/use-gelegenheiten';
-import { pdfDrucken } from '@/components/Merklisten';
+import { drucken } from '@/lib/drucken';
 
 /**
  * Der Portfolio-Bericht an einen Kunden (Tims Brief, 11D und 15):
@@ -88,7 +88,7 @@ export function PortfolioBericht({ mandantId, onZurueck, ohneMarge = false }: { 
     <div className="mx-auto max-w-3xl space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
         <button type="button" onClick={onZurueck} className={KNOPF}><ArrowLeft className="h-4 w-4" /> Zurück</button>
-        <button type="button" onClick={() => pdfDrucken(`Portfolio-Bericht ${b.kunde}`)} className={KNOPF_HAUPT}><Printer className="h-4 w-4" /> Als PDF</button>
+        <button type="button" onClick={() => drucken(`Portfolio-Bericht ${b.kunde}`)} className={KNOPF_HAUPT}><Printer className="h-4 w-4" /> Als PDF</button>
       </div>
       <div className="bericht-druck rounded border bg-white p-6 font-sans text-[#111] print:rounded-none print:border-0 print:p-0" style={EXAKT}>
         {/* Bühne */}
