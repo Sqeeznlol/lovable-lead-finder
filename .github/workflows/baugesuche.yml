@@ -211,6 +211,48 @@ jobs:
           from public.baugesuch;
           SQL
 
+      # Die Zürcher Gesuche kommen ohne Punkt, und die Zürcher Parzellen in
+      # der Datenbank haben keinen Umriss (gemessen 15. November: 0 von 7'212).
+      # Der Umkreis im Check braucht aber einen Ort. Das Gebäuderegister des
+      # Bundes kennt zu jeder EGRID die Gebäude mit Koordinaten; der Punkt ist
+      # ihr Mittel. Parzellen ohne Gebäude bleiben ohne Punkt.
+      - name: Punkte für Zürcher Gesuche (Gebäuderegister)
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y -qq unzip >/dev/null
+          psql "$DB" -X -q -At -c "select distinct egrid from public.baugesuch where kanton = 'ZH' and geometrie is null and egrid is not null" > /tmp/offen.txt
+          echo "Zürcher Gesuche ohne Punkt, EGRID verschieden: $(wc -l < /tmp/offen.txt)" | tee -a "$GITHUB_STEP_SUMMARY"
+          [ -s /tmp/offen.txt ] || exit 0
+          curl -sSfL --retry 4 -o /tmp/zh.zip https://public.madd.bfs.admin.ch/zh.zip
+          unzip -o -q /tmp/zh.zip gebaeude_batiment_edificio.csv -d /tmp/gwr
+          python3 -I - <<'PY'
+          import csv
+          csv.field_size_limit(10**9)
+          offen = set(open('/tmp/offen.txt').read().split())
+          summe = {}
+          with open('/tmp/gwr/gebaeude_batiment_edificio.csv', encoding='utf-8', newline='') as f:
+              r = csv.reader(f, delimiter='\t'); k = next(r)
+              ie, ix, iy = k.index('EGRID'), k.index('GKODE'), k.index('GKODN')
+              for z in r:
+                  g = z[ie]
+                  if g in offen and z[ix] and z[iy]:
+                      s = summe.setdefault(g, [0.0, 0.0, 0]); s[0] += float(z[ix]); s[1] += float(z[iy]); s[2] += 1
+          with open('/tmp/punkte.csv', 'w', newline='') as f:
+              w = csv.writer(f)
+              for g, (x, y, n) in summe.items():
+                  w.writerow([g, round(x / n, 1), round(y / n, 1)])
+          print(f"Punkte gefunden: {len(summe)} von {len(offen)} EGRID")
+          PY
+          psql "$DB" -X -q -v ON_ERROR_STOP=1 >> "$GITHUB_STEP_SUMMARY" <<'SQL'
+          create temp table p (egrid text primary key, e double precision, n double precision);
+          \copy p from '/tmp/punkte.csv' with (format csv)
+          update public.baugesuch b set geometrie = st_setsrid(st_makepoint(p.e, p.n), 2056)
+            from p where b.egrid = p.egrid and b.kanton = 'ZH' and b.geometrie is null;
+          select count(*) as zh_gesuche, count(geometrie) as mit_punkt from public.baugesuch where kanton = 'ZH';
+          SQL
+
       - name: Amtsblattportal fehlgeschlagen
         if: steps.amtsblatt.outcome == 'failure'
         run: |
