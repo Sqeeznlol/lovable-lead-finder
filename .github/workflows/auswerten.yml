@@ -829,6 +829,14 @@ jobs:
                      count(*) filter (where marken > 1) as mehrere_marken,
                      count(*) filter (where sitzung = 'ohnespeicher0') as ohne_speicher
               from s;"
+            frage "Echte Besucher: Sitzungen mit mehr als einem Aufruf (30 Tage)" "
+              select min(zeit)::timestamp(0) as zeit, domain, coalesce(quelle, 'direkt') as quelle,
+                     coalesce(kampagne, '') as kampagne, geraet,
+                     string_agg(distinct ereignis, ', ') as schritte
+              from check_ereignis where zeit > now() - interval '30 days'
+                and sitzung in (select sitzung from check_ereignis
+                                where ereignis not in ('aufruf', 'ratgeber') and zeit > now() - interval '30 days')
+              group by sitzung, domain, quelle, kampagne, geraet order by 1;"
             frage "Leads: Zähler gegen Tabelle anfrage, je Tag (30 Tage)" "
               with z as (select zeit::date as tag, count(distinct sitzung) as gezaehlt
                          from check_ereignis where ereignis = 'lead' and zeit > now() - interval '30 days' group by 1),
