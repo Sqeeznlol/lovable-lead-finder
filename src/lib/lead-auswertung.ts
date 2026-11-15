@@ -73,3 +73,22 @@ export const ANTWORT_TEXT: Record<'eigentuemer' | 'absicht' | 'zeitraum', Record
   zeitraum: { 12: 'In den nächsten 12 Monaten', 36: 'In 1 bis 3 Jahren', offen: 'Noch offen' },
 };
 
+
+/**
+ * Boden-Richtwert eines Leads (angaben.boden_chf, seit 15. November von den
+ * Check-Seiten: Fläche mal Baulandpreis der Gemeinde, nur ZH und BL).
+ * Damit die grossen Liegenschaften zuerst angerufen werden.
+ */
+export function bodenWert(a: Record<string, unknown> | null | undefined): number | null {
+  const x = Number(a?.boden_chf);
+  return Number.isFinite(x) && x > 0 ? x : null;
+}
+export function bodenText(a: Record<string, unknown> | null | undefined): string | null {
+  const x = bodenWert(a);
+  if (!x) return null;
+  return x >= 1e6 ? `Boden rund CHF ${(x / 1e6).toLocaleString('de-CH', { maximumFractionDigits: 2 })} Mio.` : `Boden rund CHF ${Math.round(x / 1000).toLocaleString('de-CH')}'000`;
+}
+/** Nach Wert sortiert: mit Richtwert absteigend, ohne ans Ende, dort neueste zuerst. */
+export function nachWert<T extends { angaben?: Record<string, unknown> | null; erstellt_am: string }>(l: T[]): T[] {
+  return [...l].sort((x, y) => (bodenWert(y.angaben) ?? -1) - (bodenWert(x.angaben) ?? -1) || y.erstellt_am.localeCompare(x.erstellt_am));
+}

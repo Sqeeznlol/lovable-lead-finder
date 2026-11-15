@@ -50,3 +50,18 @@ describe('Testdaten unter Leads', () => {
     expect(istTest({ name: 'Testament Erben', angaben: {} })).toBe(false);
   });
 });
+
+describe('Boden-Richtwert der Leads', () => {
+  it('Text und Sortierung', async () => {
+    const { bodenText, nachWert } = await import('@/lib/lead-auswertung');
+    expect(bodenText({ boden_chf: 1250000 })).toBe('Boden rund CHF 1.25 Mio.');
+    expect(bodenText({ boden_chf: 670000 })).toBe("Boden rund CHF 670'000");
+    expect(bodenText({})).toBeNull();
+    const l = [
+      { id: 'a', erstellt_am: '2026-11-15T10:00:00Z', angaben: {} },
+      { id: 'b', erstellt_am: '2026-11-14T10:00:00Z', angaben: { boden_chf: 670000 } },
+      { id: 'c', erstellt_am: '2026-11-13T10:00:00Z', angaben: { boden_chf: 4760000 } },
+    ];
+    expect(nachWert(l).map(x => x.id)).toEqual(['c', 'b', 'a']);
+  });
+});

@@ -5,7 +5,7 @@ import { Abschnitt, KNOPF, Leer, LISTE, Marke, Reiter, Seite } from '@/component
 import { BILD } from '@/lib/luftbild';
 import { LeadDetail, type Lead } from '@/components/LeadDetail';
 import { naechsterSchritt } from '@/lib/nachfass';
-import { ANTWORT_TEXT, gesamt, istTest, wohnungText, prozent, quellen, SCHRITT_TEXT, SCHRITTE, trichterJeSeite, type TrichterZeile } from '@/lib/lead-auswertung';
+import { ANTWORT_TEXT, bodenText, bodenWert, gesamt, istTest, nachWert, wohnungText, prozent, quellen, SCHRITT_TEXT, SCHRITTE, trichterJeSeite, type TrichterZeile } from '@/lib/lead-auswertung';
 
 /**
  * Alle Leads der Check-Seiten in einer Liste, dazu die Zahlen je Webseite
@@ -25,6 +25,8 @@ const MARKEN_NAME = (id: string) => id;
 export function Leads() {
   const [tage, setTage] = useState<Zeitraum>('30');
   const [nurOffen, setNurOffen] = useState(true);
+  // Nach Wert: die grössten Böden zuerst (Boden-Richtwert der Check-Seiten).
+  const [nachWertSortiert, setNachWertSortiert] = useState(false);
   const [mitTest, setMitTest] = useState(false);
   const [offenId, setOffenId] = useState<string | null>(null);
   // Eine Webseite in der Tabelle aufklappen: darunter ihre Leads.
@@ -59,7 +61,9 @@ export function Leads() {
   const tests = (leads.data ?? []).filter(istTest).length;
   const alle = (leads.data ?? []).filter(l => mitTest || !istTest(l));
   const offen = (leads.data ?? []).find(l => l.id === offenId) ?? null;
-  const liste = alle.filter(l => !nurOffen || !l.bearbeitet);
+  const gefiltert = alle.filter(l => !nurOffen || !l.bearbeitet);
+  const liste = nachWertSortiert ? nachWert(gefiltert) : gefiltert;
+  const mitWert = alle.filter(l => bodenWert(l.angaben)).length;
   const faellig = alle.filter(l => naechsterSchritt(l)?.jetzt).length;
   const heiss = alle.filter(l => l.angaben?.prioritaet === 'heiss' && !l.bearbeitet).length;
 
@@ -100,6 +104,7 @@ export function Leads() {
       <Abschnitt titel="Leads" zahl={liste.length}
         rechts={<div className="flex flex-wrap gap-2">
           <button type="button" className={KNOPF} onClick={() => setNurOffen(!nurOffen)}>{nurOffen ? 'Auch erledigte zeigen' : 'Nur offene'}</button>
+          {mitWert > 0 && <button type="button" className={KNOPF} onClick={() => setNachWertSortiert(!nachWertSortiert)}>{nachWertSortiert ? 'Neueste zuerst' : 'Grösste zuerst'}</button>}
           {tests > 0 && <button type="button" className={KNOPF} onClick={() => setMitTest(!mitTest)}>{mitTest ? 'Testdaten ausblenden' : `Testdaten zeigen (${tests})`}</button>}
         </div>}>
         {leads.isLoading ? <Leer titel="Lädt …" />
@@ -126,7 +131,7 @@ export function Leads() {
                         {a.thema === 'heizung' && <Marke>Heizungs-Check</Marke>}
                         {(a.utm_source || a.fbclid || a.gclid) && <Marke>{String(a.utm_source ?? (a.fbclid ? 'facebook' : 'google'))}</Marke>}
                       </div>
-                      <div className="text-sm">{l.adresse ?? '–'}{a.flaeche ? ` · ${a.flaeche} m²` : ''}{a.zone ? ` · ${a.zone}` : ''}{wohnungText(a.wohnung) ? ` · Wohnung ${wohnungText(a.wohnung)}` : ''}</div>
+                      <div className="text-sm">{l.adresse ?? '–'}{a.flaeche ? ` · ${a.flaeche} m²` : ''}{a.zone ? ` · ${a.zone}` : ''}{wohnungText(a.wohnung) ? ` · Wohnung ${wohnungText(a.wohnung)}` : ''}{bodenText(a) ? <span className="font-medium"> · {bodenText(a)}</span> : null}</div>
                       {(() => { const s = naechsterSchritt(l); return s ? <div className={`text-sm ${s.jetzt ? 'font-medium' : 'text-muted-foreground'}`}>{s.kurz}: {s.titel}{s.jetzt ? ' – fällig' : ` ab ${s.faellig.toLocaleDateString('de-CH')}`}</div> : null; })()}
                       {antwort && <div className="text-sm text-muted-foreground">{antwort}</div>}
                       <div className="flex flex-wrap gap-x-4 text-sm">

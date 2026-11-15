@@ -5,7 +5,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { KNOPF, KNOPF_HAUPT, Marke } from '@/components/rahmen';
 import { luftbildLv95 } from '@/lib/luftbild';
 import { FENSTER } from '@/lib/fenster';
-import { ANTWORT_TEXT, wohnungText } from '@/lib/lead-auswertung';
+import { ANTWORT_TEXT, bodenText, wohnungText } from '@/lib/lead-auswertung';
 import { zusatzAbfragen } from '@/lib/parzelle-zusatz';
 import { mailLink, naechsterSchritt, STUFEN } from '@/lib/nachfass';
 
@@ -211,6 +211,8 @@ export function LeadDetail({ lead, onClose, onErledigt, onNotiz, onNachfass }: {
               {zeile('Parzelle', a.parzelle)}
               {zeile('EGRID', lead.egrid)}
               {zeile('Grundstück', a.flaeche ? `${Number(a.flaeche).toLocaleString('de-CH')} m²` : null)}
+              {/* Fläche mal Baulandpreis der Gemeinde (amtliche Statistik ZH, BL); keine Schätzung. */}
+              {zeile('Boden-Richtwert', bodenText(a) ? `${bodenText(a)!.replace('Boden rund ', 'rund ')} (${Number(a.landpreis_m2).toLocaleString('de-CH')} CHF/m²)` : null)}
               {zeile('Zone', a.zone)}
               {zeile('Gebäude', a.gebaeude)}
               {zeile('Wohnungen', a.wohnungen)}
