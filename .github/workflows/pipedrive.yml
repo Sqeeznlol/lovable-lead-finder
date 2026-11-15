@@ -63,8 +63,6 @@ on:
           - aufraeumen   # Feldnamen, ÖREB-Link, EGID, Zone (Probelauf)
           - aufraeumen-schreiben   # dasselbe, aber tatsächlich schreiben
           - kontaktfelder-weg      # Objektinfo/Grundstück/Grundbuch löschen
-          - lead-probe   # Probe der Sofort-Meldung (lead-melden) zeigen
-          - lead-probe-weg         # Probe-Deal und Probe-Person löschen
       grenze:
         description: 'Höchstzahl Objekte -- bei "deal" die Deal-Nummer'
         required: false
@@ -119,12 +117,6 @@ jobs:
           TOKEN=$(tools/anmelden.sh); echo "::add-mask::$TOKEN"; export TOKEN
 
           case "${{ inputs.aufgabe }}" in
-            lead-probe)
-              python3 tools/pipedrive-lead-probe.py | tee -a "$GITHUB_STEP_SUMMARY"
-              ;;
-            lead-probe-weg)
-              python3 tools/pipedrive-lead-probe.py --loeschen | tee -a "$GITHUB_STEP_SUMMARY"
-              ;;
             probelauf)
               python3 tools/pipedrive-sync.py --grenze "${{ inputs.grenze }}" \
                 | tee -a "$GITHUB_STEP_SUMMARY"
