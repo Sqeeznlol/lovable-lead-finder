@@ -74,6 +74,9 @@ Handy-Fassung. Gebaut wird mit `<Seite>` aus `src/components/rahmen.tsx`.
   * Formulare kinderleicht: eine Frage je Bild, ein Tipp führt weiter.
   * Testdaten immer gekennzeichnet (Name TEST, Quelle test) und
     ausblendbar.
+  * Akquise und Pipedrive braucht Julian nicht mehr (15. November: «die
+    Akquise und Pipedrive brauche ich nicht mehr»): nichts mehr daran
+    bauen, keine Verbindungen nach Pipedrive.
   * Zahlen nur, wenn sie Menschen zählen (15. November: "stimmen die
     analytics?"): Besucher erst nach Tippen oder Scrollen, Bots nie,
     Tests nie. Nachprüfen mit Auswerten «besucher».
