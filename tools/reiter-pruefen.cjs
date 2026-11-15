@@ -27,6 +27,8 @@ const fs = require('fs');
 
 const ADRESSE = (process.env.ADRESSE || 'https://www.wohntraums.life').replace(/\/$/, '');
 const ATTRAPPE = process.env.ATTRAPPE === '1';
+// Eine Zürcher Liegenschaft aus der Amtlichen Vermessung (Stichprobe vom 15. November).
+const OBJEKT = process.env.OBJEKT_EGRID || 'CH958799779192';
 const REITER = ['', 'leads', 'zentrale', 'karte', 'gelegenheiten', 'baugesuche', 'leadlisten', 'auswertung',
   'nachbarschaft', 'arrondierung', 'kalender', 'karte3d', 'admin', 'fonds'];
 const GERAETE = [
@@ -112,6 +114,31 @@ async function pruefen(browser, geraet, zeilen) {
       breite: stand.breite, merkmale: MERKMALE.filter(m => m.test(stand.text)).map(m => m.source.replace(/\\b/g, '')), leer: stand.leer,
     });
   }
+  // Ein Objekt öffnen und die Machbarkeit rechnen lassen: der Weg, auf
+  // dem am meisten zusammenkommt (EGRID auflösen, Objektansicht,
+  // Bezüge, Umriss aus der Datenbank, Zonenplan). Die EGRID ist eine
+  // öffentliche Kennung des Grundbuchs, keine Angabe zu einer Person.
+  if (!ATTRAPPE && geraet.name === 'Computer') {
+    fehler = []; abgelehnt = [];
+    const start = Date.now();
+    await seite.goto(`${ADRESSE}/?egrid=${OBJEKT}`, { waitUntil: 'domcontentloaded' });
+    const offen = await seite.waitForSelector('[role=dialog]', { timeout: 20000 }).then(() => true).catch(() => false);
+    let ergebnis = 'Objekt öffnet nicht';
+    if (offen) {
+      const knopf = seite.getByRole('button', { name: 'Rechnen' });
+      if (await knopf.count()) {
+        await knopf.click();
+        await seite.waitForFunction(() => /Möglich sind rund|Nicht rechenbar|liess sich nicht laden/.test(document.body.innerText), null, { timeout: 30000 }).catch(() => {});
+        const t = await seite.locator('[role=dialog]').innerText();
+        ergebnis = /Möglich sind rund/.test(t) ? 'rechenbar' : /Nicht rechenbar/.test(t) ? 'nicht rechenbar (mit Begründung)' : /liess sich nicht laden/.test(t) ? 'Grundlage lädt nicht' : 'keine Antwort';
+        ergebnis += ` · Umriss ${/Umriss laut Amtlicher Vermessung/.test(t) ? 'ja' : 'nein'} · Zonenplan ${/amtlich · Zonenplan des Kantons/.test(t) ? 'amtlich' : 'aus der eigenen Liste'}`;
+        if (MERKMALE.some(m => m.test(t))) ergebnis += ' · auffälliger Text';
+      } else ergebnis = 'Knopf «Rechnen» fehlt';
+    }
+    const gut = /^(rechenbar|nicht rechenbar)/.test(ergebnis) && !/auffälliger Text/.test(ergebnis);
+    zeilen.push({ geraet: geraet.name, reiter: 'objekt und machbarkeit', ms: Date.now() - start, fehler: [...new Set(fehler)].concat(gut ? [] : [ergebnis]),
+      abgelehnt: [...new Set(abgelehnt)], breite: 0, merkmale: [], leer: false, notiz: ergebnis });
+  }
   await ctx.close();
 }
 
@@ -128,6 +155,7 @@ async function pruefen(browser, geraet, zeilen) {
   for (const z of zeilen) {
     aus.push(`| ${z.geraet} | ${z.reiter} | ${(z.ms / 1000).toFixed(1)} s | ${z.fehler.join('<br>') || '–'}${z.leer ? ' Seite leer' : ''} | ${z.abgelehnt.join(', ') || '–'} | ${z.breite > 1 ? z.breite + ' px' : '–'} | ${z.merkmale.join(', ') || '–'} |`);
   }
+  for (const z of zeilen.filter(z => z.notiz)) aus.push('', `Machbarkeit an einer Zürcher Parzelle: ${z.notiz}.`);
   const n = zeilen.filter(schlecht).length;
   aus.push('', n ? `**${n} von ${zeilen.length} Ansichten auffällig.**` : `Alle ${zeilen.length} Ansichten sauber.`);
   const text = aus.join('\n');

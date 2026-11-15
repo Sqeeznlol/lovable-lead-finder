@@ -261,7 +261,7 @@ function Anrufer({ mandantId, offen }: { mandantId: string; offen: number }) {
       <textarea key={m?.anweisung ?? ''} defaultValue={m?.anweisung ?? ''} rows={4} placeholder="z.B. Im Namen der Anlagestiftung anfragen; nur Verkauf, keine Vermietung; Preis nicht nennen."
                 onBlur={e => e.target.value !== (m?.anweisung ?? '') && void speichern(e.target.value)}
                 className="w-full rounded-[3px] border border-input bg-card p-3 text-sm placeholder:text-muted-foreground focus:border-foreground focus:outline-none" />
-      <p className="text-sm text-muted-foreground">{offen ? `${offen} offene Gelegenheiten` : 'Nichts offen'} · angerufen wird in Bauraum Akquise.</p>
+      <p className="text-sm text-muted-foreground">{offen ? `${offen} offene Gelegenheiten` : 'Nichts offen'}</p>
     </Abschnitt>
   );
 }
