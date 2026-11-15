@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { CookieHinweis } from '@/components/CookieHinweis';
 import { setzeZustimmung } from '@/lib/zustimmung';
 import { DATENQUELLEN, FRAGEN, SCHRITTE } from '@/lib/check-inhalt';
+import { preisZeilen, type Preise } from '@/lib/preise';
 import { useParams } from 'react-router-dom';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -58,6 +59,8 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
     fetch('/gemeinden.json').then(r => (r.ok ? r.json() : [])).then((d: GemeindeZahlen[]) => setGemeinden(mitAdressen(d))).catch(() => setGemeinden([]));
   }, [modus]);
   const gemeinde = modus === 'gemeinde' ? gemeinden?.find(g => g.slug === ortSlug) ?? null : null;
+  // Preise je Gemeinde (ZH, BL), erst geladen, wenn eine Parzelle gefunden ist.
+  const [preise, setPreise] = useState<Preise | null>(null);
   // Auf einer Marken-Domain entscheidet der Hostname, sonst /check/:marke (Vorschau auf unserer Domain).
   // Der Heizungs-Check (/heizung) trägt dieselbe Marke mit eigenen Texten.
   const marke = useMemo(() => {
@@ -336,6 +339,12 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
   const ziffern = (rechtslage && rechtslage !== 'fehlt' ? rechtslage.ziffern ?? null : null) ?? zifferKanton;
   // Ohne Auszug nennt die Nutzungsplanung des Kantons die Zone genauer als der Bund (Zug: "Kernzone C").
   const zoneText = zoneAuszug ?? (ziffern?.zone ? `${ziffern.zone}${ziffern.kuerzel ? ` [${ziffern.kuerzel}]` : ''}` : null);
+  useEffect(() => {
+    if (!befund?.bfs || preise) return;
+    fetch('/preise.json').then(r => (r.ok ? r.json() : null)).then(setPreise).catch(() => setPreise(null));
+  }, [befund?.bfs, preise]);
+  const gemeindePreise = befund?.bfs ? preise?.gemeinden[String(befund.bfs)] ?? null : null;
+  const preis = preisZeilen(gemeindePreise, befund?.flaeche ?? null);
   const zeilen = befund ? rechtZeilen(rechtslage && rechtslage !== 'fehlt' ? rechtslage : null, befund, ziffern) : [];
   const azAusPlan = ziffern?.az ?? null;
   const bmzAusPlan = azAusPlan == null ? ziffern?.bmz ?? null : null;
@@ -570,6 +579,20 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
                           )}
                           {pdf && <a className="pdf" href={pdf} target={FENSTER.extern}>Amtlicher ÖREB-Auszug (PDF)</a>}
                         </div>
+                        {preis.length > 0 && gemeindePreise && (
+                          <div className="block">
+                            <h3>Preise in {gemeindePreise.name}</h3>
+                            <dl className="recht">
+                              {preis.map(z => (
+                                <div key={z.titel}>
+                                  <dt>{z.titel}</dt>
+                                  <dd>{z.wert}{z.zusatz && <small>{z.zusatz}</small>}</dd>
+                                </div>
+                              ))}
+                            </dl>
+                            <button type="button" className="knopf marke preis-knopf" onClick={oeffnen}>Genaue Einschätzung anfordern</button>
+                          </div>
+                        )}
                         {lage.length > 0 && (
                           <div className="block">
                             <h3>Energie und Lage</h3>
@@ -583,7 +606,7 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
                             </dl>
                           </div>
                         )}
-                        <div className="block klein">Quellen: Amtliche Vermessung, Bauzonen Schweiz (ARE), Gebäude- und Wohnungsregister (BFS), ÖREB-Kataster des Kantons, Kulturgüterinventar, Solarkataster und Wärmenetze (BFE), ÖV-Güteklassen (ARE), Radonkarte (BAG), abgefragt am {new Date().toLocaleDateString('de-CH')}. Vorprüfung, keine Bewilligungszusage.</div>
+                        <div className="block klein">Quellen: Amtliche Vermessung, Bauzonen Schweiz (ARE), Gebäude- und Wohnungsregister (BFS), ÖREB-Kataster des Kantons, Kulturgüterinventar, Solarkataster und Wärmenetze (BFE), ÖV-Güteklassen (ARE), Radonkarte (BAG){gemeindePreise ? `, Immobilienpreise: ${preise?.quellen[gemeindePreise.k] ?? ''}` : ''}, abgefragt am {new Date().toLocaleDateString('de-CH')}. Vorprüfung, keine Bewilligungszusage.</div>
                       </>
                     )}
                   </div>

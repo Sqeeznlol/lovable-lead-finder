@@ -23,6 +23,8 @@ export interface Haus {
 
 export interface Befund {
   adresse: string; nummer: string | null; egrid: string | null; kanton: string | null; gemeinde: string | null;
+  /** BFS-Gemeindenummer aus den Bauzonen des Bundes (bfs_no); ausserhalb der Bauzone leer. */
+  bfs?: number | null;
   zone: string | null; flaeche: number | null;
   /** Umriss in LV95: Teile, jeder mit Ringen. */
   teile: number[][][][];
@@ -188,7 +190,7 @@ export async function befundAmOrt(ort: Ort, signal?: AbortSignal): Promise<Befun
   return {
     adresse: ort.label, nummer: a.number ? String(a.number) : null, egrid,
     kanton: typeof a.ak === 'string' ? a.ak : haeuser[0]?.kanton ?? null,
-    gemeinde: za.name ? String(za.name) : null, zone: za.ch_bez_d ? String(za.ch_bez_d) : null,
+    gemeinde: za.name ? String(za.name) : null, bfs: Number(za.bfs_no) || null, zone: za.ch_bez_d ? String(za.ch_bez_d) : null,
     flaeche: g ? Math.round(flaecheLv95(g)) : null, teile, haeuser,
   };
 }

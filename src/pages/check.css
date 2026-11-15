@@ -356,3 +356,4 @@
 .pc .cookie .knopf{min-height: 48px; width: 100%;}
 .pc:has(.cookie) .mobil-aufruf{display: none;}
 @media print{.pc .cookie{display: none;}}
+.pc .preis-knopf{width:100%; min-height:48px; margin-top:14px;}
