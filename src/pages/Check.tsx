@@ -457,7 +457,6 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
             </div>
           </section>
         )}
-        <div className="quellenband"><div className="huelle"><b>Daten aus:</b>{DATENQUELLEN.map(q => <span key={q}>{q}</span>)}</div></div>
 
         {ort && (
           <section className="ergebnis sichtbar" ref={ergebnisRef} aria-live="polite">
@@ -550,7 +549,6 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
                                 <div key={z.titel}>
                                   <dt>{z.titel}</dt>
                                   <dd>{z.art && <span className={`punkt ${z.art}`} aria-hidden="true" />}{z.link ? <a href={z.link} target={FENSTER.extern}>{z.wert}</a> : z.wert}{z.zusatz && <small>{z.zusatz}</small>}</dd>
-                                  <span className="q">{z.quelle}</span>
                                 </div>
                               ))}
                             </dl>
@@ -566,7 +564,6 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
                                 <div key={z.titel}>
                                   <dt>{z.titel}</dt>
                                   <dd>{z.art && <span className={`punkt ${z.art}`} aria-hidden="true" />}{z.link ? <a href={z.link} target={FENSTER.extern}>{z.wert}</a> : z.wert}{z.zusatz && <small>{z.zusatz}</small>}</dd>
-                                  <span className="q">{z.quelle}</span>
                                 </div>
                               ))}
                             </dl>
@@ -581,7 +578,6 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
                                 <div key={z.titel}>
                                   <dt>{z.titel}</dt>
                                   <dd>{z.art && <span className={`punkt ${z.art}`} aria-hidden="true" />}{z.link ? <a href={z.link} target={FENSTER.extern}>{z.wert}</a> : z.wert}{z.zusatz && <small>{z.zusatz}</small>}</dd>
-                                  <span className="q">{z.quelle}</span>
                                 </div>
                               ))}
                             </dl>
@@ -725,7 +721,9 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
             <li><button type="button" onClick={() => { setRecht('datenschutz'); window.scrollTo({ top: 0 }); }}>Datenschutz</button></li>
             <li><button type="button" onClick={() => setzeZustimmung(null)}>Cookie-Einstellungen</button></li>
           </ul></div>
-                    <div className="unten">Vorprüfung auf Grundlage amtlicher Daten, keine Bewilligungszusage und keine Verkehrswertschätzung.</div>
+                    {/* Die Quellen stehen klein hier und gesammelt unter dem Ergebnis, nicht je Zeile
+              (Julian, 15. November): die Angabe bleibt, swisstopo und die Kantone verlangen sie. */}
+                    <div className="unten">Vorprüfung auf Grundlage amtlicher Daten ({DATENQUELLEN.join(', ')}), keine Bewilligungszusage und keine Verkehrswertschätzung.</div>
         </div>
       </footer>
 

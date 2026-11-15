@@ -287,14 +287,13 @@
 @media (prefers-reduced-motion: reduce){.pc .ladebild .schild,.pc .ladebild .satz{transition:none;}}
 /* Was auf der Parzelle gilt */
 .pc dl.recht{margin:0; display:grid;}
-.pc dl.recht > div{display:grid; grid-template-columns:minmax(84px,110px) minmax(0,1fr) auto; gap:2px 12px; align-items:baseline; padding:10px 0; border-top:1px solid var(--linie);}
+.pc dl.recht > div{display:grid; grid-template-columns:minmax(84px,110px) minmax(0,1fr); gap:2px 12px; align-items:baseline; padding:10px 0; border-top:1px solid var(--linie);}
 .pc dl.recht > div:first-child{border-top:0; padding-top:0;}
 .pc dl.recht dt{font-size:13px; color:var(--grau);}
 .pc dl.recht dd{margin:0; font-weight:500; min-width:0; overflow-wrap:anywhere;}
 .pc dl.recht dd small{display:block; font-weight:400; font-size:13px; color:var(--grau);}
 .pc dl.recht dd a{color:var(--marke); text-underline-offset:3px;}
-.pc dl.recht .q{font-size:12px; color:var(--hell); white-space:nowrap;}
-@media (max-width:440px){.pc dl.recht > div{grid-template-columns:minmax(0,1fr) auto;} .pc dl.recht dd{grid-column:1 / -1; order:3;}}
+@media (max-width:440px){.pc dl.recht > div{grid-template-columns:minmax(0,1fr);}}
 .pc dl.recht .punkt{display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:8px; vertical-align:1px; background:var(--marke);}
 .pc dl.recht .punkt.ok{background:#2E8B57;}
 .pc dl.recht .punkt.linie{width:14px; height:0; border-radius:0; background:none; border-top:2px dashed #3D6FB6;}
