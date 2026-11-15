@@ -240,7 +240,9 @@ export function herkunft(suche: string): Record<string, string> {
 }
 
 /** Was in anfrage.angaben steht. Klein halten: die Spalte erlaubt weniger als 8 kB. */
-export function leadAngaben(o: { marke: string; domain: string; antwort: Antwort; befund: Befund; herkunft: Record<string, string> }): Record<string, unknown> {
+// Boden-Richtwert für Aurora (Julian, 15. November: die grossen Liegenschaften zuerst
+// anrufen): Fläche mal Baulandpreis der Gemeinde aus preise.json, sonst nichts.
+export function leadAngaben(o: { marke: string; domain: string; antwort: Antwort; befund: Befund; herkunft: Record<string, string>; landpreis?: number | null }): Record<string, unknown> {
   const b = o.befund;
   const bestehend = b.haeuser.filter(h => h.status === 1004 || h.status === 1003);
   const baujahre = bestehend.map(h => h.baujahr).filter((x): x is number => x != null);
@@ -254,6 +256,9 @@ export function leadAngaben(o: { marke: string; domain: string; antwort: Antwort
     bauperiode: baujahre.length ? null : aeltestes(bestehend),
     heizung: bestehend.map(heizungText).find(Boolean) ?? null,
     projekt: b.haeuser.some(h => h.status === 1001 || h.status === 1002) || null,
+    bfs: b.bfs ?? null,
+    landpreis_m2: o.landpreis ?? null,
+    boden_chf: o.landpreis && b.flaeche ? Math.round((o.landpreis * b.flaeche) / 1e4) * 1e4 : null,
     ...o.herkunft,
   };
 }

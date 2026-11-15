@@ -258,7 +258,7 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
     if (Date.now() - geoeffnet.current < 4000) { setFehler('Bitte prüfen Sie Ihre Angaben kurz und senden Sie dann nochmals.'); return; }
     if (heuteSchon().length >= 3) { setFehler('Von diesem Gerät sind heute schon mehrere Anfragen eingegangen. Wir melden uns bei Ihnen.'); return; }
     setSendet(true); setFehler(null);
-    const angaben = leadAngaben({ marke: marke.id, domain, antwort, befund, herkunft: window.location.search ? herkunft(window.location.search) : {} });
+    const angaben = leadAngaben({ marke: marke.id, domain, antwort, befund, herkunft: window.location.search ? herkunft(window.location.search) : {}, landpreis: gemeindePreise?.land?.m ?? null });
     if (modus === 'heizung') angaben.thema = 'heizung';
     // Gewählte Wohnung (Stockwerkeigentum) mitgeben, knapp: die Spalte erlaubt weniger als 8 kB.
     if (wohnung) angaben.wohnung = { egid: wohnung.egid, stock: stockText(wohnung.stock), zimmer: wohnung.zimmer, flaeche: wohnung.flaeche, nr: wohnung.nr };

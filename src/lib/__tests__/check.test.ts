@@ -42,6 +42,11 @@ describe('Lead', () => {
       befund: { adresse: 'Bodenacherstrasse 79', nummer: '2725', egrid: 'CH545639778444', kanton: 'ZH', gemeinde: 'Fällanden', zone: 'Wohnzonen', flaeche: 2119, teile: [], haeuser: h } });
     expect(a).toMatchObject({ quelle: 'check', prioritaet: 'heiss', gebaeude: 1, wohnungen: 16, baujahr: 1973, projekt: true, utm_source: 'meta' });
     expect(JSON.stringify(a).length).toBeLessThan(2000);
+    expect(a).toMatchObject({ landpreis_m2: null, boden_chf: null });
+    // Mit dem Baulandpreis der Gemeinde (Fällanden 2023 bis 2025: CHF 2'244/m²) der Boden-Richtwert.
+    const b = leadAngaben({ marke: 'x', domain: 'x.ch', herkunft: {}, antwort: { eigentuemer: 'allein', absicht: 'verkaufen', zeitraum: '12' },
+      befund: { adresse: 'x', nummer: null, egrid: null, kanton: 'ZH', gemeinde: 'Fällanden', bfs: 193, zone: null, flaeche: 2119, teile: [], haeuser: [] }, landpreis: 2244 });
+    expect(b).toMatchObject({ bfs: 193, landpreis_m2: 2244, boden_chf: 4760000 });  // 2244 × 2119 = 4755036, auf 10000 gerundet
   });
 });
 
