@@ -1,0 +1,94 @@
+# =====================================================================
+# Typen der Datenbank neu erzeugen
+# =====================================================================
+# src/integrations/supabase/types.ts beschreibt dem Programm, welche
+# Tabellen und Spalten es gibt. Die Datei stammt aus der Zeit vor der
+# Plattform: Gelegenheiten, Portfolios, Anfragen, Baugesuche und alles
+# seither fehlen darin. Darum greift der Code an über fünfzig Stellen
+# mit "as any" auf die Datenbank zu -- ein Tippfehler in einem
+# Spaltennamen fällt dann erst auf der Seite auf.
+#
+# Der Ablauf liest das Schema aus der Datenbank, prüft, ob das Programm
+# damit noch übersetzt, und schreibt die Datei nur dann nach main.
+# Übersetzt es nicht, landet sie im Zweig "typen-neu", damit sich die
+# Stellen von Hand beheben lassen -- main bleibt unberührt.
+#
+# Die Ausgabe des Werkzeugs erscheint nicht im Protokoll: sie könnte
+# die Adresse der Datenbank enthalten.
+# =====================================================================
+
+name: Typen
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  typen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Abhängigkeiten
+        run: npm install --no-audit --no-fund --silent
+
+      - name: Typen aus der Datenbank lesen
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -uo pipefail
+          [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
+          if ! npx -y supabase@2 gen types typescript --db-url "$DB" --schema public > /tmp/types.ts 2>/tmp/fehler.log; then
+            echo "Das Erzeugen ist fehlgeschlagen (die Meldung bleibt ungezeigt, sie kann die Adresse enthalten)." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          grep -q 'export type Database' /tmp/types.ts || { echo "Die Datei enthält kein Schema." | tee -a "$GITHUB_STEP_SUMMARY"; exit 1; }
+          {
+            echo "### Typen"
+            echo "Zeilen: $(wc -l < /tmp/types.ts) (vorher $(wc -l < src/integrations/supabase/types.ts))"
+            echo "Tabellen und Sichten mit Zeilentyp: $(grep -c '^        Row: {' /tmp/types.ts) (vorher $(grep -c '^        Row: {' src/integrations/supabase/types.ts))"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          cp /tmp/types.ts src/integrations/supabase/types.ts
+
+      - name: Übersetzt das Programm noch?
+        id: pruefen
+        run: |
+          set -uo pipefail
+          if npx tsc --noEmit -p tsconfig.app.json > /tmp/tsc.log 2>&1; then
+            echo "ok=ja" >> "$GITHUB_OUTPUT"
+            echo "Das Programm übersetzt mit den neuen Typen." | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "ok=nein" >> "$GITHUB_OUTPUT"
+            {
+              echo "Das Programm übersetzt mit den neuen Typen nicht: $(grep -c 'error TS' /tmp/tsc.log) Stellen."
+              echo '```'
+              head -60 /tmp/tsc.log
+              echo '```'
+            } | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Schreiben
+        env:
+          OK: ${{ steps.pruefen.outputs.ok }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- src/integrations/supabase/types.ts; then echo "Unverändert." | tee -a "$GITHUB_STEP_SUMMARY"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/integrations/supabase/types.ts
+          git commit -q -m "Typen der Datenbank neu erzeugt (Ablauf Typen)"
+          if [ "$OK" = "ja" ]; then
+            git push -q origin HEAD:main
+            echo "Nach main geschrieben." | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            git push -q -f origin HEAD:typen-neu
+            echo "In den Zweig typen-neu geschrieben; main bleibt unberührt." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
