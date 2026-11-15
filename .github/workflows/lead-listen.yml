@@ -1,0 +1,103 @@
+# =====================================================================
+# Lead-Listen aus dem Gebäuderegister
+# =====================================================================
+# Bestehende Wohngebäude mit Öl- oder Gasheizung, gebaut bis 1980, je
+# Kanton aus public.madd.bfs.admin.ch/<kt>.zip (tools/gwr_leads.py) in die
+# Tabelle lead_gebaeude (Migration 20261115120000). Nur Deutschschweiz
+# (Julian, 15. November: "nur deutsch").
+#
+# "probe" zählt nur. "schreiben" ersetzt den Inhalt in einer Transaktion
+# und bricht ab, wenn die Datenbank über der Grenze liegt (bei 1107 MB
+# wird sie schreibgeschützt). Ausgegeben werden nur Zählungen.
+# =====================================================================
+name: Lead-Listen
+
+on:
+  workflow_dispatch:
+    inputs:
+      schritt:
+        description: 'probe = nur zählen, schreiben = Tabelle füllen'
+        required: true
+        default: 'probe'
+        type: choice
+        options: [probe, schreiben]
+      kantone:
+        description: 'Kantone, mit Leerschlag getrennt'
+        required: false
+        default: 'ZH AG LU ZG SZ SO SH BE BL BS SG TG AR AI GL GR NW OW UR'
+      grenze_mb:
+        description: 'Nicht schreiben, wenn die Datenbank danach grösser wäre (MB)'
+        required: false
+        default: '1060'
+
+jobs:
+  laden:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Werkzeuge
+        run: sudo apt-get install -y -qq postgresql-client unzip >/dev/null
+
+      - name: Register lesen
+        env:
+          KANTONE: ${{ inputs.kantone }}
+        run: |
+          set -euo pipefail
+          : > /tmp/leads.csv
+          { echo '### Gebäuderegister je Kanton'; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          for kt in $KANTONE; do
+            case "$kt" in [A-Z][A-Z]) ;; *) echo "Ungültiger Kanton"; exit 1;; esac
+            k=$(echo "$kt" | tr 'A-Z' 'a-z')
+            curl -sSfL --retry 4 -o /tmp/gwr.zip "https://public.madd.bfs.admin.ch/$k.zip"
+            rm -rf "/tmp/$kt" && mkdir -p "/tmp/$kt"
+            unzip -o -q /tmp/gwr.zip gebaeude_batiment_edificio.csv eingang_entree_entrata.csv -d "/tmp/$kt"
+            python3 -I tools/gwr_leads.py "/tmp/$kt" /tmp/leads.csv | tee -a "$GITHUB_STEP_SUMMARY"
+            rm -rf "/tmp/$kt" /tmp/gwr.zip
+          done
+          echo "Zeilen gesamt: $(wc -l < /tmp/leads.csv), CSV $(du -m /tmp/leads.csv | cut -f1) MB" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Schreiben
+        if: inputs.schritt == 'schreiben'
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+          GRENZE_MB: ${{ inputs.grenze_mb }}
+        run: |
+          set -euo pipefail
+          [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
+          case "${GRENZE_MB:-}" in ''|*[!0-9]*) GRENZE_MB=1060 ;; esac
+          # Grob geschätzt: in der Datenbank rund doppelt so gross wie die CSV (Zürich: 11 MB CSV).
+          GROESSE=$(( $(du -m /tmp/leads.csv | cut -f1) * 2 ))
+          psql "$DB" -X -q -v ON_ERROR_STOP=1 -v grenze="$GRENZE_MB" -v neu="$GROESSE" >> "$GITHUB_STEP_SUMMARY" 2>&1 <<'SQL'
+          set statement_timeout = '20min';
+          select (pg_database_size(current_database())/1024/1024)::int as mb \gset
+          select coalesce((pg_total_relation_size('public.lead_gebaeude')/1024/1024)::int, 0) as alt \gset
+          select :mb - :alt + :neu >= :grenze as voll \gset
+          \if :voll
+            \echo 'ABBRUCH: Datenbank' :mb 'MB, geschätzt danach' :mb '-' :alt '+' :neu 'MB, Grenze' :grenze 'MB.'
+            \quit
+          \endif
+          \echo '### Schreiben'
+          \echo '```'
+          \echo 'Datenbank vorher:' :mb 'MB'
+          begin;
+          create temp table l (egid bigint, egrid text, kanton text, bfs smallint, gemeinde text, strasse text, plz smallint, ort text,
+            baujahr smallint, periode smallint, wohnungen smallint, klasse smallint, heizung smallint, erzeuger smallint,
+            heizung_seit date, e numeric, n numeric) on commit drop;
+          \copy l from '/tmp/leads.csv' with (format csv)
+          truncate public.lead_gebaeude;
+          insert into public.lead_gebaeude
+          select distinct on (egid) egid, nullif(egrid, ''), kanton, bfs, gemeinde, nullif(strasse, ''), plz, nullif(ort, ''),
+                 baujahr, periode, wohnungen, klasse, heizung, erzeuger, heizung_seit, round(e)::int, round(n)::int
+          from l order by egid;
+          commit;
+          vacuum analyze public.lead_gebaeude;
+          select kanton, count(*) as gebaeude, count(*) filter (where heizung = 7530) as heizoel, count(*) filter (where heizung = 7520) as gas
+            from public.lead_gebaeude group by 1 order by 2 desc;
+          select pg_size_pretty(pg_total_relation_size('public.lead_gebaeude')) as tabelle,
+                 (pg_database_size(current_database())/1024/1024)::int as datenbank_mb;
+          \echo '```'
+          SQL
+          cat "$GITHUB_STEP_SUMMARY"
