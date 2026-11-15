@@ -47,6 +47,15 @@ export function quellen(zeilen: TrichterZeile[]): { quelle: string; besucher: nu
   return [...je.entries()].map(([quelle, v]) => ({ quelle, ...v })).sort((a, b) => b.besucher - a.besucher);
 }
 
+/**
+ * Testdaten sind gekennzeichnet (CLAUDE.md: Name TEST, Quelle test) und
+ * zählen nicht mit. Am 15. November waren 3 der 4 Anfragen Tests und
+ * standen in der Zahl "Leads" (Julian: "stimmen die analytics?").
+ */
+export function istTest(l: { name?: string | null; angaben?: Record<string, unknown> | null }): boolean {
+  return /\btest\b/i.test(l.name ?? '') || String(l.angaben?.quelle ?? '').toLowerCase() === 'test';
+}
+
 export const prozent = (x: number | null) => (x == null ? '–' : `${(x * 100).toFixed(x < 0.1 ? 1 : 0)} %`);
 
 /** Die Antworten aus dem Fragebogen der Check-Seiten, wie sie im Lead stehen. */

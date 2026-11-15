@@ -40,3 +40,13 @@ describe('Auswertung der Check-Seiten', () => {
     expect(trichterJeSeite([z('x1', 'lead', 1)])[0].quote).toBeNull();
   });
 });
+
+describe('Testdaten unter Leads', () => {
+  it('erkennt Name TEST und Quelle test, nicht Wörter wie Testament', async () => {
+    const { istTest } = await import('@/lib/lead-auswertung');
+    expect(istTest({ name: 'TEST Muster', angaben: {} })).toBe(true);
+    expect(istTest({ name: 'Anna Muster', angaben: { quelle: 'test' } })).toBe(true);
+    expect(istTest({ name: 'Anna Muster', angaben: { quelle: 'check' } })).toBe(false);
+    expect(istTest({ name: 'Testament Erben', angaben: {} })).toBe(false);
+  });
+});

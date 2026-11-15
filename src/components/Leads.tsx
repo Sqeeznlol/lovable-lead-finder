@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Abschnitt, KNOPF, Leer, LISTE, Marke, Reiter, Seite } from '@/components/rahmen';
 import { BILD } from '@/lib/luftbild';
 import { LeadDetail, type Lead } from '@/components/LeadDetail';
-import { ANTWORT_TEXT, gesamt, prozent, quellen, SCHRITT_TEXT, SCHRITTE, trichterJeSeite, type TrichterZeile } from '@/lib/lead-auswertung';
+import { ANTWORT_TEXT, gesamt, istTest, prozent, quellen, SCHRITT_TEXT, SCHRITTE, trichterJeSeite, type TrichterZeile } from '@/lib/lead-auswertung';
 
 /**
  * Alle Leads der Check-Seiten in einer Liste, dazu die Zahlen je Webseite
@@ -24,6 +24,7 @@ const MARKEN_NAME = (id: string) => id;
 export function Leads() {
   const [tage, setTage] = useState<Zeitraum>('30');
   const [nurOffen, setNurOffen] = useState(true);
+  const [mitTest, setMitTest] = useState(false);
   const [offenId, setOffenId] = useState<string | null>(null);
   // Eine Webseite in der Tabelle aufklappen: darunter ihre Leads.
   const [seiteAuf, setSeiteAuf] = useState<string | null>(null);
@@ -54,7 +55,8 @@ export function Leads() {
   const t = useMemo(() => trichterJeSeite(zeilen), [zeilen]);
   const summe = gesamt(t);
   const q = quellen(zeilen);
-  const alle = leads.data ?? [];
+  const tests = (leads.data ?? []).filter(istTest).length;
+  const alle = (leads.data ?? []).filter(l => mitTest || !istTest(l));
   const offen = (leads.data ?? []).find(l => l.id === offenId) ?? null;
   const liste = alle.filter(l => !nurOffen || !l.bearbeitet);
   const heiss = alle.filter(l => l.angaben?.prioritaet === 'heiss' && !l.bearbeitet).length;
@@ -72,6 +74,11 @@ export function Leads() {
     <Seite bild={BILD.pipedrive} ueber="Check-Seiten" titel="Leads"
       unter={<>
         <span className="block">Alle Webseiten schreiben in dieselbe Liste.</span>
+        {/* Bis zum 15. November zählten auch Programme, die die Seite nur laden
+            (Auswerten «besucher»: 795 Aufrufe, 8 Suchen, ohne Werbung). */}
+        {Date.now() - Date.parse('2026-11-15T10:00:00Z') < Number(tage) * 864e5 && (
+          <span className="mt-1 block text-sm">Besucher zählen seit dem 15. November erst, wenn jemand tippt oder scrollt. Ältere Zahlen enthalten auch Suchmaschinen.</span>
+        )}
         {/* Die Zeitwahl gehört sichtbar unter den Titel: "aktionen" erscheint
             am Computer nur mit einer Seitentafel, die diese Seite nicht hat. */}
         <span className="mt-4 block"><Reiter<Zeitraum> wahl={tage} setWahl={setTage} optionen={[{ wert: '7' as Zeitraum, titel: '7 Tage' }, { wert: '30' as Zeitraum, titel: '30 Tage' }, { wert: '90' as Zeitraum, titel: '90 Tage' }]} /></span>
@@ -86,6 +93,7 @@ export function Leads() {
       <Abschnitt titel="Leads" zahl={liste.length}
         rechts={<div className="flex flex-wrap gap-2">
           <button type="button" className={KNOPF} onClick={() => setNurOffen(!nurOffen)}>{nurOffen ? 'Auch erledigte zeigen' : 'Nur offene'}</button>
+          {tests > 0 && <button type="button" className={KNOPF} onClick={() => setMitTest(!mitTest)}>{mitTest ? 'Testdaten ausblenden' : `Testdaten zeigen (${tests})`}</button>}
         </div>}>
         {leads.isLoading ? <Leer titel="Lädt …" />
           : leads.error ? <Leer titel="Leads konnten nicht geladen werden." />
