@@ -82,13 +82,15 @@ type FondsObjekt = { gefaess: string; ort_adresse: string; verkehrswert: number;
  * aus den Jahresberichten): wer hier schon hält, kauft hier eher wieder.
  */
 /** Der Sprung vom Lead in die Objektansicht: Zone, Reserve, Eigentümer, Gespräche, Nachbarn. */
-function ObjektImBestand({ egrid, schliessen }: { egrid: string | null; schliessen: () => void }) {
+function ObjektImBestand({ egrid }: { egrid: string | null }) {
   const { data: id, isLoading } = useParzelleZuEgrid(egrid);
   const setzen = useUrlSetzen();
   if (!egrid || isLoading) return null;
   if (!id) return <p className="py-2 text-sm text-muted-foreground">Nicht im Bestand von Aurora (Zürich und Thurgau).</p>;
   return (
-    <button type="button" className={`${KNOPF} mt-2`} onClick={() => { schliessen(); setzen({ parzelle: id }); }}>
+    // Ein Schritt statt zwei: zwei Adressänderungen im selben Moment
+    // überschreiben sich, dann bliebe der Lead offen.
+    <button type="button" className={`${KNOPF} my-2`} onClick={() => setzen({ lead: null, parzelle: id })}>
       Objekt in Aurora öffnen
     </button>
   );
@@ -232,7 +234,7 @@ export function LeadDetail({ lead, onClose, onErledigt, onNotiz, onNachfass }: {
               {zeile('Gemeinde', a.gemeinde && a.kanton ? `${a.gemeinde} (${a.kanton})` : a.gemeinde)}
               {zeile('Parzelle', a.parzelle)}
               {zeile('EGRID', lead.egrid)}
-              <ObjektImBestand egrid={lead.egrid} schliessen={onClose} />
+              <ObjektImBestand egrid={lead.egrid} />
               {zeile('Grundstück', a.flaeche ? `${Number(a.flaeche).toLocaleString('de-CH')} m²` : null)}
               {/* Fläche mal Baulandpreis der Gemeinde (amtliche Statistik ZH, BL); keine Schätzung. */}
               {zeile('Boden-Richtwert', bodenText(a) ? `${bodenText(a)!.replace('Boden rund ', 'rund ')} (${Number(a.landpreis_m2).toLocaleString('de-CH')} CHF/m²)` : null)}

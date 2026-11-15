@@ -18,6 +18,7 @@ import { KNOPF, KNOPF_HAUPT, Marke } from '@/components/rahmen';
 import { zoneKurzform } from '@/lib/potential';
 import { supabase } from '@/integrations/supabase/client';
 import { BaugesucheParzelle } from '@/components/BaugesucheParzelle';
+import { Bezuege } from '@/components/Bezuege';
 import { heizungBeschreiben, useGwrKodes, useParzellenGebaeude } from '@/lib/parzelle-gebaeude';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
@@ -224,6 +225,9 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
                 )}
                 {data.owner_name && <a className={KNOPF} href={`https://tel.search.ch/?was=${encodeURIComponent(data.owner_name)}`} target={FENSTER.suche}><Phone className="h-4 w-4" /> Tel.search</a>}
               </div>
+
+              {/* Kunde, Gelegenheit, Lead, Fonds: von hier aus erreichbar. */}
+              <Bezuege parzelleId={data.id} egrid={data.egrid} />
 
               <div className="space-y-1.5">
                 <h3 className="text-lg">Notizen</h3>

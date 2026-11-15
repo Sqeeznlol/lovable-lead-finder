@@ -5,6 +5,7 @@ import { Abschnitt, KNOPF, Leer, LISTE, Marke, Reiter, Seite } from '@/component
 import { BILD } from '@/lib/luftbild';
 import { LeadDetail, type Lead } from '@/components/LeadDetail';
 import { naechsterSchritt } from '@/lib/nachfass';
+import { useUrlWert } from '@/hooks/use-url-wert';
 import { ANTWORT_TEXT, bodenText, bodenWert, gesamt, istTest, nachWert, wohnungText, prozent, quellen, SCHRITT_TEXT, SCHRITTE, trichterJeSeite, type TrichterZeile } from '@/lib/lead-auswertung';
 
 /**
@@ -28,7 +29,9 @@ export function Leads() {
   // Nach Wert: die grössten Böden zuerst (Boden-Richtwert der Check-Seiten).
   const [nachWertSortiert, setNachWertSortiert] = useState(false);
   const [mitTest, setMitTest] = useState(false);
-  const [offenId, setOffenId] = useState<string | null>(null);
+  // Der offene Lead steht in der Adresse: so führt die Objektansicht
+  // direkt zu ihm, und "Zurück" schliesst ihn wieder.
+  const [offenId, setOffenId] = useUrlWert('lead');
   // Eine Webseite in der Tabelle aufklappen: darunter ihre Leads.
   const [seiteAuf, setSeiteAuf] = useState<string | null>(null);
   const qc = useQueryClient();
@@ -60,7 +63,19 @@ export function Leads() {
   const q = quellen(zeilen);
   const tests = (leads.data ?? []).filter(istTest).length;
   const alle = (leads.data ?? []).filter(l => mitTest || !istTest(l));
-  const offen = (leads.data ?? []).find(l => l.id === offenId) ?? null;
+  // Ältere oder erledigte Leads stehen nicht in der Liste; per Link
+  // geöffnet, werden sie einzeln geholt.
+  const einzeln = useQuery({
+    queryKey: ['check-lead', offenId],
+    enabled: !!offenId && !!leads.data && !leads.data.some(l => l.id === offenId),
+    queryFn: async (): Promise<Lead | null> => {
+      const { data } = await db.from('anfrage')
+        .select('id, name, email, telefon, adresse, egrid, angaben, erstellt_am, bearbeitet, bemerkung, nachfass_stufe, nachfass_am')
+        .eq('id', offenId).maybeSingle();
+      return data ?? null;
+    },
+  });
+  const offen = (leads.data ?? []).find(l => l.id === offenId) ?? einzeln.data ?? null;
   const gefiltert = alle.filter(l => !nurOffen || !l.bearbeitet);
   const liste = nachWertSortiert ? nachWert(gefiltert) : gefiltert;
   const mitWert = alle.filter(l => bodenWert(l.angaben)).length;
