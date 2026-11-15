@@ -34,6 +34,17 @@ describe('Akquise getrennt von der Webseite', () => {
     expect(treffer).toEqual([]);
   });
 
+  // Julian, 15. November: "die Akquise und Pipedrive brauche ich nicht
+  // mehr". Gesucht wird Pipedrive in Code und Text, nicht in Kommentaren.
+  it('Aurora zeigt nirgends Pipedrive oder den Akquise-Stand', () => {
+    const ohneKommentare = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+      // Der Filter, der die Akquise-Spalten ausblendet, darf sie nennen.
+      .replace(/^.*AKQUISE_SPALTEN = .*$/gm, '');
+    const treffer = quellen('src').filter(p => !p.includes('integrations/supabase/types'))
+      .filter(p => /pipedrive|akquiseStatuses|titel="Akquise"/i.test(ohneKommentare(readFileSync(p, 'utf8'))));
+    expect(treffer).toEqual([]);
+  });
+
   it('Erweiterung, Akquise-Funktionen und Pipedrive-Abläufe liegen nicht mehr hier', () => {
     for (const pfad of ['extension', 'supabase/functions/tel-search', 'supabase/functions/pipedrive-push',
       'supabase/functions/sms-confirmation', 'supabase/functions/daily-digest', '.github/workflows/pipedrive.yml',

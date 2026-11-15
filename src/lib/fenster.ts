@@ -18,7 +18,6 @@ export const FENSTER = {
   portal: 'bauraum-portal',
   karte: 'bauraum-karte',
   suche: 'bauraum-suche',
-  pipedrive: 'bauraum-pipedrive',
   // Seiten von Veranstaltern und anderen Fremden (Immo-Kalender).
   extern: 'bauraum-extern',
 } as const;

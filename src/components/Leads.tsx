@@ -96,7 +96,7 @@ export function Leads() {
   };
 
   return (
-    <Seite bild={BILD.pipedrive} ueber="Check-Seiten" titel="Leads"
+    <Seite bild={BILD.leads} ueber="Check-Seiten" titel="Leads"
       unter={<>
         <span className="block">Alle Webseiten schreiben in dieselbe Liste.</span>
         {/* Bis zum 15. November zählten auch Programme, die die Seite nur laden

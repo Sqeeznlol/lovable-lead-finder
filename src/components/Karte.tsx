@@ -198,10 +198,9 @@ const BESCHRIFTUNG: Record<string, string> = {
   ai_recommendation: 'KI-Empfehlung', ai_priority: 'KI-Priorität', ausgeschlossen: 'Ausgeschlossen',
   ausschluss_grund: 'Ausschlussgrund', denkmalschutz: 'Denkmalschutz', denkmalschutz_titel: 'Denkmalschutz, Titel',
   isos: 'ISOS', isos_titel: 'ISOS, Titel', az_quelle: 'Quelle Ausnützung', kategorie: 'Kategorie', status: 'Status',
-  acquisition_status: 'Akquise-Status', notes: 'Notizen', created_at: 'Erfasst am', updated_at: 'Geändert am',
+  notes: 'Notizen', created_at: 'Erfasst am', updated_at: 'Geändert am',
   gis_url: 'GIS-Link', google_maps_url: 'Google Maps', streetview_url: 'Street View', housing_stat_url: 'Gebäuderegister-Link',
-  pipedrive_deal_id: 'Pipedrive-Deal', contact_attempts: 'Kontaktversuche', last_contact_at: 'Letzter Kontakt',
-  follow_up_at: 'Nachfassen am', data_quality: 'Datenqualität', source_file: 'Quelldatei', imported_at: 'Importiert am',
+  data_quality: 'Datenqualität', source_file: 'Quelldatei', imported_at: 'Importiert am',
 };
 function beschriften(k: string) {
   if (BESCHRIFTUNG[k]) return BESCHRIFTUNG[k];
@@ -210,10 +209,15 @@ function beschriften(k: string) {
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
-/** Alle gefüllten Spalten der Parzelle; leere und Umrisse bleiben weg. */
+// Spalten der Akquise (Pipedrive, Kontaktversuche, Akquise-Stand):
+// Julian braucht sie seit dem 15. November nicht mehr, sie stehen nur
+// noch in der Datenbank.
+const AKQUISE_SPALTEN = /^(pipedrive_|acquisition_status$|contact_attempts$|last_contact_at$|follow_up_at$|assigned_to$|status$)/;
+
+/** Alle gefüllten Spalten der Parzelle; leere, Umrisse und Akquise bleiben weg. */
 function AlleFelder({ z }: { z: Record<string, unknown> }) {
   const zeilen = Object.entries(z).filter(([k, v]) =>
-    v !== null && v !== '' && !/geom|umriss|^id$/i.test(k)
+    v !== null && v !== '' && !/geom|umriss|^id$/i.test(k) && !AKQUISE_SPALTEN.test(k)
     && !(Array.isArray(v) && v.length === 0));
   return (
     <details className="alle">
@@ -1133,7 +1137,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
               </div>
 
               <div className="aktionen">
-                {/* Ins Objekt: Eigentümer abfragen, Gespräche, Pipedrive --
+                {/* Ins Objekt: Eigentümer, Gespräche, Bezüge --
                     vorher endete der Weg hier (Prüfung, 1. November). */}
                 {auswahl.id && <button type="button" className="knopf haupt" onClick={() => setzeUrl({ parzelle: auswahl.id! })}>Objekt öffnen</button>}
                 {e.adresse && <Kopieren wert={e.adresse} text="Adresse kopieren" />}

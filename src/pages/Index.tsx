@@ -32,7 +32,6 @@ const Teams = lazy(() => import('@/components/Teams').then(m => ({ default: m.Te
 const AdminSettings = lazy(() => import('@/components/AdminSettings').then(m => ({ default: m.AdminSettings })));
 import { Parzellensuche } from '@/components/Parzellensuche';
 import { useCanton } from '@/hooks/use-canton';
-import { KeyboardShortcutsOverlay } from '@/components/KeyboardShortcutsOverlay';
 import { AdminZugang } from '@/components/AdminZugang';
 import { Auffang } from '@/components/Auffang';
 import { useAuth } from '@/hooks/use-auth';
@@ -169,7 +168,6 @@ export default function Index() {
 
   return (
     <div className="flex min-h-safe-screen bg-background">
-      <KeyboardShortcutsOverlay />
       <PropertyDetailDialog id={parzelle} onClose={parzelleZu} />
 
       {/* Schmale Leiste nur mit Symbolen, wie in der Vorlage (DESIGN.md):

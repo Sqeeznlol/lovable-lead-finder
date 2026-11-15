@@ -39,8 +39,7 @@ export const BILD = {
   zentrale: luftbildLv95(2681800, 1248900, 800, 1280),     // Zürich, Escher-Wyss
   baugesuche: luftbildLv95(2697300, 1261900, 800, 1280),   // Winterthur, Altstadt und Bahnhof
   uebersicht: luftbildLv95(2683600, 1251800, 800, 1280),   // Zürich-Oerlikon
-  nummern: luftbildLv95(2696400, 1244800, 800, 1280),      // Uster
-  pipedrive: luftbildLv95(2686300, 1256500, 800, 1280),    // Kloten
+  leads: luftbildLv95(2686300, 1256500, 800, 1280),    // Kloten
   gelegenheiten: luftbildLv95(2685400, 1250300, 800, 1280),// Zürich-Schwamendingen
   auswertung: luftbildLv95(2693300, 1231300, 800, 1280),   // Wädenswil
   kalender: luftbildLv95(2683300, 1252500, 800, 1280),

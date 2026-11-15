@@ -27,12 +27,6 @@ import { FENSTER } from '@/lib/fenster';
 
 type Property = Tables<'properties'>;
 
-const akquiseStatuses = [
-  'Neu', 'In Prüfung', 'Interessant', 'Nicht interessant', 'Eigentümer gesucht',
-  'Eigentümer gefunden', 'Eigentümer ermittelt', 'Telefonnummer gesucht', 'Telefon gefunden',
-  'Kontaktiert', 'Kein Interesse', 'Interesse vorhanden', 'Termin vereinbart',
-  'Follow-up', 'Post', 'Exportiert', 'Archiviert',
-];
 const preselectionStatuses = [
   'Nicht geprüft', 'Sehr interessant', 'Potenzial vorhanden',
   'Später prüfen', 'Kein Potenzial', 'Ausschliessen',
@@ -267,9 +261,6 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
                 ) : (
                   <p className="text-sm text-muted-foreground">Aus dem Grundbuch noch nicht abgerufen{!data.egrid && ', keine EGRID vorhanden'}.</p>
                 )}
-                {/* Abgefragt wird nicht mehr hier: die Akquise ist seit dem
-                    7. November ein eigenes Programm (src/App.tsx). */}
-                <p className="text-xs text-muted-foreground">Eigentümer werden in Bauraum Akquise abgefragt.</p>
               </div>
               <WeitereParzellen parzelleId={data.id} />
 
@@ -284,19 +275,6 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
                     <SelectContent>{preselectionStatuses.map(x => <SelectItem key={x} value={x}>{x}</SelectItem>)}</SelectContent>
                   </Select>
                 </Feld>
-                <Feld titel="Akquise">
-                  <Select value={data.status} onValueChange={v => update({ status: v })}>
-                    <SelectTrigger className="rounded-[3px]"><SelectValue /></SelectTrigger>
-                    <SelectContent>{akquiseStatuses.map(x => <SelectItem key={x} value={x}>{x}</SelectItem>)}</SelectContent>
-                  </Select>
-                </Feld>
-                <div className="grid grid-cols-2 gap-3">
-                  <Feld titel="Follow-up">
-                    <Input type="date" value={data.follow_up_at ? data.follow_up_at.slice(0, 10) : ''}
-                           onChange={e => update({ follow_up_at: e.target.value ? new Date(e.target.value).toISOString() : null })} />
-                  </Feld>
-                  <Feld titel="Zuständig"><Input value={data.assigned_to || ''} onChange={e => update({ assigned_to: e.target.value || null })} /></Feld>
-                </div>
               </div>
 
               {/* Die öffentliche Hand verkauft ihren Grundbesitz praktisch
