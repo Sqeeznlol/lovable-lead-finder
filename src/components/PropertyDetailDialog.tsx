@@ -150,7 +150,14 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
             <button type="button" className={KNOPF} onClick={onClose}>Schliessen</button>
           </div>
         ) : loading || !data ? (
-          <div className="flex justify-center p-12"><Loader2 className="h-6 w-6 animate-spin" /></div>
+          <div className="flex justify-center p-12">
+            {/* Auch während des Ladens braucht der Dialog einen Namen: ohne
+                ihn sagt ein Bildschirmleser nur "Dialog" (gemeldet von
+                tools/reiter-pruefen.cjs auf der echten Seite). */}
+            <DialogTitle className="sr-only">Objekt wird geladen</DialogTitle>
+            <DialogDescription className="sr-only">Die Angaben zur Parzelle werden geholt.</DialogDescription>
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
         ) : (
           <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_340px]">
             <div className="min-w-0 space-y-6 p-5 sm:p-6">

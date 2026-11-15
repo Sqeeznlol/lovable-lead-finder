@@ -21,7 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 const db = () => supabase as any;
 
 interface Ziel { kennzahl: string; ausgangswert: number | null; ausgangs_am: string | null; ziel: number | null; ziel_bis: string | null; bemerkung: string | null }
-interface Stand { gebaeude: string | null; gebaeude_n: number; baugesuch: string | null; baugesuch_n: number; nachbarschaft: string | null; nachbarschaft_n: number; punkte: string | null; punkte_n: number; potenzial_annahmen: string | null }
+interface Stand { gebaeude: string | null; gebaeude_n: number; gebaeude_parzellen?: number; baugesuch: string | null; baugesuch_n: number; nachbarschaft: string | null; nachbarschaft_n: number; punkte: string | null; punkte_n: number; potenzial_annahmen: string | null }
 
 // Kleine Anteile nicht als "0 %" zeigen: 114 von 532'131 sind 0.02 %.
 const z = (n: number | null | undefined, einheit = '') => (n == null ? '–'
@@ -47,12 +47,11 @@ export function useKennzahlenTim() {
     queryKey: ['kennzahlen-tim'],
     staleTime: 60 * 1000,
     queryFn: async (): Promise<{ liste: Kennzahl[]; stand: Stand | null }> => {
-      const [objekte, mitEigner, mitTelefon, gebaeudeParzellen, kunden, portfolios, zugeordnet, alarme30, alarmeAlle, gelOffen, gelGemeldet, gelAbgeschlossen,
+      const [objekte, mitEigner, mitTelefon, kunden, portfolios, zugeordnet, alarme30, alarmeAlle, gelOffen, gelGemeldet, gelAbgeschlossen,
         arrond, nachbarnZeilen, anrufe, erreicht, verkaufsja, profile, treffer, treffer30, mandate, stand] = await Promise.all([
         zaehlen('properties', undefined, true),
         zaehlen('properties', q => q.not('owner_name', 'is', null)),
         zaehlen('properties', q => q.not('owner_phone', 'is', null)),
-        zaehlen('parzelle_gebaeude'),
         zaehlen('mandant', q => q.eq('aktiv', true)), zaehlen('portfolio'),
         zaehlen('portfolio_position', q => q.eq('zuordnung', 'zugeordnet')),
         zaehlen('gelegenheit', q => q.eq('anlass', 'baugesuch').gte('erkannt_am', vor30())),
@@ -69,6 +68,11 @@ export function useKennzahlenTim() {
         zaehlen('mandant', q => q.eq('produkt', 'acquisition')),
         db().rpc('daten_stand').then((r: { data: Stand | null; error: unknown }) => (r.error ? null : r.data)),
       ]);
+      // Parzellen mit Gebäude kommen mit daten_stand: die Sicht
+      // parzelle_gebaeude zu zählen hiess, bei jedem Öffnen 370'000
+      // Gebäude zu gruppieren, und lief unter Last in die Frist
+      // (Reiter prüfen, 15. November).
+      const gebaeudeParzellen = stand?.gebaeude_parzellen ?? null;
       const pct = (a: number | null, b: number | null) => (a != null && b ? Math.round((10000 * a) / b) / 100 : null);
       const liste: Kennzahl[] = [
         { id: 'eigentuemer_pct', bereich: 'Datenqualität', titel: 'Parzellen mit bekanntem Eigentümer', wert: pct(mitEigner, objekte), einheit: ' %', zeile: `${z(mitEigner)} von rund ${z(objekte)}, ${z(mitTelefon)} mit Telefon` },
