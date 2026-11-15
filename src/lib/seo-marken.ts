@@ -9,7 +9,8 @@
 //
 // Die Hauptadresse ist die www-Fassung: jede gekaufte Domain leitet die
 // nackte Adresse dorthin weiter (am 15. November gemessen, 308).
-import { GEKAUFT, MARKEN, type Marke } from './check-marken';
+import { BETREIBER, GEKAUFT, MARKEN, type Marke } from './check-marken';
+import { DATENQUELLEN, FRAGEN, SCHRITTE } from './check-inhalt';
 import { ARTIKEL, type Artikel } from './ratgeber';
 import { HEIZUNG_TEXT } from './heizung-text';
 import { GEMEINDE_DOMAIN, GEMEINDE_HEIMAT, kennzahlen, satz as gemeindeSatz, titel as gemeindeTitel, type Gemeinde } from './gemeinde-seiten';
@@ -38,12 +39,34 @@ export function beschreibung(m: Marke, a?: Artikel): string {
   return s.length > 158 ? `${s.slice(0, 155).replace(/\s+\S*$/, '')} …` : s;
 }
 
+const MONATE = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+/** "7. November 2026" -> "2026-11-07"; unbekannt -> undefined. */
+export function isoDatum(text: string): string | undefined {
+  const t = /^(\d{1,2})\. (\S+) (\d{4})$/.exec(text.trim());
+  const m = t ? MONATE.indexOf(t[2]) + 1 : 0;
+  return t && m ? `${t[3]}-${String(m).padStart(2, '0')}-${t[1].padStart(2, '0')}` : undefined;
+}
+
+// Strukturierte Angaben (schema.org) für Suchmaschinen und KI-Leser. "<" wird
+// maskiert, damit kein Text das Skript-Element schliessen kann.
+const ldSkript = (o: object) => `<script type="application/ld+json">${JSON.stringify(o).replace(/</g, '\\u003c')}</script>`;
+export function strukturiert(m: Marke, url: string, a?: Artikel, ausfuehrlich = false): object {
+  const herausgeber = { '@type': 'Organization', name: BETREIBER };
+  if (a) return { '@context': 'https://schema.org', '@type': 'Article', headline: a.titel, description: a.lead, inLanguage: 'de-CH',
+    url, mainEntityOfPage: url, author: herausgeber, publisher: herausgeber, ...(isoDatum(a.stand) ? { datePublished: isoDatum(a.stand), dateModified: isoDatum(a.stand) } : {}) };
+  const seite = { '@type': 'WebPage', '@id': url, url, name: titel(m), description: beschreibung(m), inLanguage: 'de-CH',
+    isPartOf: { '@type': 'WebSite', name: m.name.join(''), url: `${hauptadresse(m)}/`, publisher: herausgeber } };
+  return { '@context': 'https://schema.org', '@graph': ausfuehrlich
+    ? [seite, { '@type': 'FAQPage', '@id': `${url}#fragen`, mainEntity: FRAGEN.map(([f, x]) => ({ '@type': 'Question', name: f, acceptedAnswer: { '@type': 'Answer', text: x } })) }]
+    : [seite] };
+}
+
 /**
  * Ersetzt den Kopf von index.html und legt einen lesbaren Grundtext in
  * #root, den React beim Start ersetzt. Ohne JavaScript sieht Google so
  * Titel, Satz und Vorteile der Marke statt einer leeren Seite.
  */
-export function markenSeite(indexHtml: string, m: Marke, a?: Artikel, pfad?: string, opt: { basis?: string; links?: { href: string; text: string }[] } = {}): string {
+export function markenSeite(indexHtml: string, m: Marke, a?: Artikel, pfad?: string, opt: { basis?: string; links?: { href: string; text: string }[]; ausfuehrlich?: boolean } = {}): string {
   // Ratgeber und Heizungs-Check sind auf allen Domains gleich: eine Hauptfassung für Google.
   const url = a ? `${RATGEBER_HEIMAT}/ratgeber/${a.slug}` : pfad ? `${opt.basis ?? RATGEBER_HEIMAT}${pfad}` : `${hauptadresse(m)}/`;
   const t = esc(titel(m, a)), d = esc(beschreibung(m, a));
@@ -59,12 +82,13 @@ export function markenSeite(indexHtml: string, m: Marke, a?: Artikel, pfad?: str
     `<meta property="og:locale" content="de_CH" />`,
     `<meta name="twitter:title" content="${t}" />`,
     `<meta name="twitter:description" content="${d}" />`,
+    ldSkript(strukturiert(m, url, a, opt.ausfuehrlich)),
   ].join('\n    ');
   // Schlicht gesetzt, damit der Text beim Laden nicht roh aufblitzt; React ersetzt ihn.
   const stil = 'style="font-family:system-ui,sans-serif;max-width:40rem;margin:3rem auto;padding:0 1rem;line-height:1.5;color:#222"';
   const grund = a
     ? `<main ${stil}><p>${esc(a.rubrik)}</p><h1>${esc(a.titel)}</h1><p>${esc(a.lead)}</p>${a.abschnitte.map(x => `<h2>${esc(x.titel)}</h2>${x.absaetze.map(p => `<p>${esc(p)}</p>`).join('')}`).join('')}</main>`
-    : `<main ${stil}><p>${esc(m.etikett)}</p><h1>${esc(m.titel)}</h1><p>${esc(m.satz)}</p><ul>${m.vorteile.map(v => `<li>${esc(v)}</li>`).join('')}</ul>${opt.links ? `<ul>${opt.links.map(l => `<li><a href="${esc(l.href)}">${esc(l.text)}</a></li>`).join('')}</ul>` : ''}<p>${esc(m.aufruf)}</p><p><a href="/ratgeber/${ARTIKEL[0].slug}">Ratgeber: ${esc(ARTIKEL[0].titel)}</a></p></main>`;
+    : `<main ${stil}><p>${esc(m.etikett)}</p><h1>${esc(m.titel)}</h1><p>${esc(m.satz)}</p><ul>${m.vorteile.map(v => `<li>${esc(v)}</li>`).join('')}</ul>${opt.links ? `<ul>${opt.links.map(l => `<li><a href="${esc(l.href)}">${esc(l.text)}</a></li>`).join('')}</ul>` : ''}<p>${esc(m.aufruf)}</p>${opt.ausfuehrlich ? ausfuehrlicherText() : ''}<p><a href="/ratgeber/${ARTIKEL[0].slug}">Ratgeber: ${esc(ARTIKEL[0].titel)}</a></p></main>`;
   return indexHtml
     // Alles, was index.html über die interne App sagt, fällt weg.
     .replace(/<title>[\s\S]*?<\/title>/, '')
@@ -74,6 +98,30 @@ export function markenSeite(indexHtml: string, m: Marke, a?: Artikel, pfad?: str
     .replace(/\s*<meta name="apple-mobile-web-app-title"[^>]*>/, `\n    <meta name="apple-mobile-web-app-title" content="${esc(m.name.join(''))}" />`)
     .replace('<head>', `<head>\n    ${kopf}`)
     .replace(/<div id="root"><\/div>/, `<div id="root">${grund}</div>`);
+}
+
+/** Ablauf, Datenquellen und Fragen der Startseite, wie sie React später zeigt. */
+function ausfuehrlicherText(): string {
+  return `<h2>So funktioniert's</h2><ol>${SCHRITTE.map(([t, p]) => `<li><strong>${esc(t)}</strong>: ${esc(p)}</li>`).join('')}</ol>`
+    + `<h2>Daten aus</h2><ul>${DATENQUELLEN.map(q => `<li>${esc(q)}</li>`).join('')}</ul>`
+    + `<h2>Was Eigentümer uns fragen</h2>${FRAGEN.map(([f, x]) => `<h3>${esc(f)}</h3><p>${esc(x)}</p>`).join('')}`;
+}
+
+/**
+ * /llms.txt (llmstxt.org): eine kurze Übersicht in Markdown für KI-Leser,
+ * mit den Seiten, die sich lohnen. Links zeigen auf die Hauptfassungen.
+ */
+export function llms(m: Marke, gemeinden: Gemeinde[] = []): string {
+  const z = [`# ${m.name.join('')}`, '', `> ${m.satz} Kostenlos und unverbindlich.`, '',
+    `${m.name.join('')} ist ein Angebot von ${BETREIBER}. ${m.titel}`, '', '## Seiten', '',
+    `- [${m.titel}](${hauptadresse(m)}/): Adresse eingeben, Parzelle, Bauzone, Gebäude und Ausnützung sehen; auf Wunsch persönliche Analyse.`,
+    `- [Heizungs-Check](${RATGEBER_HEIMAT}/heizung): Heizung, Baujahr, Fernwärme und Solardach eines Hauses aus Gebäuderegister und Bundesdaten.`,
+    ...ARTIKEL.map(a => `- [Ratgeber: ${a.titel}](${RATGEBER_HEIMAT}/ratgeber/${a.slug}): ${a.lead}`),
+    ...(gemeinden.length ? [`- [Bauen in Ihrer Gemeinde](${GEMEINDE_HEIMAT}/gemeinden): Baugesuche und Gebäude je Gemeinde der Deutschschweiz (${gemeinden.length} Gemeinden).`] : []),
+    '', '## So funktioniert es', '', ...SCHRITTE.map(([t, p], i) => `${i + 1}. ${t}: ${p}`),
+    '', '## Datenquellen', '', ...DATENQUELLEN.map(q => `- ${q}`),
+    '', '## Häufige Fragen', '', ...FRAGEN.flatMap(([f, x]) => [`### ${f}`, '', x, ''])];
+  return z.join('\n').replace(/\n+$/, '\n');
 }
 
 export function sitemap(m: Marke, stand: string, gemeinden: Gemeinde[] = []): string {
@@ -110,6 +158,7 @@ export const datei = {
   artikel: (m: Marke, a: Artikel) => `marken/${m.id}/ratgeber/${a.slug}.html`,
   sitemap: (m: Marke) => `marken/${m.id}/sitemap.xml`,
   robots: (m: Marke) => `marken/${m.id}/robots.txt`,
+  llms: (m: Marke) => `marken/${m.id}/llms.txt`,
 };
 
 /** Die Umleitungen für vercel.json, je Marke nach Hostname; vor der allgemeinen Regel. */
@@ -119,6 +168,7 @@ export function vercelUmleitungen() {
     return [
       { source: '/robots.txt', has: host, destination: `/${datei.robots(m)}` },
       { source: '/sitemap.xml', has: host, destination: `/${datei.sitemap(m)}` },
+      { source: '/llms.txt', has: host, destination: `/${datei.llms(m)}` },
       ...ARTIKEL.map(a => ({ source: `/ratgeber/${a.slug}`, has: host, destination: `/${datei.artikel(m, a)}` })),
       { source: '/heizung', has: host, destination: `/${datei.heizung(m)}` },
       // Gemeinde-Seiten nur auf ihrer Domain; anderswo zeigt die App sie ohne eigenen Kopf.

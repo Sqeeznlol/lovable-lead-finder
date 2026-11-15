@@ -66,3 +66,35 @@ describe('Gemeinde-Seiten', () => {
     expect(r[0].destination).toBe(`/marken/${m.id}/gemeinde/:ort.html`);
   });
 });
+
+describe('Was KI-Leser ohne JavaScript bekommen', () => {
+  const ld = (html: string) => [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map(x => JSON.parse(x[1]));
+  it('Startseite: Ablauf, Quellen und alle Fragen im HTML, dazu FAQPage', async () => {
+    const { FRAGEN } = await import('@/lib/check-inhalt');
+    const m = MARKEN_LIVE[0];
+    const html = markenSeite(index, m, undefined, undefined, { ausfuehrlich: true });
+    for (const [f] of FRAGEN) expect(html).toContain(`<h3>${f.replace(/&/g, '&amp;')}</h3>`);
+    expect(html).toContain("<h2>So funktioniert's</h2>");
+    const [daten] = ld(html);
+    const faq = daten['@graph'].find((x: { '@type': string }) => x['@type'] === 'FAQPage');
+    expect(faq.mainEntity).toHaveLength(FRAGEN.length);
+    expect(html).not.toMatch(/CRM|Pipedrive|Aurora|Off-Market|noindex/);
+  });
+  it('Ratgeber als Article mit Datum, Unterseiten ohne doppelte Fragen', () => {
+    const [a] = ld(markenSeite(index, MARKEN_LIVE[0], ARTIKEL[0]));
+    expect(a['@type']).toBe('Article');
+    expect(a.datePublished).toBe('2026-11-07');
+    expect(a.url).toBe(`${RATGEBER_HEIMAT}/ratgeber/${ARTIKEL[0].slug}`);
+    const h = markenSeite(index, heizungsMarke(MARKEN_LIVE[0]), undefined, '/heizung');
+    expect(h).not.toContain('FAQPage');
+    expect(ld(h)).toHaveLength(1);
+  });
+  it('llms.txt je Marke mit Hauptfassungen, Umleitung je Domain', async () => {
+    const { llms } = await import('@/lib/seo-marken');
+    const t = llms(MARKEN_LIVE[0]);
+    expect(t).toMatch(/^# /);
+    expect(t).toContain(`${RATGEBER_HEIMAT}/ratgeber/${ARTIKEL[0].slug}`);
+    expect(t).toContain('## Häufige Fragen');
+    for (const m of MARKEN_LIVE) expect(vercelUmleitungen().some(r => r.source === '/llms.txt' && r.destination === `/marken/${m.id}/llms.txt`)).toBe(true);
+  });
+});

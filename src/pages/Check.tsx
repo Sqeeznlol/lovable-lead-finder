@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CookieHinweis } from '@/components/CookieHinweis';
 import { setzeZustimmung } from '@/lib/zustimmung';
+import { DATENQUELLEN, FRAGEN, SCHRITTE } from '@/lib/check-inhalt';
 import { useParams } from 'react-router-dom';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -45,14 +46,6 @@ const heuteSchon = (): number[] => {
   try { return (JSON.parse(localStorage.getItem(ZAEHLER) || '[]') as number[]).filter(t => Date.now() - t < 864e5); } catch { return []; }
 };
 
-const FRAGEN: [string, string][] = [
-  ['Was kostet die Berechnung?', 'Nichts. Die Prüfung mit den amtlichen Daten, der Rechner und die ausführliche Analyse sind kostenlos und unverbindlich.'],
-  ['Woher stammen die Daten?', 'Aus den amtlichen Registern: Parzellen aus der amtlichen Vermessung von Bund und Kantonen, Bauzonen aus den Bauzonen Schweiz des Bundesamts für Raumentwicklung, Gebäude aus dem Gebäude- und Wohnungsregister des Bundesamts für Statistik.'],
-  ['Wie genau ist der Rechner?', 'Er rechnet mit der Ausnützung, die Sie einstellen, und mit Grundfläche und Geschossen der Gebäude laut Register. Das ergibt einen Richtwert. Welche Ausnützung in Ihrer Gemeinde gilt und was davon nutzbar ist, prüfen unsere Fachleute in der Analyse.'],
-  ['Wer steckt dahinter?', `${BETREIBER}. Wir begleiten Eigentümer bei Verkauf und Entwicklung von Liegenschaften und kaufen auch selbst. Die vollständigen Angaben finden Sie im Impressum.`],
-  ['Muss ich verkaufen?', 'Nein. Die Analyse verpflichtet Sie zu nichts. Viele Eigentümer möchten einfach wissen, was ihr Grundstück kann.'],
-  ['Was passiert mit meinen Angaben?', 'Wir verwenden sie für Ihre Berechnung und Analyse und um Sie zu Ihrer Liegenschaft zu kontaktieren. An Dritte geben wir sie nicht weiter. Sie können Ihre Einwilligung jederzeit widerrufen.'],
-];
 
 type Feld = 'name' | 'email' | 'telefon';
 
@@ -464,7 +457,7 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
             </div>
           </section>
         )}
-        <div className="quellenband"><div className="huelle"><b>Daten aus:</b><span>Amtliche Vermessung</span><span>Bauzonen Schweiz (ARE)</span><span>Gebäude- und Wohnungsregister (BFS)</span><span>Luftbilder swisstopo</span></div></div>
+        <div className="quellenband"><div className="huelle"><b>Daten aus:</b>{DATENQUELLEN.map(q => <span key={q}>{q}</span>)}</div></div>
 
         {ort && (
           <section className="ergebnis sichtbar" ref={ergebnisRef} aria-live="polite">
@@ -693,9 +686,7 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
             <h2 className="titel">In drei Schritten zu Ihrer Analyse</h2>
             <p className="lead-satz">Kein Konto, kein Abo, keine Verpflichtung. Sie sehen zuerst, was die amtlichen Daten sagen, und entscheiden dann, ob Sie mehr wissen möchten.</p>
             <div className="schritte">
-              <div className="schritt-karte"><div className="nr" aria-hidden="true">1</div><h3>Adresse eingeben</h3><p>Wir finden Ihre Parzelle in der amtlichen Vermessung, schweizweit.</p></div>
-              <div className="schritt-karte"><div className="nr" aria-hidden="true">2</div><h3>Daten sehen und rechnen</h3><p>Fläche, Bauzone, Gebäude und Baujahr, dazu ein Rechner für die Ausnützung.</p></div>
-              <div className="schritt-karte"><div className="nr" aria-hidden="true">3</div><h3>Analyse erhalten</h3><p>Fachleute prüfen die Bau- und Zonenordnung Ihrer Gemeinde und melden sich innert zwei Arbeitstagen.</p></div>
+              {SCHRITTE.map(([t, p], i) => <div key={t} className="schritt-karte"><div className="nr" aria-hidden="true">{i + 1}</div><h3>{t}</h3><p>{p}</p></div>)}
             </div>
             <div className="schritte-aufruf">
               <button type="button" className="knopf marke" onClick={() => (befund ? oeffnen() : zurSuche())}>{befund ? 'Reserve kostenlos berechnen' : 'Mit Schritt 1 beginnen'}</button>

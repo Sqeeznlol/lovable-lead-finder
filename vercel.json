@@ -22,6 +22,16 @@
       "destination": "/marken/parzellenchecker/sitemap.xml"
     },
     {
+      "source": "/llms.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellenchecker\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellenchecker/llms.txt"
+    },
+    {
       "source": "/ratgeber/haus-zu-gross",
       "has": [
         {
@@ -72,6 +82,16 @@
       "destination": "/marken/hauschecker/sitemap.xml"
     },
     {
+      "source": "/llms.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(hauschecker\\.ch)"
+        }
+      ],
+      "destination": "/marken/hauschecker/llms.txt"
+    },
+    {
       "source": "/ratgeber/haus-zu-gross",
       "has": [
         {
@@ -120,6 +140,16 @@
         }
       ],
       "destination": "/marken/wasdarfichbauen/sitemap.xml"
+    },
+    {
+      "source": "/llms.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(was-kann-ich-bauen\\.ch)"
+        }
+      ],
+      "destination": "/marken/wasdarfichbauen/llms.txt"
     },
     {
       "source": "/ratgeber/haus-zu-gross",
@@ -192,6 +222,16 @@
       "destination": "/marken/ausbaupotenzial/sitemap.xml"
     },
     {
+      "source": "/llms.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(ausbaupotenzial\\.ch)"
+        }
+      ],
+      "destination": "/marken/ausbaupotenzial/llms.txt"
+    },
+    {
       "source": "/ratgeber/haus-zu-gross",
       "has": [
         {
@@ -240,6 +280,16 @@
         }
       ],
       "destination": "/marken/erbliegenschaft/sitemap.xml"
+    },
+    {
+      "source": "/llms.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(erbliegenschaft\\.ch)"
+        }
+      ],
+      "destination": "/marken/erbliegenschaft/llms.txt"
     },
     {
       "source": "/ratgeber/haus-zu-gross",
@@ -292,6 +342,16 @@
       "destination": "/marken/reserverechner/sitemap.xml"
     },
     {
+      "source": "/llms.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(ausnuetzung-check\\.ch)"
+        }
+      ],
+      "destination": "/marken/reserverechner/llms.txt"
+    },
+    {
       "source": "/ratgeber/haus-zu-gross",
       "has": [
         {
@@ -340,6 +400,16 @@
         }
       ],
       "destination": "/marken/aufstockcheck/sitemap.xml"
+    },
+    {
+      "source": "/llms.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(aufstockungscheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/aufstockcheck/llms.txt"
     },
     {
       "source": "/ratgeber/haus-zu-gross",
@@ -392,6 +462,16 @@
       "destination": "/marken/verdichtungscheck/sitemap.xml"
     },
     {
+      "source": "/llms.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(verdichtungscheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/verdichtungscheck/llms.txt"
+    },
+    {
       "source": "/ratgeber/haus-zu-gross",
       "has": [
         {
@@ -440,6 +520,16 @@
         }
       ],
       "destination": "/marken/parzellenwert/sitemap.xml"
+    },
+    {
+      "source": "/llms.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellenwert\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellenwert/llms.txt"
     },
     {
       "source": "/ratgeber/haus-zu-gross",
@@ -492,6 +582,16 @@
       "destination": "/marken/landwert24/sitemap.xml"
     },
     {
+      "source": "/llms.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(landwert24\\.ch)"
+        }
+      ],
+      "destination": "/marken/landwert24/llms.txt"
+    },
+    {
       "source": "/ratgeber/haus-zu-gross",
       "has": [
         {
@@ -540,6 +640,16 @@
         }
       ],
       "destination": "/marken/hauswertrechner/sitemap.xml"
+    },
+    {
+      "source": "/llms.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(hauswertrechner\\.ch)"
+        }
+      ],
+      "destination": "/marken/hauswertrechner/llms.txt"
     },
     {
       "source": "/ratgeber/haus-zu-gross",
@@ -592,6 +702,16 @@
       "destination": "/marken/grundstueckrechner/sitemap.xml"
     },
     {
+      "source": "/llms.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellenrechner\\.ch)"
+        }
+      ],
+      "destination": "/marken/grundstueckrechner/llms.txt"
+    },
+    {
       "source": "/ratgeber/haus-zu-gross",
       "has": [
         {
@@ -640,6 +760,16 @@
         }
       ],
       "destination": "/marken/bauzonencheck/sitemap.xml"
+    },
+    {
+      "source": "/llms.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(bauzonencheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/bauzonencheck/llms.txt"
     },
     {
       "source": "/ratgeber/haus-zu-gross",
@@ -692,6 +822,16 @@
       "destination": "/marken/eigentuemercheck/sitemap.xml"
     },
     {
+      "source": "/llms.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(eigentuemercheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/eigentuemercheck/llms.txt"
+    },
+    {
       "source": "/ratgeber/haus-zu-gross",
       "has": [
         {
@@ -740,6 +880,16 @@
         }
       ],
       "destination": "/marken/baurechner24/sitemap.xml"
+    },
+    {
+      "source": "/llms.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(baurechner24\\.ch)"
+        }
+      ],
+      "destination": "/marken/baurechner24/llms.txt"
     },
     {
       "source": "/ratgeber/haus-zu-gross",
@@ -792,6 +942,16 @@
       "destination": "/marken/checkmyparcel/sitemap.xml"
     },
     {
+      "source": "/llms.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(checkmyparcel\\.ch)"
+        }
+      ],
+      "destination": "/marken/checkmyparcel/llms.txt"
+    },
+    {
       "source": "/ratgeber/haus-zu-gross",
       "has": [
         {
@@ -840,6 +1000,16 @@
         }
       ],
       "destination": "/marken/parzellencheck24/sitemap.xml"
+    },
+    {
+      "source": "/llms.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellencheck24\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellencheck24/llms.txt"
     },
     {
       "source": "/ratgeber/haus-zu-gross",
@@ -892,6 +1062,16 @@
       "destination": "/marken/parzellepruefen/sitemap.xml"
     },
     {
+      "source": "/llms.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellepruefen\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellepruefen/llms.txt"
+    },
+    {
       "source": "/ratgeber/haus-zu-gross",
       "has": [
         {
@@ -940,6 +1120,16 @@
         }
       ],
       "destination": "/marken/parzellencheck/sitemap.xml"
+    },
+    {
+      "source": "/llms.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellen-check\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellencheck/llms.txt"
     },
     {
       "source": "/ratgeber/haus-zu-gross",
@@ -992,6 +1182,16 @@
       "destination": "/marken/hauswert24/sitemap.xml"
     },
     {
+      "source": "/llms.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(hauswert24\\.ch)"
+        }
+      ],
+      "destination": "/marken/hauswert24/llms.txt"
+    },
+    {
       "source": "/ratgeber/haus-zu-gross",
       "has": [
         {
@@ -1040,6 +1240,16 @@
         }
       ],
       "destination": "/marken/hauswertcheck/sitemap.xml"
+    },
+    {
+      "source": "/llms.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(hauswertcheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/hauswertcheck/llms.txt"
     },
     {
       "source": "/ratgeber/haus-zu-gross",
@@ -1092,6 +1302,16 @@
       "destination": "/marken/baupotenzialcheck/sitemap.xml"
     },
     {
+      "source": "/llms.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(baupotenzialcheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/baupotenzialcheck/llms.txt"
+    },
+    {
       "source": "/ratgeber/haus-zu-gross",
       "has": [
         {
@@ -1140,6 +1360,16 @@
         }
       ],
       "destination": "/marken/zonencheck/sitemap.xml"
+    },
+    {
+      "source": "/llms.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(zonen-check\\.ch)"
+        }
+      ],
+      "destination": "/marken/zonencheck/llms.txt"
     },
     {
       "source": "/ratgeber/haus-zu-gross",

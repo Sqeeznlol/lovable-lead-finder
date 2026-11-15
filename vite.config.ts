@@ -4,7 +4,7 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 import fs from "fs";
 import { ARTIKEL } from "./src/lib/ratgeber";
-import { datei, gemeindenSeite, gemeindeSeite, heizungsMarke, markenSeite, MARKEN_LIVE, robots, sitemap } from "./src/lib/seo-marken";
+import { datei, gemeindenSeite, gemeindeSeite, heizungsMarke, llms, markenSeite, MARKEN_LIVE, robots, sitemap } from "./src/lib/seo-marken";
 import { GEMEINDE_DOMAIN, mitAdressen, type GemeindeZahlen } from "./src/lib/gemeinde-seiten";
 
 // Je Check-Marke eine eigene HTML-Datei mit Titel, Beschreibung und Text,
@@ -26,7 +26,7 @@ function markenSeiten() {
         fs.writeFileSync(path.join(aus, rel), inhalt);
       };
       for (const m of MARKEN_LIVE) {
-        schreiben(datei.seite(m), markenSeite(index, m));
+        schreiben(datei.seite(m), markenSeite(index, m, undefined, undefined, { ausfuehrlich: true }));
         schreiben(datei.heizung(m), markenSeite(index, heizungsMarke(m), undefined, "/heizung"));
         for (const a of ARTIKEL) schreiben(datei.artikel(m, a), markenSeite(index, m, a));
         const heimat = m.domains.includes(GEMEINDE_DOMAIN);
@@ -36,6 +36,7 @@ function markenSeiten() {
         }
         schreiben(datei.sitemap(m), sitemap(m, stand, heimat ? gemeinden : []));
         schreiben(datei.robots(m), robots(m));
+        schreiben(datei.llms(m), llms(m, heimat ? gemeinden : []));
       }
       // Eine index.html im Wurzelordner liefert Vercel für "/" aus, bevor
       // irgendeine Umleitung greift (live gemessen am 15. November: "/"
