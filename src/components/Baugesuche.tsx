@@ -21,7 +21,8 @@ import { BetroffeneParzellen } from '@/components/BetroffeneParzellen';
 // Objektansicht sie nutzen kann, ohne diese ganze Seite mitzuladen.
 export { belege, type Gesuch } from '@/lib/baugesuch-belege';
 import { belege, type Gesuch } from '@/lib/baugesuch-belege';
-import { useUrlWert } from '@/hooks/use-url-wert';
+import { useUrlSetzen, useUrlWert } from '@/hooks/use-url-wert';
+import { useNavigate } from 'react-router-dom';
 
 // Die erzeugten Typen kennen die Plattform-Tabellen noch nicht.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -34,13 +35,15 @@ const zeit = (s: string) => new Date(s).toLocaleString('de-CH', { day: '2-digit'
  * ganze Jahr geladen ist (rund 6000), zeigten die neuesten 500 unter
  * "Alle" nur einen Teil. Gezählt wird ebenfalls dort, nicht im Browser.
  */
+const GESUCH_SPALTEN = 'id, publiziert_am, kanton, gemeinde, adresse, parzelle_nr, egrid, beschreibung, bauherrschaft, parzelle_id, nachbar_egrids, erfasst_am, quelle, publikation_nr, publikation_id, einsprache_bis, publiziert_bis, quelle_url';
+
 export function useBaugesuche(tage = 7, kanton = '') {
   return useQuery({
     queryKey: ['baugesuche', tage, kanton],
     queryFn: async () => {
       const ab = tage > 0 ? new Date(Date.now() - tage * 864e5).toISOString().slice(0, 10) : null;
       let q = db().from('baugesuch')
-        .select('id, publiziert_am, kanton, gemeinde, adresse, parzelle_nr, egrid, beschreibung, bauherrschaft, parzelle_id, nachbar_egrids, erfasst_am, quelle, publikation_nr, publikation_id, einsprache_bis, publiziert_bis, quelle_url')
+        .select(GESUCH_SPALTEN)
         // Proben aus "Auswerten" werden zurückgerollt; sicherheitshalber nie zeigen.
         .neq('quelle', 'probe');
       if (ab) q = q.gte('publiziert_am', ab);
@@ -54,16 +57,19 @@ export function useBaugesuche(tage = 7, kanton = '') {
       };
       const [g, o, gesamt, bestand, ohneOrt, letzte] = await Promise.all([
         q.order('publiziert_am', { ascending: false }).limit(1000),
-        db().from('gelegenheit').select('baugesuch_id').not('baugesuch_id', 'is', null),
+        db().from('gelegenheit').select('id, baugesuch_id').not('baugesuch_id', 'is', null),
         zaehle(c => c),
         zaehle(c => c.not('parzelle_id', 'is', null)),
         zaehle(c => c.is('egrid', null)),
         db().from('baugesuch').select('erfasst_am').order('erfasst_am', { ascending: false }).limit(1),
       ]);
       if (g.error) throw g.error;
-      const mitGelegenheit = new Set(((o.data ?? []) as { baugesuch_id: string }[]).map(x => x.baugesuch_id));
+      const gel = (o.data ?? []) as { id: string; baugesuch_id: string }[];
+      const mitGelegenheit = new Set(gel.map(x => x.baugesuch_id));
+      // Welche Gelegenheit zu welchem Gesuch: für den Sprung hinüber.
+      const gelegenheitZu = new Map(gel.map(x => [x.baugesuch_id, x.id]));
       return {
-        gesuche: (g.data ?? []) as Gesuch[], mitGelegenheit, gesamt, bestand, ohneOrt,
+        gesuche: (g.data ?? []) as Gesuch[], mitGelegenheit, gelegenheitZu, gesamt, bestand, ohneOrt,
         zuletzt: (letzte.data?.[0]?.erfasst_am as string | undefined) ?? '',
       };
     },
@@ -106,7 +112,19 @@ export function Baugesuche() {
   const [offen, setOffen] = useUrlWert('gesuch');
 
   // Der Zeitraum ist schon in der Abfrage; hier nur noch Sicht und Suchwort.
-  const liste = useMemo(() => (data ? filtern(data.gesuche, data.mitGelegenheit, sicht, 0, wort) : []), [data, sicht, wort]);
+  // Per Link geöffnet (etwa aus einer Gelegenheit), liegt das Gesuch oft
+  // ausserhalb des Zeitraums; dann wird es einzeln geholt und steht oben.
+  const einzeln = useQuery({
+    queryKey: ['baugesuch', offen],
+    enabled: !!offen && !!data && !data.gesuche.some(g => g.id === offen),
+    queryFn: async () => ((await db().from('baugesuch').select(GESUCH_SPALTEN).eq('id', offen).maybeSingle()).data ?? null) as Gesuch | null,
+  });
+  const liste = useMemo(() => {
+    const l = data ? filtern(data.gesuche, data.mitGelegenheit, sicht, 0, wort) : [];
+    return einzeln.data ? [einzeln.data, ...l] : l;
+  }, [data, sicht, wort, einzeln.data]);
+  const nav = useNavigate();
+  const setzen = useUrlSetzen();
   const zahl = (s: Sicht) => (data ? filtern(data.gesuche, data.mitGelegenheit, s, 0, '').length : 0);
   const zeitraum = tage === 0 ? 'insgesamt' : tage === 365 ? 'in diesem Jahr' : `in ${tage} Tagen`;
   const mitGel = data ? data.gesuche.filter(g => data.mitGelegenheit.has(g.id)).length : 0;
@@ -180,6 +198,18 @@ export function Baugesuche() {
                         <span className="text-xs text-muted-foreground">{b.zeile}</span>
                       </a>
                     ))}
+                    {g.parzelle_id && (
+                      <button type="button" onClick={() => setzen({ parzelle: g.parzelle_id })} className="flex min-h-11 flex-col justify-center rounded-[3px] border px-4 py-2 text-left hover:bg-secondary">
+                        <span className="text-sm font-medium">Objekt in Aurora</span>
+                        <span className="text-xs text-muted-foreground">Parzelle im Bestand</span>
+                      </button>
+                    )}
+                    {data!.gelegenheitZu.get(g.id) && (
+                      <button type="button" onClick={() => nav(`/gelegenheiten?gelegenheit=${data!.gelegenheitZu.get(g.id)}&reiter=alle`)} className="flex min-h-11 flex-col justify-center rounded-[3px] border px-4 py-2 text-left hover:bg-secondary">
+                        <span className="text-sm font-medium">Gelegenheit öffnen</span>
+                        <span className="text-xs text-muted-foreground">daraus erkannt</span>
+                      </button>
+                    )}
                     {g.egrid && (
                       <a href={`https://map.geo.admin.ch/?swisssearch=${g.egrid}&lang=de`} target={FENSTER.karte}
                          className="flex min-h-11 flex-col justify-center rounded-[3px] border px-4 py-2 hover:bg-secondary">

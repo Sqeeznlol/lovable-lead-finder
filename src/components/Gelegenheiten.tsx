@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { ObjektLink } from '@/components/ObjektLink';
 import { Auswahl } from '@/components/Auswahl';
@@ -34,6 +35,7 @@ const m2 = (n: number | null) => (n ? `${Math.round(n).toLocaleString('de-CH')} 
 
 export function Gelegenheiten() {
   const qc = useQueryClient();
+  const nav = useNavigate();
   const { data, isLoading, error } = useGelegenheiten();
   // Nur Name und Zahl; die Parzellen eines Portfolios erst bei "Nachbarn prüfen".
   const { data: portfolios } = usePortfolioListe(true);
@@ -196,6 +198,12 @@ export function Gelegenheiten() {
                       <input defaultValue={g.ergebnis ?? ''} placeholder="z. B. Nachbar verkauft an Kunden, Vorvertrag"
                              onBlur={e => e.target.value !== (g.ergebnis ?? '') && void aendern(g, { ergebnis: e.target.value || null })} className={feld} />
                     </label>
+                    {/* Aus einem Baugesuch erkannt: das Gesuch selbst ist einen Tipp entfernt. */}
+                    {g.baugesuch_id && (
+                      <button type="button" onClick={() => nav(`/baugesuche?gesuch=${g.baugesuch_id}`)} className={`${KNOPF} w-full sm:w-auto`}>
+                        Baugesuch ansehen
+                      </button>
+                    )}
                     <p className="text-xs text-muted-foreground">Erkannt {datum(g.erkannt_am)} · gemeldet {datum(g.gemeldet_am)} · abgeschlossen {datum(g.abgeschlossen_am)}</p>
                     {ausl.length > 0 && (
                       <div className="text-sm"><p className="text-[11px] uppercase tracking-wide text-muted-foreground">Parzelle des Kunden</p>

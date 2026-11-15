@@ -6,6 +6,8 @@ import { BILD } from '@/lib/luftbild';
 import { FENSTER } from '@/lib/fenster';
 import { ArrondierungZusammen } from '@/components/ArrondierungZusammen';
 import type { Gebaeude, Parzelle, Ring } from '@/lib/arrondierung-zusammen';
+import { ObjektLink } from '@/components/ObjektLink';
+import { imBestand } from '@/lib/egrid';
 
 /**
  * Mögliche Arrondierungen im Kundenportfolio (Julian, 10. November: "mit dem
@@ -253,7 +255,7 @@ export function Arrondierung() {
                   <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px] sm:items-center">
                     <div className="min-w-0 space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium">Parzelle {n.nummer ?? '?'}{n.gemeinde ? `, ${n.gemeinde}` : ''}</span>
+                        <ObjektLink egrid={imBestand(n.kanton) ? n.nachbar_egrid : null} className="font-medium">Parzelle {n.nummer ?? '?'}{n.gemeinde ? `, ${n.gemeinde}` : ''}</ObjektLink>
                         {!n.gebaeude && n.punkte > 0 && <Marke art="gruen">unbebaut</Marke>}
                         {(verbindet.get(n.nachbar_egrid)?.size ?? 1) > 1 && <Marke art="heiss">verbindet {verbindet.get(n.nachbar_egrid)!.size} Liegenschaften</Marke>}
                         {n.zone && <Marke>{n.zone}</Marke>}

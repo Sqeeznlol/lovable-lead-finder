@@ -20,7 +20,7 @@ import { zoneKurzform } from '@/lib/potential';
  * Jede Zahl ist in der Datenbank gezählt, nicht geschätzt, und jede
  * führt dorthin, wo man sie abarbeitet.
  */
-export type Ziel = 'zentrale' | 'baugesuche' | 'gelegenheiten' | 'auswertung' | 'karte';
+export type Ziel = 'zentrale' | 'baugesuche' | 'gelegenheiten' | 'auswertung' | 'karte' | 'leads';
 
 // Die erzeugten Typen kennen die Plattform-Tabellen noch nicht.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -136,7 +136,9 @@ export function Cockpit({ onGehe, onNeu }: { onGehe: (z: Ziel) => void; onNeu?: 
         { titel: 'Vorhaben', wert: n(data.vorhaben), marke: data.vorhabenNeu ? <Marke art="lila">+{data.vorhabenNeu} neu</Marke> : undefined, onClick: () => onGehe('zentrale') },
         { titel: 'Gelegenheiten', wert: n(data.gelOffen), marke: data.gelNeu ? <Marke art="rosa">{data.gelNeu} ungeprüft</Marke> : undefined, onClick: () => onGehe('gelegenheiten') },
         { titel: 'Baugesuche', wert: n(data.bgNeu), marke: <Marke art="minze">7 Tage</Marke>, onClick: () => onGehe('baugesuche') },
-        { titel: 'Wiedervorlagen', wert: n(data.faellig), marke: data.anfragen ? <Marke art="rosa">+{data.anfragen} Anfragen</Marke> : undefined, onClick: () => onGehe('auswertung') },
+        { titel: 'Wiedervorlagen', wert: n(data.faellig), marke: data.anfragen ? <Marke art="rosa">+{data.anfragen} Anfragen</Marke> : undefined, // Unbearbeitete Anfragen sind Leads der Check-Seiten; stehen keine
+          // Wiedervorlagen an, führt die Kachel zu ihnen statt in die Auswertung.
+          onClick: () => onGehe(data.anfragen && !data.faellig ? 'leads' : 'auswertung') },
       ] : undefined}
       aktionen={aktionen}
       seite={

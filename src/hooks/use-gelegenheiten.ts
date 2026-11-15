@@ -20,6 +20,7 @@ export interface Gel {
   id: string; anlass: string; zustand: Zustand; titel: string; begruendung: string | null; zustaendig: string | null;
   erkannt_am: string; gemeldet_am: string | null; abgeschlossen_am: string | null; ergebnis: string | null;
   prioritaet: number | null; fremde_nachbarn: { egrid: string; nummer: string }[] | null;
+  baugesuch_id?: string | null;
   mandant: { id: string; akteur: { name: string } | null } | null;
   gelegenheit_parzelle: { rolle: string | null; parzelle: Parz | null }[];
 }

@@ -7,6 +7,8 @@ import { KNOPF, Leer, LISTE, Seite } from '@/components/rahmen';
 import { BILD } from '@/lib/luftbild';
 import { FENSTER } from '@/lib/fenster';
 import { useUrlWert } from '@/hooks/use-url-wert';
+import { ObjektLink } from '@/components/ObjektLink';
+import { imBestand } from '@/lib/egrid';
 import { baujahrOder, bauzeit, csv, HEIZUNG_TEXT, KLASSE_TEXT, type LeadGebaeude } from '@/lib/lead-listen';
 
 /**
@@ -111,7 +113,7 @@ export function LeadListen() {
             {liste.data.zeilen.map(g => (
               <li key={g.egid} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 p-4">
                 <span className="min-w-0">
-                  <span className="block font-medium">{g.strasse ?? 'Ohne Adresse'}, {g.plz} {g.ort ?? g.gemeinde}</span>
+                  <ObjektLink egrid={imBestand(g.kanton) ? g.egrid : null} className="block font-medium">{g.strasse ?? 'Ohne Adresse'}, {g.plz} {g.ort ?? g.gemeinde}</ObjektLink>
                   <span className="block text-sm text-muted-foreground">
                     {bauzeit(g)} · {g.klasse ? KLASSE_TEXT[g.klasse] ?? 'Wohngebäude' : 'Wohngebäude'}{g.wohnungen ? ` · ${g.wohnungen} ${g.wohnungen === 1 ? 'Wohnung' : 'Wohnungen'}` : ''} · {g.heizung ? HEIZUNG_TEXT[g.heizung] : ''}
                   </span>

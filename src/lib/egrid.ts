@@ -9,6 +9,10 @@ import { supabase } from '@/integrations/supabase/client';
  * die Objektansicht öffnet sich aber über ?parzelle=<id>. Darum waren sie
  * Inseln. Dieser Auflöser ist die Brücke; ?egrid= in der Adresse nutzt ihn.
  */
+/** Kantone, deren Parzellen Aurora führt; nur dort lohnt ein Sprung ins Objekt. */
+export const KANTONE_IM_BESTAND = ['ZH', 'TG'];
+export const imBestand = (kanton: string | null | undefined) => !!kanton && KANTONE_IM_BESTAND.includes(kanton);
+
 export const EGRID_MUSTER = /^CH[0-9A-Z]{12}$/;
 
 export async function parzelleZuEgrid(egrid: string | null | undefined): Promise<string | null> {
