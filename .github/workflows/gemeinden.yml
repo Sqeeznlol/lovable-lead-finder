@@ -1,0 +1,99 @@
+# =====================================================================
+# Gemeinde-Seiten: Zahlen je Gemeinde für die Check-Seiten
+# =====================================================================
+# Julian, 14. November: "Gemeinde-Seiten für Google ... gut". Je Gemeinde
+# die Baugesuche der letzten 12 Monate (13 Kantone, Tabelle baugesuch),
+# im Kanton Zürich dazu der Gebäudebestand (Tabelle gebaeude). Nur
+# Zählungen, keine Adressen, keine Namen. Das Ergebnis landet als
+# public/gemeinden.json im Zweig akquise; der Bau dort macht daraus je
+# Gemeinde eine Seite (www.was-kann-ich-bauen.ch/gemeinde/<ort>).
+#
+# Nur Deutsch (Julian, 15. November): Gemeinden, deren Baugesuche mehr
+# als zu einem Drittel französisch oder italienisch beschrieben sind,
+# fallen weg; das Tessin ganz.
+# =====================================================================
+name: Gemeinden
+
+on:
+  schedule:
+    - cron: '41 6 * * 1'   # montags, nach dem Baugesuch-Lauf
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  gemeinden:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: akquise
+          path: akquise
+
+      - name: Werkzeuge
+        run: sudo apt-get install -y -qq postgresql-client
+
+      - name: Zahlen je Gemeinde
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
+          psql "$DB" -X -q -v ON_ERROR_STOP=1 -At > /tmp/gemeinden.json <<'SQL'
+          set statement_timeout = '10min';
+          with g as (
+            select kanton, bfs_nr,
+                   mode() within group (order by gemeinde) as name,
+                   count(*) as n365,
+                   count(*) filter (where publiziert_am > current_date - 90) as n90,
+                   count(*) filter (where beschreibung ~* 'neubau') as neubau,
+                   count(*) filter (where beschreibung ~* 'umbau|anbau|aufstock|sanierung|erweiterung') as umbau,
+                   count(*) filter (where beschreibung ~* 'w(ä|ae)rmepumpe') as waermepumpe,
+                   count(*) filter (where beschreibung ~* 'photovoltaik|pv-anlage|solaranlage|solarpanel') as solar,
+                   count(*) filter (where beschreibung ~* 'abbruch') as abbruch,
+                   count(*) filter (where beschreibung ~* '\m(construction|transformation|d(é|e)molition|agrandissement|r(é|e)novation|costruzione|demolizione|ristrutturazione|nuova)\M') as fremd
+            from public.baugesuch
+            where quelle <> 'probe' and publiziert_am > current_date - 365
+              and kanton is not null and kanton <> 'TI' and bfs_nr ~ '^\d+$' and gemeinde is not null
+            group by 1, 2
+          ),
+          h as (
+            select p.bfs_nr, count(*) as n,
+                   count(*) filter (where g.baujahr < 1980) as vor1980,
+                   count(*) filter (where g.heizung_energie in (7520, 7530)) as fossil
+            from public.gebaeude g join public.properties p on p.egrid = g.egrid
+            where g.klasse between 1110 and 1130
+            group by 1
+          )
+          select coalesce(json_agg(json_build_object(
+                   'bfs', g.bfs_nr::int, 'name', g.name, 'kanton', g.kanton, 'n365', g.n365, 'n90', g.n90,
+                   'arten', json_build_object('neubau', g.neubau, 'umbau', g.umbau, 'waermepumpe', g.waermepumpe, 'solar', g.solar, 'abbruch', g.abbruch),
+                   'wohnbauten', case when h.n is null then null else json_build_object('n', h.n, 'vor1980', h.vor1980, 'fossil', h.fossil) end)
+                 order by g.kanton, g.name), '[]'::json)
+          from g left join h on h.bfs_nr = g.bfs_nr and g.kanton = 'ZH'
+          where g.n365 >= 5 and g.fremd * 3 < g.n365;
+          SQL
+          python3 -c "import json;d=json.load(open('/tmp/gemeinden.json'));import collections;print('Gemeinden:',len(d));print(dict(collections.Counter(x['kanton'] for x in d)));print('mit Wohnbauten:',sum(1 for x in d if x['wohnbauten']))" | tee -a "$GITHUB_STEP_SUMMARY"
+          {
+            echo '### Codes der Gebäudeklasse 1110 bis 1130 (gwr_kode)'
+            echo '```'
+            psql "$DB" -X -q -c "select code, text from public.gwr_kode where merkmal = 'GKLAS' and code between 1110 and 1130 order by code;"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: In die Akquise schreiben
+        run: |
+          set -euo pipefail
+          cd akquise
+          python3 -c "import json;json.dump(json.load(open('/tmp/gemeinden.json')),open('public/gemeinden.json','w'),ensure_ascii=False,separators=(',',':'))"
+          if git diff --quiet -- public/gemeinden.json && git ls-files --error-unmatch public/gemeinden.json >/dev/null 2>&1; then
+            echo "Unverändert." >> "$GITHUB_STEP_SUMMARY"; exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/gemeinden.json
+          git commit -q -m "Gemeinde-Seiten: Zahlen je Gemeinde aufgefrischt (Ablauf Gemeinden)"
+          git push -q origin HEAD:akquise
+          echo "Geschrieben und gepusht." >> "$GITHUB_STEP_SUMMARY"
+          cat "$GITHUB_STEP_SUMMARY"
