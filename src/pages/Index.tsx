@@ -224,7 +224,11 @@ export default function Index() {
               {/* min-w-0: ohne darf der Kasten nicht schmaler werden als die
                   Kantone, das Wischen greift nie, und auf dem iPhone lag die
                   Kopfzeile 190 px über dem Rand (gemessen 3. November). */}
-              <div className="ml-auto flex min-w-0 items-center gap-3">
+              {/* Auf dem iPhone gibt der Titel nach, nicht die Knöpfe: seit
+                  dem Symbol der Suche schob ein langer Titel («Mögliche
+                  Arrondierungen») das Konto 10 px über den Rand (Reiter
+                  prüfen, 16. November). */}
+              <div className="ml-auto flex shrink-0 items-center gap-3 lg:min-w-0 lg:shrink">
                 {/* Auf dem iPhone fehlt die Leiste links: die Suche steht hier, von jeder Seite aus erreichbar. */}
                 {active !== 'suche' && (
                   <button type="button" onClick={() => gehe('suche')} aria-label="Suche"
