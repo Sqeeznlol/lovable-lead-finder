@@ -280,7 +280,10 @@ const TRAEGE_MS = 4000;
   for (const z of zeilen) {
     aus.push(`| ${z.geraet} | ${z.reiter} | ${(z.ms / 1000).toFixed(1)} s | ${z.fehler.join('<br>') || '–'}${z.leer ? ' Seite leer' : ''} | ${z.abgelehnt.join(', ') || '–'} | ${(z.langsam || []).map(dauer).join(', ') || '–'} | ${z.breite > 1 ? z.breite + ' px' : '–'} | ${z.merkmale.join(', ') || '–'} |`);
   }
-  for (const z of zeilen.filter(z => z.notiz)) aus.push('', `Machbarkeit an einer Zürcher Parzelle: ${z.notiz}.`);
+  // Jeder Durchgang unter seinem Namen: am 16. November stand das Ergebnis
+  // von CALC YOU LATER unter «Machbarkeit an einer Zürcher Parzelle».
+  const DURCHGANG = { 'objekt und machbarkeit': 'Machbarkeit an einer Zürcher Parzelle', kalkulation: 'CALC YOU LATER an einer Zürcher Adresse' };
+  for (const z of zeilen.filter(z => z.notiz)) aus.push('', `${DURCHGANG[z.reiter] ?? z.reiter}: ${z.notiz}.`);
   // Der Browser war beschäftigt, die Datenbank nicht: zur Einordnung.
   for (const z of zeilen.filter(z => (z.spaet || []).length)) {
     const antworten = z.spaet.map(s => s.antwort).filter(a => a != null);
