@@ -10,9 +10,10 @@ import { supabase } from '@/integrations/supabase/client';
  * Gemeindenummer. Aus zwei Adressen an derselben Strasse lässt sich
  * nicht ableiten, ob die Grundstücke aneinandergrenzen.
  *
- * Gerechnet wird nicht hier, sondern einmal in der Datenbank
- * (`nachbarschaft_rechnen`). ST_Touches über 396'271 Polygone ist
- * nichts für den Klick eines Benutzers; hier wird nur nachgeschlagen.
+ * Gerechnet wird nicht hier, sondern einmal vorab (Ablauf
+ * «Nachbarschaft», auf dem Runner). ST_Touches über eine halbe Million
+ * Polygone ist nichts für den Klick eines Benutzers und nichts für die
+ * Datenbank, die die Seite bedient; hier wird nur nachgeschlagen.
  *
  * Gelesen wird über die Fremdschlüssel-Beziehung statt über die Sicht
  * `nachbarn`: so bleibt es ein Weg in die Datenbank, und die

@@ -65,6 +65,26 @@ Seite acht Commits zurück stehen, und «Was ist live» wurde rot.
   * Bleibt die Seite stehen: nicht weiterpushen. In Vercel bringt
     *Promote to Production* einen gebauten Stand live, ohne Kontingent.
 
+## Die Datenbank bedient die Seite
+
+Die Datenbank ist eine kleine Instanz, und an ihr hängen Anmeldung und
+jede Abfrage der Seite. In der Nacht auf den 16. November rechnete ein
+Ablauf die Nachbarschaft der Zürcher Parzellen darin; von 00:33 bis
+00:59 Uhr scheiterte die Anmeldung, und nach dem Abbruch rechnete die
+Datenbank weiter, ohne dass es jemand sah.
+
+  * Schwere Rechnungen laufen auf dem Runner, nicht in der Datenbank
+    (Muster: Ablauf «Nachbarschaft»). Hinein kommt nur das Ergebnis, in
+    Portionen, mit Pause, und nur solange sie zügig antwortet.
+  * Jede Anweisung trägt eine Frist (`statement_timeout`). Einen Lauf
+    abbrechen beendet nicht, was er in der Datenbank gestartet hat.
+  * Antwortet die Seite träge: Auswerten «last» zeigt, was die
+    Datenbank gerade tut; «Nachbarschaft» mit «aufraeumen» beendet
+    hängende Rechnungen.
+
+Der Test `datenbank-schonen.test.ts` wird rot, wenn eine dieser
+Sicherungen verschwindet.
+
 ## Gestaltung
 
 Wie die Seite aussieht, steht in `DESIGN.md` -- vor jeder Arbeit an der

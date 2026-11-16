@@ -611,32 +611,12 @@ jobs:
             | tee -a "$GITHUB_STEP_SUMMARY"
 
           # ------------------------------------------- Nachbarschaft
-          # Ebenfalls in Stapeln. Die Funktion merkt sich in
-          # properties.nachbarn_stand, was sie schon hatte, und meldet
-          # 0, wenn nichts mehr offen ist.
-          echo "### Nachbarschaft rechnen, in Stapeln" \
+          # Hier wird sie nicht mehr gerechnet. In der Datenbank
+          # (nachbarschaft_rechnen) hat das die Seite in der Nacht auf den
+          # 16. November eine halbe Stunde lang ausgebremst. Das macht der
+          # Ablauf «Nachbarschaft», auf dem Runner statt in der Datenbank.
+          echo "Die Nachbarschaft der neuen Umrisse rechnet der Ablauf «Nachbarschaft» (Schritt schreiben)." \
             | tee -a "$GITHUB_STEP_SUMMARY"
-          parzellen=0
-          paare=0
-          runde=0
-          while :; do
-            zeile=$(psql "$DB" -v ON_ERROR_STOP=1 -X -q -t -A \
-              -c "set statement_timeout = '10min';" \
-              -c "select bearbeitet || '|' || paare
-                    from public.nachbarschaft_rechnen('$KANTON', 2000);")
-            b=${zeile%%|*}
-            pz=${zeile##*|}
-            [ "$b" -gt 0 ] || break
-            if zu_voll; then break; fi
-            parzellen=$(( parzellen + b ))
-            paare=$(( paare + pz ))
-            runde=$(( runde + 1 ))
-            if [ $(( runde % 10 )) -eq 0 ]; then
-              echo "  $parzellen Parzellen, $paare Paare, Datenbank $(groesse)"
-            fi
-          done
-          echo "Parzellen gerechnet: $parzellen" | tee -a "$GITHUB_STEP_SUMMARY"
-          echo "Nachbarschaftspaare: $paare"     | tee -a "$GITHUB_STEP_SUMMARY"
 
           echo "### Nachher" | tee -a "$GITHUB_STEP_SUMMARY"
           echo "Datenbank: $(groesse)" | tee -a "$GITHUB_STEP_SUMMARY"

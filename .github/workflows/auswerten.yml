@@ -64,6 +64,7 @@ on:
           - umrisse      # Wie viele Parzellen je Kanton einen Umriss und einen Punkt haben (nur Zählungen)
           - machbarkeit  # Ob machbarkeit_grundlage für echte Parzellen plausible Flächen liefert (nur Zahlen)
           - besucher     # Ob die Zahlen unter «Leads» stimmen: Besucher je Domain und Tag, Leads gegen Anfragen, Bots (nur Zählungen)
+          - last         # Was die Datenbank gerade belastet: laufende Anweisungen nach Art und Dauer, Aufräumen, Verbindungen (nie der Wortlaut)
       egrid:
         description: 'Nur für "objekt": die EGRID, z.B. CH707709971116'
         required: false
@@ -880,6 +881,55 @@ jobs:
               select count(*) as gebaeude, count(*) filter (where klasse between 1110 and 1130) as wohngebaeude,
                      count(*) filter (where klasse between 1110 and 1130 and heizung_energie in (7520, 7530) and baujahr < 1980) as wohn_fossil_vor1980
               from gebaeude;"
+          elif [ "$FRAGE" = "last" ]; then
+            # Am 16. November antwortete die Seite eine halbe Stunde lang
+            # träge, obwohl kein Lauf mehr lief -- und nichts zeigte, was die
+            # Datenbank noch tat. Diese Abfrage zeigt es: je Art der
+            # Anweisung die Anzahl und die längste Dauer. Vom Wortlaut
+            # erscheint nur das erste Wort (er kann Namen enthalten), beim
+            # Aufräumen der Datenbank die Tabelle.
+            #
+            # Eigener Aufruf statt frage(): gerade unter Last scheitert die
+            # Verbindung, und die Meldung dazu nennt die Adresse.
+            echo "### Last der Datenbank, $(date -u +%H:%M) UTC" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            ok=0
+            for versuch in 1 2 3 4 5; do
+              if PGCONNECT_TIMEOUT=30 psql "$DB" -X -q -c "
+                   set statement_timeout = '30s';
+                   select state as zustand,
+                          case when query ilike '%nachbarschaft_rechnen%' then 'Nachbarschaft (alter Lauf)'
+                               when query ilike '%insert into public.parzelle_punkt%' then 'Punkte (alter Lauf)'
+                               when query ilike '%insert into public.nachbarschaft%' then 'Nachbarschaft einfügen'
+                               when query ilike 'autovacuum:%' then left(query, 70)
+                               when query ilike 'vacuum%' then 'Aufräumen von Hand'
+                               else upper(split_part(ltrim(query), ' ', 1)) end as art,
+                          count(*) as anzahl,
+                          max(extract(epoch from now() - query_start))::int as laengste_s,
+                          max(wait_event_type) as wartet_auf
+                     from pg_stat_activity
+                    where pid <> pg_backend_pid() and state is distinct from 'idle'
+                      and backend_type in ('client backend', 'autovacuum worker')
+                    group by 1, 2 order by 4 desc nulls last;
+                   select count(*) as verbindungen, count(*) filter (where state = 'active') as aktiv,
+                          count(*) filter (where wait_event_type = 'Lock') as warten_auf_sperre
+                     from pg_stat_activity where backend_type = 'client backend';
+                   select relid::regclass as aufraeumen_laeuft, phase,
+                          round(100.0 * heap_blks_scanned / nullif(heap_blks_total, 0)) as prozent_gelesen,
+                          index_vacuum_count as durchgaenge_index
+                     from pg_stat_progress_vacuum;
+                   select relname as tabelle, n_live_tup as zeilen, n_dead_tup as alte_fassungen,
+                          to_char(greatest(last_vacuum, last_autovacuum), 'DD.MM. HH24:MI') as zuletzt_aufgeraeumt
+                     from pg_stat_user_tables
+                    where schemaname = 'public' and relname in ('properties', 'nachbarschaft', 'parzelle_punkt', 'gebaeude');
+                   select (pg_database_size(current_database())/1024/1024)::int as datenbank_mb;" \
+                   >> "$GITHUB_STEP_SUMMARY" 2>/dev/null; then ok=1; break; fi
+              echo "Versuch $versuch: keine Antwort in 30 Sekunden." >> "$GITHUB_STEP_SUMMARY"
+              sleep 20
+            done
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            [ "$ok" = 1 ] || echo "Die Datenbank nahm fünfmal keine Verbindung an oder antwortete nicht." >> "$GITHUB_STEP_SUMMARY"
+
           elif [ "$FRAGE" = "machbarkeit" ]; then
             # Die Funktion hinter der Machbarkeitsstudie, an echten Parzellen: je Kanton
             # 200 bebaute Parzellen mit Umriss. Erwartet: Fläche des Umrisses nahe an der

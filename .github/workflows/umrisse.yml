@@ -23,14 +23,18 @@
 #      in Stücken, mit VACUUM dazwischen: jede Änderung legt eine neue
 #      Fassung der ganzen Zeile an, und ohne Aufräumen wüchse die
 #      Tabelle um jede alte Fassung,
-#   3. setzt je Parzelle einen Punkt (parzelle_punkt), wo keiner steht,
-#   4. rechnet die Nachbarschaft in Stapeln (nachbarschaft_rechnen) --
-#      für alles, was offen ist: im Thurgau war sie erst für 65'993 von
-#      137'209 Parzellen gerechnet (der Lauf vom 31. Oktober brach an
-#      der Platzgrenze ab).
+#   3. setzt je Parzelle einen Punkt (parzelle_punkt), wo keiner steht.
+#
+# Die Nachbarschaft rechnet dieser Ablauf nicht mehr. Bis zum
+# 15. November tat er es in der Datenbank (nachbarschaft_rechnen), und
+# die Seite war deswegen in der Nacht auf den 16. eine halbe Stunde
+# kaum erreichbar. Das macht jetzt der Ablauf «Nachbarschaft», auf dem
+# Runner statt in der Datenbank: nach dem Schreiben neuer Umrisse
+# dort «schreiben» starten.
 #
 # Jeder Schritt nimmt nur, was noch offen ist; ein abgebrochener Lauf
-# wird einfach wiederholt. Vor jedem Stück wird die Grösse gemessen.
+# wird einfach wiederholt. Vor jedem Stück wird die Grösse gemessen,
+# nach jedem ruht die Datenbank so lange, wie das Stück gedauert hat.
 # Ausgegeben werden nur Zahlen.
 # =====================================================================
 
@@ -50,8 +54,7 @@ on:
         type: choice
         options:
           - probe       # Holen und zählen, was sich zuordnen liesse; nichts schreiben
-          - schreiben   # Umrisse schreiben, dann Punkte und Nachbarschaft
-          - nachbarn    # Nur Punkte und Nachbarschaft (nach einem Abbruch)
+          - schreiben   # Umrisse schreiben, dann Punkte
       quelllauf:
         description: 'Nummer eines früheren Laufs, dessen Umrissdatei wiederverwendet wird'
         required: false
@@ -64,6 +67,12 @@ on:
         description: 'Abbrechen, wenn die Datenbank so gross ist (MB)'
         required: false
         default: '4000'
+
+# Nie zwei Läufe zugleich, die in die Datenbank schreiben -- auch nicht
+# zusammen mit «Nachbarschaft».
+concurrency:
+  group: datenbank-laden
+  cancel-in-progress: false
 
 jobs:
   umrisse:
@@ -78,7 +87,7 @@ jobs:
         run: sudo apt-get install -y -qq postgresql-client
 
       - name: Umrisse holen
-        if: ${{ inputs.schritt != 'nachbarn' && inputs.quelllauf == '' }}
+        if: ${{ inputs.quelllauf == '' }}
         env:
           KANTON: ${{ inputs.kanton }}
           SEITEN: ${{ inputs.seiten }}
@@ -94,7 +103,7 @@ jobs:
           ls -lh /tmp/umrisse.csv
 
       - name: Umrisse aus früherem Lauf holen
-        if: ${{ inputs.schritt != 'nachbarn' && inputs.quelllauf != '' }}
+        if: ${{ inputs.quelllauf != '' }}
         uses: actions/download-artifact@v4
         with:
           name: umrisse-${{ inputs.kanton }}
@@ -105,7 +114,7 @@ jobs:
 
       # Bricht das Schreiben ab, muss nicht noch einmal geholt werden.
       - name: Umrissdatei aufbewahren
-        if: ${{ inputs.schritt != 'nachbarn' && inputs.quelllauf == '' }}
+        if: ${{ inputs.quelllauf == '' }}
         uses: actions/upload-artifact@v4
         with:
           name: umrisse-${{ inputs.kanton }}
@@ -114,7 +123,6 @@ jobs:
           compression-level: 6
 
       - name: Abgleichen
-        if: ${{ inputs.schritt != 'nachbarn' }}
         env:
           DB: ${{ secrets.SUPABASE_DB_URL }}
           KANTON: ${{ inputs.kanton }}
@@ -173,8 +181,9 @@ jobs:
             fi
             # ST_MakeValid: ein sich selbst schneidender Umriss liesse später
             # ST_Touches scheitern. Übrig bleiben nur Flächen (Art 3).
+            t0=$(date +%s)
             n=$(psql "$DB" -v ON_ERROR_STOP=1 -X -q -t -A \
-              -c "set statement_timeout = '10min';" \
+              -c "set statement_timeout = '3min';" \
               -c "create temp table eingang (wkt text, egrid text);" \
               -c "\copy eingang(wkt, egrid) from '$f' with (format csv)" \
               -c "
@@ -194,33 +203,36 @@ jobs:
                 )
                 select count(*) from gesetzt;")
             gesamt=$(( gesamt + n ))
+            # Die Datenbank bedient die Seite: nach jedem Stück ruht sie
+            # mindestens so lange, wie das Stück gedauert hat.
+            dauer=$(( $(date +%s) - t0 )); [ "$dauer" -lt 2 ] && dauer=2
+            sleep "$dauer"
             if [ $(( nummer % 10 )) -eq 0 ]; then
-              psql "$DB" -X -q -c "vacuum public.properties;"
+              # Gedrosselt wie das Aufräumen der Datenbank selbst.
+              psql "$DB" -X -q -c "set vacuum_cost_delay = '2ms';" -c "vacuum public.properties;"
               echo "  Stück $nummer/$stuecke -- $gesamt geschrieben, Datenbank $(megabyte) MB"
             fi
           done
-          psql "$DB" -X -q -c "vacuum analyze public.properties;"
+          psql "$DB" -X -q -c "set vacuum_cost_delay = '2ms';" -c "vacuum analyze public.properties;"
           echo "Geschrieben: $gesamt" | tee -a "$GITHUB_STEP_SUMMARY"
           echo "Datenbank nach den Umrissen: $(megabyte) MB" | tee -a "$GITHUB_STEP_SUMMARY"
           [ "$abbruch" -eq 0 ] || exit 1
 
-      - name: Punkte und Nachbarschaft
-        if: ${{ inputs.schritt == 'schreiben' || inputs.schritt == 'nachbarn' }}
+      - name: Punkte
+        if: ${{ inputs.schritt == 'schreiben' }}
         env:
           DB: ${{ secrets.SUPABASE_DB_URL }}
-          GRENZE_MB: ${{ inputs.grenze_mb }}
         run: |
           set -euo pipefail
           [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
-          GRENZE_MB=${GRENZE_MB:-4000}
-          megabyte() { psql "$DB" -X -q -t -A -c "select (pg_database_size(current_database())/1024/1024)::int;"; }
 
           # Ein Punkt je Parzelle, sicher innerhalb des Umrisses (die Mitte
           # eines L-förmigen Grundstücks läge sonst beim Nachbarn).
           echo "### Punkte" | tee -a "$GITHUB_STEP_SUMMARY"
           while :; do
+            t0=$(date +%s)
             n=$(psql "$DB" -v ON_ERROR_STOP=1 -X -q -t -A \
-              -c "set statement_timeout = '10min';" \
+              -c "set statement_timeout = '3min';" \
               -c "with neu as (
                     insert into public.parzelle_punkt (parzelle_id, e, n, quelle)
                     select p.id, round(ST_X(pt)::numeric, 1), round(ST_Y(pt)::numeric, 1), 'umriss'
@@ -228,73 +240,18 @@ jobs:
                               from public.properties p
                              where geometrie is not null
                                and not exists (select 1 from public.parzelle_punkt pp where pp.parzelle_id = p.id)
-                             limit 20000) p
+                             limit 5000) p
                     on conflict (parzelle_id) do nothing
                     returning 1)
                   select count(*) from neu;")
             [ "$n" -gt 0 ] || break
             echo "  $n Punkte gesetzt"
+            dauer=$(( $(date +%s) - t0 )); [ "$dauer" -lt 2 ] && dauer=2
+            sleep "$dauer"
           done
+          psql "$DB" -X -q -c "set vacuum_cost_delay = '2ms';" -c "vacuum analyze public.parzelle_punkt;"
           psql "$DB" -X -q -c "select count(*) as punkte from public.parzelle_punkt;" | tee -a "$GITHUB_STEP_SUMMARY"
-
-          # Ein Stapel, der in die Frist läuft, beendet den Lauf nicht mehr:
-          # am 15. November stand er nach 120'000 Parzellen, weil ein einziger
-          # Stapel länger als 15 Minuten brauchte und die Datenbank kurz
-          # darauf keine Verbindung mehr annahm. Jetzt wird der Stapel
-          # halbiert und nach einer Pause wiederholt; nach einem Erfolg
-          # wächst er wieder. Scheitert selbst eine einzelne Parzelle
-          # dreimal, wird sie übersprungen (nachbarn_stand = 1970) und am
-          # Schluss gezählt, statt alle folgenden aufzuhalten.
-          #
-          # Vom Fehler erscheint nur die Art, nie der Wortlaut: er kann die
-          # Adresse der Datenbank enthalten.
-          echo "### Nachbarschaft, in Stapeln" | tee -a "$GITHUB_STEP_SUMMARY"
-          parzellen=0; paare=0; runde=0; menge=1000; fehl=0; uebersprungen=0
-          while :; do
-            mb=$(megabyte 2>/dev/null || echo 0)
-            if [ "${mb:-0}" -ge "$GRENZE_MB" ]; then
-              echo "ABBRUCH: Datenbank bei ${mb} MB, Grenze ${GRENZE_MB} MB. Der nächste Lauf macht weiter." | tee -a "$GITHUB_STEP_SUMMARY"
-              break
-            fi
-            if zeile=$(psql "$DB" -v ON_ERROR_STOP=1 -X -q -t -A \
-                 -c "set statement_timeout = '10min';" \
-                 -c "select bearbeitet || '|' || paare from public.nachbarschaft_rechnen(null, $menge);" 2>/tmp/nb.err); then
-              fehl=0
-              b=${zeile%%|*}; pz=${zeile##*|}
-              [ "$b" -gt 0 ] || break
-              parzellen=$(( parzellen + b )); paare=$(( paare + pz )); runde=$(( runde + 1 ))
-              [ "$menge" -lt 1000 ] && menge=$(( menge * 2 ))
-              if [ $(( runde % 20 )) -eq 0 ]; then
-                # nachbarn_stand ändert jede Zeile noch einmal: aufräumen.
-                psql "$DB" -X -q -c "vacuum public.properties;" 2>/dev/null || true
-                echo "  $parzellen Parzellen, $paare Paare, Datenbank ${mb} MB"
-              fi
-            else
-              fehl=$(( fehl + 1 ))
-              art=Fehler
-              grep -q 'statement timeout' /tmp/nb.err && art=Zeitüberschreitung
-              grep -qi 'connection\|ECHECKOUTTIMEOUT' /tmp/nb.err && art='keine Verbindung'
-              echo "  Stapel zu $menge gescheitert: $art (Versuch $fehl)"
-              if [ "$art" = 'keine Verbindung' ]; then
-                # Nicht der Stapel ist zu gross, die Datenbank ist weg: warten.
-                [ "$fehl" -lt 10 ] || { echo "ABBRUCH: zehnmal keine Verbindung. Der nächste Lauf macht weiter." | tee -a "$GITHUB_STEP_SUMMARY"; exit 1; }
-                sleep 30
-              elif [ "$menge" -gt 1 ]; then
-                menge=$(( menge / 2 )); fehl=0
-              elif [ "$fehl" -ge 3 ]; then
-                n=$(psql "$DB" -X -q -t -A -c "with eine as (select id from public.properties where geometrie is not null and nachbarn_stand is null limit 1)
-                      update public.properties p set nachbarn_stand = 'epoch' from eine where p.id = eine.id returning 1;" 2>/dev/null | wc -l)
-                uebersprungen=$(( uebersprungen + n )); fehl=0
-                echo "  eine Parzelle übersprungen (insgesamt $uebersprungen)"
-                [ "$n" -gt 0 ] || { echo "ABBRUCH: die Datenbank antwortet nicht. Der nächste Lauf macht weiter." | tee -a "$GITHUB_STEP_SUMMARY"; exit 1; }
-              fi
-              sleep 30
-            fi
-          done
-          # Mit VACUUM, nicht nur ANALYZE: erst dann zählt die Datenbank über
-          # den Index statt über die Tabelle (daten_stand, Reiter Auswertung).
-          psql "$DB" -X -q -c "vacuum analyze public.properties;" -c "vacuum analyze public.nachbarschaft;" -c "vacuum analyze public.parzelle_punkt;"
-          echo "Parzellen gerechnet: $parzellen, Paare: $paare, übersprungen: $uebersprungen" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Die Nachbarschaft der neuen Umrisse rechnet der Ablauf «Nachbarschaft» (Schritt schreiben)." | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Stand
         if: always()

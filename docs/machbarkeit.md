@@ -140,3 +140,5 @@ einen Kundenbericht. Bis dahin ist sie ein Arbeitsmittel für uns.
   «Preise»
 - Umrisse: Ablauf «Umrisse laden» (`.github/workflows/umrisse.yml`),
   für jeden der 21 Kantone, die geodienste.ch freigibt
+- Nachbarschaft: Ablauf «Nachbarschaft»
+  (`.github/workflows/nachbarschaft.yml`), gerechnet auf dem Runner
