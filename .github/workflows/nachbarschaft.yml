@@ -41,6 +41,12 @@
 # Datenbank der Seite) und startet jede Nacht neu, solange etwas offen
 # ist. Neue Umrisse werden so in der folgenden Nacht mitgerechnet.
 #
+# Der erste Versuch, in der Nacht auf den 16. November, schrieb nichts:
+# die Instanz hatte ihr Guthaben für die Platte aufgebraucht (siehe
+# CLAUDE.md, «Die Datenbank bedient die Seite») und antwortete auch im
+# Leerlauf erst nach vielen Sekunden. Der Lauf wartete, wie vorgesehen,
+# statt nachzulegen.
+#
 # Jede Anweisung trägt eine Frist, die die Datenbank selbst durchsetzt.
 # Ein abgebrochener Lauf kann darum nichts zurücklassen, das länger als
 # eine Minute weiterrechnet. Der Schritt «aufraeumen» beendet, was von
@@ -70,7 +76,7 @@ on:
       bis:
         description: 'Uhrzeit (UTC, HH:MM), zu der das Einspielen von selbst aufhört'
         required: false
-        default: '04:30'
+        default: '03:30'
       pause:
         description: 'Sekunden Ruhe nach jeder Portion, mindestens'
         required: false
@@ -331,7 +337,9 @@ jobs:
         run: |
           set -uo pipefail
           case "${PAUSE:-}" in ''|*[!0-9]*) PAUSE=4 ;; esac
-          case "${BIS:-}" in [0-2][0-9]:[0-5][0-9]) ;; *) BIS=04:30 ;; esac
+          # 03:30 UTC ist in der Schweiz halb fünf oder halb sechs: danach hat
+          # die Datenbank bis zum Morgen Zeit, ihr Guthaben wieder zu füllen.
+          case "${BIS:-}" in [0-2][0-9]:[0-5][0-9]) ;; *) BIS=03:30 ;; esac
           # Feierabend: die nächste Uhrzeit BIS, heute oder morgen.
           ende=$(date -u -d "today $BIS" +%s)
           [ "$ende" -gt "$(date +%s)" ] || ende=$(date -u -d "tomorrow $BIS" +%s)

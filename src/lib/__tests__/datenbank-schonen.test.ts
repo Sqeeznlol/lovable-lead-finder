@@ -79,6 +79,17 @@ describe('Die Datenbank bedient die Seite', () => {
     expect(t).toContain("set statement_timeout = '30s'");
   });
 
+  // Mit leerem Guthaben brachte jeder Lauf von «Reiter prüfen» die Seite
+  // für Minuten zum Stehen. Er misst darum zuerst, ob die Datenbank
+  // zügig antwortet, und klickt sonst nicht durch.
+  it('Reiter prüfen klickt eine träge Datenbank nicht durch', () => {
+    const t = readFileSync('tools/reiter-pruefen.cjs', 'utf8');
+    const haupt = t.slice(t.lastIndexOf('(async () => {'));
+    expect(haupt.indexOf('await puls()')).toBeGreaterThan(-1);
+    expect(haupt.indexOf('await puls()')).toBeLessThan(haupt.indexOf('chromium.launch('));
+    expect(haupt).toMatch(/ms >= TRAEGE_MS\) \{[\s\S]*?process\.exit\(1\)/);
+  });
+
   it('Fehlermeldungen der Datenbank erscheinen in «Nachbarschaft» nie im Protokoll', () => {
     const t = ohneKommentare(lesen('nachbarschaft.yml'));
     const aufrufe = t.split('psql "$DB"').slice(1).map(a => a.split(/psql "\$LOKAL"|\n\s*\n/)[0]);

@@ -67,24 +67,40 @@ Seite acht Commits zurück stehen, und «Was ist live» wurde rot.
 
 ## Die Datenbank bedient die Seite
 
-Die Datenbank ist eine kleine Instanz, und an ihr hängen Anmeldung und
-jede Abfrage der Seite. In der Nacht auf den 16. November rechnete ein
-Ablauf die Nachbarschaft der Zürcher Parzellen darin; von 00:33 bis
-00:59 Uhr scheiterte die Anmeldung, und nach dem Abbruch rechnete die
-Datenbank weiter, ohne dass es jemand sah.
+Die Datenbank läuft auf der kleinsten bezahlten Instanz von Supabase
+(«Micro»: 1 GB Arbeitsspeicher, dauerhaft 11 MB/s und 500 Zugriffe je
+Sekunde auf die Platte; mehr nur aus einem Guthaben, das sich im
+Leerlauf füllt). Die Datenbank selbst ist seit den Zürcher Umrissen
+1.5 GB gross, passt also nicht in den Speicher. An ihr hängen Anmeldung
+und jede Abfrage der Seite.
+
+In der Nacht auf den 16. November rechnete ein Ablauf die Nachbarschaft
+der Zürcher Parzellen darin. Von 00:33 bis 00:59 Uhr scheiterte die
+Anmeldung. Danach war das Guthaben aufgebraucht: um 02:14 Uhr lief in
+der Datenbank keine einzige Anweisung, und trotzdem brauchte eine
+Statistik-Abfrage über 30 Sekunden. In diesem Zustand bringt schon ein
+Messlauf («Reiter prüfen», «Tempo») die Seite wieder zum Stehen.
 
   * Schwere Rechnungen laufen auf dem Runner, nicht in der Datenbank
     (Muster: Ablauf «Nachbarschaft»). Hinein kommt nur das Ergebnis, in
-    Portionen, mit Pause, und nur solange sie zügig antwortet.
+    Portionen, mit Pause, nachts, und nur solange sie zügig antwortet.
   * Jede Anweisung trägt eine Frist (`statement_timeout`). Einen Lauf
     abbrechen beendet nicht, was er in der Datenbank gestartet hat.
   * Die Seite zählt keine grosse Tabelle beim Öffnen. Solche Zahlen
     zählt der Ablauf «Zählen» vorab (jede Nacht und nach dem Laden);
     die Seite liest sie über `daten_stand` (`src/lib/daten-stand.ts`).
+  * Messläufe kosten vom selben Guthaben. Nach einem schweren Lauf
+    keinen hinterherschicken, sondern warten; und sie messen nur, was
+    die Seite heute fragt.
   * Antwortet die Seite träge: Auswerten «last» zeigt, was die
-    Datenbank gerade tut; «Nachbarschaft» mit «aufraeumen» beendet
-    hängende Rechnungen. «Reiter prüfen» nennt je Reiter die Abfragen,
-    die länger als drei Sekunden brauchen.
+    Datenbank gerade tut. Läuft nichts und sie ist trotzdem träge, ist
+    das Guthaben leer (in Supabase: Project Settings → Infrastructure
+    → Disk IO balance) -- dann hilft nur Ruhe. «Nachbarschaft» mit
+    «aufraeumen» beendet hängende Rechnungen. «Reiter prüfen» nennt je
+    Reiter die Abfragen, die länger als drei Sekunden brauchen.
+
+Die nächste Grösse («Small», 2 GB, doppelte Plattenleistung) kostet
+rund 5 Dollar im Monat mehr; das entscheidet Julian.
 
 Der Test `datenbank-schonen.test.ts` wird rot, wenn eine dieser
 Sicherungen verschwindet.

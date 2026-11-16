@@ -171,8 +171,45 @@ async function pruefen(browser, geraet, zeilen) {
   await ctx.close();
 }
 
+/**
+ * Antwortet die Datenbank überhaupt zügig? Gemessen wird an zwei
+ * kleinen Anfragen, ohne Anmeldung. Die Adresse steht in .env (sie ist
+ * öffentlich, die Seite trägt sie im Bündel).
+ *
+ * Warum vor dem Durchklicken: am 16. November war das Guthaben der
+ * Instanz aufgebraucht, und jeder Lauf dieses Tests brachte die Seite
+ * für Minuten zum Stehen. Ein Test, der eine träge Datenbank noch
+ * 29 Ansichten laden lässt, macht den Befund schlimmer, den er meldet.
+ */
+async function puls() {
+  let env = '';
+  try { env = fs.readFileSync('.env', 'utf8'); } catch { return null; }
+  const wert = n => (env.match(new RegExp(`^${n}="?([^"\\n]+)"?`, 'm')) || [])[1];
+  const url = wert('VITE_SUPABASE_URL'), key = wert('VITE_SUPABASE_PUBLISHABLE_KEY');
+  if (!url || !key) return null;
+  let laengste = 0;
+  for (const pfad of ['/auth/v1/health', '/rest/v1/gwr_kode?select=code&limit=1']) {
+    const start = Date.now();
+    try { await fetch(url + pfad, { headers: { apikey: key }, signal: AbortSignal.timeout(12000) }); } catch { return 12000; }
+    laengste = Math.max(laengste, Date.now() - start);
+  }
+  return laengste;
+}
+const TRAEGE_MS = 4000;
+
 (async () => {
   if (!ATTRAPPE && !process.env.KONTO_AUI) { console.error('Secret KONTO_AUI fehlt.'); process.exit(1); }
+  if (!ATTRAPPE) {
+    let ms = await puls();
+    if (ms != null && ms >= TRAEGE_MS) { await new Promise(r => setTimeout(r, 30000)); ms = await puls(); }
+    if (ms != null && ms >= TRAEGE_MS) {
+      const text = `### Reiter von Aurora (${ADRESSE})\n\n**Die Datenbank antwortet träge: ${(ms / 1000).toFixed(1)} s auf die kleinste Anfrage, zweimal gemessen.** ` +
+        'Durchgeklickt wird nicht, um sie nicht weiter zu belasten. Auswerten «last» zeigt, was sie gerade tut.';
+      console.log(text);
+      if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, text + '\n');
+      process.exit(1);
+    }
+  }
   const browser = await chromium.launch(process.env.CHROMIUM ? { executablePath: process.env.CHROMIUM } : {});
   const zeilen = [];
   for (const g of GERAETE) await pruefen(browser, g, zeilen);

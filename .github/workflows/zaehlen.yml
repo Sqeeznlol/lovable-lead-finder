@@ -18,8 +18,8 @@ name: Zählen
 
 on:
   schedule:
-    # 04:47 UTC: nach dem nächtlichen Lauf der Nachbarschaft (der bis 04:30 einspielt), vor dem Morgen.
-    - cron: '47 4 * * *'
+    # 03:47 UTC: nach dem nächtlichen Lauf der Nachbarschaft (der bis 03:30 einspielt), lange vor dem Morgen.
+    - cron: '47 3 * * *'
   workflow_dispatch:
 
 jobs:
