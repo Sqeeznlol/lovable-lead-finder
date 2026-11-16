@@ -9,6 +9,36 @@ Was hier steht, ist recherchiert (Quellen am Ende) oder ausdrücklich als
 Annahme markiert. Klickpreise für Schweizer Verkäufer-Keywords gibt es
 öffentlich nicht -- die liefert erst der Keyword-Planer und der Test.
 
+**Stand 16. November: es gibt Suchzahlen.** Der Kampagnenplan mit den
+Wörtern je Seite, Anzeigentexten, Budget und der Gesamtanalyse der
+Kanäle liegt als PDF in `docs/kampagnenplan/Kampagnenplan-Check-Seiten.pdf`
+(Julian: «ADS Kampagnen Plan wo schalten auf welche Wörter pro Seite»).
+Die Zahlen stehen in `docs/kampagnenplan/volumen.tsv`: Google Ads über
+DataForSEO, Schweiz, Deutsch, 377 Wörter, Mittel der letzten zwölf
+Monate, gegen die Rohantwort geprüft. Was sich gegenüber diesem Plan
+ändert:
+
+- **Google bekommt rund 30 % statt 20 %**, aber nur auf sieben Themen,
+  je eine Domain: Zone (zonen-check.ch), Ausnützung
+  (ausnuetzung-check.ch), Parzelle (parzellenchecker.ch), Bauen
+  (was-kann-ich-bauen.ch), Ausbau (aufstockungscheck.ch), Erbe
+  (erbliegenschaft.ch), Steuer (hauschecker.ch, Ratgeber fehlt noch).
+  Zusammen 23'410 Suchen im Monat; für 94 % davon kostet ein Platz oben
+  höchstens CHF 3, bei 41 % bietet niemand.
+- **Bewertung und Verkauf bleiben draussen**, jetzt mit Zahl:
+  «immobilienbewertung» kostet oben CHF 7 bis 19, «haus verkaufen» bis
+  CHF 11.
+- **Die Namen der Domains sucht niemand** («was darf ich bauen»: 10
+  Suchen im Monat). Gesucht wird nach Zonenplan, Ziffern, Kataster,
+  Erbengemeinschaft und Grundstückgewinnsteuer.
+- **Nie zwei eigene Seiten auf dieselbe Suche**: Google wertet das als
+  unfairen Vorteil (support.google.com/adspolicy/answer/15936768,
+  gelesen am 16. November). Die übrigen sechzehn Domains arbeiten bei
+  Facebook als Vergleich von Name und Gestaltung und als kurze Adresse
+  in Inseraten.
+
+Abschnitt 4 unten (Google) ist damit überholt; es gilt das PDF.
+
 ## 0. Entscheid vom 7. November (Tim)
 
 Tim: Google ist umkämpft, Facebook ist bei Rentnern stark, und dort
