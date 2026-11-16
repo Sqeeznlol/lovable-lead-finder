@@ -176,7 +176,7 @@ export function Ladebild({ daten, farbe, onFertig }: { daten: LadebildDaten; far
       if (blPunkt) setze(schildRef.baulinie.current, proj(blPunkt, 0), blZug > 0.5); else schildRef.baulinie.current?.classList.remove('da');
       if (eigene.length) setze(schildRef.haus.current, proj(mitte(eigene[0].r), hausHoehe + 1.5), ms > Z.haus + d.geschosse * Z.geschoss && !!d.schilder.haus);
       const i = SAETZE.filter(x => ms >= x[0]).length - 1;
-      const s = ms >= fertigUm - 600 ? 'Auswertung steht' : SAETZE[i][1];
+      const s = ms >= fertigUm - 600 ? 'Auswertung ist bereit' : SAETZE[i][1];
       if (s !== letzterSatz && satzRef.current) {
         letzterSatz = s; const el = satzRef.current; el.classList.add('weg');
         window.setTimeout(() => { el.textContent = s; el.classList.remove('weg'); }, 200);

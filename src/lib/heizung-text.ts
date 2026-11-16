@@ -10,6 +10,6 @@ export const HEIZUNG_TEXT = {
     'Welche Förderbeiträge es an Ihrer Adresse gibt',
     'Eine Einschätzung der Kosten, persönlich geprüft',
   ],
-  aufruf: 'Wissen, woran Sie sind, bevor die alte Heizung aussteigt.',
+  aufruf: 'Wissen, woran Sie sind, bevor die alte Heizung ausfällt.',
 };
 

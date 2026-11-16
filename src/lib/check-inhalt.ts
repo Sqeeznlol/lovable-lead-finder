@@ -16,6 +16,6 @@ export const FRAGEN: [string, string][] = [
   ['Woher stammen die Daten?', 'Aus den amtlichen Registern: Parzellen aus der amtlichen Vermessung von Bund und Kantonen, Bauzonen aus den Bauzonen Schweiz des Bundesamts für Raumentwicklung, Gebäude aus dem Gebäude- und Wohnungsregister des Bundesamts für Statistik.'],
   ['Wie genau ist der Rechner?', 'Er rechnet mit der Ausnützung, die Sie einstellen, und mit Grundfläche und Geschossen der Gebäude laut Register. Das ergibt einen Richtwert. Welche Ausnützung in Ihrer Gemeinde gilt und was davon nutzbar ist, prüfen unsere Fachleute in der Analyse.'],
   ['Wer steckt dahinter?', `${BETREIBER}. Wir begleiten Eigentümer bei Verkauf und Entwicklung von Liegenschaften und kaufen auch selbst. Die vollständigen Angaben finden Sie im Impressum.`],
-  ['Muss ich verkaufen?', 'Nein. Die Analyse verpflichtet Sie zu nichts. Viele Eigentümer möchten einfach wissen, was ihr Grundstück kann.'],
+  ['Muss ich verkaufen?', 'Nein. Die Analyse verpflichtet Sie zu nichts. Viele Eigentümer möchten einfach wissen, was auf ihrem Grundstück möglich ist.'],
   ['Was passiert mit meinen Angaben?', 'Wir verwenden sie für Ihre Berechnung und Analyse und um Sie zu Ihrer Liegenschaft zu kontaktieren. An Dritte geben wir sie nicht weiter. Sie können Ihre Einwilligung jederzeit widerrufen.'],
 ];

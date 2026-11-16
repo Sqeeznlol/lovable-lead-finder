@@ -85,7 +85,7 @@ export const ARTIKEL: Artikel[] = [
         ],
       },
       {
-        titel: 'Der erste Schritt: wissen, was Ihr Grundstück kann',
+        titel: 'Der erste Schritt: wissen, was auf Ihrem Grundstück möglich ist',
         absaetze: [
           'Welcher Weg passt, hängt vom Grundstück ab: wie gross es ist, in welcher Zone es liegt und wie viel darauf schon steht. Diese Angaben stehen in den amtlichen Registern von Bund und Kantonen. Für Ihre Adresse sehen Sie sie mit unserem Check in einer Minute, kostenlos.',
         ],
@@ -257,7 +257,7 @@ export const ARTIKEL: Artikel[] = [
         ],
       },
       {
-        titel: 'Der erste Schritt: wissen, was das Grundstück erlaubt',
+        titel: 'Der erste Schritt: wissen, was auf dem Grundstück erlaubt ist',
         absaetze: [
           'Ob noch Fläche frei ist, lässt sich mit den amtlichen Daten grob abschätzen: Grundstücksfläche, Bauzone und die Gebäude laut Register. Für Ihre Adresse sehen Sie das mit unserem Check in einer Minute, kostenlos. Die verbindliche Antwort gibt die Baubehörde Ihrer Gemeinde.',
         ],

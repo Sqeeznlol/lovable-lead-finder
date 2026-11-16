@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { MARKEN, markeFuerHost } from '@/lib/check-marken';
+import { readFileSync } from 'node:fs';
+import { BETREIBER_ADRESSE, MARKEN, markeFuerHost } from '@/lib/check-marken';
+import { FRAGEN, SCHRITTE } from '@/lib/check-inhalt';
+import { HEIZUNG_TEXT } from '@/lib/heizung-text';
+import { ARTIKEL } from '@/lib/ratgeber';
 import { haeuserAus, herkunft, leadAngaben, mailOk, nameOk, prioritaet, schweizerNummer, ueberbauung } from '@/lib/check-daten';
 
 describe('Marken der Check-Seiten', () => {
@@ -13,6 +17,45 @@ describe('Marken der Check-Seiten', () => {
   it('jede Domain gehört zu genau einer Marke', () => {
     const alle = MARKEN.flatMap(m => m.domains);
     expect(new Set(alle).size).toBe(alle.length);
+  });
+});
+
+// Julian, 16. November: «Was Ihre Parzelle TRÄGT» macht wenig Sinn. Ein
+// Grundstück trägt, kann, erlaubt und gibt nichts her -- darauf wird
+// gebaut, und was erlaubt ist, sagt die Gemeinde. Ein Haus dagegen
+// trägt ein Geschoss mehr oder nicht (Ratgeber Aufstocken).
+describe('Wortlaut der Check-Seiten', () => {
+  const texte = [
+    ...MARKEN.flatMap(m => [m.titel, m.satz, m.aufruf, m.etikett, ...m.vorteile]),
+    ...SCHRITTE.flat(), ...FRAGEN.flat(),
+    HEIZUNG_TEXT.titel, HEIZUNG_TEXT.satz, HEIZUNG_TEXT.aufruf, ...HEIZUNG_TEXT.vorteile,
+    ...ARTIKEL.flatMap(a => [a.titel, a.lead, a.kasten.titel, a.kasten.satz, a.kasten.knopf, ...a.abschnitte.flatMap(x => [x.titel, ...x.absaetze])]),
+  ];
+  it('kein Grundstück und keine Parzelle, die etwas trägt, kann, erlaubt oder hergibt', () => {
+    // Nur wo Grundstück oder Parzelle selbst handeln (Nominativ): «was die Zone auf Ihrem Land erlaubt» ist richtig.
+    const schief = /\b((Ihre|ihre|die|meine|eine) (Parzelle|Liegenschaft)|(Ihr|ihr|das|mein|ein) (Grundstück|Land))\b[^.?!:,]{0,40}\b(trägt|hergibt|kann|erlaubt)\b/;
+    expect(schief.test('Sehen Sie, wie viel Ihre Parzelle heute trägt.')).toBe(true);
+    expect(schief.test('wissen, was Ihr Grundstück kann')).toBe(true);
+    expect(schief.test('wissen, was das Grundstück erlaubt')).toBe(true);
+    expect(schief.test('was Ihr Grundstück laut den amtlichen Daten hergibt')).toBe(true);
+    expect(texte.filter(s => schief.test(s))).toEqual([]);
+  });
+  it('kein Gedankenstrich und kein scharfes S', () => {
+    expect(texte.filter(s => /[–—ß]/.test(s))).toEqual([]);
+  });
+});
+
+describe('Impressum', () => {
+  const seite = readFileSync('src/pages/Check.tsx', 'utf8');
+  it('nennt die Postadresse des Betreibers', () => {
+    expect(BETREIBER_ADRESSE).toEqual(['c/o PROJECTA SERVICES GMBH', 'Sihleggstrasse 23', '8832 Wollerau']);
+    const impressum = seite.slice(seite.indexOf("recht === 'impressum'\n"), seite.indexOf('Wir speichern die Angaben'));
+    expect(impressum).toContain('BETREIBER_ADRESSE.map(');
+    expect(seite).not.toContain('werden hier ergänzt');
+  });
+  it('ist auch vom Ratgeber aus erreichbar', () => {
+    expect(readFileSync('src/pages/Ratgeber.tsx', 'utf8')).toContain('<a href={impressum}>Impressum</a>');
+    expect(seite).toContain("window.location.hash === '#impressum' ? 'impressum'");
   });
 });
 

@@ -255,7 +255,10 @@ Gebaut:
 Fehlt noch:
 
 1. Domains kaufen und bei Vercel dem Projekt hinzufügen (Julian).
-2. Impressum- und Datenschutzangaben: Firmenname, Adresse, UID (Julian).
+2. Impressum- und Datenschutzangaben: die Postadresse steht seit dem
+   16. November (c/o PROJECTA SERVICES GMBH, Sihleggstrasse 23, 8832
+   Wollerau). Es fehlen E-Mail und UID, im Datenschutz die
+   Auftragsbearbeiter mit Ländern (Julian).
 3. Eine Telefonnummer für "Lieber anrufen?" -- viele Ältere rufen lieber
    an, als ein Formular auszufüllen (Julian).
 4. Benachrichtigung bei heissem Lead aufs Telefon -- braucht einen

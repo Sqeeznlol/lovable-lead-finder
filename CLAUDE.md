@@ -68,6 +68,16 @@ Handy-Fassung. Gebaut wird mit `<Seite>` aus `src/components/rahmen.tsx`.
   * Formulare kinderleicht: eine Frage je Bild, ein Tipp führt weiter.
   * Testdaten immer gekennzeichnet (Name TEST, Quelle test) und
     ausblendbar.
+  * Die Check-Seiten bleiben in Gebrauch (16. November: Wortlaut,
+    Impressum, Kampagnenplan). «Akquise und Pipedrive brauche ich nicht
+    mehr» (15. November) meint Eigentümerabfrage, Nummern und Pipedrive,
+    nicht die Check-Seiten.
+  * Wortlaut der Check-Seiten (16. November: «Was Ihre Parzelle TRÄGT
+    macht wenig Sinn»): schreiben, wie ein Eigentümer redet. Ein
+    Grundstück trägt, kann, erlaubt und gibt nichts her -- darauf wird
+    gebaut, und was erlaubt ist, sagt die Gemeinde. «Baureserve» statt
+    «Reserve», wo das Wort allein steht. Der Test `check.test.ts`
+    (Wortlaut der Check-Seiten) wird rot, wenn so ein Satz zurückkommt.
 
 ## Sprache
 

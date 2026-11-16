@@ -9,7 +9,7 @@ import type L from 'leaflet';
 import './check.css';
 import { datenbank } from '@/lib/datenbank';
 import { lv95NachWgs84 } from '@/lib/koordinaten';
-import { BETREIBER, markeFuerHost, markeNachId, STANDARD_MARKE, type Marke } from '@/lib/check-marken';
+import { BETREIBER, BETREIBER_ADRESSE, markeFuerHost, markeNachId, STANDARD_MARKE, type Marke } from '@/lib/check-marken';
 import { KATASTER } from '@/lib/check-hintergrund';
 import { useImBild } from '@/lib/im-bild';
 import { zaehlen } from '@/lib/check-zaehlen';
@@ -91,8 +91,8 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
   const [fehler, setFehler] = useState<string | null>(null);
   const [luftbild, setLuftbild] = useState(true);
   const [az, setAz] = useState(0.6);
-  // Der Ratgeber verlinkt mit #datenschutz direkt auf den Text.
-  const [recht, setRecht] = useState<'impressum' | 'datenschutz' | null>(() => window.location.hash === '#datenschutz' ? 'datenschutz' : null);
+  // Der Ratgeber verlinkt mit #datenschutz und #impressum direkt auf den Text.
+  const [recht, setRecht] = useState<'impressum' | 'datenschutz' | null>(() => window.location.hash === '#datenschutz' ? 'datenschutz' : window.location.hash === '#impressum' ? 'impressum' : null);
   // Ladebild: Gebäude rundum und Rechtslage (ÖREB) laufen neben dem Befund her.
   const [gebaeude, setGebaeude] = useState<Koerper[] | 'fehlt' | null>(null);
   const [rechtslage, setRechtslage] = useState<Recht | 'fehlt' | null>(null);
@@ -230,7 +230,7 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
   };
 
   const meldung: Record<Feld, string> = {
-    name: nameOk(kontakt.name) ? '' : 'Bitte Ihren Namen.',
+    name: nameOk(kontakt.name) ? '' : 'Bitte Vor- und Nachnamen angeben.',
     email: mailOk(kontakt.email) ? '' : 'Bitte eine gültige E-Mail-Adresse.',
     telefon: schweizerNummer(kontakt.telefon) ? '' : 'Bitte eine Schweizer Nummer, z. B. 079 412 58 36.',
   };
@@ -373,7 +373,7 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
   // Aufrufleiste auf dem Handy: nur, wenn gerade kein anderer Aufruf im Bild ist.
   const andererAufruf = useImBild('.pc .suche, .pc .aufruf, .pc .rechner, .pc .formular.offen, .pc .danke.sichtbar, .pc .schritte-aufruf', [befund, schritt, recht]);
   const leiste = recht || schritt !== 0 || andererAufruf ? null
-    : befund ? { text: 'Reserve kostenlos berechnen', tun: oeffnen }
+    : befund ? { text: 'Baureserve kostenlos berechnen', tun: oeffnen }
     : { text: 'Grundstück kostenlos prüfen', tun: zurSuche };
 
   const wortmarke = <><span className="zeichen" aria-hidden="true"><i /></span><span>{marke.name[0]}<b>{marke.name[1]}</b></span></>;
@@ -392,12 +392,15 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
         <main className="huelle rechtliches">
           <h2>{recht === 'impressum' ? 'Impressum' : 'Datenschutz'}</h2>
           {recht === 'impressum'
-            ? <p>{marke.name.join('')} ist ein Angebot von {BETREIBER}. Firmenname, Postadresse, E-Mail und UID werden hier ergänzt.</p>
+            ? <>
+                <p>{marke.name.join('')} ist ein Angebot von {BETREIBER}.</p>
+                <address>{BETREIBER}{BETREIBER_ADRESSE.map(z => <span key={z}>{z}</span>)}</address>
+              </>
             : <>
                 <p>Wir speichern die Angaben, die Sie im Formular machen (Vorname, Name, E-Mail, Telefon, Adresse der Liegenschaft und Ihre Antworten), um Ihnen die Berechnung und Analyse zu erstellen und Sie zu Ihrer Liegenschaft zu kontaktieren. An Dritte geben wir sie nicht weiter.</p>
                 <p>Grundstücksdaten und Karten laden wir von geo.admin.ch (Bund), die Schriften von Google Fonts. Dabei sehen diese Dienste Ihre IP-Adresse.</p>
                 <p>Besuche zählen wir anonym und ohne Cookie: mit einer zufälligen Nummer im Speicher dieses Browserfensters, die beim Schliessen verfällt. Werbe-Cookies und Messpunkte von Werbeplattformen (Meta, Google) setzen wir nur, wenn Sie im Cookie-Hinweis zustimmen. Ihre Wahl ändern Sie jederzeit unten unter «Cookie-Einstellungen».</p>
-                <p>Die vollständige Datenschutzerklärung mit Verantwortlichem, Auftragsbearbeitern und Ländern wird mit den Angaben zum Betreiber ergänzt.</p>
+                <p>Verantwortlich für die Bearbeitung Ihrer Daten ist {BETREIBER}, {BETREIBER_ADRESSE.join(', ')}. Die vollständige Datenschutzerklärung mit Auftragsbearbeitern und Ländern wird ergänzt.</p>
               </>}
           <button type="button" className="knopf" onClick={() => setRecht(null)}>Zurück</button>
         </main>
@@ -521,7 +524,7 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
                     {befund && (
                       <>
                         <div className="kacheln">
-                          <div><small>Grundstücksfläche</small><b>{n(befund.flaeche)} <span>m²</span></b><em>amtlicher Umriss</em></div>
+                          <div><small>Grundstücksfläche</small><b>{n(befund.flaeche)} <span>m²</span></b><em>laut amtlicher Vermessung</em></div>
                           <div><small>Bauzone</small><b>{zonenKuerzel(zoneText) ?? kurzZone(befund.zone)}</b><em>{zoneText ?? befund.zone ?? 'keine Bauzone erfasst'}</em></div>
                           <div><small>Überbaut</small><b>{anteil != null ? <>{anteil} <span>%</span></> : '–'}</b><em>{grundfl ? `${n(grundfl)} m² Gebäudegrundfläche` : 'kein Gebäude erfasst'}</em></div>
                           <div><small>Ältestes Gebäude</small><b>{aeltestesGebaeude ?? '–'}</b><em>{best.length} Gebäude laut Register</em></div>
@@ -542,7 +545,7 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
                                   </dl>
                                   {h.einheiten.length > 1 && (
                                     <div className="wohnungen">
-                                      <div className="klein">Gehört Ihnen eine dieser Wohnungen? Antippen, dann bezieht sich Ihre Analyse auf sie.</div>
+                                      <div className="klein">Gehört Ihnen eine dieser Wohnungen? Tippen Sie sie an, dann gilt Ihre Analyse für diese Wohnung.</div>
                                       <ul>
                                         {(alleWohnungen === h.egid ? h.einheiten : h.einheiten.slice(0, 6)).map((w, i) => {
                                           const id = `${h.egid}-${w.nr ?? i}-${w.stock}-${w.flaeche}`;
@@ -582,7 +585,7 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
                           </div>
                         )}
                         <div className="block">
-                          <h3>Was auf der Parzelle gilt</h3>
+                          <h3>Was für Ihre Parzelle gilt</h3>
                           {rechtslage === null && <div className="klein">Rechtslage wird beim Kanton abgefragt …</div>}
                           {zeilen.length > 0 && (
                             <dl className="recht">
@@ -666,13 +669,13 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
                             <>
                               <div className="frage-nr">Frage {frage + 1} von 3</div>
                               {frage === 0 && <><div className="frage">Sind Sie Eigentümer/in dieser Liegenschaft?</div>{wahl('eigentuemer', ANTWORT_TEXT.eigentuemer)}</>}
-                              {frage === 1 && <><div className="frage">Was beschäftigt Sie?</div>{wahl('absicht', modus === 'heizung' ? ABSICHT_HEIZUNG : ANTWORT_TEXT.absicht as Record<string, string>)}</>}
+                              {frage === 1 && <><div className="frage">Was haben Sie vor?</div>{wahl('absicht', modus === 'heizung' ? ABSICHT_HEIZUNG : ANTWORT_TEXT.absicht as Record<string, string>)}</>}
                               {frage === 2 && <><div className="frage">Bis wann?</div>{wahl('zeitraum', ANTWORT_TEXT.zeitraum)}</>}
                               <button type="button" className="zurueck" onClick={() => (frage > 0 ? setFrage(frage - 1) : setSchritt(0))}>Zurück</button>
                             </>
                           ) : (
                             <>
-                              <div className="frage">Fast geschafft: Wohin dürfen wir die Berechnung schicken?</div>
+                              <div className="frage">Fast geschafft: Wem dürfen wir die Analyse schicken?</div>
                               <p className="klein" style={{ margin: 0 }}>Die Berechnung erscheint sofort hier. Die ausführliche Analyse senden wir Ihnen persönlich.</p>
                               {feld('name', 'Vor- und Nachname', 'text', 'name')}
                               {feld('telefon', 'Telefon', 'tel', 'tel', { inputMode: 'tel', placeholder: '079 412 58 36' })}
@@ -741,7 +744,7 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
               {SCHRITTE.map(([t, p], i) => <div key={t} className="schritt-karte"><div className="nr" aria-hidden="true">{i + 1}</div><h3>{t}</h3><p>{p}</p></div>)}
             </div>
             <div className="schritte-aufruf">
-              <button type="button" className="knopf marke" onClick={() => (befund ? oeffnen() : zurSuche())}>{befund ? 'Reserve kostenlos berechnen' : 'Mit Schritt 1 beginnen'}</button>
+              <button type="button" className="knopf marke" onClick={() => (befund ? oeffnen() : zurSuche())}>{befund ? 'Baureserve kostenlos berechnen' : 'Mit Schritt 1 beginnen'}</button>
               <span>Kostenlos, ohne Konto, in einer Minute.</span>
             </div>
           </div>

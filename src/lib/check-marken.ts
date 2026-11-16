@@ -21,9 +21,12 @@
  * meineparzelle.ch und mfhcheck.ch -- darum stehen sie nicht hier.
  */
 // Wer die Seiten betreibt -- gehört ins Impressum, in die Einwilligung und
-// unter jeden Ratgeber. Rechtlicher Name, Adresse und UID trägt Julian nach
-// (docs/werbeplan-eigentuemer.md, Abschnitt 8).
+// unter jeden Ratgeber (docs/werbeplan-eigentuemer.md, Abschnitt 8).
 export const BETREIBER = 'Bauraum';
+// Die Postadresse fürs Impressum (Julian, 16. November: «die c/o adresse
+// impressum»). E-Mail und UID fehlen noch; das Gesetz verlangt auch die
+// Adresse der elektronischen Post (UWG Art. 3 Abs. 1 lit. s).
+export const BETREIBER_ADRESSE = ['c/o PROJECTA SERVICES GMBH', 'Sihleggstrasse 23', '8832 Wollerau'];
 
 export type Schwerpunkt = 'parzelle' | 'haus' | 'bauen' | 'reserve' | 'wert' | 'erbe' | 'alter' | 'mfh';
 
@@ -86,7 +89,7 @@ export interface Marke {
 }
 
 const VORTEILE_PARZELLE = [
-  'Ausnützung und Reserve nach der Bau- und Zonenordnung Ihrer Gemeinde',
+  'Wie viel Sie nach der Bau- und Zonenordnung Ihrer Gemeinde noch bauen dürfen',
   'Was sich anbauen, aufstocken oder neu bauen liesse',
   'Eine Einschätzung des Werts von Grundstück und Gebäude',
   'Persönlich geprüft von Fachleuten, nicht nur gerechnet',
@@ -99,7 +102,7 @@ const VORTEILE_HAUS = [
 ];
 const VORTEILE_WERT = [
   'Eine Einschätzung des Werts von Grundstück und Gebäude',
-  'Welche Reserve den Wert erhöht',
+  'Ob ungenutzte Baureserve den Wert erhöht',
   'Was ein Verkauf heute bringen könnte',
   'Persönlich geprüft von Fachleuten, nicht nur gerechnet',
 ];
@@ -153,7 +156,7 @@ export const MARKEN: Marke[] = [
     id: 'ausbaupotenzial',
     domains: ['ausbaupotenzial.ch', 'anbaupotenzial.ch'],
     name: ['Ausbau', 'Potenzial'], farbe: '#B7A6FF', hell: '#2A2547', aufFarbe: '#14121F', schwerpunkt: 'reserve',
-    etikett: STANDARD_ETIKETT, aufruf: 'Mehr Wohnraum beginnt mit der richtigen Zahl.',
+    etikett: STANDARD_ETIKETT, aufruf: 'Wie viel Platz ist auf Ihrem Grundstück noch frei?',
     ueber: 'Anbau & Aufstockung', titel: 'Wie viel mehr Wohnraum ist möglich?',
     satz: 'Anbau, Aufstockung oder ein zweites Haus im Garten: Sehen Sie zuerst, wie dicht Ihre Parzelle heute bebaut ist.',
     analyse: 'Ihre ausführliche Reserveanalyse', vorteile: VORTEILE_PARZELLE,
@@ -175,9 +178,9 @@ export const MARKEN: Marke[] = [
     name: ['Erb', 'Liegenschaft'], farbe: '#2F5446', hell: '#E8EFEB', schwerpunkt: 'erbe',
     etikett: 'Vertraulich · kostenlos · unverbindlich', aufruf: 'Eine gute Entscheidung beginnt mit den richtigen Zahlen.',
     ueber: 'Liegenschaft geerbt?', titel: 'Eine Liegenschaft geerbt. Und jetzt?',
-    satz: 'Behalten, vermieten oder verkaufen: Der erste Schritt ist zu wissen, was die Liegenschaft ist und kann.',
+    satz: 'Behalten, vermieten oder verkaufen? Sehen Sie zuerst, was auf dem Grundstück steht und was darauf möglich wäre.',
     analyse: 'Ihre Entscheidungsgrundlage',
-    vorteile: ['Eine Einschätzung des Werts für die Erbteilung', 'Was Behalten, Vermieten oder Verkaufen bedeutet', 'Ob auf dem Grundstück mehr möglich wäre', 'Persönlich und vertraulich, ohne Verpflichtung'],
+    vorteile: ['Eine Einschätzung des Werts für die Erbteilung', 'Was für Behalten, Vermieten oder Verkaufen spricht', 'Ob auf dem Grundstück mehr möglich wäre', 'Persönlich und vertraulich, ohne Verpflichtung'],
     design: { buehne: 'mitte', schrift: 'Albert Sans', titelSchrift: 'Fraunces', muster: 'keins', zeichen: 'punkt', radius: 16, papier: '#F6F7F4' },
   },
   {
@@ -186,9 +189,9 @@ export const MARKEN: Marke[] = [
     name: ['Haus zu ', 'gross?'], farbe: '#8A4B2A', hell: '#F5ECE6', schwerpunkt: 'alter',
     etikett: 'Kostenlos · vertraulich · ohne Verpflichtung', aufruf: 'In Ruhe entscheiden, mit den richtigen Zahlen.',
     ueber: 'Wohnen im Alter', titel: 'Ist Ihr Haus zu gross geworden?',
-    satz: 'Bevor Sie entscheiden, ob Sie bleiben, umbauen oder verkaufen: Sehen Sie in einer Minute, was Ihr Grundstück laut den amtlichen Daten hergibt.',
+    satz: 'Bevor Sie entscheiden, ob Sie bleiben, umbauen oder verkaufen: Sehen Sie in einer Minute, was die amtlichen Daten über Ihr Haus und Ihr Grundstück sagen.',
     analyse: 'Ihre persönliche Auslegeordnung',
-    vorteile: ['Was Bleiben, Umbauen oder Verkaufen bedeuten', 'Ob sich eine Einliegerwohnung oder ein Anbau lohnt', 'Eine Einschätzung des Werts von Haus und Grundstück', 'Persönlich und in Ruhe besprochen, ohne Verpflichtung'],
+    vorteile: ['Was für Bleiben, Umbauen oder Verkaufen spricht', 'Ob sich eine Einliegerwohnung oder ein Anbau lohnt', 'Eine Einschätzung des Werts von Haus und Grundstück', 'Persönlich und in Ruhe besprochen, ohne Verpflichtung'],
     design: { buehne: 'zeitung', schrift: 'Source Sans 3', titelSchrift: 'Lora', muster: 'keins', zeichen: 'keins', radius: 4, gross: true, papier: '#FBF8F3' },
   },
   {
@@ -196,8 +199,8 @@ export const MARKEN: Marke[] = [
     // Gekauft ist ausnuetzung-check.ch (13. November).
     domains: ['ausnuetzung-check.ch'],
     name: ['Ausnützung', 'Check'], farbe: '#0F6E7A', hell: '#E3F2F3', schwerpunkt: 'reserve',
-    etikett: STANDARD_ETIKETT, aufruf: 'Reserve, die man kennt, ist Wert, den man nutzen kann.',
-    ueber: 'Ausnützung & Reserve', titel: 'Wie viel Reserve steckt in Ihrem Grundstück?',
+    etikett: STANDARD_ETIKETT, aufruf: 'Wer seine Baureserve kennt, kann sie nutzen.',
+    ueber: 'Ausnützung & Reserve', titel: 'Wie viel Baureserve steckt in Ihrem Grundstück?',
     satz: 'Die Gemeinde erlaubt oft mehr, als heute steht. Wir rechnen es mit den amtlichen Daten vor, für Ihre Adresse.',
     analyse: 'Ihre ausführliche Reserveanalyse', vorteile: VORTEILE_PARZELLE,
     design: { buehne: 'luftbild', schrift: 'IBM Plex Sans', muster: 'keins', zeichen: 'linie', radius: 8, ort: ORT.hoengg },
@@ -209,7 +212,7 @@ export const MARKEN: Marke[] = [
     name: ['Aufstockungs', 'Check'], farbe: '#B4441E', hell: '#FBEDE6', schwerpunkt: 'bauen',
     etikett: STANDARD_ETIKETT, aufruf: 'Nach oben bauen statt neu kaufen.',
     ueber: 'Aufstocken & Ausbauen', titel: 'Ein Stockwerk mehr auf Ihrem Haus?',
-    satz: 'Ob eine Aufstockung erlaubt ist, hängt an Zone und Ausnützung. Prüfen Sie Ihre Parzelle mit den amtlichen Daten.',
+    satz: 'Ob eine Aufstockung erlaubt ist, hängt von Zone und Ausnützung ab. Prüfen Sie Ihre Parzelle mit den amtlichen Daten.',
     analyse: 'Ihre Abklärung zur Aufstockung',
     vorteile: ['Ob die Zone ein weiteres Geschoss zulässt', 'Wie viel Geschossfläche noch frei ist', 'Was eine Aufstockung kosten und bringen könnte', 'Persönlich geprüft von Fachleuten, nicht nur gerechnet'],
     design: { buehne: 'karte', schrift: 'Outfit', muster: 'raster', zeichen: 'linie', radius: 4 },
@@ -220,7 +223,7 @@ export const MARKEN: Marke[] = [
     name: ['Verdichtungs', 'Check'], farbe: '#F2B84B', hell: '#3A2E14', aufFarbe: '#17120A', schwerpunkt: 'reserve',
     etikett: STANDARD_ETIKETT, aufruf: 'Wo verdichtet wird, zählt jeder Quadratmeter.',
     ueber: 'Verdichtung', titel: 'Wie dicht darf Ihr Grundstück bebaut werden?',
-    satz: 'Wo Gemeinden verdichten, darf oft mehr gebaut werden. Sehen Sie, wie viel Ihre Parzelle heute trägt.',
+    satz: 'Wo Gemeinden verdichten, darf oft mehr gebaut werden. Sehen Sie, wie dicht Ihre Parzelle heute bebaut ist.',
     analyse: 'Ihre Analyse zur Verdichtung', vorteile: VORTEILE_PARZELLE,
     design: { buehne: 'mitte', schrift: 'Schibsted Grotesk', muster: 'raster', zeichen: 'linie', radius: 6, dunkel: true },
   },
@@ -240,7 +243,7 @@ export const MARKEN: Marke[] = [
     name: ['Landwert', '24'], farbe: '#4C6B1F', hell: '#EEF3E4', schwerpunkt: 'wert',
     etikett: STANDARD_ETIKETT, aufruf: 'Land wird nicht mehr. Kennen Sie seinen Wert?',
     ueber: 'Bauland & Landwert', titel: 'Bauland oder Garten: Was ist Ihr Land wert?',
-    satz: 'Ob Bauland, Reserve oder grosser Garten: Die amtlichen Daten zeigen, was auf Ihrem Land möglich ist.',
+    satz: 'Ob Bauland oder grosser Garten: Die amtlichen Daten zeigen, was auf Ihrem Land möglich ist.',
     analyse: 'Ihre Einschätzung zum Landwert',
     vorteile: ['Eine Einschätzung des Landwerts', 'Ob sich ein Teil als Bauland abtrennen liesse', 'Was die Zone auf Ihrem Land erlaubt', 'Persönlich geprüft von Fachleuten, nicht nur gerechnet'],
     design: { buehne: 'geteilt', schrift: 'Plus Jakarta Sans', muster: 'raster', zeichen: 'punkt', radius: 10, ort: ORT.duebendorf },
@@ -281,7 +284,7 @@ export const MARKEN: Marke[] = [
     domains: ['parzellenrechner.ch'],
     name: ['Parzellen', 'Rechner'], farbe: '#155E75', hell: '#E2F0F4', schwerpunkt: 'reserve',
     etikett: STANDARD_ETIKETT, aufruf: 'Ein Rechner, Ihre Zahlen, keine Schätzung ins Blaue.',
-    ueber: 'Rechner für Eigentümer', titel: 'Rechnen Sie nach, was Ihre Parzelle trägt',
+    ueber: 'Rechner für Eigentümer', titel: 'Rechnen Sie nach, wie viel Sie bauen dürfen',
     satz: 'Ausnützung einstellen, Reserve sehen: Der Rechner nimmt Fläche und Gebäude direkt aus den amtlichen Daten.',
     analyse: 'Ihre ausführliche Berechnung', vorteile: VORTEILE_PARZELLE,
     design: { buehne: 'mitte', schrift: 'Onest', muster: 'raster', zeichen: 'linie', radius: 10 },
@@ -312,9 +315,9 @@ export const MARKEN: Marke[] = [
     name: ['MFH', 'Check'], farbe: '#0B4F6C', hell: '#E3EFF4', schwerpunkt: 'mfh',
     etikett: 'Für Eigentümer von Mehrfamilienhäusern', aufruf: 'Rendite beginnt mit den richtigen Zahlen.',
     ueber: 'Mehrfamilienhaus', titel: 'Was steckt in Ihrem Mehrfamilienhaus?',
-    satz: 'Wohnungen, Baujahr, Heizung und Reserve: die Zahlen zu Ihrem Renditeobjekt, direkt aus den amtlichen Registern.',
+    satz: 'Wohnungen, Baujahr, Heizung und Baureserve: die Zahlen zu Ihrem Renditeobjekt, direkt aus den amtlichen Registern.',
     analyse: 'Ihre Analyse zum Mehrfamilienhaus',
-    vorteile: ['Eine Einschätzung des Werts der Liegenschaft', 'Ob sich Aufstockung oder Ersatzneubau rechnen', 'Was Sanierung und Heizungsersatz bedeuten', 'Persönlich geprüft von Fachleuten, nicht nur gerechnet'],
+    vorteile: ['Eine Einschätzung des Werts der Liegenschaft', 'Ob sich Aufstockung oder Ersatzneubau rechnen', 'Was Sanierung und Heizungsersatz kosten und bringen', 'Persönlich geprüft von Fachleuten, nicht nur gerechnet'],
     design: { buehne: 'zeitung', schrift: 'Libre Franklin', titelSchrift: 'Source Serif 4', muster: 'keins', zeichen: 'keins', radius: 2, papier: '#F5F6F7' },
   },
   {
@@ -323,7 +326,7 @@ export const MARKEN: Marke[] = [
     name: ['Baurechner', '24'], farbe: '#5B21B6', hell: '#EFE9FB', schwerpunkt: 'bauen',
     etikett: STANDARD_ETIKETT, aufruf: 'Bauen beginnt mit einer Rechnung.',
     ueber: 'Bauen & Rechnen', titel: 'Wie viel dürfen Sie bauen? Rechnen Sie nach.',
-    satz: 'Zone, Fläche und Ausnützung für Ihre Adresse, amtlich und in Sekunden. Den Rest rechnet der Rechner.',
+    satz: 'Zone, Fläche und Ausnützung für Ihre Adresse, amtlich und in Sekunden. Den Rest übernimmt der Rechner.',
     analyse: 'Ihre ausführliche Bauabklärung', vorteile: VORTEILE_PARZELLE,
     design: { buehne: 'luftbild', schrift: 'Bricolage Grotesque', muster: 'keins', zeichen: 'punkt', radius: 16, ort: ORT.kuesnacht },
   },
@@ -387,7 +390,7 @@ export const MARKEN: Marke[] = [
     id: 'hauswertcheck',
     domains: ['hauswertcheck.ch', 'hauswert-check.ch'],
     name: ['HausWert', 'Check'], farbe: '#3B5323', hell: '#ECF2E5', schwerpunkt: 'haus',
-    etikett: STANDARD_ETIKETT, aufruf: 'Ein Check, eine klare Zahl, kein Druck.',
+    etikett: STANDARD_ETIKETT, aufruf: 'Ein Check, klare Zahlen, kein Druck.',
     ueber: 'Hauswert-Check', titel: 'Der Wert-Check für Ihr Haus',
     satz: 'Was die amtlichen Register über Ihr Haus wissen, ist die Grundlage für seinen Wert. Sehen Sie es in Sekunden.',
     analyse: 'Ihre persönliche Wertschätzung', vorteile: VORTEILE_WERT,
