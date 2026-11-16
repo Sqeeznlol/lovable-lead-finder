@@ -44,6 +44,7 @@ export const BILD = {
   auswertung: luftbildLv95(2693300, 1231300, 800, 1280),   // Wädenswil
   kalender: luftbildLv95(2683300, 1252500, 800, 1280),
   gebaeudesuche: luftbildLv95(2684900, 1243200, 800, 1280), // Zürichsee, rechtes Ufer     // Zürich-Oerlikon, Messe und Halle 550
+  suche: luftbildLv95(2671734, 1250505, 800, 1280),       // Dietikon, das Beispiel der Suche (Mitte laut Suchdienst des Bundes)
   // Wohntraums: jede Seite ihr eigener Ort, wie in Bauraum.
   fondsBaugesuche: luftbildLv95(2681400, 1249700, 800, 1280),   // Zürich-West, Baustellen
   fondsGespraeche: luftbildLv95(2683900, 1246200, 800, 1280),   // Zürich, Seefeld

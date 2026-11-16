@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { Building2, X, Shield, Share, Plus, Map, Target, BarChart3, Gauge, HardHat, MoreHorizontal, Briefcase, LogOut, Orbit, CalendarDays, Inbox, Combine, Flame } from 'lucide-react';
+import { Building2, X, Shield, Share, Plus, Map, Target, BarChart3, Gauge, HardHat, MoreHorizontal, Briefcase, LogOut, Orbit, CalendarDays, Inbox, Combine, Flame, Search } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { KontoMenu } from '@/components/KontoMenu';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
@@ -20,6 +20,7 @@ const Gelegenheiten = lazy(() => import('@/components/Gelegenheiten').then(m => 
 const Karte3DSeite = lazy(() => import('@/components/karte3d/Karte3DSeite').then(m => ({ default: m.Karte3DSeite })));
 const Kalender = lazy(() => import('@/components/Kalender').then(m => ({ default: m.Kalender })));
 const Nachbarschaft = lazy(() => import('@/components/Nachbarschaft').then(m => ({ default: m.Nachbarschaft })));
+const Suche = lazy(() => import('@/components/Suche').then(m => ({ default: m.Suche })));
 // Die Karte zieht Leaflet nach -- das gehoert nicht ins erste
 // Buendel, sondern wird geholt, wenn jemand den Reiter oeffnet.
 const Karte = lazy(() => import('@/components/Karte').then(m => ({ default: m.Karte })));
@@ -39,7 +40,7 @@ import { usePlatform } from '@/hooks/use-platform';
 
 // Jeder Bereich ist eine Adresse: /zentrale, /baugesuche ... ("/" ist
 // das Cockpit). So führt "Zurück" im Browser in den vorigen Bereich.
-const TABS = ['cockpit', 'leads', 'zentrale', 'baugesuche', 'leadlisten', 'karte', 'nachbarschaft', 'arrondierung', 'gelegenheiten', 'auswertung', 'kalender', 'karte3d', 'admin'] as const;
+const TABS = ['cockpit', 'suche', 'leads', 'zentrale', 'baugesuche', 'leadlisten', 'karte', 'nachbarschaft', 'arrondierung', 'gelegenheiten', 'auswertung', 'kalender', 'karte3d', 'admin'] as const;
 type Tab = typeof TABS[number];
 const istTab = (x: string | undefined): x is Tab => !!x && (TABS as readonly string[]).includes(x);
 
@@ -54,6 +55,8 @@ type Eintrag = { id: Tab; label: string; icon: React.ComponentType<{ className?:
 const gruppen: { titel: string; eintraege: Eintrag[] }[] = [
   { titel: 'Heute', eintraege: [
     { id: 'cockpit', label: 'Cockpit', icon: Gauge },
+    // Ein Satz, eine Liste: «Alle W2 in Dietikon» (Julian, 16. November).
+    { id: 'suche', label: 'Suche', icon: Search },
     // Die Leads der Check-Seiten (20 Webseiten, eine Liste), mit Zahlen je Webseite.
     { id: 'leads', label: 'Leads', icon: Inbox },
     // Jedes Kundenvorhaben an einem Ort: von der Adressliste bis zur
@@ -222,6 +225,13 @@ export default function Index() {
                   Kantone, das Wischen greift nie, und auf dem iPhone lag die
                   Kopfzeile 190 px über dem Rand (gemessen 3. November). */}
               <div className="ml-auto flex min-w-0 items-center gap-3">
+                {/* Auf dem iPhone fehlt die Leiste links: die Suche steht hier, von jeder Seite aus erreichbar. */}
+                {active !== 'suche' && (
+                  <button type="button" onClick={() => gehe('suche')} aria-label="Suche"
+                          className="grid h-11 w-11 shrink-0 place-items-center rounded-[3px] text-foreground hover:bg-secondary lg:hidden">
+                    <Search className="h-5 w-5" />
+                  </button>
+                )}
                 <button type="button" onClick={neuesVorhaben}
                         className="hidden h-11 items-center gap-2 rounded-[3px] bg-accent px-4 text-[15px] font-medium text-accent-foreground transition-transform active:scale-[0.97] lg:inline-flex">
                   <Plus className="h-4 w-4" /> Neues Vorhaben
@@ -243,6 +253,7 @@ export default function Index() {
             </div>
           }>
             {active === 'cockpit' && <Cockpit onGehe={z => gehe(z)} onNeu={neuesVorhaben} />}
+            {active === 'suche' && <Suche />}
             {active === 'leads' && <Leads />}
             {active === 'zentrale' && <Zentrale />}
             {active === 'baugesuche' && <Baugesuche />}

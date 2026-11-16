@@ -64,6 +64,7 @@ on:
           - umrisse      # Wie viele Parzellen je Kanton einen Umriss und einen Punkt haben (nur Zählungen)
           - machbarkeit  # Ob machbarkeit_grundlage für echte Parzellen plausible Flächen liefert (nur Zahlen)
           - besucher     # Ob die Zahlen unter «Leads» stimmen: Besucher je Domain und Tag, Leads gegen Anfragen, Bots (nur Zählungen)
+          - suche-probe  # Die Suche an echten Daten: Zonenkürzel je Gemeinde, Treffer und Tempo (nur Zählungen, keine Adressen)
           - suche-daten  # Für die Suche: wie Zonen in vier Gemeinden heissen und welche Angaben je Parzelle gefüllt sind (nur Zählungen und Zonennamen)
           - last         # Was die Datenbank gerade belastet: laufende Anweisungen nach Art und Dauer, Aufräumen, Verbindungen (nie der Wortlaut)
       egrid:
@@ -873,6 +874,45 @@ jobs:
               select count(*) as gebaeude, count(*) filter (where klasse between 1110 and 1130) as wohngebaeude,
                      count(*) filter (where klasse between 1110 and 1130 and heizung_energie in (7520, 7530) and baujahr < 1980) as wohn_fossil_vor1980
               from gebaeude;"
+          elif [ "$FRAGE" = "suche-probe" ]; then
+            # Die Suche (Migration 20261116080000) an den echten Namen: fällt
+            # jede Wohnzone auf ein Kürzel, und keine andere Zone darauf?
+            # Dazu die Treffer von Julians Beispiel und die Laufzeit. Nur
+            # Zonennamen und Zählungen.
+            frage "Zonennamen und ihr Kürzel (alle, nicht nur die häufigsten)" "
+              set local statement_timeout = '30s';
+              with g as (select gemeinde from public.gemeinde_stats_mv where gemeinde ~* '^(Dietikon|Uster|Kloten|Frauenfeld)')
+              select p.gemeinde, coalesce(public.zone_kurz(p.zone), '–') as kurz,
+                     btrim(regexp_replace(coalesce(p.zone, '(leer)'), '\\([^)]*\\)', ' ', 'g')) as zone, count(*) as parzellen
+                from public.properties p join g on g.gemeinde = p.gemeinde
+               group by 1, 2, 3 order by 1, 2, 4 desc;"
+            frage "Alle W2 in Dietikon, und weitere Beispiele: Treffer, ohne Adressen" "
+              set local statement_timeout = '30s';
+              select b.satz, (r->>'anzahl')::int as treffer, (r->>'im_ort')::int as im_ort, (r->>'ohne_zone')::int as ohne_zone,
+                     jsonb_array_length(r->'zeilen') as zeilen_seite,
+                     (select count(*) from jsonb_array_elements(r->'zeilen') z where z->'umriss' <> 'null') as mit_umriss,
+                     (select count(*) from jsonb_array_elements(r->'zeilen') z where z->'baujahr' <> 'null') as mit_baujahr,
+                     (select count(*) from jsonb_array_elements(r->'zeilen') z where z->'heizung' <> 'null') as mit_heizung,
+                     (select count(*) from jsonb_array_elements(r->'zeilen') z where (z->>'reserve')::numeric > 0) as mit_reserve,
+                     (select count(*) from jsonb_array_elements(r->'zeilen') z where z->'eigentuemer' <> 'null') as mit_eigentuemer
+                from (values
+                  ('Alle W2 in Dietikon', '{\"gemeinden\":[\"Dietikon\"],\"zone\":\"W2\"}'::jsonb),
+                  ('W3 in Uster vor 1970', '{\"gemeinden\":[\"Uster\"],\"zone\":\"W3\",\"baujahr_max\":1969}'::jsonb),
+                  ('EFH in Kloten mit Ölheizung', '{\"gemeinden\":[\"Kloten\"],\"art\":\"efh\",\"heizung\":[7530]}'::jsonb),
+                  ('W2 in Frauenfeld', '{\"gemeinden\":[\"Frauenfeld\"],\"zone\":\"W2\"}'::jsonb)
+                ) as b(satz, f)
+                cross join lateral (select public.suche_parzellen(b.f, 50, 0) as r) x;"
+            frage "Laufzeit in der Datenbank (ms)" "
+              set local statement_timeout = '30s';
+              create temp table zeit (satz text, ms numeric);
+              do \$\$ declare j json; begin
+                execute 'explain (analyze, format json) select public.suche_parzellen(''{\"gemeinden\":[\"Dietikon\"],\"zone\":\"W2\"}'', 50, 0)' into j;
+                insert into zeit values ('Alle W2 in Dietikon', round((j->0->>'Execution Time')::numeric, 1));
+                execute 'explain (analyze, format json) select public.suche_parzellen(''{\"gemeinden\":[\"Uster\"],\"heizung\":[7520,7530]}'', 50, 0)' into j;
+                insert into zeit values ('Uster, Öl oder Gas', round((j->0->>'Execution Time')::numeric, 1));
+              end \$\$;
+              select * from zeit;"
+
           elif [ "$FRAGE" = "suche-daten" ]; then
             # Julian, 16. November: eine Suche, die «Alle W2 in Dietikon»
             # versteht. Die Zonen stehen im Bestand als Fliesstext mit dem

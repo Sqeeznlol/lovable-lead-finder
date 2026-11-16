@@ -44,6 +44,17 @@ describe('Die Datenbank bedient die Seite', () => {
     expect(aufrufe.filter(a => !a.includes('statement_timeout'))).toEqual([]);
   });
 
+  // Die Suche (16. November) liest die Parzellen nur über einen Ort: ohne
+  // ihn müsste die Datenbank alle 530'000 lesen, bei jeder Suche.
+  it('die Suche verlangt einen Ort und liest über den Index', () => {
+    const m = readFileSync('supabase/migrations/20261116080000_suche.sql', 'utf8');
+    const funktion = m.slice(m.indexOf('create or replace function public.suche_parzellen('));
+    expect(funktion).toMatch(/if cardinality\(v_gemeinden\) = 0 and cardinality\(v_plz\) = 0 then\s+raise exception/);
+    expect(funktion).toMatch(/where p\.gemeinde = any\(v_gemeinden\) or p\.plz = any\(v_plz\)/);
+    // Höchstens 100 Zeilen je Anfrage, die Umrisse nur für diese.
+    expect(funktion).toContain('least(greatest(coalesce(p_grenze, 50), 1), 100)');
+  });
+
   // «Reiter prüfen», Lauf 18: nach dem Reiter «Auswertung» stockte die
   // Datenbank fünf Minuten lang. Er zählte bei jedem Öffnen die grossen
   // Tabellen. Die Zahlen kommen jetzt vorab gezählt (lib/daten-stand).
