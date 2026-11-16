@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Marke } from '@/components/rahmen';
 import { chf, m2, type Art, type Gebaeude } from '@/lib/machbarkeit';
-import type { Bewertung, CalcAnnahmen, ErloesQuelle } from '@/lib/calc';
+import { parzellenText, type Bewertung, type CalcAnnahmen, type ErloesQuelle } from '@/lib/calc';
 import { betrag } from '@/lib/calc-ablauf';
 import type { Adresse } from '@/lib/calc-daten';
 import { luftbildLv95 } from '@/lib/luftbild';
@@ -77,7 +77,7 @@ export function Ergebnis({ b, annahmen, onErloes }: { b: Bewertung; annahmen: Ca
   const n = b.neubau, m = b.neubauMiete, h = b.bestand, s = b.studie;
   const eck: [string, string, string][] = n ? [
     ['Grundstück', m2(s.flaeche), 'laut Amtlicher Vermessung'],
-    ['Mögliche Hauptnutzfläche', m2(n.hnf), `${m2(n.gf)} Geschossfläche`],
+    ['Mögliche Hauptnutzfläche', m2(n.hnf), `${n.hnfText?.startsWith('Praxisformel') ? 'Praxisformel, ' : ''}${m2(n.gf)} Geschossfläche`],
     ['Kubatur', `${de(Math.round(n.kubatur))} m³`, 'über Boden'],
     ['Wohnungen', `rund ${de(n.wohnungen)}`, `je ${de(annahmen.wohnungM2)} m²`],
     ['Baukosten', chf(n.baukosten + n.abbruch), `CHF ${de(n.baukostenJeM2)} je m² Nutzfläche${n.abbruch ? `, dazu ${chf(n.abbruch)} Abbruch` : ''}`],
@@ -88,8 +88,17 @@ export function Ergebnis({ b, annahmen, onErloes }: { b: Bewertung; annahmen: Ca
 
   return (
     <div className="space-y-5">
-      {/* Ein Satz mit der Zahl, wie im Cockpit. */}
-      {b.empfehlung != null ? (
+      {/* Ein Satz mit der Zahl, wie im Cockpit. Mit dazugekauftem Nachbarn sagt er das. */}
+      {b.empfehlung != null && b.zusammen?.lohnt && b.empfehlung === b.zusammen.empfehlung ? (
+        <p className="text-[22px] leading-snug tracking-tight">
+          Kaufpreisempfehlung <span className="font-semibold">{betrag(b.empfehlung)}</span> mit {parzellenText(b.zusammen.teile)} dazugekauft.{' '}
+          <span className="text-muted-foreground">
+            Allein wären es {b.empfehlungAllein != null ? betrag(b.empfehlungAllein) : 'keine Empfehlung'}.{' '}
+            {b.zusammen.teile.length === 1 ? 'Der Nachbar bekommt seinen eigenen Wert' : 'Die Nachbarn bekommen zusammen ihren eigenen Wert'} ({chf(b.zusammen.nachbarWert)}),
+            der Rest der gemeinsamen Rechnung geht in dieses Angebot. Davon gehen {de(annahmen.abschlag * 100)} % Abschlag ab.
+          </span>
+        </p>
+      ) : b.empfehlung != null ? (
         <p className="text-[22px] leading-snug tracking-tight">
           Kaufpreisempfehlung <span className="font-semibold">{betrag(b.empfehlung)}</span>.{' '}
           <span className="text-muted-foreground">
@@ -105,7 +114,7 @@ export function Ergebnis({ b, annahmen, onErloes }: { b: Bewertung; annahmen: Ca
         <p className="text-[22px] leading-snug tracking-tight">
           Noch keine Empfehlung.{' '}
           <span className="text-muted-foreground">
-            {!s.rechenbar ? `${s.grund} Ziffer und Geschosse lassen sich unten von Hand eingeben.` : 'Mit diesen Annahmen bleibt für das Land nichts übrig.'}
+            {!n ? `${s.grund ?? "Die Zone nennt keine Ziffer."} Ziffer und Geschosse lassen sich unten von Hand eingeben.` : 'Mit diesen Annahmen bleibt für das Land nichts übrig.'}
           </span>
         </p>
       )}
@@ -228,11 +237,11 @@ export function Ergebnis({ b, annahmen, onErloes }: { b: Bewertung; annahmen: Ca
         </div>
       </div>
 
-      {s.rechenbar && (
+      {(s.rechenbar || n) && (
         <details className="rounded-[3px] border bg-card print:hidden">
           <summary className="flex min-h-11 cursor-pointer items-center px-4 text-sm font-medium">Herkunft jeder Zahl</summary>
           <div className="space-y-4 border-t p-4">
-            {s.abschnitte.map(a => (
+            {(b.herkunft ?? s.abschnitte).map(a => (
               <div key={a.titel} className="space-y-1.5">
                 <p className={ETIKETT}>{a.titel}</p>
                 <dl className="divide-y rounded-[3px] border">

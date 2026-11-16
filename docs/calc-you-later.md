@@ -25,6 +25,39 @@ Die Empfehlung ist dieser Wert minus Abschlag (Vorgabe 10 %), auf
 10'000 abgerundet. Der Bestand wird bewertet, wenn das Register drei
 oder mehr Wohnungen führt oder jemand Mieten einträgt.
 
+### Hauptnutzfläche nach Julians Praxisformel
+
+    Grundstück × Ausnützung ÷ Vollgeschosse × (Vollgeschosse + 0.66) × 0.77
+
+Dieselbe Formel wie in der Potenzialrechnung (`potential.ts`, Migration
+`20260904120000_hnf_praxisformel.sql`). Das Attika zählt 0.66 eines
+Vollgeschosses, ausser die Zone verbietet Dachgeschosse; eine
+Baumassenziffer wird über 3.2 m Geschosshöhe zur Ausnützung. Die
+Grenzabstände rechnet die Formel nicht: lassen sie weniger zu, steht
+das unter den Risiken. Nur wo die Zone keine Ziffer nennt, rechnet die
+Machbarkeit (Hülle). Hochweidstrasse 9: 1'411 m² × (1.8 ÷ 3.2) ÷ 2 ×
+2.66 × 0.77 = 813 m² (vorher 611 m² mit Hülle und ohne Attika).
+
+### Nachbar dazukaufen
+
+Julian, 16. November: «Parzelle nebenan, wenn man kaufen kann:
+dazukaufen, besseres Angebot.» Die Seite holt die Nachbarparzellen beim
+Bund (Kataster, Gebäuderegister, Zonenplan), jede mit ihrem Wert allein.
+Angekreuzt wird, was sich dazukaufen lässt. Die Regel:
+
+  * Gemeinsam gerechnet: Nutzfläche nach Praxisformel je Parzelle,
+    zusammengezählt; ab 3'000 m² gemeinsamer Fläche +10 % für eine
+    Arealüberbauung (Annahme, in der Bauordnung der Gemeinde nachsehen;
+    beide Werte lassen sich ändern).
+  * Jeder Nachbar bekommt, was seine Parzelle allein wert ist (die
+    höchste seiner drei Bewertungen).
+  * Was die gemeinsame Rechnung darüber hinaus hergibt, geht in das
+    Angebot für diese Parzelle -- aber nur, wenn es mindestens
+    CHF 10'000 mehr ist als allein.
+
+Hochweidstrasse 9 mit den Parzellen 3947, 4903 und 4902 (zusammen
+3'434 m²): Empfehlung CHF 9.72 Mio. statt 7.78 Mio. allein.
+
 ### Vorgaben von Julian (16. November)
 
   * **Gewinn** 20 % des Erlöses (beim Vermieten: des Werts).
@@ -36,9 +69,10 @@ oder mehr Wohnungen führt oder jemand Mieten einträgt.
   * **Mietwohnungen**: Baukosten CHF 6'500 je m².
   * **Hanglage** 10 bzw. 20 % teurer. Die Steigung kommt aus dem
     Geländemodell des Bundes (Höhen je 15 m um den Punkt); ab 10 %
-    Steigung +10 %, ab 20 % +20 % -- die Schwellen sind angenommen.
-  * **Nähe zu Zürich** teurer. Wie viel, ist angenommen: +10 % am
-    Hauptbahnhof, gleichmässig weniger bis 0 % in 25 km.
+    Steigung +10 %, ab 20 % +20 % (von Julian bestätigt).
+  * **Nähe zu Zürich** teurer: +10 % am Hauptbahnhof, gleichmässig
+    weniger bis 0 % in 25 km (von Julian bestätigt).
+  * Die Baukosten gelten je m² verkaufbarer Nutzfläche (bestätigt).
   * **Kilchberg**: Verkaufspreis 20'000 bis 30'000 je m²
     (`src/lib/erloes-angaben.ts`, gerechnet mit der Mitte).
 
@@ -46,7 +80,8 @@ oder mehr Wohnungen führt oder jemand Mieten einträgt.
 
 Er ist der grösste Hebel. Am 16. November rechnete die Hochweidstrasse 9
 in Kilchberg mit der Annahme CHF 9'500 und empfahl CHF 3.16 Mio.; mit
-Julians 25'000 und der amtlichen Zone sind es CHF 5.81 Mio. Woher er
+Julians 25'000 und der amtlichen Zone waren es CHF 5.81 Mio., mit der
+Praxisformel CHF 7.78 Mio. Woher er
 kommt, in dieser Reihenfolge:
 
   1. Stadt Zürich: amtlich, neue Eigentumswohnungen, Median

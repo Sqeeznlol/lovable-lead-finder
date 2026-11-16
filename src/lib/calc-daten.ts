@@ -27,7 +27,8 @@ import { gemeindePreise, type GemeindePreise } from '@/lib/preise';
 import { zusatzAbfragen } from '@/lib/parzelle-zusatz';
 import { istVorhanden } from '@/lib/potential';
 import type { Gebaeude, ZonenRegeln } from '@/lib/machbarkeit';
-import { zuerichKm } from '@/lib/calc';
+import { CALC_ANNAHMEN, hnfPraxis, zuerichKm, type NachbarTeil } from '@/lib/calc';
+import { bundParzelle, mitte } from '@/lib/bund-parzelle';
 
 // Die erzeugten Typen kennen Tabelle und Funktion noch nicht.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -279,4 +280,54 @@ export function comparisOrt(ort: string | null | undefined): string | null {
 export async function leadLaden(id: string): Promise<{ id: string; name: string | null; adresse: string | null } | null> {
   const r = await db().from('anfrage').select('id, name, adresse').eq('id', id).maybeSingle();
   return r.error ? null : r.data ?? null;
+}
+
+// ------------------------------------------------- Nachbarn dazukaufen
+
+/** Eine Nachbarparzelle mit allem, was die gemeinsame Rechnung braucht. */
+export interface NachbarDaten extends NachbarTeil {
+  kanton: string | null;
+  /** Ob die Praxisformel hier rechnen kann (Bauzone mit Ziffer und Geschossen). */
+  bebaubar: boolean;
+}
+
+/** Ein Ort aus dem eigenen Bestand: die Zone, wo kein amtlicher Zonenplan angebunden ist. */
+async function zoneAusListe(egrid: string): Promise<ZonenRegeln | null> {
+  const r = await db().from('properties').select('zone, ausnuetzung, vollgeschosse_zulaessig, gemeinde').eq('egrid', egrid).limit(1).maybeSingle();
+  return r.data ? zoneAusBestand(r.data)?.regeln ?? null : null;
+}
+
+async function nachbarLaden(egrid: string): Promise<NachbarDaten | null> {
+  const q = new URLSearchParams({ layer: 'ch.kantone.cadastralwebmap-farbe', searchField: 'egris_egrid', searchText: egrid, contains: 'false',
+    returnGeometry: 'true', geometryFormat: 'geojson', sr: '2056' });
+  const j = await holen(`${API}/all/MapServer/find?${q}`).catch(() => null) as { results?: { geometry?: { type: string; coordinates: number[][][] | number[][][][] }; attributes?: Record<string, unknown>; properties?: Record<string, unknown> }[] } | null;
+  const r = j?.results?.[0];
+  if (!r?.geometry) return null;
+  const g = r.geometry;
+  const ringe = (g.type === 'Polygon' ? g.coordinates : (g.coordinates as number[][][][]).flat()) as number[][][];
+  const { e, n } = mitte(ringe);
+  const flaeche = Math.round(flaecheLv95(g));
+  const a = r.attributes ?? r.properties ?? {};
+  const kanton = typeof a.ak === 'string' && /^[A-Z]{2}$/.test(a.ak) ? a.ak : null;
+  // Die Zone am Schwerpunkt der Parzelle; bei sehr verwinkelten Parzellen kann er daneben liegen.
+  const [register, zone] = await Promise.all([
+    registerBund(egrid).catch(() => null),
+    kanton === 'ZH' ? zoneZh(e, n, undefined, 12000).catch(() => null) : zoneAusListe(egrid).catch(() => null),
+  ]);
+  return {
+    egrid, nummer: a.number ? String(a.number) : null, flaeche, zone, gebaeude: register?.gebaeude ?? [], kanton,
+    bebaubar: !!hnfPraxis(flaeche, zone, CALC_ANNAHMEN),
+  };
+}
+
+/**
+ * Die Nachbarparzellen beim Bund: wer an die Parzelle grenzt (Kataster),
+ * mit Fläche, Zone und Gebäuden. Strassen und Parzellen ohne Bauzone
+ * kommen mit, sind aber nicht bebaubar. Höchstens zwölf.
+ */
+export async function nachbarnLaden(egrid: string): Promise<NachbarDaten[]> {
+  const b = await bundParzelle(egrid);
+  if (!b) throw new Error('Der Kataster des Bundes hat nicht geantwortet.');
+  const alle = await Promise.all(b.nachbarn.slice(0, 12).map(nachbarLaden));
+  return alle.filter((x): x is NachbarDaten => !!x).sort((x, y) => Number(y.bebaubar) - Number(x.bebaubar) || y.flaeche - x.flaeche);
 }

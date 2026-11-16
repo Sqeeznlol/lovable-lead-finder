@@ -152,6 +152,10 @@ senden. Alles Weitere in `docs/calc-you-later.md`.
     Wer die Migration ändert, lässt `tools/kalkulation-probe.sh` laufen.
   * Keine Zahl ohne Herkunft: amtlich, berechnet oder Annahme. Neue
     Chancen und Risiken sind Regeln mit Zahl, kein Sprachmodell.
+  * Die Nutzfläche rechnet Julians Praxisformel (Grundstück × Ausnützung
+    ÷ VG × (VG + 0.66) × 0.77), wie die Potenzialrechnung. Seine
+    Vorgaben für Baukosten, Gewinn und Zuschläge stehen im Dokument;
+    nicht eigenmächtig ändern.
 
 ## Gestaltung
 

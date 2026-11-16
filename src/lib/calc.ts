@@ -24,7 +24,7 @@
  *
  * Diese Datei rechnet nur; geholt wird in calc-daten.ts.
  */
-import { ANNAHMEN, chf, m2, studieRechnen, type Annahmen, type Eingabe, type Studie, type ZonenRegeln } from '@/lib/machbarkeit';
+import { ANNAHMEN, bestandGf, chf, m2, studieRechnen, type Annahmen, type Eingabe, type Gebaeude, type Posten, type Studie, type ZonenRegeln } from '@/lib/machbarkeit';
 import { MIETEN, MIETEN_JAHR } from '@/lib/mieten-daten';
 
 export interface CalcAnnahmen extends Annahmen {
@@ -41,13 +41,67 @@ export interface CalcAnnahmen extends Annahmen {
   baukostenHnf: number | null;
   /** Baukosten je m² Nutzfläche für Mietwohnungen, vor den Zuschlägen. */
   baukostenMiete: number;
+  /** Ab dieser gemeinsamen Fläche (m²) gilt eine Arealüberbauung, mit diesem Bonus auf die Nutzfläche (0 bis 1). */
+  arealMin: number;
+  arealBonus: number;
 }
 /**
  * Julian, 16. November: «Wir brauchen eine Gewinnmarge von 20 %», und
  * «bei Miete rechnest du 6500/m² Baukosten». In den Baukosten sind die
  * Nebenkosten enthalten; der Abbruch kommt dazu.
  */
-export const CALC_ANNAHMEN: CalcAnnahmen = { ...ANNAHMEN, marge: 0.2, rendite: 0.04, abschlag: 0.1, baukostenHnf: null, baukostenMiete: 6500 };
+export const CALC_ANNAHMEN: CalcAnnahmen = {
+  ...ANNAHMEN, marge: 0.2, rendite: 0.04, abschlag: 0.1, baukostenHnf: null, baukostenMiete: 6500,
+  // Annahme: viele Zürcher Bauordnungen erlauben eine Arealüberbauung ab
+  // einer Mindestfläche, mit mehr Ausnützung. Wie viel und ab wann, steht
+  // in der Bauordnung der Gemeinde; die Felder lassen sich ändern.
+  arealMin: 3000, arealBonus: 0.1,
+};
+
+/**
+ * Die Hauptnutzfläche nach Julians Praxisformel, mit der Objekte
+ * tatsächlich beurteilt werden (Migration 20260904120000, potential.ts):
+ *
+ *   Grundstück × Ausnützung ÷ Vollgeschosse × (Vollgeschosse + 0.66) × 0.77
+ *
+ * Das Attikageschoss zählt 0.66 eines Vollgeschosses, ausser die Zone
+ * verbietet Dachgeschosse ausdrücklich. Eine Baumassenziffer wird über die
+ * Geschosshöhe zur Ausnützung. Ohne Ziffer oder Vollgeschosse: null.
+ */
+export interface Praxis { hnf: number; az: number; vg: number; attika: number; text: string }
+export function hnfPraxis(flaeche: number, zone: ZonenRegeln | null, a: Pick<Annahmen, 'geschosshoehe' | 'hnfFaktor' | 'dachFaktor'>): Praxis | null {
+  const vg = pos(zone?.vollgeschosse);
+  const az = pos(zone?.az) ?? (pos(zone?.bmz) ? zone!.bmz! / a.geschosshoehe : null);
+  if (!(flaeche > 0) || !vg || !az) return null;
+  const attika = zone!.dachgeschosse === 0 ? 0 : a.dachFaktor;
+  const ziffer = pos(zone!.az) ? `AZ ${de(az, 2)}` : `BMZ ${de(zone!.bmz!, 2)} ÷ ${de(a.geschosshoehe, 1)} m`;
+  return {
+    hnf: (flaeche * az / vg) * (vg + attika) * a.hnfFaktor, az, vg, attika,
+    text: `${m2(flaeche)} × ${ziffer} ÷ ${de(vg)} VG × ${de(vg + attika, 2)} × ${de(a.hnfFaktor, 2)}`,
+  };
+}
+
+/** «Parzelle 3947» oder «Parzellen 3947, 4903 und 4902». */
+export function parzellenText(teile: { nummer: string | null }[]): string {
+  const nr = teile.map(t => t.nummer ?? 'ohne Nummer');
+  if (nr.length === 1) return teile[0].nummer ? `Parzelle ${teile[0].nummer}` : 'der Nachbarparzelle';
+  return `Parzellen ${nr.slice(0, -1).join(', ')} und ${nr[nr.length - 1]}`;
+}
+
+/** Eine Nachbarparzelle, die man dazukaufen kann. */
+export interface NachbarTeil { egrid: string; nummer: string | null; flaeche: number; zone: ZonenRegeln | null; gebaeude: Gebaeude[] }
+
+/**
+ * Mit Nachbarn zusammen (Julian, 16. November: «Parzelle nebenan, wenn
+ * man kaufen kann: dazukaufen, besseres Angebot»). Die Regel: der Nachbar
+ * bekommt, was seine Parzelle allein wert ist; was die gemeinsame Rechnung
+ * darüber hinaus hergibt, steht für diese Parzelle zur Verfügung.
+ */
+export interface Zusammen {
+  teile: { egrid: string; nummer: string | null; flaeche: number; hnf: number | null; wertAllein: number }[];
+  flaeche: number; hnfOhneBonus: number; bonus: number; hnf: number; abbruch: number;
+  landwert: number; nachbarWert: number; fuerUns: number; mehr: number; lohnt: boolean; empfehlung: number | null;
+}
 
 /**
  * Baukosten je m² Nutzfläche, inklusive Nebenkosten, nach dem Verkaufspreis:
@@ -141,6 +195,8 @@ export interface Umfeld {
 }
 
 export interface CalcEingabe {
+  /** Nachbarparzellen, die man dazukaufen kann. */
+  nachbarn?: NachbarTeil[];
   grundlage: Omit<Eingabe, 'annahmen'>;
   annahmen: CalcAnnahmen;
   kanton: string | null;
@@ -165,6 +221,8 @@ export interface Neubau {
   jeM3: number;
   /** Was eine Wohnung mittlerer Grösse in dieser Rechnung kostet. */
   wohnungPreis: number;
+  /** Wie die Nutzfläche gerechnet ist: Praxisformel, sonst Machbarkeit (Hülle). */
+  hnfText: string;
   /** Baukosten je m² Nutzfläche mit Zuschlägen, und woraus sie bestehen. */
   baukostenJeM2: number;
   kosten: Kosten;
@@ -211,8 +269,13 @@ export interface Bewertung {
   /** Welche der drei Bewertungen den Preis bestimmt. */
   massgebend: 'neubau' | 'miete' | 'bestand' | null;
   wert: number | null;
-  /** Wert minus Abschlag, auf 10'000 abgerundet. */
+  /** Wert minus Abschlag, auf 10'000 abgerundet; mit Nachbarn, wenn das mehr bringt. */
   empfehlung: number | null;
+  /** Die Empfehlung für diese Parzelle allein. */
+  empfehlungAllein: number | null;
+  zusammen: Zusammen | null;
+  /** Woher jede Zahl stammt: die Abschnitte der Machbarkeit und die Praxisformel. */
+  herkunft: { titel: string; zeilen: Posten[] }[];
   /**
    * Der Massstab des Marktes: die Fläche zum Median dessen, was in der
    * Gemeinde für Wohnbauland bezahlt wurde (amtlich, nur ZH und BL).
@@ -280,6 +343,14 @@ export function bewerten(e: CalcEingabe): Bewertung {
   const studie = studieRechnen({ ...g, zone, annahmen: a });
   const flaeche = studie.flaeche;
   const ort = u.gemeinde || 'der Gemeinde';
+  // Nutzfläche nach der Praxisformel; nur wo die Zone keine Ziffer nennt,
+  // die Machbarkeit mit Hülle und Grenzabständen.
+  const bauzone = pos(g.bauzoneM2) && g.bauzoneM2! < flaeche * 0.98 ? g.bauzoneM2! : flaeche;
+  const praxis = hnfPraxis(bauzone, zone, a);
+  const rechenbar = !!praxis || studie.rechenbar;
+  const hnf = praxis?.hnf ?? (studie.rechenbar ? studie.hnfNeu : 0);
+  const gf = praxis ? praxis.hnf / a.hnfFaktor : studie.gfNeu;
+  const wohnungenNeu = Math.floor(hnf / a.wohnungM2);
 
   // ---- Neubau: was für das Land bleibt
   const zuschlag = (1 + hangZuschlag(u.neigung)) * (1 + zuerichZuschlag(u.zuerichKm));
@@ -291,15 +362,16 @@ export function bewerten(e: CalcEingabe): Bewertung {
   };
   const abbruch = (studie.gfBestand ?? 0) * a.abbruch;
   // Landwert = Erlös − Baukosten − Abbruch − Gewinn, alles je m² Nutzfläche.
-  const landBei = (erloes: number) => studie.hnfNeu * (erloes * (1 - a.marge) - kostenBei(erloes).jeM2) - abbruch;
+  const landBei = (erloes: number) => hnf * (erloes * (1 - a.marge) - kostenBei(erloes).jeM2) - abbruch;
   let neubau: Neubau | null = null;
-  if (studie.rechenbar) {
+  if (rechenbar) {
     const kosten = kostenBei(a.erloes);
-    const erloes = studie.hnfNeu * a.erloes, baukosten = studie.hnfNeu * kosten.jeM2;
-    const kubatur = studie.gfNeu * a.geschosshoehe;
+    const erloes = hnf * a.erloes, baukosten = hnf * kosten.jeM2;
+    const kubatur = gf * a.geschosshoehe;
     const landwert = erloes - baukosten - abbruch - erloes * a.marge;
     neubau = {
-      gf: studie.gfNeu, hnf: studie.hnfNeu, kubatur, wohnungen: studie.wohnungen, baukosten, abbruch, erloes,
+      gf, hnf, kubatur, wohnungen: wohnungenNeu, baukosten, abbruch, erloes,
+      hnfText: praxis ? `Praxisformel: ${praxis.text}` : 'Machbarkeit: Ziffer und Hülle, die engere gilt',
       gewinn: erloes * a.marge, landwert, jeM2: flaeche ? landwert / flaeche : 0,
       jeM3: kubatur > 0 ? baukosten / kubatur : 0, wohnungPreis: a.erloes * a.wohnungM2,
       baukostenJeM2: kosten.jeM2, kosten,
@@ -310,14 +382,14 @@ export function bewerten(e: CalcEingabe): Bewertung {
   let neubauMiete: NeubauMiete | null = null;
   const neuMiete = median((e.hand.vergleiche ?? []).filter(v => pos(v.flaeche) && pos(v.miete)).map(v => v.miete / v.flaeche));
   const neuStatistik = mieteStatistik(e.kanton, 9999);
-  if (studie.rechenbar && pos(a.rendite) && (neuMiete || neuStatistik)) {
+  if (rechenbar && pos(a.rendite) && (neuMiete || neuStatistik)) {
     const miete = neuMiete ?? neuStatistik!.wert;
-    const ertrag = studie.hnfNeu * miete * 12, wert = ertrag / a.rendite;
+    const ertrag = hnf * miete * 12, wert = ertrag / a.rendite;
     const baukostenJeM2 = Math.round(a.baukostenMiete * zuschlag / 10) * 10;
-    const baukosten = studie.hnfNeu * baukostenJeM2, gewinn = wert * a.marge;
+    const baukosten = hnf * baukostenJeM2, gewinn = wert * a.marge;
     const landwert = wert - baukosten - abbruch - gewinn;
     neubauMiete = {
-      hnf: studie.hnfNeu, miete, mieteQuelle: neuMiete ? 'Median der eingetragenen Inserate' : neuStatistik!.text,
+      hnf, miete, mieteQuelle: neuMiete ? 'Median der eingetragenen Inserate' : neuStatistik!.text,
       ertrag, wert, baukosten, baukostenJeM2, abbruch, gewinn, landwert, jeM2: flaeche ? landwert / flaeche : 0,
     };
   }
@@ -357,8 +429,35 @@ export function bewerten(e: CalcEingabe): Bewertung {
   // Das Land, wenn man neu baut: zum Verkaufen oder zum Vermieten, was mehr bringt.
   const wN = Math.max(neubau?.landwert ?? 0, neubauMiete?.landwert ?? 0) || null;
   const wB = bestand?.wert ?? null;
-  const gerundet = wert ? Math.floor((wert * (1 - a.abschlag)) / 10000) * 10000 : 0;
-  const empfehlung = gerundet > 0 ? gerundet : null;
+  const runden = (w: number | null) => { const r = w ? Math.floor((w * (1 - a.abschlag)) / 10000) * 10000 : 0; return r > 0 ? r : null; };
+  const empfehlungAllein = runden(wert);
+
+  // ---- mit Nachbarn zusammen
+  let zusammen: Zusammen | null = null;
+  const nachbarn = (e.nachbarn ?? []).filter(n => n.flaeche > 0);
+  if (nachbarn.length && neubau) {
+    const teile = nachbarn.map(n => {
+      const allein = bewerten({ ...e, grundlage: { flaeche: n.flaeche, bebaubarM2: null, zone: n.zone, gebaeude: n.gebaeude, registerVollstaendig: true }, hand: {}, nachbarn: [] });
+      return { egrid: n.egrid, nummer: n.nummer, flaeche: n.flaeche, hnf: hnfPraxis(n.flaeche, n.zone, a)?.hnf ?? null,
+        wertAllein: allein.wert ?? 0, gfBestand: bestandGf(n.gebaeude) ?? 0 };
+    });
+    const flaecheZ = flaeche + teile.reduce((s, t) => s + t.flaeche, 0);
+    const hnfOhneBonus = hnf + teile.reduce((s, t) => s + (t.hnf ?? 0), 0);
+    const bonus = flaecheZ >= a.arealMin ? a.arealBonus : 0;
+    const hnfZ = hnfOhneBonus * (1 + bonus);
+    const abbruchZ = abbruch + teile.reduce((s, t) => s + t.gfBestand * a.abbruch, 0);
+    const landwert = hnfZ * (a.erloes * (1 - a.marge) - neubau.baukostenJeM2) - abbruchZ;
+    const nachbarWert = teile.reduce((s, t) => s + t.wertAllein, 0);
+    const fuerUns = landwert - nachbarWert;
+    const mehr = fuerUns - (wert ?? 0);
+    zusammen = {
+      teile: teile.map(({ gfBestand: _, ...t }) => t), flaeche: flaecheZ, hnfOhneBonus, bonus, hnf: hnfZ, abbruch: abbruchZ,
+      // Erst ab CHF 10'000 mehr zählt es als besseres Angebot, nicht wegen Rundung.
+      landwert, nachbarWert, fuerUns, mehr, lohnt: mehr >= 10000, empfehlung: runden(fuerUns),
+    };
+  }
+  // Dazukaufen zählt nur, wenn es dieser Parzelle mehr bringt als allein.
+  const empfehlung = zusammen?.lohnt && (zusammen.empfehlung ?? 0) > (empfehlungAllein ?? 0) ? zusammen.empfehlung : empfehlungAllein;
 
   // ---- der Erlös am Markt gemessen
   const erloesQuelle = e.erloesQuelle ?? ERLOES_ANNAHME;
@@ -380,7 +479,7 @@ export function bewerten(e: CalcEingabe): Bewertung {
   const chancen: string[] = [], risiken: string[] = [];
   const jahr = e.jahr ?? new Date().getFullYear();
 
-  if (studie.rechenbar && neubau) {
+  if (neubau) {
     const unbebaut = studie.gfBestand == null && g.gebaeude.length === 0 && g.registerVollstaendig !== false;
     if (unbebaut) chancen.push('Unbebaut: kein Abbruch und keine Mieter.');
     else if (studie.ausgenuetzt != null && studie.ausgenuetzt < 0.7 && studie.reserve) {
@@ -451,6 +550,17 @@ export function bewerten(e: CalcEingabe): Bewertung {
   if (erloesInserate && Math.abs(erloesInserate / a.erloes - 1) > 0.15) {
     risiken.push(`Die Kaufinserate verlangen CHF ${de(Math.round(erloesInserate / 100) * 100)} je m², gerechnet ist mit CHF ${de(a.erloes)}.`);
   }
+  // Die Praxisformel kennt keine Grenzabstände. Sind sie enger, steht es hier.
+  if (praxis && studie.rechenbar && studie.begrenzt === 'huelle' && studie.hnfNeu < praxis.hnf * 0.9) {
+    risiken.push(`Mit ${de(a.grenzabstand, 1)} m Grenzabstand rundum haben nur ${m2(studie.hnfNeu)} Nutzfläche Platz; gerechnet ist nach der Praxisformel mit ${m2(praxis.hnf)}.`);
+  }
+  if (zusammen) {
+    const wer = parzellenText(zusammen.teile);
+    const verkauft = zusammen.teile.length === 1 ? 'der Nachbar zu seinem eigenen Wert verkauft' : 'die Nachbarn je zu ihrem eigenen Wert verkaufen';
+    const areal = zusammen.bonus > 0 ? `, mit Arealüberbauung (+${prozent(zusammen.bonus)} % ab ${m2(a.arealMin)})` : '';
+    if (zusammen.lohnt) chancen.push(`Mit ${wer} dazugekauft: ${chf(zusammen.mehr)} mehr für diese Parzelle${areal}, wenn ${verkauft}.`);
+    else risiken.push(`Mit ${wer} dazugekauft bleibt für diese Parzelle nicht mehr als allein${zusammen.bonus > 0 ? '' : ` (gemeinsam ${m2(zusammen.flaeche)}, eine Arealüberbauung gilt hier erst ab ${m2(a.arealMin)})`}.`);
+  }
   if (neubau && !neubau.kosten.vonHand && neubau.kosten.hang > 0) {
     risiken.push(`Hanglage: das Gelände steigt um ${de(Math.round(u.neigung!))} %, die Baukosten sind ${prozent(neubau.kosten.hang)} % höher gerechnet.`);
   }
@@ -462,5 +572,23 @@ export function bewerten(e: CalcEingabe): Bewertung {
   }
 
   const landMarkt = u.land && flaeche ? { jeM2: u.land.m, wert: u.land.m * flaeche } : null;
-  return { studie, neubau, neubauMiete, bestand, massgebend, wert, empfehlung, landMarkt, erloesQuelle, erloesLand, erloesInserate, kaeufe: kaeufe.length, chancen, risiken };
+  // ---- jede Zahl mit ihrer Herkunft: die Machbarkeit, dazu die Praxisformel
+  const amtlich = zone?.quelle === 'kanton' ? 'amtlich' : 'annahme';
+  const herkunft: Bewertung['herkunft'] = [
+    ...studie.abschnitte.map(s => (s.titel === 'Was Platz hat'
+      ? { titel: 'Was zwischen den Grenzabständen Platz hat (Machbarkeit)', zeilen: s.zeilen.filter(z => z.titel !== 'Wohnungen') }
+      : s)),
+    ...(praxis ? [{ titel: 'Hauptnutzfläche nach Praxisformel (gerechnet)', zeilen: [
+      { titel: 'Grundstück in der Bauzone', wert: m2(bauzone), art: 'amtlich' as const, quelle: 'Amtliche Vermessung' },
+      { titel: pos(zone?.az) ? 'Ausnützungsziffer' : 'Ausnützung aus Baumassenziffer', wert: de(praxis.az, 2), art: amtlich as Posten['art'],
+        quelle: pos(zone?.az) ? 'Zone' : `BMZ ${de(zone!.bmz!, 2)} ÷ ${de(a.geschosshoehe, 1)} m Geschosshöhe` },
+      { titel: 'Vollgeschosse', wert: de(praxis.vg), art: amtlich as Posten['art'], quelle: 'Zone' },
+      { titel: 'Attika', wert: praxis.attika ? `${de(praxis.attika, 2)} Vollgeschoss` : 'keines', art: 'annahme' as const,
+        quelle: praxis.attika ? 'Praxisformel' : 'die Zone erlaubt kein Dachgeschoss' },
+      { titel: 'Hauptnutzfläche', wert: m2(praxis.hnf), art: 'berechnet' as const, quelle: praxis.text },
+      { titel: 'Wohnungen', wert: `rund ${de(wohnungenNeu)}`, art: 'annahme' as const, quelle: `je ${de(a.wohnungM2)} m² Hauptnutzfläche` },
+    ] }] : []),
+  ];
+
+  return { studie, neubau, neubauMiete, bestand, massgebend, wert, empfehlung, empfehlungAllein, zusammen, herkunft, landMarkt, erloesQuelle, erloesLand, erloesInserate, kaeufe: kaeufe.length, chancen, risiken };
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { vi } from 'vitest';
 vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
-import { baukostenNachErloes, bewerten, CALC_ANNAHMEN, hangZuschlag, median, mieteStatistik, zoneMitHand, zuerichKm, zuerichZuschlag, type CalcEingabe } from '@/lib/calc';
+import { baukostenNachErloes, bewerten, CALC_ANNAHMEN, hangZuschlag, hnfPraxis, median, mieteStatistik, zoneMitHand, zuerichKm, zuerichZuschlag, type CalcEingabe } from '@/lib/calc';
 import { angebotEntwurf, betrag, uhr } from '@/lib/calc-ablauf';
 import type { ZonenRegeln } from '@/lib/machbarkeit';
 
@@ -67,8 +67,9 @@ describe('CALC YOU LATER: Neubau', () => {
     const o = bewerten({ ...leer, grundlage: { ...leer.grundlage, zone: null, bebaubarM2: null }, hand: { az: 0.6, vollgeschosse: 2 } });
     expect(o.studie.rechenbar).toBe(true);
     expect(o.neubauMiete).not.toBeNull();
-    // Ohne Dachgeschoss in der Eingabe: 600 m².
-    expect(o.neubau!.gf).toBeCloseTo(600, 6);
+    // Praxisformel mit Attika: 1000 × 0.6 ÷ 2 × 2.66 × 0.77 = 614.46 m² Nutzfläche, 798 m² Geschossfläche.
+    expect(o.neubau!.hnf).toBeCloseTo(614.46, 6);
+    expect(o.neubau!.gf).toBeCloseTo(798, 6);
     expect(o.risiken.some(r => r.includes('von Hand eingegeben'))).toBe(true);
     expect(o.risiken.some(r => r.includes('Ohne Umriss'))).toBe(true);
   });
@@ -347,5 +348,80 @@ describe('CALC YOU LATER: Neubau zum Vermieten', () => {
     expect(o.neubauMiete!.landwert).toBeCloseTo(1_904_826, 0);
     expect(o.massgebend).toBe('miete');
     expect(o.empfehlung).toBe(1_710_000);
+  });
+});
+
+describe('CALC YOU LATER: Julians Praxisformel', () => {
+  const a = CALC_ANNAHMEN;
+  it('Grundstück × Ausnützung ÷ VG × (VG + 0.66) × 0.77', () => {
+    expect(hnfPraxis(1000, zone, a)!.hnf).toBeCloseTo(614.46, 6);
+    // Wie im Test der Potenzialrechnung: 720 ÷ 2 × 2.66 × 0.77 = 737.
+    expect(Math.round(hnfPraxis(1200, { ...zone, az: 0.6, vollgeschosse: 2 }, a)!.hnf)).toBe(737);
+  });
+
+  it('Baumassenziffer über die Geschosshöhe; Hochweidstrasse 9 in Kilchberg', () => {
+    // W2B: BMZ 1.8, 2 Vollgeschosse, 1 411 m². 1.8 ÷ 3.2 = 0.5625.
+    const p = hnfPraxis(1411, { ...zone, az: null, bmz: 1.8, vollgeschosse: 2, dachgeschosse: 2 }, a)!;
+    expect(p.az).toBe(0.5625);
+    expect(p.hnf).toBeCloseTo(812.815, 3);
+    expect(p.text).toMatch(/^1.411 m² × BMZ 1,8|^1.411 m² × BMZ 1.8/);
+  });
+
+  it('ohne Attika, wo die Zone kein Dachgeschoss erlaubt; ohne Ziffer keine Formel', () => {
+    expect(hnfPraxis(1000, { ...zone, dachgeschosse: 0 }, a)!.hnf).toBeCloseTo(462, 6);
+    expect(hnfPraxis(1000, { ...zone, az: null, bmz: null }, a)).toBeNull();
+    expect(hnfPraxis(1000, { ...zone, vollgeschosse: null }, a)).toBeNull();
+  });
+
+  it('sagt, wenn die Grenzabstände weniger zulassen als die Formel', () => {
+    // Hülle: 200 m² × 2 VG + Dach 132 = 532 m² Geschossfläche, 409.64 m² Nutzfläche.
+    const o = bewerten({ ...leer, grundlage: { ...leer.grundlage, bebaubarM2: 200 } });
+    expect(o.neubau!.hnf).toBeCloseTo(614.46, 6);
+    expect(o.risiken).toContain('Mit 5 m Grenzabstand rundum haben nur 410 m² Nutzfläche Platz; gerechnet ist nach der Praxisformel mit 614 m².');
+    expect(o.herkunft.some(h => h.titel === 'Hauptnutzfläche nach Praxisformel (gerechnet)')).toBe(true);
+  });
+});
+
+describe('CALC YOU LATER: Nachbarparzelle dazukaufen', () => {
+  const nachbar = (flaeche: number) => ({ egrid: 'CH000000000001', nummer: '99', flaeche, zone, gebaeude: [] });
+
+  it('der Nachbar bekommt seinen eigenen Wert; ohne Arealbonus bleibt nicht mehr', () => {
+    const o = bewerten({ ...leer, nachbarn: [nachbar(1000)] });
+    const z = o.zusammen!;
+    expect(z.flaeche).toBe(2000);
+    expect(z.bonus).toBe(0);
+    expect(z.nachbarWert).toBeCloseTo(983_136, 3);
+    expect(z.mehr).toBeCloseTo(0, 3);
+    expect(z.lohnt).toBe(false);
+    expect(o.empfehlung).toBe(880_000);
+    expect(o.risiken.some(r => r.startsWith('Mit Parzelle 99 dazugekauft bleibt für diese Parzelle nicht mehr als allein'))).toBe(true);
+  });
+
+  it('ab 3 000 m² zusammen: Arealüberbauung +10 %, besseres Angebot', () => {
+    const o = bewerten({ ...leer, nachbarn: [nachbar(2500)] });
+    const z = o.zusammen!;
+    expect(z.flaeche).toBe(3500);
+    expect(z.bonus).toBe(0.1);
+    // (614.46 + 1 536.15) × 1.1 = 2 365.671 m²; × (9 500 × 0.8 − 6 000) = 3 785 073.6.
+    expect(z.hnf).toBeCloseTo(2365.671, 3);
+    expect(z.landwert).toBeCloseTo(3_785_073.6, 1);
+    expect(z.nachbarWert).toBeCloseTo(2_457_840, 1);
+    expect(z.fuerUns).toBeCloseTo(1_327_233.6, 1);
+    expect(z.mehr).toBeCloseTo(344_097.6, 1);
+    expect(z.lohnt).toBe(true);
+    expect(o.empfehlungAllein).toBe(880_000);
+    expect(o.empfehlung).toBe(1_190_000);
+    expect(o.chancen.some(c => /^Mit Parzelle 99 dazugekauft: CHF 344.000 mehr für diese Parzelle, mit Arealüberbauung \(\+10 % ab 3.000 m²\), wenn der Nachbar zu seinem eigenen Wert verkauft\.$/.test(c))).toBe(true);
+  });
+
+  it('mehrere Nachbarn im Satz', () => {
+    const o = bewerten({ ...leer, nachbarn: [{ ...nachbar(1500), nummer: '3947' }, { ...nachbar(600), egrid: 'CH000000000002', nummer: '4903' }, { ...nachbar(600), egrid: 'CH000000000003', nummer: '4902' }] });
+    expect(o.chancen.some(c => c.startsWith('Mit Parzellen 3947, 4903 und 4902 dazugekauft:') && c.endsWith('wenn die Nachbarn je zu ihrem eigenen Wert verkaufen.'))).toBe(true);
+  });
+
+  it('ein bebauter Nachbar mit Mieten kostet mehr, als er bringt', () => {
+    const o = bewerten({ ...leer, nachbarn: [{ ...nachbar(2500), gebaeude: [{ grundflaeche: 400, geschosse: 4, baujahr: 2015, wohnungen: 16 }] }] });
+    expect(o.zusammen!.lohnt).toBe(false);
+    expect(o.empfehlung).toBe(o.empfehlungAllein);
   });
 });

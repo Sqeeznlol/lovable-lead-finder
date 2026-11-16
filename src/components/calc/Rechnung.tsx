@@ -7,11 +7,12 @@ import { Ergebnis, Objektkopf } from '@/components/calc/Ergebnis';
 import { useName } from '@/components/calc/name';
 import { FENSTER } from '@/lib/fenster';
 import { adresseWaehlen } from '@/lib/adresswahl';
-import { bewerten, CALC_ANNAHMEN, ERLOES_ANNAHME, median, type CalcAnnahmen, type CalcEingabe, type ErloesQuelle, type Kauf, type Umfeld, type Vergleich, type VonHand } from '@/lib/calc';
+import { bewerten, CALC_ANNAHMEN, ERLOES_ANNAHME, median, type CalcAnnahmen, type CalcEingabe, type ErloesQuelle, type Kauf, type NachbarTeil, type Umfeld, type Vergleich, type VonHand } from '@/lib/calc';
 import { ERLOES_AMTLICH } from '@/lib/erloes-daten';
 import { ERLOES_ANGABEN } from '@/lib/erloes-angaben';
 import { entwurfLoeschen, entwurfSpeichern, schritt, type Kalkulation } from '@/lib/calc-ablauf';
-import { adressen, leadLaden, objektLaden, portalLinks, umfeldLaden, type Adresse } from '@/lib/calc-daten';
+import { adressen, leadLaden, nachbarnLaden, objektLaden, portalLinks, umfeldLaden, type Adresse } from '@/lib/calc-daten';
+import { chf } from '@/lib/machbarkeit';
 import { grundlageLaden } from '@/lib/machbarkeit-daten';
 import { wohnungText, type Wert } from '@/lib/preise';
 
@@ -68,6 +69,8 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
   const [annahmen, setAnnahmen] = useState<CalcAnnahmen>(alt?.eingabe.annahmen ?? CALC_ANNAHMEN);
   const [hand, setHand] = useState<VonHand>(alt?.eingabe.hand ?? {});
   const [erloesQuelle, setErloesQuelle] = useState<ErloesQuelle>(alt?.eingabe.erloesQuelle ?? ERLOES_ANNAHME);
+  const [nachbarn, setNachbarn] = useState<NachbarTeil[]>(alt?.eingabe.nachbarn ?? []);
+  const [nachbarnAuf, setNachbarnAuf] = useState((alt?.eingabe.nachbarn?.length ?? 0) > 0);
   const [kontakt, setKontakt] = useState(entwurf?.kontakt ?? '');
   const [test, setTest] = useState(entwurf?.test ?? false);
   const [name, setName] = useName();
@@ -147,11 +150,16 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
 
   const eingabe: CalcEingabe | null = useMemo(() => basis && {
     grundlage: { ...basis.grundlage, bebaubarM2: huelle.data?.umriss_da ? huelle.data.bebaubar_m2 : basis.grundlage.bebaubarM2 },
-    annahmen, kanton: basis.kanton, hand, umfeld: basis.umfeld, erloesQuelle,
-  }, [basis, huelle.data, annahmen, hand, erloesQuelle]);
+    annahmen, kanton: basis.kanton, hand, umfeld: basis.umfeld, erloesQuelle, nachbarn,
+  }, [basis, huelle.data, annahmen, hand, erloesQuelle, nachbarn]);
+  // Die Nachbarparzellen erst auf Wunsch: das sind bis zu zwölf Abfragen beim Bund.
+  const nachbarListe = useQuery({
+    queryKey: ['calc-nachbarn', basis?.egrid], queryFn: () => nachbarnLaden(basis!.egrid!),
+    enabled: nachbarnAuf && !!basis?.egrid, staleTime: 30 * 60 * 1000, retry: 1,
+  });
   const b = useMemo(() => (eingabe ? bewerten(eingabe) : null), [eingabe]);
 
-  const andere = () => { setGewaehlt(null); setText(''); setGesucht(''); setHand({}); setAnnahmen(CALC_ANNAHMEN); setErloesQuelle(ERLOES_ANNAHME); setFehler(null); };
+  const andere = () => { setGewaehlt(null); setText(''); setGesucht(''); setHand({}); setAnnahmen(CALC_ANNAHMEN); setErloesQuelle(ERLOES_ANNAHME); setNachbarn([]); setNachbarnAuf(false); setFehler(null); };
   const erloesSetzen = (erloes: number, quelle: ErloesQuelle) => { setAnnahmen(a => ({ ...a, erloes })); setErloesQuelle(quelle); };
 
   const speichern = async (einreichen: boolean) => {
@@ -255,6 +263,63 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
       )}
 
       <Ergebnis b={b} annahmen={annahmen} onErloes={erloesSetzen} />
+
+      <section className="space-y-3">
+        <div>
+          <h3 className="text-lg">Nachbar dazukaufen</h3>
+          <p className="text-sm text-muted-foreground">
+            Lässt sich eine Nachbarparzelle dazukaufen, rechnen beide zusammen. Der Nachbar bekommt, was seine Parzelle allein wert ist;
+            was die gemeinsame Rechnung mehr hergibt, geht in dieses Angebot.
+          </p>
+        </div>
+        {!nachbarnAuf && (
+          <button type="button" className={KNOPF} disabled={!basis.egrid} onClick={() => setNachbarnAuf(true)}>Nachbarparzellen laden</button>
+        )}
+        {nachbarnAuf && nachbarListe.isLoading && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Nachbarn werden beim Bund geholt …</p>}
+        {nachbarnAuf && nachbarListe.error && <p className="text-sm text-destructive">Die Nachbarparzellen liessen sich nicht holen. Bitte später noch einmal.</p>}
+        {nachbarnAuf && (nachbarListe.data || nachbarn.length > 0) && (
+          <ul className={LISTE}>
+            {(nachbarListe.data ?? nachbarn.map(n => ({ ...n, kanton: null, bebaubar: true }))).map(n => {
+              const an = nachbarn.some(x => x.egrid === n.egrid);
+              const allein = n.bebaubar ? bewerten({ ...eingabe, grundlage: { flaeche: n.flaeche, bebaubarM2: null, zone: n.zone, gebaeude: n.gebaeude, registerVollstaendig: true }, hand: {}, nachbarn: [] }).wert : null;
+              const haus = n.gebaeude[0];
+              const zeile = [
+                `${de(n.flaeche)} m²`, n.zone ? n.zone.abkuerzung ?? n.zone.bezeichnung : null,
+                n.gebaeude.length ? `${n.gebaeude.length} ${n.gebaeude.length === 1 ? 'Gebäude' : 'Gebäude'}${haus?.baujahr ? `, Baujahr ${haus.baujahr}` : ''}` : 'unbebaut',
+              ].filter(Boolean).join(' · ');
+              return (
+                <li key={n.egrid}>
+                  <label className={`flex min-h-12 items-center gap-3 px-4 py-2.5 ${n.bebaubar ? 'cursor-pointer hover:bg-secondary/60' : 'opacity-50'}`}>
+                    <input type="checkbox" className="h-5 w-5 shrink-0 accent-foreground" checked={an} disabled={!n.bebaubar}
+                           onChange={x => setNachbarn(v => (x.target.checked ? [...v, { egrid: n.egrid, nummer: n.nummer, flaeche: n.flaeche, zone: n.zone, gebaeude: n.gebaeude }] : v.filter(y => y.egrid !== n.egrid)))} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[15px]">{n.nummer ? `Parzelle ${n.nummer}` : 'Parzelle'}</span>
+                      <span className="block text-sm text-muted-foreground">{n.bebaubar ? zeile : `${zeile} · keine Bauzone mit Ziffer`}</span>
+                    </span>
+                    {allein != null && <span className="shrink-0 text-sm tabular-nums text-muted-foreground">allein {chf(allein)}</span>}
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {nachbarnAuf && nachbarListe.data?.length === 0 && <p className="text-sm text-muted-foreground">Der Kataster nennt keine Nachbarparzellen.</p>}
+        {nachbarnAuf && (
+          <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+            <Zahl titel="Arealüberbauung ab" wert={annahmen.arealMin} einheit="m²" min={0} max={50000} schritt={500} setWert={n => setze({ arealMin: n })} />
+            <Zahl titel="Bonus Arealüberbauung" wert={Math.round(annahmen.arealBonus * 1000) / 10} einheit="%" min={0} max={50} schritt={1} setWert={n => setze({ arealBonus: n / 100 })} />
+          </div>
+        )}
+        {b.zusammen && (
+          <dl className="space-y-1.5 rounded-[3px] border bg-card p-4 text-sm">
+            <div className="flex justify-between gap-3"><dt className="text-muted-foreground">Zusammen</dt><dd className="tabular-nums">{de(b.zusammen.flaeche)} m², {de(Math.round(b.zusammen.hnf))} m² Nutzfläche{b.zusammen.bonus > 0 ? ` (+${Math.round(b.zusammen.bonus * 100)} % Arealüberbauung)` : ''}</dd></div>
+            <div className="flex justify-between gap-3"><dt className="text-muted-foreground">Landwert zusammen</dt><dd className="tabular-nums">{chf(b.zusammen.landwert)}</dd></div>
+            <div className="flex justify-between gap-3"><dt className="text-muted-foreground">{b.zusammen.teile.length === 1 ? 'Der Nachbar zu seinem eigenen Wert' : 'Die Nachbarn je zu ihrem eigenen Wert'}</dt><dd className="tabular-nums">− {chf(b.zusammen.nachbarWert)}</dd></div>
+            <div className="flex justify-between gap-3 border-t pt-1.5 font-medium"><dt>Bleibt für diese Parzelle</dt><dd className="tabular-nums">{chf(b.zusammen.fuerUns)}</dd></div>
+            <div className="flex justify-between gap-3"><dt className="text-muted-foreground">Allein</dt><dd className="tabular-nums">{b.wert != null ? chf(b.wert) : '–'}</dd></div>
+          </dl>
+        )}
+      </section>
 
       <section className="space-y-3">
         <div>
