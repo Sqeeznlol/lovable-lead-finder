@@ -30,6 +30,8 @@ const ADRESSE = (process.env.ADRESSE || 'https://www.wohntraums.life').replace(/
 const ATTRAPPE = process.env.ATTRAPPE === '1';
 // Eine Zürcher Liegenschaft aus der Amtlichen Vermessung (Stichprobe vom 15. November).
 const OBJEKT = process.env.OBJEKT_EGRID || 'CH958799779192';
+// Eine öffentliche Adresse für CALC YOU LATER (ein Bürohaus in Zürich, keine Angabe zu einer Person).
+const CALC_ADRESSE = process.env.CALC_ADRESSE || 'Dufourstrasse 90, Zürich';
 // Die Suche mit Julians Beispiel: so läuft auch die Abfrage dahinter einmal echt.
 const REITER = ['', 'suche?q=Alle%20W2%20in%20Dietikon', 'leads', 'calc', 'zentrale', 'karte', 'gelegenheiten', 'baugesuche', 'leadlisten', 'auswertung',
   'nachbarschaft', 'arrondierung', 'kalender', 'karte3d', 'admin', 'fonds'];
@@ -186,6 +188,38 @@ async function pruefen(browser, geraet, zeilen) {
     }
     const gut = /^(rechenbar|nicht rechenbar)/.test(ergebnis) && !/auffälliger Text/.test(ergebnis);
     zeilen.push({ geraet: geraet.name, reiter: 'objekt und machbarkeit', ms: Date.now() - start, fehler: [...new Set(fehler)].concat(gut ? [] : [ergebnis]),
+      abgelehnt: [...new Set(abgelehnt)], langsam: langsame(), spaet: spaete(), breite: 0, merkmale: [], leer: false, notiz: ergebnis });
+  }
+
+  // CALC YOU LATER einmal ganz: eine Adresse rechnen (Suchdienst, Kataster
+  // und Register des Bundes, Zonenplan des Kantons), als Entwurf speichern
+  // und wieder löschen. So zeigt sich mit echter Anmeldung, ob die Rechte
+  // an der Tabelle halten -- und es bleibt nichts zurück. Am 16. November
+  // ging die Seite live, bevor die Migration eingespielt war: «kalkulation
+  // 404» fiel nur auf, weil dieser Lauf die Abfragen mitliest.
+  if (!ATTRAPPE && geraet.name === 'Computer') {
+    fehler = []; abgelehnt = [];
+    const start = Date.now();
+    await seite.goto(`${ADRESSE}/calc?neu=${encodeURIComponent(CALC_ADRESSE)}`, { waitUntil: 'domcontentloaded' });
+    let ergebnis = 'Adresse wird nicht gerechnet';
+    const gerechnet = await seite.waitForFunction(() => /Kaufpreisempfehlung CHF|Noch keine Empfehlung/.test(document.body.innerText), null, { timeout: 30000 }).then(() => true).catch(() => false);
+    if (gerechnet) {
+      const t = await seite.locator('main').innerText();
+      ergebnis = /Kaufpreisempfehlung CHF/.test(t) ? 'Empfehlung' : 'keine Empfehlung (mit Begründung)';
+      ergebnis += ` · Zonenplan ${/Zonenplan des Kantons/.test(t) ? 'amtlich' : 'nicht amtlich'}`;
+      if (MERKMALE.some(m => m.test(t))) ergebnis += ' · auffälliger Text';
+      // Gekennzeichnet als Test: bliebe der Entwurf doch stehen, ist er ausgeblendet.
+      await seite.getByPlaceholder('Frau Muster').fill('TEST Reiter prüfen');
+      await seite.getByRole('button', { name: 'Als Entwurf speichern' }).click();
+      const loeschen = seite.getByRole('button', { name: 'Entwurf löschen' });
+      if (await loeschen.waitFor({ state: 'visible', timeout: 15000 }).then(() => true).catch(() => false)) {
+        await loeschen.click();
+        const weg = await seite.getByLabel('Adresse').waitFor({ state: 'visible', timeout: 15000 }).then(() => true).catch(() => false);
+        ergebnis += weg ? ' · Entwurf angelegt und gelöscht' : ' · Entwurf lässt sich nicht löschen';
+      } else ergebnis += ' · Entwurf lässt sich nicht speichern';
+    }
+    const gut = /Entwurf angelegt und gelöscht$/.test(ergebnis) && !/auffälliger Text/.test(ergebnis);
+    zeilen.push({ geraet: geraet.name, reiter: 'kalkulation', ms: Date.now() - start, fehler: [...new Set(fehler)].concat(gut ? [] : [ergebnis]),
       abgelehnt: [...new Set(abgelehnt)], langsam: langsame(), spaet: spaete(), breite: 0, merkmale: [], leer: false, notiz: ergebnis });
   }
   await ctx.close();
