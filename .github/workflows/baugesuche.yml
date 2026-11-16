@@ -21,8 +21,20 @@ name: Baugesuche
 
 on:
   schedule:
-    # Täglich 05:23 UTC: die Quelle wird gegen 04:15 UTC erneuert
-    # (metadata_modified am 31.10.: 04:13).
+    # Die Quelle wird gegen 04:15 UTC erneuert (metadata_modified am
+    # 31.10.: 04:13). GitHub startet geplante Läufe hier aber 6 bis 9
+    # Stunden nach Plan (gemessen, siehe tools/zeitfenster.sh): mit 05:23
+    # allein kamen die Gesuche vom 4. bis 15. November erst zwischen
+    # 11:47 und 14:00 Uhr an.
+    #
+    # Der Eintrag vom Vorabend trifft bei dieser Verspätung den frühen
+    # Morgen (04:47 bis 07:01 UTC) und lädt nur dann: zwischen 04:20 und
+    # 08:20 UTC, nach der Erneuerung der Quelle und nach «Zählen», vor
+    # «Reiter prüfen». Der Eintrag 05:23 lädt immer, wann er auch
+    # startet -- so fällt kein Tag aus, wie GitHub sich auch verhält.
+    # Zweimal laden schadet nicht: jedes Gesuch wird über (quelle,
+    # fremd_id) ersetzt, nie doppelt angelegt.
+    - cron: '23 22 * * *'
     - cron: '23 5 * * *'
   workflow_dispatch:
     inputs:
@@ -43,7 +55,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Zur vorgesehenen Zeit?
+        id: zeit
+        env:
+          # Welcher der beiden Einträge diesen Lauf ausgelöst hat.
+          EINTRAG: ${{ github.event.schedule }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = schedule ] && [ "$EINTRAG" != '23 5 * * *' ] && ! tools/zeitfenster.sh 04:20 08:20; then
+            echo "Geplanter Start um $(date -u +%H:%M) UTC, ausserhalb des frühen Morgens (04:20 bis 08:20 UTC): dieser Lauf tut nichts, geladen wird mit dem Eintrag 05:23." | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "weiter=nein" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Werkzeuge
+        if: ${{ steps.zeit.outputs.weiter != 'nein' }}
         run: sudo apt-get install -y -qq postgresql-client
 
       # Vor Zürich, damit der Abgleich unten auch diese Gesuche zuordnet.
@@ -51,7 +75,7 @@ jobs:
       # Schritt macht den Lauf dann rot.
       - name: Übrige Kantone (Amtsblattportal)
         id: amtsblatt
-        if: inputs.nur_abgleich != 'ja'
+        if: ${{ steps.zeit.outputs.weiter != 'nein' && inputs.nur_abgleich != 'ja' }}
         continue-on-error: true
         env:
           DB: ${{ secrets.SUPABASE_DB_URL }}
@@ -92,6 +116,7 @@ jobs:
           SQL
 
       - name: Laden, ergänzen, abgleichen
+        if: ${{ steps.zeit.outputs.weiter != 'nein' }}
         env:
           DB: ${{ secrets.SUPABASE_DB_URL }}
           TAGE: ${{ inputs.tage || '3' }}
@@ -217,6 +242,7 @@ jobs:
       # Bundes kennt zu jeder EGRID die Gebäude mit Koordinaten; der Punkt ist
       # ihr Mittel. Parzellen ohne Gebäude bleiben ohne Punkt.
       - name: Punkte für Zürcher Gesuche (Gebäuderegister)
+        if: ${{ steps.zeit.outputs.weiter != 'nein' }}
         env:
           DB: ${{ secrets.SUPABASE_DB_URL }}
         run: |

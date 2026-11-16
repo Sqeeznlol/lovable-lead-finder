@@ -159,6 +159,38 @@ describe('Geplante Läufe treffen ihre Tageszeit, wie spät GitHub auch startet'
     expect(ohneKommentare(lesen('reiter.yml'))).toMatch(/group: reiter\n\s+cancel-in-progress: \$\{\{ github\.event_name != 'schedule' \}\}/);
   });
 
+  // Die Gesuche sollen am Morgen da sein, nicht am Mittag -- und an keinem
+  // Tag ausbleiben: der Eintrag vom Vorabend lädt nur am frühen Morgen,
+  // der Eintrag 05:23 immer.
+  it('Baugesuche: der Vorabend trifft den Morgen, und ein Eintrag lädt immer', () => {
+    const roh = lesen('baugesuche.yml');
+    const t = ohneKommentare(roh);
+    const eintraege = [...t.matchAll(/- cron: '([^']+)'/g)].map(m => m[1]);
+    expect(eintraege).toEqual(['23 22 * * *', '23 5 * * *']);
+    const wache = /\[ "\$GITHUB_EVENT_NAME" = schedule \] && \[ "\$EINTRAG" != '([^']+)' \] && ! tools\/zeitfenster\.sh (\d\d:\d\d) (\d\d:\d\d);/.exec(t);
+    expect(wache).not.toBeNull();
+    const [, immer, von, bis] = wache!;
+    // Der Eintrag, der immer lädt, steht wörtlich im Zeitplan.
+    expect(eintraege).toContain(immer);
+    expect(t).toContain('EINTRAG: ${{ github.event.schedule }}');
+    // Gemessen: 6 h 24 bis 8 h 38 nach Plan.
+    const vorabend = 22 * 60 + 23;
+    for (let spaet = 6 * 60 + 24; spaet <= 8 * 60 + 38; spaet += 2) expect(imFenster(vorabend + spaet, von, bis), `${spaet} min`).toBe(true);
+    // Pünktlich gestartet lädt der Vorabend nicht (die Quelle ist dann von gestern).
+    expect(imFenster(vorabend, von, bis)).toBe(false);
+    // Nach der Erneuerung der Quelle (gegen 04:15 UTC).
+    expect(minuten(von)).toBeGreaterThanOrEqual(minuten('04:20'));
+    // Jeder Schritt danach hängt an der Uhr -- ausser dem letzten, der nur
+    // meldet, dass das Amtsblattportal ausfiel.
+    const nachDerUhr = t.slice(t.indexOf('tools/zeitfenster.sh'));
+    const schritte = [...nachDerUhr.matchAll(/\n {6}- name: ([^\n]+)\n((?: {8}[^\n]*\n)*)/g)]
+      .filter(s => !s[2].includes("steps.amtsblatt.outcome == 'failure'"));
+    expect(schritte.map(s => s[1])).toEqual([
+      'Werkzeuge', 'Übrige Kantone (Amtsblattportal)', 'Laden, ergänzen, abgleichen', 'Punkte für Zürcher Gesuche (Gebäuderegister)',
+    ]);
+    expect(schritte.filter(s => !/if: \$\{\{ steps\.zeit\.outputs\.weiter != 'nein'/.test(s[2])).map(s => s[1])).toEqual([]);
+  });
+
   // Nach dem Einspielen zählt «Nachbarschaft» selbst.
   it('Zählen zählt nicht gleich noch einmal', () => {
     const t = ohneKommentare(lesen('zaehlen.yml'));

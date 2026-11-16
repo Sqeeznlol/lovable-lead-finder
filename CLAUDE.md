@@ -122,6 +122,9 @@ nachts.
   * So laufen «Nachbarschaft» (22:00 bis 02:00 UTC), «Zählen» (03:40 bis
     07:40) und «Reiter prüfen» (04:30 bis 08:30). Von Hand gestartet
     gilt die Uhr nicht.
+  * Was an keinem Tag ausfallen darf, hat einen Eintrag ohne Uhr:
+    «Baugesuche» lädt mit dem Eintrag vom Vorabend nur am frühen Morgen
+    (04:20 bis 08:20), mit dem Eintrag 05:23 immer.
   * Ob ein geplanter Lauf wirklich gelaufen ist, steht in der Liste der
     Läufe, nicht im Zeitplan.
 
