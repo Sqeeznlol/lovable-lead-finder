@@ -105,6 +105,28 @@ rund 5 Dollar im Monat mehr; das entscheidet Julian.
 Der Test `datenbank-schonen.test.ts` wird rot, wenn eine dieser
 Sicherungen verschwindet.
 
+## Geplante Läufe starten Stunden zu spät
+
+GitHub startet die Zeitpläne dieses Repositorys 6 bis 9 Stunden nach
+Plan. Gemessen an «Baugesuche» (Plan 05:23 UTC), 4. bis 15. November:
+Start zwischen 11:47 und 14:00 Uhr. Am 16. November waren darum weder
+«Zählen» (03:47) noch «Reiter prüfen» (05:20) am Morgen gelaufen, und
+die «Nachbarschaft» (23:30) hätte um sieben Uhr früh geschrieben statt
+nachts.
+
+  * Ein Zeitplan sagt nicht, wann ein Lauf arbeitet. Wer eine Tageszeit
+    braucht, prüft die Uhr im Lauf selbst: `tools/zeitfenster.sh VON BIS`.
+  * Dazu drei Einträge im Zeitplan, dreieinhalb Stunden auseinander,
+    damit bei jeder Verspätung von 0 bis 9½ Stunden einer ins Fenster
+    trifft. Wer daneben startet, endet nach Sekunden.
+  * So laufen «Nachbarschaft» (22:00 bis 02:00 UTC), «Zählen» (03:40 bis
+    07:40) und «Reiter prüfen» (04:30 bis 08:30). Von Hand gestartet
+    gilt die Uhr nicht.
+  * Ob ein geplanter Lauf wirklich gelaufen ist, steht in der Liste der
+    Läufe, nicht im Zeitplan.
+
+Der Test `zeitplan.test.ts` rechnet die Abdeckung nach.
+
 ## Gestaltung
 
 Wie die Seite aussieht, steht in `DESIGN.md` -- vor jeder Arbeit an der

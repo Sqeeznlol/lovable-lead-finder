@@ -19,8 +19,13 @@ on:
   workflow_dispatch:
   schedule:
     # Einmal am Morgen, damit ein stehengebliebener Ausrollstand
-    # auffällt, bevor jemand danach telefoniert.
-    - cron: '0 5 * * 1-5'
+    # auffällt, bevor jemand danach telefoniert. GitHub startet geplante
+    # Läufe hier 6 bis 9 Stunden nach Plan (siehe tools/zeitfenster.sh);
+    # der Eintrag vom Vorabend trifft darum den Morgen, der zweite gilt,
+    # falls GitHub wieder pünktlich wird. Die Prüfung ist eine einzige
+    # Anfrage -- zweimal am Tag schadet sie nicht.
+    - cron: '43 21 * * 0-4'
+    - cron: '3 5 * * 1-5'
 
 # Bei drei Pushes kurz nacheinander interessiert nur der letzte.
 concurrency:

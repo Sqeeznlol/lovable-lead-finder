@@ -11,6 +11,13 @@
 # daten_stand und zeigt, wann gezählt wurde. Bleibt der Ablauf aus,
 # steht dort nach zwei Tagen «veraltet».
 #
+# Der erste geplante Lauf (03:47 UTC, 16. November) blieb aus: GitHub
+# startet geplante Läufe hier 6 bis 9 Stunden nach Plan (gemessen, siehe
+# tools/zeitfenster.sh), gezählt worden wäre also am Mittag. Der Lauf
+# prüft darum die Uhr selbst und zählt geplant nur zwischen 03:40 und
+# 07:40 UTC: nach dem Einspielen der Nachbarschaft (bis 03:30), vor dem
+# Morgen. Hat «Nachbarschaft» eben selbst gezählt, ist nichts zu tun.
+#
 # Ausgegeben werden nur Zahlen.
 # =====================================================================
 
@@ -18,8 +25,13 @@ name: Zählen
 
 on:
   schedule:
-    # 03:47 UTC: nach dem nächtlichen Lauf der Nachbarschaft (der bis 03:30 einspielt), lange vor dem Morgen.
-    - cron: '47 3 * * *'
+    # Drei Einträge, damit bei jeder Verspätung einer ins Fenster trifft:
+    #   21:57  bei 5.7 bis 9.7 Stunden Verspätung (der gemessene Fall)
+    #   01:27  bei 2.2 bis 6.2 Stunden
+    #   04:57  bei 0 bis 2.7 Stunden (falls GitHub wieder pünktlich wird)
+    - cron: '57 21 * * *'
+    - cron: '27 1 * * *'
+    - cron: '57 4 * * *'
   workflow_dispatch:
 
 jobs:
@@ -29,15 +41,40 @@ jobs:
     env:
       PGCONNECT_TIMEOUT: 30
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Zur vorgesehenen Zeit?
+        id: zeit
+        run: |
+          # Von Hand gestartet gilt die Uhr nicht: das ist eine Entscheidung.
+          if [ "$GITHUB_EVENT_NAME" = schedule ] && ! tools/zeitfenster.sh 03:40 07:40; then
+            echo "Geplanter Start um $(date -u +%H:%M) UTC, ausserhalb der Zeit (03:40 bis 07:40 UTC): dieser Lauf tut nichts." | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "weiter=nein" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Werkzeuge
+        if: ${{ steps.zeit.outputs.weiter != 'nein' }}
         run: sudo apt-get install -y -qq postgresql-client >/dev/null
 
       - name: Zählen und ablegen
+        if: ${{ steps.zeit.outputs.weiter != 'nein' }}
         env:
           DB: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           set -uo pipefail
           [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
+          # «Nachbarschaft» zählt nach dem Einspielen selbst. Ein zweiter
+          # Durchgang gleich danach kostete nur vom Guthaben der Platte.
+          if [ "$GITHUB_EVENT_NAME" = schedule ]; then
+            alter=$(psql "$DB" -X -q -t -A \
+                      -c "set statement_timeout = '20s';" \
+                      -c "select coalesce(floor(extract(epoch from now() - max(gezaehlt_am)) / 60), 99999)::int from public.daten_zaehlung;" 2>/dev/null) || alter=""
+            case "$alter" in ''|*[!0-9]*) alter=99999 ;; esac
+            if [ "$alter" -lt 360 ]; then
+              echo "Vor $alter Minuten gezählt: nichts zu tun." | tee -a "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+          fi
           # Ein Durchgang durch die Parzellen und je einer durch Gebäude,
           # Paare und Punkte. Die Frist setzt die Datenbank durch; die
           # Fehlermeldung erscheint nicht, sie kann die Adresse enthalten.

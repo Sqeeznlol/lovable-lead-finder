@@ -60,8 +60,20 @@ name: Nachbarschaft
 
 on:
   schedule:
-    # 23:30 UTC: in der Schweiz halb eins oder halb zwei in der Nacht.
-    - cron: '30 23 * * *'
+    # GitHub startet geplante Läufe hier 6 bis 9 Stunden nach Plan
+    # (gemessen, siehe tools/zeitfenster.sh). Mit dem einen Eintrag 23:30
+    # hätte dieser Lauf morgens um sieben geschrieben statt nachts.
+    #
+    # Darum prüft der Lauf die Uhr selbst: ein geplanter Start arbeitet nur
+    # zwischen 22:00 und 02:00 UTC (in der Schweiz ab elf oder zwölf Uhr
+    # nachts) und endet sonst nach Sekunden, ohne die Datenbank zu fragen.
+    # Drei Einträge, damit bei jeder Verspätung einer ins Fenster trifft:
+    #   16:07  bei 5.9 bis 9.9 Stunden Verspätung (der gemessene Fall)
+    #   19:37  bei 2.4 bis 6.4 Stunden
+    #   23:07  bei 0 bis 2.9 Stunden (falls GitHub wieder pünktlich wird)
+    - cron: '7 16 * * *'
+    - cron: '37 19 * * *'
+    - cron: '7 23 * * *'
   workflow_dispatch:
     inputs:
       schritt:
@@ -91,7 +103,9 @@ concurrency:
 jobs:
   nachbarschaft:
     runs-on: ubuntu-latest
-    timeout-minutes: 330
+    # Start frühestens 22:00, Einspielen bis 03:30, danach Aufräumen und
+    # Zählen: das braucht die sechs Stunden, die GitHub höchstens gibt.
+    timeout-minutes: 360
     env:
       LOKAL: postgresql://postgres:lokal@127.0.0.1:5433/postgres
       PGCONNECT_TIMEOUT: 20
@@ -140,6 +154,13 @@ jobs:
           DB: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           set -uo pipefail
+          # Geplante Läufe schreiben nur nachts (siehe oben, beim Zeitplan).
+          # Von Hand gestartet gilt die Uhr nicht: das ist eine Entscheidung.
+          if [ "$GITHUB_EVENT_NAME" = schedule ] && ! tools/zeitfenster.sh 22:00 02:00; then
+            echo "Geplanter Start um $(date -u +%H:%M) UTC, ausserhalb der Nacht (22:00 bis 02:00 UTC): dieser Lauf tut nichts." | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "n=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
           # Diese Zählung liest die Datenbank aus einem kleinen Index
           # (idx_properties_nachbarn_offen). Ist nichts offen, endet der

@@ -23,23 +23,50 @@ on:
   workflow_run:
     workflows: ['Was ist live']
     types: [completed]
+  # Jeden Werktag am Morgen. GitHub startet geplante Läufe hier 6 bis 9
+  # Stunden nach Plan (gemessen, siehe tools/zeitfenster.sh): mit dem
+  # einen Eintrag 05:20 wäre am Mittag geprüft worden. Der Lauf prüft
+  # darum die Uhr selbst und klickt geplant nur zwischen 04:30 und 08:30
+  # UTC durch -- eine knappe Stunde nach «Zählen», damit nicht gemessen
+  # wird, während gezählt wird. Drei Einträge, damit bei jeder
+  # Verspätung einer trifft:
+  #   22:50 am Vorabend  bei 5.7 bis 9.7 Stunden (der gemessene Fall)
+  #   02:20              bei 2.2 bis 6.2 Stunden
+  #   05:50              bei 0 bis 2.7 Stunden
   schedule:
-    - cron: '20 5 * * 1-5'
+    - cron: '50 22 * * 0-4'
+    - cron: '20 2 * * 1-5'
+    - cron: '50 5 * * 1-5'
 
+# Ein neuer Stand löst die Prüfung des vorigen ab. Ein geplanter Lauf
+# aber wartet: er endet ausserhalb seiner Zeit nach Sekunden und darf
+# dafür keine laufende Prüfung eines Standes abbrechen.
 concurrency:
   group: reiter
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name != 'schedule' }}
 
 jobs:
   reiter:
-    # Ist der Stand gar nicht live, gibt es hier nichts zu prüfen.
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    # Ist der Stand gar nicht live, gibt es hier nichts zu prüfen. Und die
+    # Morgenkontrolle von «Was ist live» zieht keinen zweiten Durchgang
+    # nach: am Morgen prüft der eigene Zeitplan, einmal.
+    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event != 'schedule') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
+      - name: Zur vorgesehenen Zeit?
+        id: zeit
+        run: |
+          # Nach einem ausgelieferten Stand und von Hand gilt die Uhr nicht.
+          if [ "$GITHUB_EVENT_NAME" = schedule ] && ! tools/zeitfenster.sh 04:30 08:30; then
+            echo "Geplanter Start um $(date -u +%H:%M) UTC, ausserhalb des Morgens (04:30 bis 08:30 UTC): dieser Lauf tut nichts." | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "weiter=nein" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Browser einrichten
+        if: ${{ steps.zeit.outputs.weiter != 'nein' }}
         run: |
           set -euo pipefail
           # Der Chrome des Runners: Playwright 1.57 kann für Ubuntu 26.04
@@ -53,6 +80,7 @@ jobs:
           npm install --silent playwright-core@1.57.0
 
       - name: Jeden Reiter öffnen
+        if: ${{ steps.zeit.outputs.weiter != 'nein' }}
         env:
           KONTO_AUI: ${{ secrets.KONTO_AUI }}
           NODE_PATH: /tmp/pruefung/node_modules
