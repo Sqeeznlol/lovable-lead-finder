@@ -237,30 +237,64 @@ jobs:
           done
           psql "$DB" -X -q -c "select count(*) as punkte from public.parzelle_punkt;" | tee -a "$GITHUB_STEP_SUMMARY"
 
+          # Ein Stapel, der in die Frist läuft, beendet den Lauf nicht mehr:
+          # am 15. November stand er nach 120'000 Parzellen, weil ein einziger
+          # Stapel länger als 15 Minuten brauchte und die Datenbank kurz
+          # darauf keine Verbindung mehr annahm. Jetzt wird der Stapel
+          # halbiert und nach einer Pause wiederholt; nach einem Erfolg
+          # wächst er wieder. Scheitert selbst eine einzelne Parzelle
+          # dreimal, wird sie übersprungen (nachbarn_stand = 1970) und am
+          # Schluss gezählt, statt alle folgenden aufzuhalten.
+          #
+          # Vom Fehler erscheint nur die Art, nie der Wortlaut: er kann die
+          # Adresse der Datenbank enthalten.
           echo "### Nachbarschaft, in Stapeln" | tee -a "$GITHUB_STEP_SUMMARY"
-          parzellen=0; paare=0; runde=0
+          parzellen=0; paare=0; runde=0; menge=1000; fehl=0; uebersprungen=0
           while :; do
-            mb=$(megabyte)
-            if [ "$mb" -ge "$GRENZE_MB" ]; then
+            mb=$(megabyte 2>/dev/null || echo 0)
+            if [ "${mb:-0}" -ge "$GRENZE_MB" ]; then
               echo "ABBRUCH: Datenbank bei ${mb} MB, Grenze ${GRENZE_MB} MB. Der nächste Lauf macht weiter." | tee -a "$GITHUB_STEP_SUMMARY"
               break
             fi
-            zeile=$(psql "$DB" -v ON_ERROR_STOP=1 -X -q -t -A \
-              -c "set statement_timeout = '15min';" \
-              -c "select bearbeitet || '|' || paare from public.nachbarschaft_rechnen(null, 2000);")
-            b=${zeile%%|*}; pz=${zeile##*|}
-            [ "$b" -gt 0 ] || break
-            parzellen=$(( parzellen + b )); paare=$(( paare + pz )); runde=$(( runde + 1 ))
-            if [ $(( runde % 10 )) -eq 0 ]; then
-              # nachbarn_stand ändert jede Zeile noch einmal: aufräumen.
-              psql "$DB" -X -q -c "vacuum public.properties;"
-              echo "  $parzellen Parzellen, $paare Paare, Datenbank ${mb} MB"
+            if zeile=$(psql "$DB" -v ON_ERROR_STOP=1 -X -q -t -A \
+                 -c "set statement_timeout = '10min';" \
+                 -c "select bearbeitet || '|' || paare from public.nachbarschaft_rechnen(null, $menge);" 2>/tmp/nb.err); then
+              fehl=0
+              b=${zeile%%|*}; pz=${zeile##*|}
+              [ "$b" -gt 0 ] || break
+              parzellen=$(( parzellen + b )); paare=$(( paare + pz )); runde=$(( runde + 1 ))
+              [ "$menge" -lt 1000 ] && menge=$(( menge * 2 ))
+              if [ $(( runde % 20 )) -eq 0 ]; then
+                # nachbarn_stand ändert jede Zeile noch einmal: aufräumen.
+                psql "$DB" -X -q -c "vacuum public.properties;" 2>/dev/null || true
+                echo "  $parzellen Parzellen, $paare Paare, Datenbank ${mb} MB"
+              fi
+            else
+              fehl=$(( fehl + 1 ))
+              art=Fehler
+              grep -q 'statement timeout' /tmp/nb.err && art=Zeitüberschreitung
+              grep -qi 'connection\|ECHECKOUTTIMEOUT' /tmp/nb.err && art='keine Verbindung'
+              echo "  Stapel zu $menge gescheitert: $art (Versuch $fehl)"
+              if [ "$art" = 'keine Verbindung' ]; then
+                # Nicht der Stapel ist zu gross, die Datenbank ist weg: warten.
+                [ "$fehl" -lt 10 ] || { echo "ABBRUCH: zehnmal keine Verbindung. Der nächste Lauf macht weiter." | tee -a "$GITHUB_STEP_SUMMARY"; exit 1; }
+                sleep 30
+              elif [ "$menge" -gt 1 ]; then
+                menge=$(( menge / 2 )); fehl=0
+              elif [ "$fehl" -ge 3 ]; then
+                n=$(psql "$DB" -X -q -t -A -c "with eine as (select id from public.properties where geometrie is not null and nachbarn_stand is null limit 1)
+                      update public.properties p set nachbarn_stand = 'epoch' from eine where p.id = eine.id returning 1;" 2>/dev/null | wc -l)
+                uebersprungen=$(( uebersprungen + n )); fehl=0
+                echo "  eine Parzelle übersprungen (insgesamt $uebersprungen)"
+                [ "$n" -gt 0 ] || { echo "ABBRUCH: die Datenbank antwortet nicht. Der nächste Lauf macht weiter." | tee -a "$GITHUB_STEP_SUMMARY"; exit 1; }
+              fi
+              sleep 30
             fi
           done
           # Mit VACUUM, nicht nur ANALYZE: erst dann zählt die Datenbank über
           # den Index statt über die Tabelle (daten_stand, Reiter Auswertung).
           psql "$DB" -X -q -c "vacuum analyze public.properties;" -c "vacuum analyze public.nachbarschaft;" -c "vacuum analyze public.parzelle_punkt;"
-          echo "Parzellen gerechnet: $parzellen, Paare: $paare" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Parzellen gerechnet: $parzellen, Paare: $paare, übersprungen: $uebersprungen" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Stand
         if: always()
