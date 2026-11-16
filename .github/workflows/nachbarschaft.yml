@@ -17,21 +17,29 @@
 # Die Datenbank ist eine kleine Instanz, die die Seite bedient. Eine
 # Rechnung, die eine Stunde lang einen ganzen Prozessor braucht, gehört
 # nicht dorthin. Der Runner hat vier Prozessoren und nichts anderes zu
-# tun. Darum:
+# tun. Gemessen am 16. November (Probelauf): 330'625 offene Parzellen,
+# 2'009'826 Paare, gerechnet in zwei Minuten.
 #
-#   1. Umrisse der Kantone von geodienste.ch holen (wie «Umrisse laden»).
-#   2. Aus der Datenbank nur lesen, welche Parzellen es gibt und welche
-#      noch offen sind (ein Durchgang). Parzellen, die geodienste.ch
-#      nicht führt (seither geteilt oder vereinigt, oder ohne EGRID),
-#      bringen ihren Umriss aus der Datenbank mit.
-#   3. In einer PostGIS-Instanz AUF DEM RUNNER die Paare rechnen,
+#   1. Nachsehen, ob überhaupt etwas offen ist. Wenn nicht: fertig.
+#   2. Aus der Datenbank lesen, welche Parzellen es gibt, in welchem
+#      Kanton, und welche noch offen sind (ein Durchgang, ohne Umrisse).
+#   3. Die Umrisse dieser Kantone von geodienste.ch holen. Parzellen,
+#      die geodienste.ch nicht führt (seither geteilt oder vereinigt,
+#      oder ohne EGRID), bringen ihren Umriss aus der Datenbank mit.
+#   4. In einer PostGIS-Instanz AUF DEM RUNNER die Paare rechnen,
 #      vierfach parallel. Dieselbe Bedingung wie nachbarschaft_rechnen:
 #      Umgebungen überlappen und die Flächen berühren sich.
-#   4. Die fertigen Paare in kleinen Portionen einfügen und die
-#      Parzellen als gerechnet kennzeichnen. Nach jeder Portion ruht
-#      die Datenbank mindestens so lange, wie die Portion gedauert hat,
-#      und vor jeder wird gemessen, ob sie zügig antwortet. Tut sie es
-#      nicht, wartet der Lauf, statt nachzulegen.
+#   5. In Portionen einspielen: je 1000 Parzellen ihre Paare und die
+#      Kennzeichnung «gerechnet», zusammen in einer Anweisung. Bricht
+#      der Lauf ab, ist jede Portion ganz da oder gar nicht, und der
+#      nächste Lauf nimmt nur, was noch offen ist. Nach jeder Portion
+#      ruht die Datenbank mindestens so lange, wie die Portion gedauert
+#      hat, und vor jeder wird gemessen, ob sie zügig antwortet. Tut
+#      sie es nicht, wartet der Lauf, statt nachzulegen.
+#
+# Der Lauf hört zur Uhrzeit «bis» von selbst auf (am Morgen gehört die
+# Datenbank der Seite) und startet jede Nacht neu, solange etwas offen
+# ist. Neue Umrisse werden so in der folgenden Nacht mitgerechnet.
 #
 # Jede Anweisung trägt eine Frist, die die Datenbank selbst durchsetzt.
 # Ein abgebrochener Lauf kann darum nichts zurücklassen, das länger als
@@ -45,12 +53,11 @@
 name: Nachbarschaft
 
 on:
+  schedule:
+    # 23:30 UTC: in der Schweiz halb eins oder halb zwei in der Nacht.
+    - cron: '30 23 * * *'
   workflow_dispatch:
     inputs:
-      kantone:
-        description: 'Kantonskürzel, durch Leerzeichen getrennt'
-        required: true
-        default: 'ZH TG'
       schritt:
         description: 'Was ausgeführt werden soll'
         required: true
@@ -58,8 +65,12 @@ on:
         type: choice
         options:
           - probe       # Rechnen und zählen, nichts schreiben
-          - schreiben   # Rechnen und in die Datenbank einfügen
+          - schreiben   # Rechnen und in die Datenbank einspielen
           - aufraeumen  # Nur: hängende Rechnungen früherer Läufe beenden
+      bis:
+        description: 'Uhrzeit (UTC, HH:MM), zu der das Einspielen von selbst aufhört'
+        required: false
+        default: '04:30'
       pause:
         description: 'Sekunden Ruhe nach jeder Portion, mindestens'
         required: false
@@ -74,7 +85,7 @@ concurrency:
 jobs:
   nachbarschaft:
     runs-on: ubuntu-latest
-    timeout-minutes: 300
+    timeout-minutes: 330
     env:
       LOKAL: postgresql://postgres:lokal@127.0.0.1:5433/postgres
       PGCONNECT_TIMEOUT: 20
@@ -116,8 +127,31 @@ jobs:
           done
           echo "Die Datenbank nahm keine Verbindung an." | tee -a "$GITHUB_STEP_SUMMARY"; exit 1
 
-      - name: Eigene PostGIS-Instanz
+      - name: Ist etwas offen?
+        id: offen
         if: ${{ inputs.schritt != 'aufraeumen' }}
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -uo pipefail
+          [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
+          # Diese Zählung liest die Datenbank aus einem kleinen Index
+          # (idx_properties_nachbarn_offen). Ist nichts offen, endet der
+          # Lauf hier, ohne den Bestand zu lesen.
+          n=""
+          for versuch in 1 2 3 4 5; do
+            n=$(psql "$DB" -v ON_ERROR_STOP=1 -X -q -t -A \
+                  -c "set statement_timeout = '30s';" \
+                  -c "select count(*) from public.properties where geometrie is not null and nachbarn_stand is null;" 2>/dev/null) || n=""
+            case "$n" in ''|*[!0-9]*) n="" ;; *) break ;; esac
+            echo "  keine Antwort, warte eine Minute ($versuch)"; sleep 60
+          done
+          [ -n "$n" ] || { echo "Die Datenbank antwortete nicht." | tee -a "$GITHUB_STEP_SUMMARY"; exit 1; }
+          echo "Parzellen mit Umriss, deren Nachbarschaft noch nicht gerechnet ist: $n" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "n=$n" >> "$GITHUB_OUTPUT"
+
+      - name: Eigene PostGIS-Instanz
+        if: ${{ inputs.schritt != 'aufraeumen' && steps.offen.outputs.n != '0' }}
         run: |
           set -euo pipefail
           # Ohne Absicherung gegen Stromausfall: die Instanz lebt nur für
@@ -134,19 +168,51 @@ jobs:
           [ "$bereit" = 1 ] || { echo "Die eigene Instanz startet nicht."; docker logs pg 2>&1 | tail -20; exit 1; }
           psql "$LOKAL" -X -q -t -A -c "select 'PostGIS ' || postgis_lib_version();"
 
-      - name: Umrisse holen
-        if: ${{ inputs.schritt != 'aufraeumen' }}
+      - name: Bestand lesen
+        if: ${{ inputs.schritt != 'aufraeumen' && steps.offen.outputs.n != '0' }}
         env:
-          KANTONE: ${{ inputs.kantone }}
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -uo pipefail
+          art() { a=Fehler; grep -q 'statement timeout' /tmp/db.err && a=Zeitüberschreitung; grep -qi 'connection\|ECHECKOUTTIMEOUT' /tmp/db.err && a='keine Verbindung'; echo "$a"; }
+
+          # Ein Durchgang durch die Parzellen: Kennung, EGRID, Kanton, noch
+          # offen? Der Umriss selbst wird nicht gelesen, nur ob er da ist.
+          if ! psql "$DB" -v ON_ERROR_STOP=1 -X -q \
+                 -c "set statement_timeout = '10min';" \
+                 -c "\copy (select id, egrid, kanton, (nachbarn_stand is null) as offen from public.properties where geometrie is not null) to '/tmp/bestand.csv' with (format csv)" 2>/tmp/db.err; then
+            echo "Der Bestand liess sich nicht lesen: $(art)." | tee -a "$GITHUB_STEP_SUMMARY"; exit 1
+          fi
+          set -e
+          # Eine Parzelle ohne EGRID bekommt hier eine eigene Kennung. So
+          # rechnet sie mit, statt ihren Nachbarn zu fehlen.
+          psql "$LOKAL" -v ON_ERROR_STOP=1 -X -q \
+            -c "create table bestand (id uuid, egrid text, kanton text, offen boolean);" \
+            -c "\copy bestand from '/tmp/bestand.csv' with (format csv)" \
+            -c "update bestand set egrid = 'ohne:' || id where egrid is null or egrid = '';" \
+            -c "create index on bestand (egrid);" -c "analyze bestand;" \
+            -c "select coalesce(kanton, '(leer)') as kanton, count(*) as mit_umriss, count(*) filter (where offen) as offen from bestand group by 1 order by 2 desc;" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+          # Die Kantone, deren Umrisse zu holen sind: alle mit Umriss im
+          # Bestand, nicht nur die offenen -- ein Nachbar kann jenseits der
+          # Kantonsgrenze liegen.
+          psql "$LOKAL" -X -q -t -A -c "select distinct kanton from bestand where kanton ~ '^[A-Z]{2}$' order by 1;" > /tmp/kantone.txt
+          echo "Kantone: $(tr '\n' ' ' < /tmp/kantone.txt)" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Umrisse holen
+        if: ${{ inputs.schritt != 'aufraeumen' && steps.offen.outputs.n != '0' }}
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           set -euo pipefail
+          art() { a=Fehler; grep -q 'statement timeout' /tmp/db.err && a=Zeitüberschreitung; grep -qi 'connection\|ECHECKOUTTIMEOUT' /tmp/db.err && a='keine Verbindung'; echo "$a"; }
           psql "$LOKAL" -v ON_ERROR_STOP=1 -X -q -c "create table eingang (wkt text, egrid text);"
-          for k in $KANTONE; do
-            case "$k" in [A-Z][A-Z]) ;; *) echo "Kanton als Kürzel, z.B. ZH."; exit 1 ;; esac
+          while read -r k; do
+            [ -n "$k" ] || continue
             python3 tools/umrisse_laden.py "$k" "/tmp/umrisse-$k.csv" | tee -a "$GITHUB_STEP_SUMMARY"
             psql "$LOKAL" -v ON_ERROR_STOP=1 -X -q -c "\copy eingang from '/tmp/umrisse-$k.csv' with (format csv, header)"
             rm -f "/tmp/umrisse-$k.csv"
-          done
+          done < /tmp/kantone.txt
           # Wie beim Schreiben der Umrisse: ungültige Flächen heilen, sonst
           # scheitert ST_Touches an ihnen. Eine EGRID, die zwei Kantone
           # liefern, zählt einmal.
@@ -159,33 +225,8 @@ jobs:
             -c "delete from u where g is null or ST_IsEmpty(g);" \
             -c "create unique index on u (egrid);" \
             -c "select count(*) as umrisse_von_geodienste from u;" \
+            -c "\copy (select b.id from bestand b where not exists (select 1 from u where u.egrid = b.egrid)) to '/tmp/rest.csv' with (format csv)" \
             | tee -a "$GITHUB_STEP_SUMMARY"
-
-      - name: Bestand lesen
-        if: ${{ inputs.schritt != 'aufraeumen' }}
-        env:
-          DB: ${{ secrets.SUPABASE_DB_URL }}
-        run: |
-          set -uo pipefail
-          [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
-          art() { a=Fehler; grep -q 'statement timeout' /tmp/db.err && a=Zeitüberschreitung; grep -qi 'connection\|ECHECKOUTTIMEOUT' /tmp/db.err && a='keine Verbindung'; echo "$a"; }
-
-          # Ein Durchgang durch die Parzellen: Kennung, EGRID, noch offen?
-          # Der Umriss selbst wird nicht gelesen, nur ob er da ist.
-          if ! psql "$DB" -v ON_ERROR_STOP=1 -X -q \
-                 -c "set statement_timeout = '10min';" \
-                 -c "\copy (select id, egrid, (nachbarn_stand is null) as offen from public.properties where geometrie is not null) to '/tmp/bestand.csv' with (format csv)" 2>/tmp/db.err; then
-            echo "Der Bestand liess sich nicht lesen: $(art)." | tee -a "$GITHUB_STEP_SUMMARY"; exit 1
-          fi
-          set -e
-          # Eine Parzelle ohne EGRID bekommt hier eine eigene Kennung. So
-          # rechnet sie mit, statt ihren Nachbarn zu fehlen.
-          psql "$LOKAL" -v ON_ERROR_STOP=1 -X -q \
-            -c "create table bestand (id uuid, egrid text, offen boolean);" \
-            -c "\copy bestand from '/tmp/bestand.csv' with (format csv)" \
-            -c "update bestand set egrid = 'ohne:' || id where egrid is null or egrid = '';" \
-            -c "create index on bestand (egrid);" -c "analyze bestand;" \
-            -c "\copy (select b.id from bestand b where not exists (select 1 from u where u.egrid = b.egrid)) to '/tmp/rest.csv' with (format csv)"
           rest=$(wc -l < /tmp/rest.csv)
           echo "Im Bestand, aber bei geodienste.ch nicht geführt (Umriss kommt aus der Datenbank): $rest" | tee -a "$GITHUB_STEP_SUMMARY"
 
@@ -223,7 +264,7 @@ jobs:
             | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Paare rechnen (vierfach parallel)
-        if: ${{ inputs.schritt != 'aufraeumen' }}
+        if: ${{ inputs.schritt != 'aufraeumen' && steps.offen.outputs.n != '0' }}
         run: |
           set -euo pipefail
           start=$(date +%s)
@@ -246,17 +287,21 @@ jobs:
             pids+=($!)
           done
           for p in "${pids[@]}"; do wait "$p"; done
+          # Je 1000 Parzellen eine Portion; ihre Paare tragen dieselbe Nummer.
           psql "$LOKAL" -v ON_ERROR_STOP=1 -X -q \
             -c "create table paare as select * from paare_0 union all select * from paare_1 union all select * from paare_2 union all select * from paare_3;" \
             -c "analyze paare;" \
+            -c "create table fertig as
+                  select b.id, ((row_number() over (order by b.id)) - 1) / 1000 as portion
+                    from bestand b where b.offen and exists (select 1 from u where u.egrid = b.egrid);" \
+            -c "create unique index on fertig (id);" -c "analyze fertig;" \
             -c "create table hoch as
-                  select distinct pa.id as parzelle_id, pb.id as nachbar_id, p.l
+                  select distinct f.portion, pa.id as parzelle_id, pb.id as nachbar_id, p.l
                     from paare p
                     join bestand pa on pa.egrid = p.a and pa.offen
+                    join fertig f on f.id = pa.id
                     join bestand pb on pb.egrid = p.b
                    where pa.id <> pb.id;" \
-            -c "create table fertig as
-                  select b.id from bestand b where b.offen and exists (select 1 from u where u.egrid = b.egrid);" \
             -c "select (select count(*) from fertig) as parzellen_gerechnet,
                        (select count(*) from bestand where offen) - (select count(*) from fertig) as bleiben_offen,
                        (select count(*) from hoch) as paare_einzufuegen,
@@ -264,18 +309,24 @@ jobs:
                        (select count(*) from fertig f where not exists (select 1 from hoch h where h.parzelle_id = f.id)) as ohne_nachbarn;" \
             | tee -a "$GITHUB_STEP_SUMMARY"
           psql "$LOKAL" -v ON_ERROR_STOP=1 -X -q \
-            -c "\copy hoch to '/tmp/hoch.csv' with (format csv)" \
-            -c "\copy fertig to '/tmp/fertig.csv' with (format csv)"
+            -c "\copy (select portion, parzelle_id, nachbar_id, l from hoch order by portion) to '/tmp/hoch.csv' with (format csv)" \
+            -c "\copy (select portion, id from fertig order by portion) to '/tmp/fertig.csv' with (format csv)"
           echo "Gerechnet in $(( ($(date +%s) - start) / 60 )) Minuten." | tee -a "$GITHUB_STEP_SUMMARY"
 
-      - name: Einfügen, in Portionen
-        if: ${{ inputs.schritt == 'schreiben' }}
+      - name: Einspielen, in Portionen
+        if: ${{ (inputs.schritt == 'schreiben' || github.event_name == 'schedule') && steps.offen.outputs.n != '0' }}
         env:
           DB: ${{ secrets.SUPABASE_DB_URL }}
           PAUSE: ${{ inputs.pause }}
+          BIS: ${{ inputs.bis }}
         run: |
           set -uo pipefail
           case "${PAUSE:-}" in ''|*[!0-9]*) PAUSE=4 ;; esac
+          case "${BIS:-}" in [0-2][0-9]:[0-5][0-9]) ;; *) BIS=04:30 ;; esac
+          # Feierabend: die nächste Uhrzeit BIS, heute oder morgen.
+          ende=$(date -u -d "today $BIS" +%s)
+          [ "$ende" -gt "$(date +%s)" ] || ende=$(date -u -d "tomorrow $BIS" +%s)
+          echo "Eingespielt wird bis $BIS UTC." | tee -a "$GITHUB_STEP_SUMMARY"
 
           art() { a=Fehler; grep -q 'statement timeout' /tmp/db.err && a=Zeitüberschreitung; grep -qi 'connection\|ECHECKOUTTIMEOUT' /tmp/db.err && a='keine Verbindung'; echo "$a"; }
 
@@ -294,19 +345,30 @@ jobs:
             return 1
           }
 
-          # Eine Portion einspielen. $1 Datei, $2 Spalten der Zwischentabelle,
-          # $3 Anweisung, die aus ihr schreibt und die Zahl zurückgibt.
-          # Die Frist setzt die Datenbank durch: bricht der Lauf ab, rechnet
-          # dort nichts länger als eine Minute weiter.
+          # Eine Portion: die Paare von 1000 Parzellen und ihre Kennzeichnung
+          # in EINER Anweisung -- ganz da oder gar nicht. Die Frist setzt die
+          # Datenbank durch: bricht der Lauf ab, rechnet dort nichts länger
+          # als eine Minute weiter. $1 Paare, $2 Parzellen.
           portion() {
             for versuch in 1 2 3 4 5; do
               wach || return 1
               t0=$(date +%s)
               if z=$(psql "$DB" -v ON_ERROR_STOP=1 -X -q -t -A \
                    -c "set statement_timeout = '60s';" \
-                   -c "create temp table e ($2);" \
+                   -c "create temp table e (parzelle_id uuid, nachbar_id uuid, l numeric);" \
                    -c "\copy e from '$1' with (format csv)" \
-                   -c "$3" 2>/tmp/db.err); then
+                   -c "create temp table f (id uuid);" \
+                   -c "\copy f from '$2' with (format csv)" \
+                   -c "with paare as (
+                         insert into public.nachbarschaft (parzelle_id, nachbar_id, grenzlaenge_m, distanz_m)
+                         select parzelle_id, nachbar_id, l, 0 from e
+                         on conflict (parzelle_id, nachbar_id) do nothing
+                         returning 1),
+                       gekennzeichnet as (
+                         update public.properties p set nachbarn_stand = now()
+                           from f where p.id = f.id and p.nachbarn_stand is null
+                         returning 1)
+                       select (select count(*) from paare) || '|' || (select count(*) from gekennzeichnet);" 2>/tmp/db.err); then
                 dauer=$(( $(date +%s) - t0 ))
                 # Mindestens so lange ruhen, wie die Portion gedauert hat.
                 ruhe=$PAUSE; [ "$dauer" -gt "$ruhe" ] && ruhe=$dauer
@@ -320,65 +382,48 @@ jobs:
             return 1
           }
 
+          # Die erste Spalte ist die Nummer der Portion; sie bestimmt die Datei.
           rm -f /tmp/h_* /tmp/f_*
-          split -l 10000 -a 4 /tmp/hoch.csv /tmp/h_
-          split -l 2000 -a 4 /tmp/fertig.csv /tmp/f_
-          echo "Portionen: $(ls /tmp/h_* 2>/dev/null | wc -l) mit Paaren, $(ls /tmp/f_* 2>/dev/null | wc -l) mit Parzellen" | tee -a "$GITHUB_STEP_SUMMARY"
+          awk -F, '{ d = sprintf("/tmp/f_%06d", $1); if (d != alt) { if (alt) close(alt); alt = d } print $2 >> d }' /tmp/fertig.csv
+          awk -F, '{ d = sprintf("/tmp/h_%06d", $1); if (d != alt) { if (alt) close(alt); alt = d } print $2 "," $3 "," $4 >> d }' /tmp/hoch.csv
+          anzahl=$(ls /tmp/f_* 2>/dev/null | wc -l)
+          echo "Portionen zu je 1000 Parzellen: $anzahl" | tee -a "$GITHUB_STEP_SUMMARY"
 
-          echo "### Paare einfügen" | tee -a "$GITHUB_STEP_SUMMARY"
-          n=0; eingefuegt=0
-          for f in /tmp/h_*; do
-            [ -e "$f" ] || break
-            n=$(( n + 1 ))
-            portion "$f" "parzelle_id uuid, nachbar_id uuid, l numeric" \
-              "with neu as (
-                 insert into public.nachbarschaft (parzelle_id, nachbar_id, grenzlaenge_m, distanz_m)
-                 select parzelle_id, nachbar_id, l, 0 from e
-                 on conflict (parzelle_id, nachbar_id) do nothing
-                 returning 1)
-               select count(*) from neu;" || exit 1
-            eingefuegt=$(( eingefuegt + z ))
-            [ $(( n % 20 )) -eq 0 ] && echo "  $n Portionen, $eingefuegt Paare eingefügt"
-          done
-          echo "Paare eingefügt: $eingefuegt" | tee -a "$GITHUB_STEP_SUMMARY"
-
-          # Erst jetzt kennzeichnen: bricht der Lauf vorher ab, gelten die
-          # Parzellen weiter als offen, und der nächste fügt den Rest ein.
-          echo "### Parzellen als gerechnet kennzeichnen" | tee -a "$GITHUB_STEP_SUMMARY"
-          n=0; gesetzt=0
+          n=0; paare=0; parzellen=0; schluss=fertig
           for f in /tmp/f_*; do
             [ -e "$f" ] || break
-            n=$(( n + 1 ))
-            portion "$f" "id uuid" \
-              "with neu as (
-                 update public.properties p set nachbarn_stand = now()
-                   from e where p.id = e.id and p.nachbarn_stand is null
-                 returning 1)
-               select count(*) from neu;" || exit 1
-            gesetzt=$(( gesetzt + z ))
-            [ $(( n % 20 )) -eq 0 ] && echo "  $n Portionen, $gesetzt Parzellen gekennzeichnet"
+            if [ "$(date +%s)" -ge "$ende" ]; then schluss=uhr; break; fi
+            h="/tmp/h_${f#/tmp/f_}"; [ -e "$h" ] || : > "$h"
+            portion "$h" "$f" || { schluss=abbruch; break; }
+            n=$(( n + 1 )); paare=$(( paare + ${z%%|*} )); parzellen=$(( parzellen + ${z##*|} ))
+            [ $(( n % 20 )) -eq 0 ] && echo "  $n von $anzahl Portionen: $parzellen Parzellen, $paare Paare, zuletzt ${dauer} s"
           done
-          echo "Parzellen gekennzeichnet: $gesetzt" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Eingespielt: $parzellen Parzellen, $paare Paare, in $n von $anzahl Portionen." | tee -a "$GITHUB_STEP_SUMMARY"
+          [ "$schluss" = uhr ] && echo "Es ist $BIS UTC: der Rest folgt im nächsten Lauf." | tee -a "$GITHUB_STEP_SUMMARY"
 
           # Die alten Fassungen der Zeilen räumt die Datenbank laufend
-          # selbst weg, gedrosselt. Hier nur noch einmal, ebenfalls
-          # gedrosselt, damit sie danach über den Index zählt (daten_stand,
-          # Reiter Auswertung).
-          wach || exit 1
-          for t in nachbarschaft properties; do
-            psql "$DB" -X -q -c "set vacuum_cost_delay = '2ms';" -c "set statement_timeout = '45min';" \
-              -c "vacuum analyze public.$t;" >/dev/null 2>&1 \
-              && echo "Aufgeräumt: $t" || echo "Aufräumen von $t nicht beendet; die Datenbank holt es selbst nach."
-          done | tee -a "$GITHUB_STEP_SUMMARY"
+          # selbst weg, gedrosselt. Hier noch einmal, ebenfalls gedrosselt,
+          # damit sie danach über den Index zählt -- und dann die Zahlen
+          # für die Seite neu ablegen (daten_zaehlen).
+          if [ "$n" -gt 0 ] && wach; then
+            for t in nachbarschaft properties; do
+              psql "$DB" -X -q -c "set vacuum_cost_delay = '2ms';" -c "set statement_timeout = '45min';" \
+                -c "vacuum analyze public.$t;" >/dev/null 2>&1 \
+                && echo "Aufgeräumt: $t" || echo "Aufräumen von $t nicht beendet; die Datenbank holt es selbst nach."
+            done | tee -a "$GITHUB_STEP_SUMMARY"
+            psql "$DB" -v ON_ERROR_STOP=1 -X -q -t -A -c "set statement_timeout = '10min';" \
+              -c "select 'Zählungen neu abgelegt: ' || public.daten_zaehlen();" 2>/dev/null \
+              | tee -a "$GITHUB_STEP_SUMMARY" || echo "Zählungen nicht neu abgelegt." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+          [ "$schluss" = abbruch ] && exit 1 || exit 0
 
       - name: Stand
-        if: ${{ always() && inputs.schritt == 'schreiben' }}
+        if: ${{ always() && (inputs.schritt == 'schreiben' || github.event_name == 'schedule') && steps.offen.outputs.n != '0' }}
         env:
           DB: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           psql "$DB" -X -q \
             -c "set statement_timeout = '2min';" \
-            -c "select count(*) as paare from public.nachbarschaft;" \
             -c "select count(*) as noch_offen from public.properties where geometrie is not null and nachbarn_stand is null;" \
             -c "select (pg_database_size(current_database())/1024/1024)::int as datenbank_mb;" \
             2>/dev/null | tee -a "$GITHUB_STEP_SUMMARY" || echo "Stand nicht lesbar." | tee -a "$GITHUB_STEP_SUMMARY"

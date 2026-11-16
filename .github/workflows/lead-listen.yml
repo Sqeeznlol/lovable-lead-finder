@@ -95,6 +95,9 @@ jobs:
           from l order by egid;
           commit;
           vacuum analyze public.lead_gebaeude;
+          -- Die Gemeinden mit Anzahl sind abgelegt (Migration 20261116010000),
+          -- damit die Seite nicht bei jedem Öffnen alle Gebäude gruppiert.
+          refresh materialized view public.lead_gebaeude_gemeinden;
           select kanton, count(*) as gebaeude, count(*) filter (where heizung = 7530) as heizoel, count(*) filter (where heizung = 7520) as gas
             from public.lead_gebaeude group by 1 order by 2 desc;
           select pg_size_pretty(pg_total_relation_size('public.lead_gebaeude')) as tabelle,

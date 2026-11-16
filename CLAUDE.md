@@ -78,9 +78,13 @@ Datenbank weiter, ohne dass es jemand sah.
     Portionen, mit Pause, und nur solange sie zügig antwortet.
   * Jede Anweisung trägt eine Frist (`statement_timeout`). Einen Lauf
     abbrechen beendet nicht, was er in der Datenbank gestartet hat.
+  * Die Seite zählt keine grosse Tabelle beim Öffnen. Solche Zahlen
+    zählt der Ablauf «Zählen» vorab (jede Nacht und nach dem Laden);
+    die Seite liest sie über `daten_stand` (`src/lib/daten-stand.ts`).
   * Antwortet die Seite träge: Auswerten «last» zeigt, was die
     Datenbank gerade tut; «Nachbarschaft» mit «aufraeumen» beendet
-    hängende Rechnungen.
+    hängende Rechnungen. «Reiter prüfen» nennt je Reiter die Abfragen,
+    die länger als drei Sekunden brauchen.
 
 Der Test `datenbank-schonen.test.ts` wird rot, wenn eine dieser
 Sicherungen verschwindet.

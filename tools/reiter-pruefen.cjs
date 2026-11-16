@@ -1,8 +1,9 @@
 /**
  * Klickt jeden Reiter von Aurora durch, auf dem iPhone und am Computer,
  * und meldet, was dabei bricht: Fehler im Programm, Abfragen, die die
- * Datenbank ablehnt, Seiten, die über den Rand ragen, und Text wie
- * "NaN" oder "undefined", der nur bei einem Rechenfehler sichtbar wird.
+ * Datenbank ablehnt oder die lange brauchen, Seiten, die über den Rand
+ * ragen, und Text wie "NaN" oder "undefined", der nur bei einem
+ * Rechenfehler sichtbar wird.
  *
  * Warum: bis zum 15. November war kein einziger Reiter je mit echten
  * Daten durchgeklickt worden -- geprüft wurde mit Attrappen, und auf
@@ -35,6 +36,10 @@ const GERAETE = [
   { name: 'iPhone', einstellung: devices['iPhone 13'] },
   { name: 'Computer', einstellung: { viewport: { width: 1440, height: 900 } } },
 ];
+// Ab wann eine Abfrage als langsam gilt, und ab wann als Befund. Am
+// 16. November lud «Auswertung» 15 Sekunden lang, und nichts sagte,
+// welche Abfrage es war -- danach stockte die Datenbank für alle.
+const LANGSAM_MS = 3000, ZU_LANGSAM_MS = 8000;
 // Sichtbarer Text, der nur bei einem Fehler erscheint.
 const MERKMALE = [/\bNaN\b/, /\bundefined\b/, /\[object Object\]/, /Something went wrong/i, /Unerwarteter Fehler/i];
 
@@ -64,15 +69,31 @@ async function pruefen(browser, geraet, zeilen) {
   const ctx = await browser.newContext(geraet.einstellung);
   await ctx.addInitScript(() => { try { sessionStorage.setItem('bauraum-install-hint-dismissed', '1'); } catch { /* gleichgültig */ } });
   const seite = await ctx.newPage();
-  let fehler = [], abgelehnt = [];
+  let fehler = [], abgelehnt = [], langsam = [];
+  // Jede Abfrage an die Datenbank mit ihrem Beginn: so zeigt sich, welche lange braucht.
+  const laufend = new Map();
+  const istDb = u => /supabase\.co\/(rest|functions|auth)/.test(u);
+  // Nur Tabelle oder Funktion -- nie die Bedingungen der Abfrage.
+  const kurz = u => u.split('/v1/')[1]?.split('?')[0] ?? '?';
+  seite.on('request', q => { if (istDb(q.url()) && q.method() !== 'OPTIONS') laufend.set(q, Date.now()); });
+  seite.on('requestfinished', q => {
+    const t = laufend.get(q); if (t == null) return;
+    laufend.delete(q);
+    if (Date.now() - t >= LANGSAM_MS) langsam.push({ name: kurz(q.url()), ms: Date.now() - t });
+  });
+  seite.on('requestfailed', q => laufend.delete(q));
+  // Was beim Verlassen einer Ansicht noch läuft, ist nicht fertig geworden.
+  const langsame = () => {
+    const offen = [...laufend].filter(([, t]) => Date.now() - t >= LANGSAM_MS).map(([q, t]) => ({ name: kurz(q.url()), ms: Date.now() - t, offen: true }));
+    const alle = [...langsam, ...offen];
+    langsam = []; laufend.clear();
+    return alle;
+  };
   seite.on('pageerror', e => fehler.push(String(e.message).slice(0, 160)));
   seite.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|net::ERR|favicon/i.test(m.text())) fehler.push('Konsole: ' + m.text().split('\n')[0].replace(/\?[^\s]*/g, '').slice(0, 160)); });
   seite.on('response', r => {
     const u = r.url();
-    if (r.status() >= 400 && /supabase\.co\/(rest|functions|auth)/.test(u)) {
-      // Nur Tabelle oder Funktion und der Code -- nie die Bedingungen der Abfrage.
-      abgelehnt.push(`${u.split('/v1/')[1]?.split('?')[0] ?? '?'} ${r.status()}`);
-    }
+    if (r.status() >= 400 && istDb(u)) abgelehnt.push(`${kurz(u)} ${r.status()}`);
   });
   // Die 3D-Karte startet mit Fotokacheln von Google, und die werden je
   // Aufruf abgerechnet. Eine Prüfung darf nichts kosten: gesperrt.
@@ -87,11 +108,12 @@ async function pruefen(browser, geraet, zeilen) {
     await seite.waitForSelector('#passwort', { state: 'detached', timeout: 20000 }).catch(() => {});
   }
   if (await seite.locator('#passwort').count()) {
-    zeilen.push({ geraet: geraet.name, reiter: '(Anmeldung)', ms: 0, fehler: ['Anmeldung fehlgeschlagen'], abgelehnt, breite: 0, merkmale: [], leer: false });
+    zeilen.push({ geraet: geraet.name, reiter: '(Anmeldung)', ms: 0, fehler: ['Anmeldung fehlgeschlagen'], abgelehnt, langsam: langsame(), breite: 0, merkmale: [], leer: false });
     await ctx.close();
     return;
   }
 
+  langsame();
   for (const r of REITER) {
     fehler = []; abgelehnt = [];
     const start = Date.now();
@@ -110,7 +132,7 @@ async function pruefen(browser, geraet, zeilen) {
       };
     });
     zeilen.push({
-      geraet: geraet.name, reiter: r || 'cockpit', ms, fehler: [...new Set(fehler)], abgelehnt: [...new Set(abgelehnt)],
+      geraet: geraet.name, reiter: r || 'cockpit', ms, fehler: [...new Set(fehler)], abgelehnt: [...new Set(abgelehnt)], langsam: langsame(),
       breite: stand.breite, merkmale: MERKMALE.filter(m => m.test(stand.text)).map(m => m.source.replace(/\\b/g, '')), leer: stand.leer,
     });
   }
@@ -139,7 +161,7 @@ async function pruefen(browser, geraet, zeilen) {
     }
     const gut = /^(rechenbar|nicht rechenbar)/.test(ergebnis) && !/auffälliger Text/.test(ergebnis);
     zeilen.push({ geraet: geraet.name, reiter: 'objekt und machbarkeit', ms: Date.now() - start, fehler: [...new Set(fehler)].concat(gut ? [] : [ergebnis]),
-      abgelehnt: [...new Set(abgelehnt)], breite: 0, merkmale: [], leer: false, notiz: ergebnis });
+      abgelehnt: [...new Set(abgelehnt)], langsam: langsame(), breite: 0, merkmale: [], leer: false, notiz: ergebnis });
   }
   await ctx.close();
 }
@@ -151,11 +173,14 @@ async function pruefen(browser, geraet, zeilen) {
   for (const g of GERAETE) await pruefen(browser, g, zeilen);
   await browser.close();
 
-  const schlecht = z => z.fehler.length || z.abgelehnt.length || z.breite > 1 || z.merkmale.length || z.leer;
+  // Eine Abfrage ab acht Sekunden, oder eine, die gar nicht fertig wird, ist ein Befund: sie bremst alle.
+  const zuLangsam = z => (z.langsam || []).some(l => l.offen || l.ms >= ZU_LANGSAM_MS);
+  const schlecht = z => z.fehler.length || z.abgelehnt.length || z.breite > 1 || z.merkmale.length || z.leer || zuLangsam(z);
+  const dauer = l => `${l.name} ${(l.ms / 1000).toFixed(1)} s${l.offen ? ' (nicht fertig)' : ''}`;
   const aus = [`### Reiter von Aurora (${ATTRAPPE ? 'leere Attrappe' : 'echte Daten'}, ${ADRESSE})`, '',
-    '| Gerät | Reiter | geladen in | Fehler | abgelehnte Abfragen | über den Rand | auffälliger Text |', '|---|---|---:|---|---|---:|---|'];
+    '| Gerät | Reiter | geladen in | Fehler | abgelehnte Abfragen | langsame Abfragen (ab 3 s) | über den Rand | auffälliger Text |', '|---|---|---:|---|---|---|---:|---|'];
   for (const z of zeilen) {
-    aus.push(`| ${z.geraet} | ${z.reiter} | ${(z.ms / 1000).toFixed(1)} s | ${z.fehler.join('<br>') || '–'}${z.leer ? ' Seite leer' : ''} | ${z.abgelehnt.join(', ') || '–'} | ${z.breite > 1 ? z.breite + ' px' : '–'} | ${z.merkmale.join(', ') || '–'} |`);
+    aus.push(`| ${z.geraet} | ${z.reiter} | ${(z.ms / 1000).toFixed(1)} s | ${z.fehler.join('<br>') || '–'}${z.leer ? ' Seite leer' : ''} | ${z.abgelehnt.join(', ') || '–'} | ${(z.langsam || []).map(dauer).join(', ') || '–'} | ${z.breite > 1 ? z.breite + ' px' : '–'} | ${z.merkmale.join(', ') || '–'} |`);
   }
   for (const z of zeilen.filter(z => z.notiz)) aus.push('', `Machbarkeit an einer Zürcher Parzelle: ${z.notiz}.`);
   const n = zeilen.filter(schlecht).length;

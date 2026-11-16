@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { KNOPF, LISTE, Marke } from '@/components/rahmen';
 import { useToast } from '@/hooks/use-toast';
+import { DATEN_STAND, type DatenStand } from '@/lib/daten-stand';
 
 /**
  * Tims Abschnitt 8, als Tabelle mit denselben Zeilen: Bereich,
@@ -21,7 +22,7 @@ import { useToast } from '@/hooks/use-toast';
 const db = () => supabase as any;
 
 interface Ziel { kennzahl: string; ausgangswert: number | null; ausgangs_am: string | null; ziel: number | null; ziel_bis: string | null; bemerkung: string | null }
-interface Stand { gebaeude: string | null; gebaeude_n: number; gebaeude_parzellen?: number; baugesuch: string | null; baugesuch_n: number; nachbarschaft: string | null; nachbarschaft_n: number; punkte: string | null; punkte_n: number; potenzial_annahmen: string | null }
+type Stand = DatenStand;
 
 // Kleine Anteile nicht als "0 %" zeigen: 114 von 532'131 sind 0.02 %.
 const z = (n: number | null | undefined, einheit = '') => (n == null ? '–'
@@ -30,8 +31,8 @@ const datum = (s: string | null | undefined) => (s ? new Date(s).toLocaleDateStr
 const tage = (s: string | null | undefined) => (s ? Math.floor((Date.now() - new Date(s).getTime()) / 86400000) : null);
 
 /** Zählen mit dem Kopf von PostgREST: nur die Zahl, keine Zeilen. */
-async function zaehlen(tabelle: string, filter?: (q: any) => any, geschaetzt = false): Promise<number | null> { // eslint-disable-line @typescript-eslint/no-explicit-any
-  let q = db().from(tabelle).select('*', { count: geschaetzt ? 'estimated' : 'exact', head: true });
+async function zaehlen(tabelle: string, filter?: (q: any) => any): Promise<number | null> { // eslint-disable-line @typescript-eslint/no-explicit-any
+  let q = db().from(tabelle).select('*', { count: 'exact', head: true });
   if (filter) q = filter(q);
   const r = await q;
   return r.error ? null : r.count ?? null;
@@ -43,15 +44,13 @@ const vor30 = () => new Date(Date.now() - 30 * 86400000).toISOString();
 export interface Kennzahl { id: string; bereich: string; titel: string; wert: number | null; einheit?: string; zeile?: string; messbar?: boolean }
 
 export function useKennzahlenTim() {
+  const qc = useQueryClient();
   return useQuery({
     queryKey: ['kennzahlen-tim'],
     staleTime: 60 * 1000,
     queryFn: async (): Promise<{ liste: Kennzahl[]; stand: Stand | null }> => {
-      const [objekte, mitEigner, mitTelefon, kunden, portfolios, zugeordnet, alarme30, alarmeAlle, gelOffen, gelGemeldet, gelAbgeschlossen,
+      const [kunden, portfolios, zugeordnet, alarme30, alarmeAlle, gelOffen, gelGemeldet, gelAbgeschlossen,
         arrond, nachbarnZeilen, anrufe, erreicht, verkaufsja, profile, treffer, treffer30, mandate, stand] = await Promise.all([
-        zaehlen('properties', undefined, true),
-        zaehlen('properties', q => q.not('owner_name', 'is', null)),
-        zaehlen('properties', q => q.not('owner_phone', 'is', null)),
         zaehlen('mandant', q => q.eq('aktiv', true)), zaehlen('portfolio'),
         zaehlen('portfolio_position', q => q.eq('zuordnung', 'zugeordnet')),
         zaehlen('gelegenheit', q => q.eq('anlass', 'baugesuch').gte('erkannt_am', vor30())),
@@ -66,16 +65,20 @@ export function useKennzahlenTim() {
         zaehlen('investorprofil', q => q.eq('aktiv', true)),
         zaehlen('investor_treffer'), zaehlen('investor_treffer', q => q.gte('gefunden_am', vor30())),
         zaehlen('mandant', q => q.eq('produkt', 'acquisition')),
-        db().rpc('daten_stand').then((r: { data: Stand | null; error: unknown }) => (r.error ? null : r.data)),
+        qc.fetchQuery(DATEN_STAND),
       ]);
-      // Parzellen mit Gebäude kommen mit daten_stand: die Sicht
-      // parzelle_gebaeude zu zählen hiess, bei jedem Öffnen 370'000
-      // Gebäude zu gruppieren, und lief unter Last in die Frist
-      // (Reiter prüfen, 15. November).
+      // Alles, was eine grosse Tabelle zählt, kommt vorab gezählt mit
+      // daten_stand. Hier gezählt wird nur noch, was klein ist. Am
+      // 16. November liess dieser Reiter die Datenbank stocken, weil er
+      // bei jedem Öffnen die Parzellen mit Eigentümer und mit Telefon
+      // zählte (Reiter prüfen, Lauf 18).
+      const objekte = stand?.parzellen ?? null;
+      const mitEigner = stand?.mit_eigentuemer ?? null;
+      const mitTelefon = stand?.mit_telefon ?? null;
       const gebaeudeParzellen = stand?.gebaeude_parzellen ?? null;
       const pct = (a: number | null, b: number | null) => (a != null && b ? Math.round((10000 * a) / b) / 100 : null);
       const liste: Kennzahl[] = [
-        { id: 'eigentuemer_pct', bereich: 'Datenqualität', titel: 'Parzellen mit bekanntem Eigentümer', wert: pct(mitEigner, objekte), einheit: ' %', zeile: `${z(mitEigner)} von rund ${z(objekte)}, ${z(mitTelefon)} mit Telefon` },
+        { id: 'eigentuemer_pct', bereich: 'Datenqualität', titel: 'Parzellen mit bekanntem Eigentümer', wert: pct(mitEigner, objekte), einheit: ' %', zeile: `${z(mitEigner)} von ${z(objekte)}, ${z(mitTelefon)} mit Telefon` },
         { id: 'gebaeude_pct', bereich: 'Datenqualität', titel: 'Parzellen mit Gebäude aus dem Register', wert: pct(gebaeudeParzellen, objekte), einheit: ' %', zeile: `${z(gebaeudeParzellen)} Parzellen mit Gebäude` },
         { id: 'ueberwacht', bereich: 'Portfolioabdeckung', titel: 'Überwachte Parzellen', wert: zugeordnet, zeile: `${z(kunden)} Kunden, ${z(portfolios)} Portfolios` },
         { id: 'alarme_30', bereich: 'Baugesuch-Alarme', titel: 'Gelegenheiten aus Baugesuchen, letzte 30 Tage', wert: alarme30, zeile: `${z(alarmeAlle)} insgesamt` },
@@ -185,6 +188,8 @@ export function KennzahlenTim() {
     ['Nachbarschaften vom Bund', s.nachbarschaft, 90, `${z(s.nachbarschaft_n)} Paare`],
     ['Lage der Portfolio-Parzellen', s.punkte, 90, `${z(s.punkte_n)} Punkte`],
     ['Annahmen der Potenzialrechnung', s.potenzial_annahmen, 365, 'Zone, Baukosten, Erlös'],
+    // Die grossen Zahlen oben stammen aus einer Zählung, die jede Nacht läuft: bleibt sie aus, steht es hier.
+    ['Zählung der grossen Tabellen', s.gezaehlt_am, 2, `${z(s.parzellen)} Parzellen, ${z(s.mit_umriss)} mit Umriss, ${z(s.nachbarn_gerechnet)} mit Nachbarn`],
   ] : [];
 
   return (

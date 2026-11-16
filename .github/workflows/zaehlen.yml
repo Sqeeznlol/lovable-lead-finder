@@ -1,0 +1,53 @@
+# =====================================================================
+# Zählen
+# =====================================================================
+# Die Seite zeigt Zahlen aus grossen Tabellen: Parzellen mit Eigentümer,
+# Gebäude, Nachbarschaftspaare, Punkte. Bis zum 16. November zählte sie
+# sie bei jedem Öffnen des Reiters «Auswertung» selbst, und die kleine
+# Datenbank kam dabei ins Stocken («Reiter prüfen», Lauf 18).
+#
+# Jetzt zählt dieser Ablauf: jede Nacht einmal, und von Hand nach jedem
+# Laden. Das Ergebnis liegt in daten_zaehlung; die Seite liest es über
+# daten_stand und zeigt, wann gezählt wurde. Bleibt der Ablauf aus,
+# steht dort nach zwei Tagen «veraltet».
+#
+# Ausgegeben werden nur Zahlen.
+# =====================================================================
+
+name: Zählen
+
+on:
+  schedule:
+    # 04:47 UTC: nach dem nächtlichen Lauf der Nachbarschaft (der bis 04:30 einspielt), vor dem Morgen.
+    - cron: '47 4 * * *'
+  workflow_dispatch:
+
+jobs:
+  zaehlen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PGCONNECT_TIMEOUT: 30
+    steps:
+      - name: Werkzeuge
+        run: sudo apt-get install -y -qq postgresql-client >/dev/null
+
+      - name: Zählen und ablegen
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -uo pipefail
+          [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
+          # Ein Durchgang durch die Parzellen und je einer durch Gebäude,
+          # Paare und Punkte. Die Frist setzt die Datenbank durch; die
+          # Fehlermeldung erscheint nicht, sie kann die Adresse enthalten.
+          for versuch in 1 2 3; do
+            if psql "$DB" -v ON_ERROR_STOP=1 -X -q \
+                 -c "set statement_timeout = '10min';" \
+                 -c "select public.daten_zaehlen() as zahlen_abgelegt;" \
+                 -c "select schluessel, zahl, to_char(gezaehlt_am, 'DD.MM. HH24:MI') as gezaehlt_am from public.daten_zaehlung order by 1;" \
+                 2>/dev/null | tee -a "$GITHUB_STEP_SUMMARY"; then exit 0; fi
+            echo "Versuch $versuch gescheitert, warte fünf Minuten." | tee -a "$GITHUB_STEP_SUMMARY"
+            sleep 300
+          done
+          echo "Die Zählung liess sich nicht ablegen." | tee -a "$GITHUB_STEP_SUMMARY"; exit 1

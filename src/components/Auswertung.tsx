@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ObjektLink } from '@/components/ObjektLink';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Marke, Seite } from '@/components/rahmen';
 import { BILD } from '@/lib/luftbild';
 import { Loader2 } from 'lucide-react';
@@ -9,6 +9,7 @@ import { KATEGORIEN, kategorie, type Absicht, type Kategorie } from '@/lib/gespr
 import { Investoren } from '@/components/Investoren';
 import { KennzahlenTim } from '@/components/KennzahlenTim';
 import { useUrlWert } from '@/hooks/use-url-wert';
+import { DATEN_STAND } from '@/lib/daten-stand';
 
 // Die Check-Seiten leben seit dem 7. November in Bauraum Akquise; ihre
 // Leads kommen weiter hier an. Damit die Antworten lesbar bleiben, stehen
@@ -138,22 +139,23 @@ function Reaktivierung() {
 }
 
 /** Zählen mit dem Kopf von PostgREST: nur die Zahl, keine Zeilen. */
-async function zaehlen(tabelle: string, filter?: (q: any) => any, geschaetzt = false): Promise<number | null> { // eslint-disable-line @typescript-eslint/no-explicit-any
-  let q = db().from(tabelle).select('*', { count: geschaetzt ? 'estimated' : 'exact', head: true });
+async function zaehlen(tabelle: string, filter?: (q: any) => any): Promise<number | null> { // eslint-disable-line @typescript-eslint/no-explicit-any
+  let q = db().from(tabelle).select('*', { count: 'exact', head: true });
   if (filter) q = filter(q);
   const r = await q;
   return r.error ? null : r.count ?? null;
 }
 
 function useKennzahlen() {
+  const qc = useQueryClient();
   return useQuery({
     queryKey: ['kennzahlen'],
     queryFn: async () => {
-      const [objekte, mitEigner, portfolios, positionen, zugeordnet, gel, gemeldet, abgeschlossen, anrufe, erreicht, profile] = await Promise.all([
-        zaehlen('properties', undefined, true),
-        // owner_name hat einen Index nur über die gefüllten Zeilen
-        // (20261101180000): so ist die Zählung schnell.
-        zaehlen('properties', q => q.not('owner_name', 'is', null)),
+      // Die Parzellen zählt die Seite nicht mehr selbst: die Zahlen
+      // kommen vorab gezählt (lib/daten-stand). Derselbe Schlüssel wie
+      // bei den Kennzahlen darunter, also eine Anfrage für beide.
+      const [stand, portfolios, positionen, zugeordnet, gel, gemeldet, abgeschlossen, anrufe, erreicht, profile] = await Promise.all([
+        qc.fetchQuery(DATEN_STAND),
         zaehlen('portfolio'), zaehlen('portfolio_position'),
         zaehlen('portfolio_position', q => q.eq('zuordnung', 'zugeordnet')),
         zaehlen('gelegenheit'), zaehlen('gelegenheit', q => q.not('gemeldet_am', 'is', null)),
@@ -161,6 +163,7 @@ function useKennzahlen() {
         zaehlen('anruf'), zaehlen('anruf', q => q.eq('erreicht', true)),
         zaehlen('investorprofil', q => q.eq('aktiv', true)),
       ]);
+      const objekte = stand?.parzellen ?? null, mitEigner = stand?.mit_eigentuemer ?? null;
       return { objekte, mitEigner, portfolios, positionen, zugeordnet, gel, gemeldet, abgeschlossen, anrufe, erreicht, profile };
     },
     staleTime: 60 * 1000,

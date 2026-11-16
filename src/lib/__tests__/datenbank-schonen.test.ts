@@ -5,9 +5,10 @@
  * der Läufe rechnete die Datenbank weiter, ohne dass es jemand sah.
  *
  * Seither rechnet der Ablauf «Nachbarschaft» auf dem Runner und spielt
- * nur das Ergebnis ein, in Portionen mit Pause. Dieser Wächter wird
- * rot, wenn eine der drei Sicherungen wieder verschwindet -- statt dass
- * es die nächste langsame Seite zeigt.
+ * nur das Ergebnis ein, in Portionen mit Pause, und die Seite zählt
+ * die grossen Tabellen nicht mehr bei jedem Öffnen. Dieser Wächter
+ * wird rot, wenn eine dieser Sicherungen wieder verschwindet -- statt
+ * dass es die nächste langsame Seite zeigt.
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -41,6 +42,29 @@ describe('Die Datenbank bedient die Seite', () => {
     const aufrufe = t.split('psql "$DB"').slice(1).map(a => a.split(/psql "\$LOKAL"|\n\s*\n/)[0]);
     expect(aufrufe.length).toBeGreaterThanOrEqual(6);
     expect(aufrufe.filter(a => !a.includes('statement_timeout'))).toEqual([]);
+  });
+
+  // «Reiter prüfen», Lauf 18: nach dem Reiter «Auswertung» stockte die
+  // Datenbank fünf Minuten lang. Er zählte bei jedem Öffnen die grossen
+  // Tabellen. Die Zahlen kommen jetzt vorab gezählt (lib/daten-stand).
+  it('die Auswertung zählt die grossen Tabellen nicht selbst', () => {
+    for (const datei of ['src/components/KennzahlenTim.tsx', 'src/components/Auswertung.tsx']) {
+      const t = readFileSync(datei, 'utf8');
+      expect(t).not.toMatch(/zaehlen\('(properties|gebaeude|nachbarschaft|parzelle_punkt|lead_gebaeude|parzelle_gebaeude)'/);
+      expect(t).toContain('DATEN_STAND');
+    }
+  });
+
+  it('die Gemeinden der Lead-Listen sind abgelegt und werden nach dem Laden aufgefrischt', () => {
+    const migration = readFileSync('supabase/migrations/20261116010000_zaehlungen_vorab.sql', 'utf8');
+    expect(migration).toMatch(/create materialized view if not exists public\.lead_gebaeude_gemeinden/);
+    expect(ohneKommentare(lesen('lead-listen.yml'))).toContain('refresh materialized view public.lead_gebaeude_gemeinden');
+  });
+
+  it('die Zählung läuft jede Nacht und nach dem Einspielen der Nachbarschaft', () => {
+    expect(lesen('zaehlen.yml')).toMatch(/schedule:\s*\n(\s*#.*\n)*\s*- cron:/);
+    expect(ohneKommentare(lesen('zaehlen.yml'))).toContain('public.daten_zaehlen()');
+    expect(ohneKommentare(lesen('nachbarschaft.yml'))).toContain('public.daten_zaehlen()');
   });
 
   it('Fehlermeldungen der Datenbank erscheinen in «Nachbarschaft» nie im Protokoll', () => {
