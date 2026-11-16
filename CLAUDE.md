@@ -97,7 +97,8 @@ Messlauf («Reiter prüfen», «Tempo») die Seite wieder zum Stehen.
     das Guthaben leer (in Supabase: Project Settings → Infrastructure
     → Disk IO balance) -- dann hilft nur Ruhe. «Nachbarschaft» mit
     «aufraeumen» beendet hängende Rechnungen. «Reiter prüfen» nennt je
-    Reiter die Abfragen, die länger als drei Sekunden brauchen.
+    Reiter die Abfragen, auf die die Datenbank erst nach drei Sekunden
+    antwortet (nicht, wie lange der Browser des Prüfers damit braucht).
 
 Die nächste Grösse («Small», 2 GB, doppelte Plattenleistung) kostet
 rund 5 Dollar im Monat mehr; das entscheidet Julian.

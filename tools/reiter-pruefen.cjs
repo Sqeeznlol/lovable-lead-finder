@@ -70,17 +70,33 @@ async function pruefen(browser, geraet, zeilen) {
   const ctx = await browser.newContext(geraet.einstellung);
   await ctx.addInitScript(() => { try { sessionStorage.setItem('bauraum-install-hint-dismissed', '1'); } catch { /* gleichgültig */ } });
   const seite = await ctx.newPage();
-  let fehler = [], abgelehnt = [], langsam = [];
+  let fehler = [], abgelehnt = [], langsam = [], spaetFertig = [];
   // Jede Abfrage an die Datenbank mit ihrem Beginn: so zeigt sich, welche lange braucht.
   const laufend = new Map();
   const istDb = u => /supabase\.co\/(rest|functions|auth)/.test(u);
   // Nur Tabelle oder Funktion -- nie die Bedingungen der Abfrage.
   const kurz = u => u.split('/v1/')[1]?.split('?')[0] ?? '?';
+  // Wie lange die Datenbank selbst gebraucht hat: vom Absenden bis zum
+  // ersten Byte der Antwort. Die Dauer bis «fertig» enthält auch, was der
+  // Browser tut -- und der des Runners zeichnet die 3D-Karte ohne
+  // Grafikkarte. Am 16. November standen dort Abfragen nach 200 Gebäuden
+  // mit 3.5 bis 4.5 s; gegen die Attrappe, die sofort antwortet, waren es
+  // dieselben 3.7 s. Die Zeit brauchte der Browser, nicht die Datenbank.
+  const antwortMs = q => {
+    if (ATTRAPPE) return 0;
+    try {
+      const z = q.timing();
+      return z && z.requestStart >= 0 && z.responseStart >= z.requestStart ? Math.round(z.responseStart - z.requestStart) : null;
+    } catch { return null; }
+  };
   seite.on('request', q => { if (istDb(q.url()) && q.method() !== 'OPTIONS') laufend.set(q, Date.now()); });
   seite.on('requestfinished', q => {
     const t = laufend.get(q); if (t == null) return;
     laufend.delete(q);
-    if (Date.now() - t >= LANGSAM_MS) langsam.push({ name: kurz(q.url()), ms: Date.now() - t });
+    const dauer = Date.now() - t, antwort = antwortMs(q);
+    // Massgebend ist die Antwort der Datenbank; fehlt die Messung, die Dauer.
+    if ((antwort ?? dauer) >= LANGSAM_MS) langsam.push({ name: kurz(q.url()), ms: antwort ?? dauer });
+    else if (dauer >= LANGSAM_MS) spaetFertig.push({ ms: dauer, antwort });
   });
   seite.on('requestfailed', q => laufend.delete(q));
   // Was beim Verlassen einer Ansicht noch läuft, ist nicht fertig geworden.
@@ -90,6 +106,9 @@ async function pruefen(browser, geraet, zeilen) {
     langsam = []; laufend.clear();
     return alle;
   };
+  // Zügig beantwortet, aber im Browser erst nach Sekunden fertig: kein
+  // Befund der Datenbank, nur eine Zeile unter der Tabelle.
+  const spaete = () => { const s = spaetFertig; spaetFertig = []; return s; };
   seite.on('pageerror', e => fehler.push(String(e.message).slice(0, 160)));
   seite.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|net::ERR|favicon/i.test(m.text())) fehler.push('Konsole: ' + m.text().split('\n')[0].replace(/\?[^\s]*/g, '').slice(0, 160)); });
   seite.on('response', r => {
@@ -114,7 +133,7 @@ async function pruefen(browser, geraet, zeilen) {
     return;
   }
 
-  langsame();
+  langsame(); spaete();
   for (const r of REITER) {
     fehler = []; abgelehnt = [];
     const start = Date.now();
@@ -133,7 +152,7 @@ async function pruefen(browser, geraet, zeilen) {
       };
     });
     zeilen.push({
-      geraet: geraet.name, reiter: r || 'cockpit', ms, fehler: [...new Set(fehler)], abgelehnt: [...new Set(abgelehnt)], langsam: langsame(),
+      geraet: geraet.name, reiter: r || 'cockpit', ms, fehler: [...new Set(fehler)], abgelehnt: [...new Set(abgelehnt)], langsam: langsame(), spaet: spaete(),
       breite: stand.breite, merkmale: MERKMALE.filter(m => m.test(stand.text)).map(m => m.source.replace(/\\b/g, '')), leer: stand.leer,
     });
   }
@@ -167,7 +186,7 @@ async function pruefen(browser, geraet, zeilen) {
     }
     const gut = /^(rechenbar|nicht rechenbar)/.test(ergebnis) && !/auffälliger Text/.test(ergebnis);
     zeilen.push({ geraet: geraet.name, reiter: 'objekt und machbarkeit', ms: Date.now() - start, fehler: [...new Set(fehler)].concat(gut ? [] : [ergebnis]),
-      abgelehnt: [...new Set(abgelehnt)], langsam: langsame(), breite: 0, merkmale: [], leer: false, notiz: ergebnis });
+      abgelehnt: [...new Set(abgelehnt)], langsam: langsame(), spaet: spaete(), breite: 0, merkmale: [], leer: false, notiz: ergebnis });
   }
   await ctx.close();
 }
@@ -223,11 +242,17 @@ const TRAEGE_MS = 4000;
   const schlecht = z => z.fehler.length || z.abgelehnt.length || z.breite > 1 || z.merkmale.length || z.leer || zuLangsam(z);
   const dauer = l => `${l.name} ${(l.ms / 1000).toFixed(1)} s${l.offen ? ' (nicht fertig)' : ''}`;
   const aus = [`### Reiter von Aurora (${ATTRAPPE ? 'leere Attrappe' : 'echte Daten'}, ${ADRESSE})`, '',
-    '| Gerät | Reiter | geladen in | Fehler | abgelehnte Abfragen | langsame Abfragen (ab 3 s) | über den Rand | auffälliger Text |', '|---|---|---:|---|---|---|---:|---|'];
+    '| Gerät | Reiter | geladen in | Fehler | abgelehnte Abfragen | langsame Abfragen (Antwort ab 3 s) | über den Rand | auffälliger Text |', '|---|---|---:|---|---|---|---:|---|'];
   for (const z of zeilen) {
     aus.push(`| ${z.geraet} | ${z.reiter} | ${(z.ms / 1000).toFixed(1)} s | ${z.fehler.join('<br>') || '–'}${z.leer ? ' Seite leer' : ''} | ${z.abgelehnt.join(', ') || '–'} | ${(z.langsam || []).map(dauer).join(', ') || '–'} | ${z.breite > 1 ? z.breite + ' px' : '–'} | ${z.merkmale.join(', ') || '–'} |`);
   }
   for (const z of zeilen.filter(z => z.notiz)) aus.push('', `Machbarkeit an einer Zürcher Parzelle: ${z.notiz}.`);
+  // Der Browser war beschäftigt, die Datenbank nicht: zur Einordnung.
+  for (const z of zeilen.filter(z => (z.spaet || []).length)) {
+    const antworten = z.spaet.map(s => s.antwort).filter(a => a != null);
+    aus.push('', `${z.geraet}, ${z.reiter}: ${z.spaet.length} Abfragen waren im Browser erst nach ${(Math.max(...z.spaet.map(s => s.ms)) / 1000).toFixed(1)} s fertig`
+      + (antworten.length ? `, die Datenbank antwortete nach höchstens ${(Math.max(...antworten) / 1000).toFixed(1)} s.` : '.'));
+  }
   const n = zeilen.filter(schlecht).length;
   aus.push('', n ? `**${n} von ${zeilen.length} Ansichten auffällig.**` : `Alle ${zeilen.length} Ansichten sauber.`);
   const text = aus.join('\n');
