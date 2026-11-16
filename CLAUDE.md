@@ -156,7 +156,9 @@ Handy-Fassung. Gebaut wird mit `<Seite>` aus `src/components/rahmen.tsx`.
     ausblendbar.
   * Akquise und Pipedrive braucht Julian nicht mehr (15. November: «die
     Akquise und Pipedrive brauche ich nicht mehr»): nichts mehr daran
-    bauen, keine Verbindungen nach Pipedrive.
+    bauen, keine Verbindungen nach Pipedrive. Die Check-Seiten gehören
+    nicht dazu: sie bleiben in Gebrauch (16. November: Wortlaut,
+    Impressum, Kampagnenplan) und liegen im Zweig `akquise`.
   * Nicht fragen, was als Nächstes kommt (15. November: «wieso immer was
     als nächstes ... mach alle verbesserungen die dir einfallen ... ohne
     widerrede»): die offene Liste selber abarbeiten, das Wichtigste
