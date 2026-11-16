@@ -148,6 +148,11 @@ async function pruefen(browser, geraet, zeilen) {
     let ergebnis = 'Objekt öffnet nicht';
     if (offen) {
       const knopf = seite.getByRole('button', { name: 'Rechnen' });
+      // Der Dialog steht sofort (mit Namen für Bildschirmleser), sein
+      // Inhalt erst, wenn das Objekt geladen ist. Ohne dieses Warten
+      // meldete Lauf 19 nach einer Sekunde, die Seite kenne die
+      // Machbarkeit nicht.
+      await knopf.first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
       if (await knopf.count()) {
         await knopf.click();
         await seite.waitForFunction(() => /Möglich sind rund|Nicht rechenbar|liess sich nicht laden/.test(document.body.innerText), null, { timeout: 30000 }).catch(() => {});
@@ -173,8 +178,10 @@ async function pruefen(browser, geraet, zeilen) {
   for (const g of GERAETE) await pruefen(browser, g, zeilen);
   await browser.close();
 
-  // Eine Abfrage ab acht Sekunden, oder eine, die gar nicht fertig wird, ist ein Befund: sie bremst alle.
-  const zuLangsam = z => (z.langsam || []).some(l => l.offen || l.ms >= ZU_LANGSAM_MS);
+  // Eine Abfrage ab acht Sekunden ist ein Befund: sie bremst alle. Was
+  // beim Verlassen einer Karte seit ein paar Sekunden läuft, ist keiner
+  // -- Karten laden nach, solange sie offen sind.
+  const zuLangsam = z => (z.langsam || []).some(l => l.ms >= ZU_LANGSAM_MS);
   const schlecht = z => z.fehler.length || z.abgelehnt.length || z.breite > 1 || z.merkmale.length || z.leer || zuLangsam(z);
   const dauer = l => `${l.name} ${(l.ms / 1000).toFixed(1)} s${l.offen ? ' (nicht fertig)' : ''}`;
   const aus = [`### Reiter von Aurora (${ATTRAPPE ? 'leere Attrappe' : 'echte Daten'}, ${ADRESSE})`, '',

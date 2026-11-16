@@ -178,11 +178,18 @@ jobs:
 
           # Ein Durchgang durch die Parzellen: Kennung, EGRID, Kanton, noch
           # offen? Der Umriss selbst wird nicht gelesen, nur ob er da ist.
-          if ! psql "$DB" -v ON_ERROR_STOP=1 -X -q \
+          # Antwortet die Datenbank gerade nicht: warten und wiederholen,
+          # statt den Lauf aufzugeben (am 16. November scheiterte er so an
+          # einer Minute ohne Verbindung).
+          gelesen=0
+          for versuch in 1 2 3 4 5; do
+            if psql "$DB" -v ON_ERROR_STOP=1 -X -q \
                  -c "set statement_timeout = '10min';" \
-                 -c "\copy (select id, egrid, kanton, (nachbarn_stand is null) as offen from public.properties where geometrie is not null) to '/tmp/bestand.csv' with (format csv)" 2>/tmp/db.err; then
-            echo "Der Bestand liess sich nicht lesen: $(art)." | tee -a "$GITHUB_STEP_SUMMARY"; exit 1
-          fi
+                 -c "\copy (select id, egrid, kanton, (nachbarn_stand is null) as offen from public.properties where geometrie is not null) to '/tmp/bestand.csv' with (format csv)" 2>/tmp/db.err; then gelesen=1; break; fi
+            echo "  Bestand nicht gelesen: $(art) (Versuch $versuch), warte zwei Minuten"
+            sleep 120
+          done
+          [ "$gelesen" = 1 ] || { echo "Der Bestand liess sich nicht lesen." | tee -a "$GITHUB_STEP_SUMMARY"; exit 1; }
           set -e
           # Eine Parzelle ohne EGRID bekommt hier eine eigene Kennung. So
           # rechnet sie mit, statt ihren Nachbarn zu fehlen.
@@ -238,15 +245,17 @@ jobs:
           fi
           : > /tmp/restumrisse.csv
           if [ "$rest" -gt 0 ]; then
-            set +e
-            psql "$DB" -v ON_ERROR_STOP=1 -X -q \
-              -c "set statement_timeout = '5min';" \
-              -c "create temp table e (id uuid primary key);" \
-              -c "\copy e from '/tmp/rest.csv' with (format csv)" \
-              -c "\copy (select p.id, encode(ST_AsEWKB(p.geometrie), 'hex') from public.properties p join e on e.id = p.id) to '/tmp/restumrisse.csv' with (format csv)" 2>/tmp/db.err
-            ok=$?
-            set -e
-            [ "$ok" = 0 ] || { echo "Die Umrisse des Rests liessen sich nicht lesen: $(art)." | tee -a "$GITHUB_STEP_SUMMARY"; exit 1; }
+            gelesen=0
+            for versuch in 1 2 3 4 5; do
+              if psql "$DB" -v ON_ERROR_STOP=1 -X -q \
+                   -c "set statement_timeout = '5min';" \
+                   -c "create temp table e (id uuid primary key);" \
+                   -c "\copy e from '/tmp/rest.csv' with (format csv)" \
+                   -c "\copy (select p.id, encode(ST_AsEWKB(p.geometrie), 'hex') from public.properties p join e on e.id = p.id) to '/tmp/restumrisse.csv' with (format csv)" 2>/tmp/db.err; then gelesen=1; break; fi
+              echo "  Umrisse des Rests nicht gelesen: $(art) (Versuch $versuch), warte zwei Minuten"
+              sleep 120
+            done
+            [ "$gelesen" = 1 ] || { echo "Die Umrisse des Rests liessen sich nicht lesen." | tee -a "$GITHUB_STEP_SUMMARY"; exit 1; }
           fi
           psql "$LOKAL" -v ON_ERROR_STOP=1 -X -q \
             -c "create table restumriss (id uuid, hex text);" \

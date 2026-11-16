@@ -3,12 +3,19 @@ name: Tempo
 # Misst, wo die Seite Zeit verliert (Julian, 3. November: "es lädt alles
 # sehr sehr langsam"). Zwei Blickwinkel:
 #
-#   1. Von aussen: dieselben Abfragen, die die Startseite (Cockpit), die
-#      Masterliste und die 3D-Karte stellen, angemeldet als aui wie die
-#      Seite -- je dreimal, damit ein Ausreisser nicht als Regel gilt.
+#   1. Von aussen: dieselben Abfragen, die das Cockpit, die Auswertung,
+#      die Lead-Listen und die 3D-Karte stellen, angemeldet als aui wie
+#      die Seite -- je dreimal, damit ein Ausreisser nicht als Regel gilt.
 #   2. Von innen: die Statistik der Datenbank (pg_stat_statements),
 #      welche Abfragen insgesamt und je Aufruf die meiste Zeit kosten,
 #      und welche Tabellen ohne Index ganz gelesen werden.
+#
+# Gemessen wird nur, was die Seite heute fragt, und nichts, das eine
+# grosse Tabelle ganz liest. Am 16. November mass dieser Ablauf noch
+# die Masterliste und die Gebäudesuche der Akquise (beide gibt es auf
+# der Seite nicht mehr) und zählte dazu die Parzellen ein Dutzend Mal
+# durch -- und brachte damit selbst die Datenbank zum Stocken, deren
+# Tempo er messen sollte.
 #
 # Ausgegeben werden nur Laufzeiten, Zählungen und Abfragetexte, die die
 # Datenbank selbst ohne Werte speichert ($1, $2 ...) -- das Protokoll ist
@@ -70,8 +77,6 @@ jobs:
           miss "Cockpit: heisse Gelegenheiten" "gelegenheit?select=id,titel,prioritaet,gelegenheit_parzelle(rolle,properties(gemeinde))&zustand=not.in.(abgeschlossen,verworfen)&order=prioritaet.desc.nullslast&limit=4"
           miss "Cockpit: Protokoll" "aktivitaet?select=id,aktion,zeit&aktion=in.(abfrage,eigentuemer,archiviert,deal)&order=zeit.desc&limit=5"
           miss "Cockpit: grösste Margen" "properties?select=id,address,marge_chf&kanton=eq.ZH&ausgeschlossen=eq.false&preselection_status=neq.Ausschliessen&owner_name=is.null&order=marge_chf.desc.nullslast&limit=3"
-          miss "Masterliste: nach Potenzial, 50" "properties?select=id,address,hnf_delta&ausgeschlossen=eq.false&order=hnf_delta.desc.nullslast&limit=50"
-          miss "Masterliste: zählen" "properties?select=*&ausgeschlossen=eq.false" zaehlen
           # Wie use-portfolio.ts: alle Portfolios mit Positionen und Parzellen.
           miss "Portfolios mit Positionen" "portfolio?select=id,name,mandant:mandant_id(akteur:akteur_id(name)),portfolio_position(id,roh_adresse,parzelle:parzelle_id(id,address,egrid,plot_number,area,zone))&order=name"
           miss "Portfolios, nur Name und Zahl" "portfolio?select=id,name,portfolio_position(count)&portfolio_position.parzelle_id=not.is.null&order=name"
@@ -81,26 +86,17 @@ jobs:
             -H "apikey: $KEY" -H "Authorization: Bearer $TOKEN" \
             | jq -c '{portfolios: length, parzellen_summe: (map(.portfolio_position[0].count) | add), form: (.[0].portfolio_position)}' \
             | sed 's/^/Form: /' >> "$GITHUB_STEP_SUMMARY" || true
-          # Gebäudesuche (Funktion gebaeude_suchen), wie die Seite sie aufruft.
-          for i in 1 2 3; do
-            r=$(curl -sS -o /dev/null -w '%{http_code} %{time_total}' -X POST "$URL/rest/v1/rpc/gebaeude_suchen" \
-              -H "apikey: $KEY" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-              -d '{"p_gemeinde":"Kloten","p_baujahr_von":1920,"p_baujahr_bis":1929,"p_grenze":500}')
-            echo "| Gebäudesuche, Lauf $i | ${r%% *} | ${r##* } | | |" >> "$GITHUB_STEP_SUMMARY"
-          done
-          # Wie viele Treffer (nur die Zahl -- Adressen gehören nicht ins öffentliche Protokoll).
-          curl -sS -X POST "$URL/rest/v1/rpc/gebaeude_suchen" -H "apikey: $KEY" -H "Authorization: Bearer $TOKEN" \
-            -H "Content-Type: application/json" -d '{"p_gemeinde":"Kloten","p_baujahr_von":1920,"p_baujahr_bis":1929,"p_grenze":1000}' \
-            | jq -r '"Gebäudesuche Kloten 1920-1929: \(if type == "array" then length else "Fehler" end) Treffer"' >> "$GITHUB_STEP_SUMMARY" || true
-          # Beide Schreibweisen einer Gemeinde ("Küsnacht (ZH)" und "Küsnacht ZH"),
-          # Migration 20261103180000. Nur Zahlen, je Schreibweise.
-          curl -sS -X POST "$URL/rest/v1/rpc/gebaeude_suchen" -H "apikey: $KEY" -H "Authorization: Bearer $TOKEN" \
-            -H "Content-Type: application/json" -d '{"p_gemeinde":"Küsnacht (ZH)","p_baujahr_von":1949,"p_baujahr_bis":1949,"p_grenze":1000}' \
-            | jq -r '"Gebäudesuche Küsnacht 1949: \(if type == "array" then "\(length) Treffer, davon \(map(select(.gemeinde == "Küsnacht ZH")) | length) unter \"Küsnacht ZH\"" else "Fehler \(.message // .)" end)"' >> "$GITHUB_STEP_SUMMARY" || true
-          # Merklisten (Migration 20261103170000): 200 = Tabelle da und lesbar.
-          miss "Merklisten" "merkliste?select=id&limit=1"
           miss "3D: Gebäude, 200 nach EGID" "gebaeude?select=egid,heizung_energie&egid=in.($(seq -s, 302061100 302061299))"
           miss "3D: Codetabelle" "gwr_kode?select=merkmal,code,text"
+          # Auswertung: die vorab gezählten Zahlen (eine Anfrage statt vieler Zählungen).
+          for i in 1 2 3; do
+            r=$(curl -sS -o /dev/null -w '%{http_code} %{time_total}' -X POST "$URL/rest/v1/rpc/daten_stand" \
+              -H "apikey: $KEY" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{}' || echo "000 0")
+            echo "| Auswertung: daten_stand, Lauf $i | ${r%% *} | ${r##* } | | |" >> "$GITHUB_STEP_SUMMARY"
+          done
+          # Lead-Listen: Gemeinden zur Auswahl, dann die 200 ältesten eines Kantons samt Anzahl.
+          miss "Lead-Listen: Gemeinden" "lead_gebaeude_gemeinden?select=*&order=gemeinde&limit=5000"
+          miss "Lead-Listen: ZH bis 1980, 200 älteste (mit Anzahl)" "lead_gebaeude?select=egid,baujahr&kanton=eq.ZH&baujahr=lte.1980&order=baujahr.asc.nullsfirst&limit=200" zaehlen
           # Was der öffentliche Schlüssel ohne Anmeldung lesen kann (Punkt 8,
           # Sicherheit): Status und ob eine Zeile zurückkommt -- nie die Zeile.
           echo "" >> "$GITHUB_STEP_SUMMARY"
@@ -121,8 +117,11 @@ jobs:
         run: |
           set -euo pipefail
           [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
-          psql "$DB" -X -q -v ON_ERROR_STOP=0 >> "$GITHUB_STEP_SUMMARY" 2>&1 <<'SQL'
+          # Die Fehlerausgabe erscheint nicht: sie kann die Adresse enthalten.
+          psql "$DB" -X -q -v ON_ERROR_STOP=0 >> "$GITHUB_STEP_SUMMARY" 2>/dev/null <<'SQL'
           \pset footer off
+          -- Hier wird nur Statistik gelesen. Nichts darf lange laufen.
+          set statement_timeout = '30s';
           \echo '### Datenbank'
           \echo '```'
           select (pg_database_size(current_database())/1024/1024)::int as datenbank_mb,
@@ -153,24 +152,6 @@ jobs:
               and query !~* '^(vacuum|copy|create|insert|update|delete|do |analyze)'
             order by shared_blks_read desc limit 12;
           \echo
-          \echo 'Gebäude je Parzelle (Kanton Zürich), nur Zählungen:'
-          select count(*) as parzellen_zh,
-                 count(*) filter (where p.egrid is not null) as mit_egrid,
-                 count(*) filter (where exists (select 1 from public.gebaeude g where g.egrid = p.egrid)) as mit_gebaeude_im_register
-            from public.properties p where p.kanton = 'ZH';
-          select count(*) as gebaeude, count(egrid) as mit_egrid, count(distinct egrid) as verschiedene_parzellen,
-                 count(heizung_energie) as mit_heizung, count(baujahr) as mit_baujahr from public.gebaeude;
-          select count(*) as gebaeude_deren_parzelle_fehlt from public.gebaeude g
-            where g.egrid is not null and not exists (select 1 from public.properties p where p.egrid = g.egrid);
-          select (select count(*) from public.gwr_kode) as kodes, (select count(*) from public.gwr_kode where merkmal = 'GENH') as kodes_genh,
-                 (select count(*) from public.gwr_kode where merkmal = 'GWAERZH') as kodes_gwaerzh;
-          \echo
-          \echo 'Gemeindenamen in mehreren Schreibweisen ("X (ZH)" und "X ZH"), nur Namen und Zählungen:'
-          select regexp_replace(gemeinde, '\s*\(?(ZH|TG)\)?$', '') as grundname,
-                 string_agg(format('%s [%s] = %s', gemeinde, kanton, total), ' | ' order by total desc) as schreibweisen
-            from public.gemeinde_stats_mv
-            group by 1 having count(*) > 1 order by 1;
-          select count(*) as zeilen_gemeindeliste, count(distinct gemeinde) as verschiedene_namen from public.gemeinde_stats_mv;
           \echo
           \echo 'Grösste Tabellen und Indizes:'
           select c.relname as name, c.relkind as art, pg_size_pretty(pg_relation_size(c.oid)) as groesse
@@ -191,53 +172,6 @@ jobs:
             join pg_index x on x.indexrelid = i.oid
             where s.schemaname = 'public' and s.idx_scan = 0 and not x.indisunique and not x.indisprimary
             order by pg_relation_size(i.oid) desc limit 20;
-          \echo '```'
-          \echo '### Messungen für die Nachtarbeit (3./4. November), nur Zahlen'
-          \echo '```'
-          \echo 'Punkt 1 -- Potenzialrechnung je Kanton (hnf_delta = Reserve in m² HNF):'
-          select kanton, count(*) as parzellen, count(hnf_delta) as gerechnet,
-                 count(*) filter (where hnf_delta >= 200) as reserve_ab_200, count(*) filter (where hnf_delta >= 500) as reserve_ab_500,
-                 count(*) filter (where confidence = 'hoch') as sicher_hoch, count(*) filter (where confidence = 'mittel') as sicher_mittel,
-                 count(*) filter (where gf_zulaessig is not null) as mit_gf_zulaessig, count(zone) as mit_zone
-            from public.properties group by kanton order by 1;
-          \echo 'Punkt 1 -- Portfolio-Parzellen (Demo-Kunden gesondert):'
-          select case when a.name like '%(Demo)' then 'Demo' else 'echt' end as kunde, count(distinct m.id) as kunden, count(distinct pf.id) as portfolios,
-                 count(pos.parzelle_id) as parzellen, count(*) filter (where p.hnf_delta >= 200) as reserve_ab_200,
-                 count(*) filter (where exists (select 1 from public.gebaeude g where g.egrid = p.egrid)) as mit_gebaeude,
-                 count(*) filter (where exists (select 1 from public.gebaeude g where g.egrid = p.egrid and g.baujahr <= 1975)) as gebaeude_bis_1975,
-                 count(*) filter (where exists (select 1 from public.nachbarschaft nb where nb.parzelle_id = p.id)) as mit_nachbarn
-            from public.portfolio_position pos join public.portfolio pf on pf.id = pos.portfolio_id join public.mandant m on m.id = pf.mandant_id
-            join public.akteur a on a.id = m.akteur_id left join public.properties p on p.id = pos.parzelle_id group by 1;
-          select (select count(*) from public.nachbarschaft) as nachbarschaften,
-                 (select count(*) from public.gebaeude where grundflaeche is not null and geschosse is not null) as gebaeude_mit_flaeche_und_geschossen,
-                 (select count(*) from public.gelegenheit where anlass = 'ausnuetzungsreserve') as gelegenheiten_reserve;
-          \echo 'Punkt 3 -- Investorprofile und Akteure:'
-          select (select count(*) from public.investorprofil) as profile, (select count(*) from public.investorprofil where aktiv) as aktiv,
-                 (select count(*) from public.investorprofil where lagen is not null and array_length(lagen, 1) > 0) as mit_lagen,
-                 (select count(*) from public.investorprofil where objekttypen is not null and array_length(objekttypen, 1) > 0) as mit_objekttypen,
-                 (select count(*) from public.investorprofil where budget_max_chf is not null) as mit_budget;
-          select art, count(*) from public.akteur group by 1 order by 1;
-          \echo 'Punkt 5/9 -- Gelegenheiten, Eigentümer, Gespräche:'
-          select anlass, zustand, count(*) from public.gelegenheit group by 1, 2 order by 1, 2;
-          select count(*) filter (where nullif(trim(owner_name), '') is not null) as parzellen_mit_eigentuemer,
-                 count(distinct lower(trim(owner_name))) filter (where nullif(trim(owner_name), '') is not null) as verschiedene_namen,
-                 count(*) filter (where nullif(trim(owner_phone), '') is not null) as mit_telefon,
-                 count(*) filter (where owners_json is not null) as mit_owners_json,
-                 (select count(*) from public.eigentum) as eigentum_zeilen
-            from public.properties;
-          select status, count(*) from public.properties where status not in ('Neu') group by 1 order by 2 desc limit 15;
-          select verkaufsabsicht, count(*) from public.anruf group by 1 order by 1;
-          \echo 'Punkt 6 -- Aadorf mit Kanton ZH (nur Zählungen):'
-          select kanton, gemeinde, bfs_nr, count(*), count(egrid) as mit_egrid, count(zone) as mit_zone from public.properties where gemeinde like 'Aadorf%' group by 1, 2, 3 order by 1, 2, 3;
-          select count(*) as gemeinde_endet_auf_zh from public.properties where gemeinde ~ '\s+ZH$';
-          \echo 'Punkt 21 -- Stand der Daten je Quelle:'
-          select (select max(geladen_am) from public.gebaeude) as gebaeude_geladen,
-                 (select max(publiziert_am) from public.baugesuch) as baugesuch_neuestes,
-                 (select max(geometrie_stand) from public.properties) as geometrie_stand,
-                 (select max(scored_at) from public.properties) as potenzial_gerechnet,
-                 (select max(berechnet_am) from public.nachbarschaft) as nachbarschaft_berechnet,
-                 (select max(erfasst_am) from public.parzelle_punkt) as punkte_erfasst;
-          select count(*) filter (where geometrie is not null) as mit_umriss, count(*) filter (where kanton = 'ZH' and geometrie is not null) as zh_mit_umriss from public.properties;
           \echo '```'
           SQL
           cat "$GITHUB_STEP_SUMMARY"

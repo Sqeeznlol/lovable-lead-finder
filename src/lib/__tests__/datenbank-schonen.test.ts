@@ -67,6 +67,18 @@ describe('Die Datenbank bedient die Seite', () => {
     expect(ohneKommentare(lesen('nachbarschaft.yml'))).toContain('public.daten_zaehlen()');
   });
 
+  // «Tempo» sollte messen, wie schnell die Seite ist, und zählte dafür
+  // die Parzellen ein Dutzend Mal durch. Am 16. November brachte der
+  // Messlauf so selbst die Datenbank zum Stocken -- und den Lauf der
+  // Nachbarschaft zum Scheitern, der gerade eine Verbindung brauchte.
+  it('der Messlauf «Tempo» liest keine grosse Tabelle ganz', () => {
+    const t = ohneKommentare(lesen('tempo.yml'));
+    expect(t).not.toMatch(/from public\.(properties|gebaeude|nachbarschaft|parzelle_punkt)\b/);
+    expect(t).not.toMatch(/"properties\?select=\*[^"]*" zaehlen/);
+    expect(t).not.toContain('gebaeude_suchen');
+    expect(t).toContain("set statement_timeout = '30s'");
+  });
+
   it('Fehlermeldungen der Datenbank erscheinen in «Nachbarschaft» nie im Protokoll', () => {
     const t = ohneKommentare(lesen('nachbarschaft.yml'));
     const aufrufe = t.split('psql "$DB"').slice(1).map(a => a.split(/psql "\$LOKAL"|\n\s*\n/)[0]);

@@ -793,21 +793,12 @@ jobs:
             execute 'explain (analyze, format json) ' || q into j;
             insert into zeiten values (b, round((j->0->>'Execution Time')::numeric, 1));
           end $f$;
-          select pg_temp.mess('Uebersicht ZH, Seite 1', $q$select id, address, gemeinde, hnf_delta, marge_chf, owner_name from properties where ausgeschlossen = false and kanton = 'ZH' and hnf_delta is not null order by hnf_delta desc nulls last limit 1000$q$);
-          select pg_temp.mess('Uebersicht ZH, Seite 2', $q$select id from properties where ausgeschlossen = false and kanton = 'ZH' and hnf_delta is not null order by hnf_delta desc nulls last offset 1000 limit 1000$q$);
-          select pg_temp.mess('Nummern / Pipedrive', $q$select id, address, owner_name, owner_phone from properties where pipedrive_deal_id is null and owner_name is not null and owner_name <> '' order by marge_chf desc nulls last limit 300$q$);
-          select pg_temp.mess('Pipedrive uebertragen', $q$select id from properties where pipedrive_deal_id is not null order by last_export_at desc nulls last limit 30$q$);
           select pg_temp.mess('Cockpit Baugesuche 7 Tage', $q$select count(*) from baugesuch where quelle <> 'probe' and publiziert_am >= current_date - 7$q$);
           select pg_temp.mess('Baugesuche Liste', $q$select * from baugesuch where quelle <> 'probe' order by publiziert_am desc limit 500$q$);
           select pg_temp.mess('Cockpit Potenzial ZH', $q$select id, address, gemeinde, zone, area, hnf_delta, marge_chf, baujahr from properties where kanton = 'ZH' and ausgeschlossen = false and preselection_status <> 'Ausschliessen' and owner_name is null order by marge_chf desc nulls last limit 3$q$);
           select pg_temp.mess('Zentrale Liste', $q$select * from vorhaben_liste order by geaendert_am desc limit 300$q$);
           select pg_temp.mess('Gelegenheiten', $q$select g.*, (select count(*) from gelegenheit_parzelle gp where gp.gelegenheit_id = g.id) from gelegenheit g limit 500$q$);
           select bereich, ms from zeiten;
-          \echo '```'
-          \echo '### Plan der Uebersicht (zweimal: kalt, warm)'
-          \echo '```'
-          explain (analyze, buffers, costs off, timing on) select id, address, gemeinde, plz, parzelle, plot_number, egrid, owner_phone, bfs_nr, kanton, zone, ausnuetzung, area, gebaeudeflaeche, geschosse, baujahr, owner_name, eigentuemer_name, hnf_delta, marge_chf, preselection_status from properties where ausgeschlossen = false and kanton = 'ZH' and hnf_delta is not null order by hnf_delta desc nulls last limit 1000;
-          explain (analyze, buffers, costs off, timing on) select id, address, gemeinde, plz, parzelle, plot_number, egrid, owner_phone, bfs_nr, kanton, zone, ausnuetzung, area, gebaeudeflaeche, geschosse, baujahr, owner_name, eigentuemer_name, hnf_delta, marge_chf, preselection_status from properties where ausgeschlossen = false and kanton = 'ZH' and hnf_delta is not null order by hnf_delta desc nulls last limit 1000;
           \echo '```'
           SQL
 
