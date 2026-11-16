@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { Building2, X, Shield, Share, Plus, Map, Target, BarChart3, Gauge, HardHat, MoreHorizontal, Briefcase, LogOut, Orbit, CalendarDays, Inbox, Combine, Flame, Search } from 'lucide-react';
+import { Building2, X, Shield, Share, Plus, Map, Target, BarChart3, Gauge, HardHat, MoreHorizontal, Briefcase, LogOut, Orbit, CalendarDays, Inbox, Combine, Flame, Search, Calculator } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { KontoMenu } from '@/components/KontoMenu';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
@@ -21,6 +21,7 @@ const Karte3DSeite = lazy(() => import('@/components/karte3d/Karte3DSeite').then
 const Kalender = lazy(() => import('@/components/Kalender').then(m => ({ default: m.Kalender })));
 const Nachbarschaft = lazy(() => import('@/components/Nachbarschaft').then(m => ({ default: m.Nachbarschaft })));
 const Suche = lazy(() => import('@/components/Suche').then(m => ({ default: m.Suche })));
+const CalcYouLater = lazy(() => import('@/components/CalcYouLater').then(m => ({ default: m.CalcYouLater })));
 // Die Karte zieht Leaflet nach -- das gehoert nicht ins erste
 // Buendel, sondern wird geholt, wenn jemand den Reiter oeffnet.
 const Karte = lazy(() => import('@/components/Karte').then(m => ({ default: m.Karte })));
@@ -40,7 +41,7 @@ import { usePlatform } from '@/hooks/use-platform';
 
 // Jeder Bereich ist eine Adresse: /zentrale, /baugesuche ... ("/" ist
 // das Cockpit). So führt "Zurück" im Browser in den vorigen Bereich.
-const TABS = ['cockpit', 'suche', 'leads', 'zentrale', 'baugesuche', 'leadlisten', 'karte', 'nachbarschaft', 'arrondierung', 'gelegenheiten', 'auswertung', 'kalender', 'karte3d', 'admin'] as const;
+const TABS = ['cockpit', 'suche', 'leads', 'calc', 'zentrale', 'baugesuche', 'leadlisten', 'karte', 'nachbarschaft', 'arrondierung', 'gelegenheiten', 'auswertung', 'kalender', 'karte3d', 'admin'] as const;
 type Tab = typeof TABS[number];
 const istTab = (x: string | undefined): x is Tab => !!x && (TABS as readonly string[]).includes(x);
 
@@ -59,6 +60,8 @@ const gruppen: { titel: string; eintraege: Eintrag[] }[] = [
     { id: 'suche', label: 'Suche', icon: Search },
     // Die Leads der Check-Seiten (20 Webseiten, eine Liste), mit Zahlen je Webseite.
     { id: 'leads', label: 'Leads', icon: Inbox },
+    // Vom Lead zur Kaufpreisempfehlung und in einem Tag zum Angebot (16. November).
+    { id: 'calc', label: 'Calc You Later', icon: Calculator },
     // Jedes Kundenvorhaben an einem Ort: von der Adressliste bis zur
     // Akquise in seinem Namen.
     { id: 'zentrale', label: 'Zentrale', icon: Briefcase },
@@ -259,6 +262,7 @@ export default function Index() {
             {active === 'cockpit' && <Cockpit onGehe={z => gehe(z)} onNeu={neuesVorhaben} />}
             {active === 'suche' && <Suche />}
             {active === 'leads' && <Leads />}
+            {active === 'calc' && <CalcYouLater />}
             {active === 'zentrale' && <Zentrale />}
             {active === 'baugesuche' && <Baugesuche />}
             {active === 'leadlisten' && <LeadListen />}

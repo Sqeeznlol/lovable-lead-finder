@@ -1,0 +1,238 @@
+/**
+ * Woher CALC YOU LATER seine Zahlen holt (gerechnet wird in calc.ts):
+ *
+ *   Adresse, Parzelle, Fläche      Suchdienst und Kataster des Bundes
+ *   Gebäude (Fläche, Geschosse,    Gebäude- und Wohnungsregister des
+ *   Baujahr, Wohnungen)            Bundes, alle Kantone
+ *   Zone                           Zonenplan des Kantons Zürich; sonst
+ *                                  die eigene Liste oder von Hand
+ *   Umriss, bebaubare Fläche       eigener Bestand (ZH, TG)
+ *   Preise der Gemeinde            amtliche Statistik (ZH, BL)
+ *   Belastete Standorte, ÖV        Bund und geodienste.ch
+ *   Baugesuche im Umkreis          eigener Bestand
+ *
+ * Die Feldnamen des Bundes sind nachgesehen (Dufourstrasse 90, Zürich,
+ * 16. November): der Kataster liefert ak, number, egris_egrid; das
+ * Register egid, gdekt, ggdenr, ggdename, gstat, gbauj, garea, gastw,
+ * ganzwhg; der Suchdienst im Feld detail zuletzt die Nummer der
+ * Gemeinde und den Kanton («... 8008 zuerich 261 zuerich ch zh»).
+ *
+ * Jede Abfrage beim Bund trägt eine Frist: fällt ein Dienst aus, fehlt
+ * diese Angabe, und die Rechnung sagt es -- sie wartet nicht.
+ */
+import { supabase } from '@/integrations/supabase/client';
+import { flaecheLv95 } from '@/lib/ortsabfrage';
+import { grundlageLaden, zoneAusBestand, zoneZh, type Grundlage } from '@/lib/machbarkeit-daten';
+import { gemeindePreise, type GemeindePreise } from '@/lib/preise';
+import { zusatzAbfragen } from '@/lib/parzelle-zusatz';
+import { istVorhanden } from '@/lib/potential';
+import type { Gebaeude, ZonenRegeln } from '@/lib/machbarkeit';
+
+// Die erzeugten Typen kennen Tabelle und Funktion noch nicht.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const db = () => supabase as any;
+
+const API = 'https://api3.geo.admin.ch/rest/services';
+const FRIST_MS = 8000;
+const EGRID = /^CH[0-9A-Z]{12}$/;
+
+async function holen(adresse: string): Promise<unknown> {
+  const frist = new AbortController();
+  const uhr = setTimeout(() => frist.abort(), FRIST_MS);
+  try {
+    const r = await fetch(adresse, { signal: frist.signal });
+    if (!r.ok) throw new Error(`Der Bund antwortet mit ${r.status}.`);
+    return await r.json();
+  } finally {
+    clearTimeout(uhr);
+  }
+}
+
+export interface Adresse {
+  /** «Dufourstrasse 90 8008 Zürich», wie der Bund sie schreibt. */
+  label: string;
+  strasse: string; plz: string | null; ort: string | null;
+  e: number; n: number;
+  kanton: string | null; bfs: string | null;
+}
+
+/** Strasse, Postleitzahl und Ort aus der Schreibweise des Bundes; Kanton und Gemeindenummer aus dem Feld detail. */
+export function adresseLesen(label: string, detail: string, e: number, n: number): Adresse {
+  const sauber = label.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+  const m = sauber.match(/^(.*?)\s+(\d{4})\s+(.+)$/);
+  const kt = detail.match(/\bch ([a-z]{2})$/);
+  const bfs = kt ? detail.match(/\b(\d{1,4})\b\D*\bch [a-z]{2}$/) : null;
+  return {
+    label: sauber, strasse: m ? m[1] : sauber, plz: m ? m[2] : null, ort: m ? m[3] : null, e, n,
+    kanton: kt ? kt[1].toUpperCase() : null, bfs: bfs ? bfs[1] : null,
+  };
+}
+
+/** Vorschläge des Bundes zu einer getippten Adresse. */
+export async function adressen(text: string): Promise<Adresse[]> {
+  if (text.trim().length < 4) return [];
+  const j = await holen(`${API}/ech/SearchServer?type=locations&origins=address&limit=6&sr=2056&lang=de&searchText=${encodeURIComponent(text.trim())}`) as { results?: { attrs?: Record<string, unknown> }[] };
+  return (j?.results ?? [])
+    // Mit sr=2056 steht der Ostwert in y, der Nordwert in x.
+    .map(x => adresseLesen(String(x.attrs?.label ?? ''), String(x.attrs?.detail ?? ''), Number(x.attrs?.y), Number(x.attrs?.x)))
+    .filter(a => a.label && Number.isFinite(a.e) && Number.isFinite(a.n));
+}
+
+interface BundParzelle { kanton: string | null; nummer: string | null; egrid: string | null; flaeche: number | null }
+
+async function parzelleBund(e: number, n: number): Promise<BundParzelle | null> {
+  const q = new URLSearchParams({ geometryType: 'esriGeometryPoint', geometry: `${e},${n}`, sr: '2056', tolerance: '0',
+    returnGeometry: 'true', geometryFormat: 'geojson', layers: 'all:ch.kantone.cadastralwebmap-farbe',
+    mapExtent: `${e - 100},${n - 100},${e + 100},${n + 100}`, imageDisplay: '400,400,96', lang: 'de' });
+  const j = await holen(`${API}/all/MapServer/identify?${q}`) as { results?: { geometry?: { type: string; coordinates: unknown }; attributes?: Record<string, unknown>; properties?: Record<string, unknown> }[] };
+  const p = j?.results?.[0];
+  if (!p) return null;
+  const a = p.attributes ?? p.properties ?? {};
+  const egrid = String(a.egris_egrid ?? '');
+  return {
+    kanton: typeof a.ak === 'string' && /^[A-Z]{2}$/.test(a.ak) ? a.ak : null,
+    nummer: a.number ? String(a.number) : null,
+    egrid: EGRID.test(egrid) ? egrid : null,
+    flaeche: p.geometry ? Math.round(flaecheLv95(p.geometry)) : null,
+  };
+}
+
+const zahl = (v: unknown): number | null => { const x = Number(v); return v != null && v !== '' && Number.isFinite(x) && x > 0 ? x : null; };
+
+/** Ein Eintrag des Registers als Gebäude der Rechnung; null, wenn das Gebäude nicht (mehr) steht. */
+export function gebaeudeAusRegister(a: Record<string, unknown>): Gebaeude | null {
+  // 1004: bestehend. Projektierte, abgebrochene und nicht realisierte zählen nicht zum Bestand.
+  if (a.gstat != null && Number(a.gstat) !== 1004) return null;
+  return { grundflaeche: zahl(a.garea), geschosse: zahl(a.gastw), baujahr: zahl(a.gbauj), wohnungen: zahl(a.ganzwhg) };
+}
+
+interface Register { gebaeude: Gebaeude[]; kanton: string | null; bfs: string | null; gemeinde: string | null }
+
+async function registerBund(egrid: string): Promise<Register> {
+  const q = new URLSearchParams({ layer: 'ch.bfs.gebaeude_wohnungs_register', searchField: 'egrid', searchText: egrid, contains: 'false', returnGeometry: 'false' });
+  const j = await holen(`${API}/all/MapServer/find?${q}`) as { results?: { attributes?: Record<string, unknown> }[] };
+  const alle = (j?.results ?? []).map(r => r.attributes ?? {});
+  const erster = alle[0] ?? {};
+  return {
+    gebaeude: alle.map(gebaeudeAusRegister).filter((g): g is Gebaeude => !!g),
+    kanton: typeof erster.gdekt === 'string' ? erster.gdekt : null,
+    bfs: erster.ggdenr != null ? String(erster.ggdenr) : null,
+    gemeinde: typeof erster.ggdename === 'string' ? erster.ggdename : null,
+  };
+}
+
+/** Alles, was zu einer Adresse gefunden wurde. */
+export interface Objekt {
+  adresse: Adresse;
+  kanton: string | null; bfs: string | null; gemeinde: string | null;
+  egrid: string | null; parzelleNr: string | null;
+  /** Die Parzelle im eigenen Bestand (ZH, TG); null ausserhalb. */
+  parzelleId: string | null;
+  flaeche: number | null;
+  /** Der Punkt für Umriss und Zone: in der Parzelle, wenn der Bestand ihn kennt. */
+  punkt: [number, number];
+  grundlage: Grundlage | null;
+  zone: ZonenRegeln | null; bauzoneM2: number | null;
+  /** Der Zonenplan des Kantons hat nicht geantwortet. */
+  zonenplanAus: boolean;
+  gebaeude: Gebaeude[]; bestandQuelle: 'register' | 'liste';
+  /** Das Register hat geantwortet: «kein Gebäude» heisst dann «unbebaut». */
+  registerDa: boolean;
+  denkmal: boolean; isos: boolean;
+  eigentuemer: string | null;
+  preise: GemeindePreise | null;
+  /** Was nicht geholt werden konnte, in Worten. */
+  luecken: string[];
+}
+
+type Zeile = Record<string, unknown>;
+
+export async function objektLaden(a: Adresse, abstand: number): Promise<Objekt> {
+  const luecken: string[] = [];
+  const bund = await parzelleBund(a.e, a.n).catch(() => null);
+  if (!bund) luecken.push('Der Kataster des Bundes hat nicht geantwortet: Parzelle und Fläche fehlen.');
+  const egrid = bund?.egrid ?? null;
+
+  const [register, eigen] = await Promise.all([
+    egrid ? registerBund(egrid).catch(() => null) : Promise.resolve(null),
+    egrid ? db().from('properties').select('*').eq('egrid', egrid).limit(1).maybeSingle().then((r: { data: Zeile | null }) => r.data ?? null, () => null) as Promise<Zeile | null> : Promise.resolve(null),
+  ]);
+  if (egrid && !register) luecken.push('Das Gebäuderegister des Bundes hat nicht geantwortet.');
+
+  const kanton = bund?.kanton ?? register?.kanton ?? (eigen?.kanton as string | undefined) ?? a.kanton;
+  const bfs = eigen?.bfs_nr != null ? String(eigen.bfs_nr) : register?.bfs ?? a.bfs;
+  const parzelleId = (eigen?.id as string | undefined) ?? null;
+
+  const grundlage = parzelleId ? await grundlageLaden(parzelleId, abstand).catch(() => null) : null;
+  const punkt: [number, number] = grundlage?.punkt ?? [a.e, a.n];
+
+  // Zone: amtlich für Zürich, sonst was die eigene Liste weiss, sonst von Hand.
+  const liste = eigen ? zoneAusBestand(eigen as Parameters<typeof zoneAusBestand>[0]) : null;
+  let zone: ZonenRegeln | null = null, zonenplanAus = false;
+  if (kanton === 'ZH') {
+    try { zone = await zoneZh(punkt[0], punkt[1]); } catch { zonenplanAus = true; }
+  }
+  const [preise] = await Promise.all([gemeindePreise(bfs).catch(() => null)]);
+
+  // Gebäude: das Register des Bundes; fällt es aus, der eigene Bestand.
+  const ausBestand = grundlage?.gebaeude?.length ? grundlage.gebaeude : null;
+  const ausListe = eigen && zahl(eigen.gebaeudeflaeche) && zahl(eigen.geschosse)
+    ? [{ grundflaeche: zahl(eigen.gebaeudeflaeche), geschosse: zahl(eigen.geschosse), baujahr: zahl(eigen.baujahr), wohnungen: zahl(eigen.wohnungen) }] : null;
+  const gebaeude = register?.gebaeude ?? ausBestand ?? ausListe ?? [];
+
+  return {
+    adresse: a, kanton: kanton ?? null, bfs: bfs ?? null,
+    gemeinde: (eigen?.gemeinde as string | undefined) ?? register?.gemeinde ?? a.ort,
+    egrid, parzelleNr: bund?.nummer ?? (eigen?.parzelle as string | undefined) ?? null, parzelleId,
+    flaeche: zahl(eigen?.area) ?? grundlage?.flaeche_umriss ?? bund?.flaeche ?? null,
+    punkt, grundlage,
+    zone: zone ?? liste?.regeln ?? null, bauzoneM2: zone ? null : liste?.bauzoneM2 ?? null, zonenplanAus,
+    gebaeude, bestandQuelle: register || ausBestand ? 'register' : 'liste', registerDa: !!register,
+    denkmal: istVorhanden(eigen?.denkmalschutz as string | undefined), isos: istVorhanden(eigen?.isos as string | undefined),
+    eigentuemer: (eigen?.owner_name as string | undefined) ?? null,
+    preise, luecken,
+  };
+}
+
+/** Was das Umfeld sagt: belastete Standorte, ÖV und Baugesuche im Umkreis. Jede Lücke bleibt leer. */
+export async function umfeldLaden(o: Pick<Objekt, 'egrid' | 'punkt' | 'kanton'>, meter = 300): Promise<{ belastet: number | null; oev: string | null; baugesuche: number | null; baugesucheMeter: number }> {
+  const [zusatz, bau] = await Promise.all([
+    o.egrid ? zusatzAbfragen(o.egrid, o.punkt[0], o.punkt[1]).catch(() => null) : Promise.resolve(null),
+    o.kanton ? db().rpc('baugesuche_umkreis', { p_e: o.punkt[0], p_n: o.punkt[1], p_kanton: o.kanton, p_meter: meter })
+      .then((r: { data: { n365?: number } | null; error: unknown }) => (r.error ? null : r.data), () => null) as Promise<{ n365?: number } | null> : Promise.resolve(null),
+  ]);
+  return { belastet: zusatz ? zusatz.belastet.length : null, oev: zusatz?.oev ?? null, baugesuche: bau?.n365 ?? null, baugesucheMeter: meter };
+}
+
+// --------------------------------------------------- Portale von Hand
+
+const klein = (s: string) => s.toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue');
+
+/**
+ * Wo man die Mieten der Nachbarschaft nachsieht. Comparis und Homegate
+ * verbieten das automatische Auslesen und sperren Programme aus; darum
+ * öffnet die Seite nur die Suche, und ein Mensch überträgt, was er sieht.
+ *
+ * Die Adressen sind nachgesehen (16. November): Homegate führt
+ * /rent/apartment/zip-8008/matching-list, Comparis
+ * /immobilien/marktplatz/winterthur/wohnung/mieten. Wie Comparis Orte
+ * aus mehreren Wörtern schreibt, ist nicht belegt -- dort sucht Google.
+ */
+export function portalLinks(a: Pick<Adresse, 'strasse' | 'plz' | 'ort'>): { titel: string; adresse: string }[] {
+  const aus: { titel: string; adresse: string }[] = [];
+  const google = (q: string) => `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+  if (a.plz) aus.push({ titel: `Homegate: Wohnungen in ${a.plz}`, adresse: `https://www.homegate.ch/rent/apartment/zip-${a.plz}/matching-list` });
+  if (a.ort && /^[A-Za-zÄÖÜäöü]+$/.test(a.ort)) {
+    aus.push({ titel: `Comparis: Wohnungen in ${a.ort}`, adresse: `https://www.comparis.ch/immobilien/marktplatz/${klein(a.ort)}/wohnung/mieten` });
+  } else if (a.ort) {
+    aus.push({ titel: `Comparis: Wohnungen in ${a.ort}`, adresse: google(`site:comparis.ch Wohnung mieten ${a.plz ?? ''} ${a.ort}`.replace(/\s+/g, ' ')) });
+  }
+  aus.push({ titel: 'Inserate an dieser Adresse', adresse: google(`"${a.strasse}" ${a.plz ?? ''} ${a.ort ?? ''} mieten (site:homegate.ch OR site:comparis.ch OR site:immoscout24.ch)`.replace(/\s+/g, ' ')) });
+  return aus;
+}
+
+/** Der Lead der Check-Seiten, von dem aus gerechnet wird: Name und Adresse zum Vorbelegen. */
+export async function leadLaden(id: string): Promise<{ id: string; name: string | null; adresse: string | null } | null> {
+  const r = await db().from('anfrage').select('id, name, adresse').eq('id', id).maybeSingle();
+  return r.error ? null : r.data ?? null;
+}

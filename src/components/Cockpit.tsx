@@ -8,6 +8,7 @@ import { useCanton } from '@/hooks/use-canton';
 import { Abschnitt, Karussell, KNOPF, KNOPF_HAUPT, KNOPF_LEISE, Leer, LISTE, Marke, Seite, Strichbalken } from '@/components/rahmen';
 import { LuftbildKarte } from '@/components/LuftbildKarte';
 import { KOPFBILD } from '@/lib/luftbild';
+import { kalkulationenLaden, uhr } from '@/lib/calc-ablauf';
 import { zoneKurzform } from '@/lib/potential';
 
 /**
@@ -119,6 +120,13 @@ export function Cockpit({ onGehe, onNeu }: { onGehe: (z: Ziel) => void; onNeu?: 
     staleTime: 60 * 1000,
   });
 
+  // CALC YOU LATER: was auf Prüfung, Freigabe oder Angebot wartet, muss in
+  // einem Tag durch -- darum steht es hier, wo jeder den Tag beginnt.
+  // Dieselbe kleine Abfrage wie im Reiter; fehlt sie, bleibt die Zeile weg.
+  const calc = useQuery({ queryKey: ['kalkulationen'], queryFn: kalkulationenLaden, staleTime: 60 * 1000, retry: 0 });
+  const wartend = (calc.data ?? []).filter(k => !k.test && ['pruefung', 'freigabe', 'angebot'].includes(k.zustand));
+  const zuSpaet = wartend.filter(k => uhr(k)?.ueberfaellig).length;
+
   const maxPrio = Math.max(1, ...(data?.heisse ?? []).map(h => Number(h.prioritaet) || 0));
   const FARBEN = ['heiss', 'akzent', 'gruen', 'heiss'] as const;
 
@@ -150,6 +158,14 @@ export function Cockpit({ onGehe, onNeu }: { onGehe: (z: Ziel) => void; onNeu?: 
         </Abschnitt>
       }>
       {isLoading && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> wird gezählt …</p>}
+      {wartend.length > 0 && (
+        <button type="button" onClick={() => navigate('/calc')}
+                className="flex min-h-12 w-full flex-wrap items-center gap-x-3 gap-y-1 rounded border bg-card px-4 py-3 text-left transition-colors hover:bg-secondary/60">
+          <span className="font-medium">{wartend.length} {wartend.length === 1 ? 'Kalkulation wartet' : 'Kalkulationen warten'} auf den nächsten Schritt</span>
+          {zuSpaet > 0 && <Marke art="heiss">{zuSpaet} überfällig</Marke>}
+          <span className="ml-auto text-sm text-accent">Calc You Later ↗</span>
+        </button>
+      )}
       {data && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <Abschnitt titel="Heisse Gelegenheiten" unter="Höchste Priorität, noch offen" symbol={Flame} kachel="heiss"

@@ -31,7 +31,7 @@ const ATTRAPPE = process.env.ATTRAPPE === '1';
 // Eine Zürcher Liegenschaft aus der Amtlichen Vermessung (Stichprobe vom 15. November).
 const OBJEKT = process.env.OBJEKT_EGRID || 'CH958799779192';
 // Die Suche mit Julians Beispiel: so läuft auch die Abfrage dahinter einmal echt.
-const REITER = ['', 'suche?q=Alle%20W2%20in%20Dietikon', 'leads', 'zentrale', 'karte', 'gelegenheiten', 'baugesuche', 'leadlisten', 'auswertung',
+const REITER = ['', 'suche?q=Alle%20W2%20in%20Dietikon', 'leads', 'calc', 'zentrale', 'karte', 'gelegenheiten', 'baugesuche', 'leadlisten', 'auswertung',
   'nachbarschaft', 'arrondierung', 'kalender', 'karte3d', 'admin', 'fonds'];
 const GERAETE = [
   { name: 'iPhone', einstellung: devices['iPhone 13'] },

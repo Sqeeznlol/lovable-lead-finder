@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { ExternalLink, Loader2, Printer } from 'lucide-react';
 import { FELD, KNOPF, KNOPF_HAUPT } from '@/components/rahmen';
 import { FENSTER } from '@/lib/fenster';
@@ -31,7 +32,7 @@ const ART: Record<Art, string> = { amtlich: 'amtlich', berechnet: 'berechnet', a
 const de = (n: number, stellen = 0) => n.toLocaleString('de-CH', { maximumFractionDigits: stellen });
 
 /** Zahlenfeld, das erst beim Verlassen übernimmt -- sonst rechnet jede Ziffer neu. */
-function Zahl({ titel, wert, einheit, setWert, min, max, schritt }: { titel: string; wert: number; einheit: string; setWert: (n: number) => void; min: number; max: number; schritt: number }) {
+export function Zahl({ titel, wert, einheit, setWert, min, max, schritt }: { titel: string; wert: number; einheit: string; setWert: (n: number) => void; min: number; max: number; schritt: number }) {
   const [text, setText] = useState(String(wert));
   useEffect(() => { setText(String(wert)); }, [wert]);
   const uebernehmen = () => {
@@ -68,6 +69,7 @@ function VarianteTafel({ v }: { v: Variante }) {
 }
 
 export function Machbarkeit({ parzelle }: { parzelle: Parzelle }) {
+  const navigate = useNavigate();
   const [auf, setAuf] = useState(false);
   const [annahmen, setAnnahmen] = useState<Annahmen>(ANNAHMEN);
   const setze = (teil: Partial<Annahmen>) => setAnnahmen(a => ({ ...a, ...teil }));
@@ -112,7 +114,16 @@ export function Machbarkeit({ parzelle }: { parzelle: Parzelle }) {
           <h3 className="text-lg">Machbarkeit</h3>
           <p className="text-sm text-muted-foreground">Was hier Platz hat und was es wert ist, mit der Herkunft jeder Zahl.</p>
         </div>
-        <button type="button" className={KNOPF} onClick={() => setAuf(true)}>Rechnen</button>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className={KNOPF} onClick={() => setAuf(true)}>Rechnen</button>
+          {/* CALC YOU LATER macht aus derselben Rechnung eine Kaufpreisempfehlung mit Freigabe. */}
+          {parzelle.address && (
+            <button type="button" className={KNOPF}
+                    onClick={() => navigate(`/calc?neu=${encodeURIComponent([parzelle.address, parzelle.gemeinde].filter(Boolean).join(', '))}`)}>
+              Kaufpreis kalkulieren
+            </button>
+          )}
+        </div>
       </div>
     );
   }

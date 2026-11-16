@@ -131,6 +131,21 @@ nachts.
 
 Der Test `zeitplan.test.ts` rechnet die Abdeckung nach.
 
+## CALC YOU LATER
+
+Reiter `/calc`: Adresse eingeben, heraus kommen Landwert, Nutzfläche,
+Kubatur, Baukosten, Erlös, Gewinn, Chancen, Risiken und eine
+Kaufpreisempfehlung (Neubau und Bestand, die höhere Bewertung zählt).
+Danach in 24 Stunden: Kaufpreis prüfen, freigeben, Angebot schreiben,
+senden. Alles Weitere in `docs/calc-you-later.md`.
+
+  * Comparis und Homegate werden nicht automatisch ausgelesen: beide
+    verbieten es. Die Seite öffnet die Suche, ein Mensch trägt ein.
+  * Reihenfolge und Uhr erzwingt die Datenbank (`kalkulation_schritt`).
+    Wer die Migration ändert, lässt `tools/kalkulation-probe.sh` laufen.
+  * Keine Zahl ohne Herkunft: amtlich, berechnet oder Annahme. Neue
+    Chancen und Risiken sind Regeln mit Zahl, kein Sprachmodell.
+
 ## Gestaltung
 
 Wie die Seite aussieht, steht in `DESIGN.md` -- vor jeder Arbeit an der

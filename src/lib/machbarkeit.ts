@@ -46,8 +46,12 @@ export interface ZonenRegeln {
   wohnanteilMin: number | null;
   rechtsstatus: string | null;
   dokument: string | null;
-  /** kanton: Zonenplan des Kantons (amtlich). bestand: aus der eigenen Liste, ohne Gewähr. */
-  quelle: 'kanton' | 'bestand';
+  /**
+   * kanton: Zonenplan des Kantons (amtlich). bestand: aus der eigenen
+   * Liste, ohne Gewähr. hand: von einem Menschen eingegeben, wo kein
+   * Zonenplan angebunden ist (CALC YOU LATER).
+   */
+  quelle: 'kanton' | 'bestand' | 'hand';
 }
 
 export interface Gebaeude { grundflaeche: number | null; geschosse: number | null; baujahr: number | null; wohnungen: number | null }
@@ -167,7 +171,7 @@ export function studieRechnen(e: Eingabe): Studie {
   const bauzone = pos(e.bauzoneM2) && e.bauzoneM2! < flaeche * 0.98 ? e.bauzoneM2! : null;
   const anrechenbar = bauzone ?? flaeche;
   const amtlich: Art = z.quelle === 'kanton' ? 'amtlich' : 'annahme';
-  const zonenQuelle = z.quelle === 'kanton' ? 'Zonenplan des Kantons' : 'eigene Liste, nicht amtlich';
+  const zonenQuelle = z.quelle === 'kanton' ? 'Zonenplan des Kantons' : z.quelle === 'hand' ? 'von Hand eingegeben' : 'eigene Liste, nicht amtlich';
 
   // ---- die Ziffer
   const az = pos(z.az), bmz = pos(z.bmz);
@@ -284,7 +288,8 @@ export function studieRechnen(e: Eingabe): Studie {
   else pruefen.push('Kein Umriss: ob das Volumen zwischen den Grenzabständen Platz hat, ist nicht gerechnet.');
   if (ziffer === 'BMZ') pruefen.push(`Baumasse: in Geschossfläche umgerechnet mit ${de(a.geschosshoehe, 1)} m Geschosshöhe. Hohe Räume oder ein steiles Dach ändern das.`);
   if (!ziffer) pruefen.push('Die Zone nennt keine Ziffer (häufig in Kern- und Zentrumszonen): dort entscheiden Gestaltungsvorschriften und der Einzelfall.');
-  if (z.quelle !== 'kanton') pruefen.push('Die Angaben zur Zone stammen aus der eigenen Liste, nicht aus dem Zonenplan des Kantons.');
+  if (z.quelle === 'hand') pruefen.push('Ziffer oder Geschosse sind von Hand eingegeben: in der Bauordnung der Gemeinde nachsehen.');
+  else if (z.quelle !== 'kanton') pruefen.push('Die Angaben zur Zone stammen aus der eigenen Liste, nicht aus dem Zonenplan des Kantons.');
   if (bauzone) pruefen.push('Die Parzelle liegt nur zum Teil in der Bauzone.');
   if (unbekannt) pruefen.push('Der Bestand ist nicht bekannt: ob und was heute steht, ist nicht eingerechnet.');
   if (ausgenuetzt != null && ausgenuetzt > 1) pruefen.push('Der Bestand ist grösser als heute erlaubt (Besitzstand): ein Neubau dürfte kleiner ausfallen.');

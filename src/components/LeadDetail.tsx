@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { KNOPF, KNOPF_HAUPT, Marke } from '@/components/rahmen';
@@ -174,6 +175,7 @@ export function LeadDetail({ lead, onClose, onErledigt, onNotiz, onNachfass }: {
   lead: Lead | null; onClose: () => void; onErledigt: (l: Lead) => void; onNotiz: (l: Lead, text: string) => Promise<void>;
   onNachfass: (l: Lead) => Promise<void>;
 }) {
+  const navigate = useNavigate();
   const [notiz, setNotiz] = useState('');
   const [speichert, setSpeichert] = useState(false);
   useEffect(() => { setNotiz(lead?.bemerkung ?? ''); }, [lead]);
@@ -200,6 +202,8 @@ export function LeadDetail({ lead, onClose, onErledigt, onNotiz, onNachfass }: {
             <div className="grid grid-cols-2 gap-2">
               {lead.telefon && <a className={KNOPF_HAUPT} href={`tel:${lead.telefon.replace(/\s/g, '')}`}>Anrufen</a>}
               {lead.email && <a className={KNOPF} href={`mailto:${lead.email}`}>E-Mail</a>}
+              {/* CALC YOU LATER rechnet zur Adresse des Leads den Kaufpreis. */}
+              {lead.adresse && <button type="button" className={`${KNOPF} col-span-2`} onClick={() => navigate(`/calc?anfrage=${lead.id}`)}>Kaufpreis kalkulieren</button>}
             </div>
 
             {lv95 && (
