@@ -86,7 +86,7 @@ export function regelnAusZh(p: Record<string, unknown>): ZonenRegeln {
 export const ZONEN_FRIST_MS = 8000;
 
 /** Die Zone am Punkt (LV95), aus dem Zonenplan des Kantons Zürich. Null: keine gefunden. */
-export async function zoneZh(e: number, n: number, signal?: AbortSignal): Promise<ZonenRegeln | null> {
+export async function zoneZh(e: number, n: number, signal?: AbortSignal, fristMs = ZONEN_FRIST_MS): Promise<ZonenRegeln | null> {
   const q = new URLSearchParams({
     SERVICE: 'WFS', VERSION: '2.0.0', REQUEST: 'GetFeature', TYPENAMES: ZONEN_EBENE, COUNT: '5',
     BBOX: `${e - 0.5},${n - 0.5},${e + 0.5},${n + 0.5},urn:ogc:def:crs:EPSG::2056`, OUTPUTFORMAT: 'geojson',
@@ -94,7 +94,7 @@ export async function zoneZh(e: number, n: number, signal?: AbortSignal): Promis
   // Mit Frist: hängt der Dienst des Kantons, wartete die Studie sonst
   // endlos, statt mit der eigenen Liste zu rechnen und das zu sagen.
   const frist = new AbortController();
-  const uhr = setTimeout(() => frist.abort(), ZONEN_FRIST_MS);
+  const uhr = setTimeout(() => frist.abort(), fristMs);
   signal?.addEventListener('abort', () => frist.abort());
   let j: { features?: { properties: Record<string, unknown> }[] };
   try {

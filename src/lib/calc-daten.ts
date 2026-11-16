@@ -22,11 +22,12 @@
  */
 import { supabase } from '@/integrations/supabase/client';
 import { flaecheLv95 } from '@/lib/ortsabfrage';
-import { grundlageLaden, zoneAusBestand, zoneZh, type Grundlage } from '@/lib/machbarkeit-daten';
+import { grundlageLaden, ZONEN_FRIST_MS, zoneAusBestand, zoneZh, type Grundlage } from '@/lib/machbarkeit-daten';
 import { gemeindePreise, type GemeindePreise } from '@/lib/preise';
 import { zusatzAbfragen } from '@/lib/parzelle-zusatz';
 import { istVorhanden } from '@/lib/potential';
 import type { Gebaeude, ZonenRegeln } from '@/lib/machbarkeit';
+import { zuerichKm } from '@/lib/calc';
 
 // Die erzeugten Typen kennen Tabelle und Funktion noch nicht.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -170,7 +171,13 @@ export async function objektLaden(a: Adresse, abstand: number): Promise<Objekt> 
   const liste = eigen ? zoneAusBestand(eigen as Parameters<typeof zoneAusBestand>[0]) : null;
   let zone: ZonenRegeln | null = null, zonenplanAus = false;
   if (kanton === 'ZH') {
-    try { zone = await zoneZh(punkt[0], punkt[1]); } catch { zonenplanAus = true; }
+    // Der Dienst des Kantons hängt manchmal einige Sekunden: am 16. November
+    // fiel die Hochweidstrasse 9 in Kilchberg auf die eigene Liste zurück
+    // (Wohnzone ohne Ziffer), obwohl der Zonenplan eine Minute später in
+    // 0.8 s antwortete. Darum ein zweiter Versuch mit längerer Frist.
+    for (const frist of [ZONEN_FRIST_MS, 15000]) {
+      try { zone = await zoneZh(punkt[0], punkt[1], undefined, frist); zonenplanAus = false; break; } catch { zonenplanAus = true; }
+    }
   }
   const [preise] = await Promise.all([gemeindePreise(bfs).catch(() => null)]);
 
@@ -194,14 +201,42 @@ export async function objektLaden(a: Adresse, abstand: number): Promise<Objekt> 
   };
 }
 
-/** Was das Umfeld sagt: belastete Standorte, ÖV und Baugesuche im Umkreis. Jede Lücke bleibt leer. */
-export async function umfeldLaden(o: Pick<Objekt, 'egrid' | 'punkt' | 'kanton'>, meter = 300): Promise<{ belastet: number | null; oev: string | null; baugesuche: number | null; baugesucheMeter: number }> {
-  const [zusatz, bau] = await Promise.all([
+/**
+ * Wie steil das Gelände ist, in Prozent: Höhen des Geländemodells des
+ * Bundes (swissALTI3D) je 15 m nördlich, südlich, östlich und westlich
+ * des Punktes. Nachgesehen an der Hochweidstrasse 9 in Kilchberg
+ * (16. November): 508.2 bis 510.5 m, rund 8 % Steigung.
+ */
+export function neigungAus(h: { n: number; s: number; o: number; w: number }, abstand = 15): number {
+  const gx = (h.o - h.w) / (2 * abstand), gy = (h.n - h.s) / (2 * abstand);
+  return Math.round(Math.hypot(gx, gy) * 1000) / 10;
+}
+
+async function neigungLaden(e: number, n: number): Promise<number | null> {
+  const hoehe = async (x: number, y: number) => {
+    const j = await holen(`${API}/height?easting=${Math.round(x)}&northing=${Math.round(y)}&sr=2056`) as { height?: string };
+    const h = Number(j?.height);
+    if (!Number.isFinite(h)) throw new Error('keine Höhe');
+    return h;
+  };
+  try {
+    const [hn, hs, ho, hw] = await Promise.all([hoehe(e, n + 15), hoehe(e, n - 15), hoehe(e + 15, n), hoehe(e - 15, n)]);
+    return neigungAus({ n: hn, s: hs, o: ho, w: hw });
+  } catch {
+    return null;
+  }
+}
+
+/** Was das Umfeld sagt: belastete Standorte, ÖV, Baugesuche im Umkreis, Gelände und Lage. Jede Lücke bleibt leer. */
+export async function umfeldLaden(o: Pick<Objekt, 'egrid' | 'punkt' | 'kanton'>, meter = 300): Promise<{ belastet: number | null; oev: string | null; baugesuche: number | null; baugesucheMeter: number; neigung: number | null; zuerichKm: number }> {
+  const [zusatz, bau, neigung] = await Promise.all([
     o.egrid ? zusatzAbfragen(o.egrid, o.punkt[0], o.punkt[1]).catch(() => null) : Promise.resolve(null),
     o.kanton ? db().rpc('baugesuche_umkreis', { p_e: o.punkt[0], p_n: o.punkt[1], p_kanton: o.kanton, p_meter: meter })
       .then((r: { data: { n365?: number } | null; error: unknown }) => (r.error ? null : r.data), () => null) as Promise<{ n365?: number } | null> : Promise.resolve(null),
+    neigungLaden(o.punkt[0], o.punkt[1]),
   ]);
-  return { belastet: zusatz ? zusatz.belastet.length : null, oev: zusatz?.oev ?? null, baugesuche: bau?.n365 ?? null, baugesucheMeter: meter };
+  return { belastet: zusatz ? zusatz.belastet.length : null, oev: zusatz?.oev ?? null, baugesuche: bau?.n365 ?? null, baugesucheMeter: meter,
+    neigung, zuerichKm: Math.round(zuerichKm(o.punkt[0], o.punkt[1]) * 10) / 10 };
 }
 
 // --------------------------------------------------- Portale von Hand
@@ -218,17 +253,26 @@ const klein = (s: string) => s.toLowerCase().replace(/ä/g, 'ae').replace(/ö/g,
  * /immobilien/marktplatz/winterthur/wohnung/mieten. Wie Comparis Orte
  * aus mehreren Wörtern schreibt, ist nicht belegt -- dort sucht Google.
  */
-export function portalLinks(a: Pick<Adresse, 'strasse' | 'plz' | 'ort'>): { titel: string; adresse: string }[] {
+export function portalLinks(a: Pick<Adresse, 'strasse' | 'plz' | 'ort'>, art: 'mieten' | 'kaufen' = 'mieten'): { titel: string; adresse: string }[] {
   const aus: { titel: string; adresse: string }[] = [];
   const google = (q: string) => `https://www.google.com/search?q=${encodeURIComponent(q)}`;
-  if (a.plz) aus.push({ titel: `Homegate: Wohnungen in ${a.plz}`, adresse: `https://www.homegate.ch/rent/apartment/zip-${a.plz}/matching-list` });
-  if (a.ort && /^[A-Za-zÄÖÜäöü]+$/.test(a.ort)) {
-    aus.push({ titel: `Comparis: Wohnungen in ${a.ort}`, adresse: `https://www.comparis.ch/immobilien/marktplatz/${klein(a.ort)}/wohnung/mieten` });
-  } else if (a.ort) {
-    aus.push({ titel: `Comparis: Wohnungen in ${a.ort}`, adresse: google(`site:comparis.ch Wohnung mieten ${a.plz ?? ''} ${a.ort}`.replace(/\s+/g, ' ')) });
-  }
-  aus.push({ titel: 'Inserate an dieser Adresse', adresse: google(`"${a.strasse}" ${a.plz ?? ''} ${a.ort ?? ''} mieten (site:homegate.ch OR site:comparis.ch OR site:immoscout24.ch)`.replace(/\s+/g, ' ')) });
+  // Nachgesehen: /rent/apartment/zip-8008/... und /buy/apartment/zip-8802/...
+  if (a.plz) aus.push({ titel: `Homegate: Wohnungen in ${a.plz}`, adresse: `https://www.homegate.ch/${art === 'kaufen' ? 'buy' : 'rent'}/apartment/zip-${a.plz}/matching-list` });
+  const slug = comparisOrt(a.ort);
+  if (slug) aus.push({ titel: `Comparis: Wohnungen in ${a.ort}`, adresse: `https://www.comparis.ch/immobilien/marktplatz/${slug}/wohnung/${art}` });
+  else if (a.ort) aus.push({ titel: `Comparis: Wohnungen in ${a.ort}`, adresse: google(`site:comparis.ch Wohnung ${art} ${a.plz ?? ''} ${a.ort}`.replace(/\s+/g, ' ')) });
+  aus.push({ titel: 'Inserate an dieser Adresse', adresse: google(`"${a.strasse}" ${a.plz ?? ''} ${a.ort ?? ''} ${art} (site:homegate.ch OR site:comparis.ch OR site:immoscout24.ch)`.replace(/\s+/g, ' ')) });
   return aus;
+}
+
+/**
+ * Wie Comparis einen Ort in der Adresse schreibt. Belegt sind nur zwei
+ * Formen (16. November): ein Wort («winterthur», «zuerich») und ein Wort
+ * mit Kanton («kilchberg-zh»). Alles andere geht über die Suche bei Google.
+ */
+export function comparisOrt(ort: string | null | undefined): string | null {
+  const m = ort?.trim().match(/^([A-Za-zÄÖÜäöü]+)(?: ([A-Z]{2}))?$/);
+  return m ? [klein(m[1]), m[2]?.toLowerCase()].filter(Boolean).join('-') : null;
 }
 
 /** Der Lead der Check-Seiten, von dem aus gerechnet wird: Name und Adresse zum Vorbelegen. */

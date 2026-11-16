@@ -13,20 +13,53 @@ schickt es ab. «Wichtig, dass es schnell Resultate gibt, die halten.»
 
 ## Was gerechnet wird
 
-Zwei Bewertungen, die höhere bestimmt den Preis (`src/lib/calc.ts`):
+Drei Bewertungen, die höchste bestimmt den Preis (`src/lib/calc.ts`):
 
 | | Rechnung | Woher |
 |---|---|---|
-| **Neubau** | Erlös minus Baukosten, Abbruch und Gewinn = Landwert | Machbarkeitsstudie (`machbarkeit.ts`): Ziffer und Hülle, die engere gilt |
-| **Bestand** | vermietbare Fläche × Miete × 12 ÷ Rendite = Ertragswert | Fussabdruck × Geschosse × 77 %; Miete laut Eingabe, sonst Statistik |
+| **Neubau zum Verkaufen** | Erlös − Baukosten − Abbruch − Gewinn = Landwert | Flächen aus der Machbarkeit (`machbarkeit.ts`): Ziffer und Hülle, die engere gilt |
+| **Neubau zum Vermieten** | Nutzfläche × Miete × 12 ÷ Rendite − Baukosten − Abbruch − Gewinn = Landwert | Miete aus Inseraten, sonst BFS für Baujahre ab 2021 |
+| **Bestand** | vermietbare Fläche × Miete × 12 ÷ Rendite = Ertragswert | Fussabdruck × Geschosse × 77 %; Miete laut Eingabe, sonst BFS nach Baujahr |
 
 Die Empfehlung ist dieser Wert minus Abschlag (Vorgabe 10 %), auf
 10'000 abgerundet. Der Bestand wird bewertet, wenn das Register drei
 oder mehr Wohnungen führt oder jemand Mieten einträgt.
 
-Jede Annahme lässt sich ändern (Erlös, Baukosten, Gewinn, Abschlag,
-Grenzabstand, Wohnungsgrösse, Abbruch, Rendite), und unter «Herkunft
-jeder Zahl» steht, was amtlich, was berechnet und was Annahme ist.
+### Vorgaben von Julian (16. November)
+
+  * **Gewinn** 20 % des Erlöses (beim Vermieten: des Werts).
+  * **Baukosten je m² Nutzfläche**, inklusive Nebenkosten, nach dem
+    Verkaufspreis: unter 15'000 rund 6'000, darüber 7'000, über 20'000
+    8'000, über 25'000 9'000. Gerechnet ohne Treppe, als Gerade durch die
+    Mitte jeder Stufe (12'500 → 6'000 ... 27'500 → 9'000), begrenzt auf
+    6'000 bis 9'000. Der Abbruch kommt dazu (CHF 250 je m² Bestand).
+  * **Mietwohnungen**: Baukosten CHF 6'500 je m².
+  * **Hanglage** 10 bzw. 20 % teurer. Die Steigung kommt aus dem
+    Geländemodell des Bundes (Höhen je 15 m um den Punkt); ab 10 %
+    Steigung +10 %, ab 20 % +20 % -- die Schwellen sind angenommen.
+  * **Nähe zu Zürich** teurer. Wie viel, ist angenommen: +10 % am
+    Hauptbahnhof, gleichmässig weniger bis 0 % in 25 km.
+  * **Kilchberg**: Verkaufspreis 20'000 bis 30'000 je m²
+    (`src/lib/erloes-angaben.ts`, gerechnet mit der Mitte).
+
+### Der Verkaufspreis je m²
+
+Er ist der grösste Hebel. Am 16. November rechnete die Hochweidstrasse 9
+in Kilchberg mit der Annahme CHF 9'500 und empfahl CHF 3.16 Mio.; mit
+Julians 25'000 und der amtlichen Zone sind es CHF 5.81 Mio. Woher er
+kommt, in dieser Reihenfolge:
+
+  1. Stadt Zürich: amtlich, neue Eigentumswohnungen, Median
+     (`tools/erloes.py`, 2025: CHF 18'229 aus 223 Verkäufen).
+  2. Angaben von Julian je Gemeinde (`src/lib/erloes-angaben.ts`).
+  3. Sonst die Annahme CHF 9'500, als solche gekennzeichnet.
+
+Unter dem Preis steht, wenn es abweicht, welcher Erlös zum bezahlten
+Landpreis der Gemeinde passt und was eingetragene Kaufinserate
+verlangen, je mit einem Knopf zum Übernehmen.
+
+Jede Annahme lässt sich ändern, und unter «Herkunft jeder Zahl» steht,
+was amtlich, was berechnet und was Annahme ist.
 
 ## Woher die Zahlen kommen
 
@@ -39,6 +72,8 @@ jeder Zahl» steht, was amtlich, was berechnet und was Annahme ist.
 | Bauland, Eigentumswohnung, Einfamilienhaus | amtliche Statistik, `public/preise.json` | ZH (BL nur Bauland) |
 | Miete je m² | BFS, Strukturerhebung 2024, je Kanton und Bauperiode (`tools/mieten.py`) | ganze Schweiz |
 | Belastete Standorte, ÖV-Güteklasse | Bund und geodienste.ch | ganze Schweiz |
+| Steigung des Geländes | Höhendienst des Bundes (swissALTI3D) | ganze Schweiz |
+| Verkaufspreis je m² | Statistik Stadt Zürich; sonst Angabe Julian oder Annahme | Stadt Zürich |
 | Baugesuche im Umkreis von 300 m | eigener Bestand, `baugesuche_umkreis` | geladene Kantone |
 
 Die Mieten des BFS sind Bestandsmieten: was heute im Durchschnitt
@@ -52,6 +87,7 @@ das BFS nichts. Neu holen:
 ## Comparis und Homegate
 
 Beide verbieten das automatische Auslesen und sperren Programme aus.
+Das gilt für Mieten wie für Kaufpreise.
 Sperren werden nicht umgangen. Die Seite öffnet darum nur die Suche
 (Homegate nach Postleitzahl, Comparis nach Ort, dazu eine Suche nach
 Inseraten an der Adresse), und ein Mensch überträgt zwei, drei

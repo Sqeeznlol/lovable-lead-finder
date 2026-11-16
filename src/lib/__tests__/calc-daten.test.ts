@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
-import { adresseLesen, gebaeudeAusRegister, portalLinks } from '@/lib/calc-daten';
+import { adresseLesen, comparisOrt, gebaeudeAusRegister, neigungAus, portalLinks } from '@/lib/calc-daten';
 
 /**
  * Was CALC YOU LATER vom Bund liest. Die Beispiele sind echte Antworten
@@ -63,5 +63,24 @@ describe('CALC YOU LATER: Portale', () => {
       const t = readFileSync(f, 'utf8');
       expect(t).not.toMatch(/fetch\([^)]*(comparis|homegate)/i);
     }
+  });
+});
+
+describe('CALC YOU LATER: Kauf und Gelände', () => {
+  it('Kaufinserate: Homegate nach Postleitzahl, Comparis mit Kanton im Ortsnamen', () => {
+    // Nachgesehen am 16. November: /buy/apartment/zip-8802/... und /kilchberg-zh/wohnung/kaufen.
+    const l = portalLinks({ strasse: 'Hochweidstrasse 9', plz: '8802', ort: 'Kilchberg ZH' }, 'kaufen');
+    expect(l[0].adresse).toBe('https://www.homegate.ch/buy/apartment/zip-8802/matching-list');
+    expect(l[1].adresse).toBe('https://www.comparis.ch/immobilien/marktplatz/kilchberg-zh/wohnung/kaufen');
+    expect(decodeURIComponent(l[2].adresse)).toContain('"Hochweidstrasse 9" 8802 Kilchberg ZH kaufen');
+    expect(comparisOrt('Zürich')).toBe('zuerich');
+    expect(comparisOrt('Affoltern am Albis')).toBeNull();
+  });
+
+  it('Steigung aus vier Höhen des Geländemodells', () => {
+    // Hochweidstrasse 9, Kilchberg, je 15 m: Nord 508.2, Süd 510.5, Ost 508.3, West 508.9.
+    expect(neigungAus({ n: 508.2, s: 510.5, o: 508.3, w: 508.9 })).toBe(7.9);
+    expect(neigungAus({ n: 500, s: 500, o: 500, w: 500 })).toBe(0);
+    expect(neigungAus({ n: 506, s: 500, o: 500, w: 500 })).toBe(20);
   });
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { vi } from 'vitest';
 vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
-import { bewerten, CALC_ANNAHMEN, median, mieteStatistik, zoneMitHand, type CalcEingabe } from '@/lib/calc';
+import { baukostenNachErloes, bewerten, CALC_ANNAHMEN, hangZuschlag, median, mieteStatistik, zoneMitHand, zuerichKm, zuerichZuschlag, type CalcEingabe } from '@/lib/calc';
 import { angebotEntwurf, betrag, uhr } from '@/lib/calc-ablauf';
 import type { ZonenRegeln } from '@/lib/machbarkeit';
 
@@ -30,14 +30,16 @@ describe('CALC YOU LATER: Neubau', () => {
     expect(b.neubau!.hnf).toBeCloseTo(614.46, 6);
     expect(b.neubau!.kubatur).toBeCloseTo(2553.6, 6);
     expect(b.neubau!.wohnungen).toBe(6);
-    expect(b.neubau!.baukosten).toBeCloseTo(2_553_600, 3);
+    // Verkaufspreis 9'500 je m²: unter 15'000, also CHF 6'000 je m² Nutzfläche.
+    expect(b.neubau!.baukostenJeM2).toBe(6000);
+    expect(b.neubau!.baukosten).toBeCloseTo(3_686_760, 3);
     expect(b.neubau!.abbruch).toBe(0);
     expect(b.neubau!.erloes).toBeCloseTo(5_837_370, 3);
-    expect(b.neubau!.gewinn).toBeCloseTo(875_605.5, 3);
-    expect(b.neubau!.landwert).toBeCloseTo(2_408_164.5, 3);
-    expect(b.neubau!.jeM2).toBeCloseTo(2408.1645, 3);
-    // Baukosten je m³: 3200 ÷ 3.2 m Geschosshöhe.
-    expect(b.neubau!.jeM3).toBeCloseTo(1000, 6);
+    // Gewinn 20 % des Erlöses.
+    expect(b.neubau!.gewinn).toBeCloseTo(1_167_474, 3);
+    expect(b.neubau!.landwert).toBeCloseTo(983_136, 3);
+    expect(b.neubau!.jeM2).toBeCloseTo(983.136, 3);
+    expect(b.neubau!.jeM3).toBeCloseTo(1443.75, 2);
   });
 
   it('Erlös minus Baukosten, Abbruch und Gewinn ist der Landwert', () => {
@@ -48,8 +50,8 @@ describe('CALC YOU LATER: Neubau', () => {
 
   it('empfiehlt den Wert minus Abschlag, auf 10 000 abgerundet', () => {
     expect(b.massgebend).toBe('neubau');
-    expect(b.wert).toBeCloseTo(2_408_164.5, 3);
-    expect(b.empfehlung).toBe(2_160_000);
+    expect(b.wert).toBeCloseTo(983_136, 3);
+    expect(b.empfehlung).toBe(880_000);
     expect(b.bestand).toBeNull();
     expect(b.chancen).toContain('Unbebaut: kein Abbruch und keine Mieter.');
   });
@@ -64,6 +66,7 @@ describe('CALC YOU LATER: Neubau', () => {
   it('rechnet mit Ziffer und Geschossen von Hand und sagt das als Risiko', () => {
     const o = bewerten({ ...leer, grundlage: { ...leer.grundlage, zone: null, bebaubarM2: null }, hand: { az: 0.6, vollgeschosse: 2 } });
     expect(o.studie.rechenbar).toBe(true);
+    expect(o.neubauMiete).not.toBeNull();
     // Ohne Dachgeschoss in der Eingabe: 600 m².
     expect(o.neubau!.gf).toBeCloseTo(600, 6);
     expect(o.risiken.some(r => r.includes('von Hand eingegeben'))).toBe(true);
@@ -103,18 +106,18 @@ describe('CALC YOU LATER: Bestand', () => {
     expect(b.risiken).toContain('6 Wohnungen im Haus: Kündigungen und Erstreckungen brauchen Zeit.');
   });
 
-  it('die höhere der beiden Bewertungen bestimmt die Empfehlung', () => {
-    // Land: 2 408 164.5 minus 150 000 Abbruch = 2 258 164.5; das Haus ist mehr wert.
-    expect(b.neubau!.landwert).toBeCloseTo(2_258_164.5, 3);
+  it('die höchste der drei Bewertungen bestimmt die Empfehlung', () => {
+    // Land: 983 136 minus 150 000 Abbruch (600 m² × 250) = 833 136; das Haus ist mehr wert.
+    expect(b.neubau!.landwert).toBeCloseTo(833_136, 3);
     expect(b.massgebend).toBe('bestand');
     expect(b.empfehlung).toBe(2_510_000);
     expect(b.risiken.some(r => r.includes('ein Abbruch lohnt sich nicht'))).toBe(true);
   });
 
   it('der Mietertrag laut Mieterspiegel geht jeder Annahme vor', () => {
-    const o = bewerten({ ...e, hand: { mietertragJahr: 80_000 } });
+    const o = bewerten({ ...e, hand: { mietertragJahr: 20_000 } });
     expect(o.bestand!.mieteArt).toBe('ertrag');
-    expect(o.bestand!.wert).toBe(2_000_000);
+    expect(o.bestand!.wert).toBe(500_000);
     expect(o.massgebend).toBe('neubau');
     expect(o.risiken.some(r => r.includes('Mieterspiegel verlangen'))).toBe(false);
     expect(o.chancen.some(c => c.startsWith('Als Bauland ist die Liegenschaft'))).toBe(true);
@@ -140,14 +143,18 @@ describe('CALC YOU LATER: Bestand', () => {
 
 describe('CALC YOU LATER: Chancen und Risiken', () => {
   it('misst den Landwert an dem, was in der Gemeinde bezahlt wird', () => {
-    const teuer = bewerten({ ...leer, umfeld: { gemeinde: 'Muster', land: { m: 1200, q25: 1000, q75: 1500 } } });
+    // Die Rechnung gibt CHF 983 je m² Land her.
+    const teuer = bewerten({ ...leer, umfeld: { gemeinde: 'Muster', land: { m: 500, q25: 400, q75: 600 } } });
     expect(teuer.risiken.some(r => r.includes('liegt deutlich über dem, was in Muster für Bauland bezahlt wird'))).toBe(true);
     const guenstig = bewerten({ ...leer, umfeld: { gemeinde: 'Muster', land: { m: 4000, q25: 3500, q75: 5000 } } });
     expect(guenstig.risiken.some(r => r.includes('zu diesem Preis verkauft kaum jemand'))).toBe(true);
-    const passt = bewerten({ ...leer, umfeld: { gemeinde: 'Muster', land: { m: 2400, q25: 2000, q75: 2800 } } });
+    // 4 000 000 für das Land: 614.46 × (0.8 E − (6000 + 0.2 (E − 12 500))) = 4 000 000, also E ≈ 16 683.
+    expect(guenstig.erloesLand).toBe(16_700);
+    expect(guenstig.risiken.some(r => /Zum Landpreis passt ein Erlös um CHF 16.700 je m² Nutzfläche, gerechnet ist mit CHF 9.500\.$/.test(r))).toBe(true);
+    const passt = bewerten({ ...leer, umfeld: { gemeinde: 'Muster', land: { m: 1000, q25: 800, q75: 1200 } } });
     expect(passt.chancen.some(c => c.includes('liegt im Rahmen dessen'))).toBe(true);
     // Der Massstab des Marktes: 1000 m² zum Median der Gemeinde.
-    expect(passt.landMarkt).toEqual({ jeM2: 2400, wert: 2_400_000 });
+    expect(passt.landMarkt).toEqual({ jeM2: 1000, wert: 1_000_000 });
     expect(bewerten(leer).landMarkt).toBeNull();
   });
 
@@ -159,7 +166,10 @@ describe('CALC YOU LATER: Chancen und Risiken', () => {
     expect(vorsichtig.chancen.some(c => c.startsWith('Vorsichtig gerechnet'))).toBe(true);
     // Zürich, 2025: Median 1.745 Mio., unteres Viertel bis 1.34 Mio. -- 855 000 ist dort zu tief.
     const tief = bewerten({ ...leer, umfeld: { gemeinde: 'Zürich', stwe: { m: 1_745_000, q25: 1_340_000, q75: 2_323_750 } } });
-    expect(tief.chancen.some(c => c.startsWith('Tief gerechnet') && c.endsWith('der Erlös je m² lässt sich höher ansetzen.'))).toBe(true);
+    expect(tief.chancen.some(c => c.startsWith('Tief gerechnet') && c.endsWith('wie gross sie waren, sagt die Statistik nicht.'))).toBe(true);
+    // Endet der Betrag auf «Mio.», steht kein zweiter Punkt dahinter.
+    const mio = bewerten({ ...leer, annahmen: { ...CALC_ANNAHMEN, erloes: 25_000 }, umfeld: { gemeinde: 'Kilchberg', stwe: { m: 2_920_000, q25: 2_520_000, q75: 3_776_800 } } });
+    expect(mio.chancen.some(c => /^Tief gerechnet: eine Wohnung von 90 m² kostet hier CHF 2.25 Mio\. Drei Viertel/.test(c))).toBe(true);
   });
 
   it('nennt Schutz, Belastung, Alter und Bautätigkeit', () => {
@@ -184,7 +194,9 @@ describe('CALC YOU LATER: Chancen und Risiken', () => {
     const o = bewerten({ ...leer, grundlage: { ...leer.grundlage, gebaeude: [mfh], bauzoneM2: 700 },
       umfeld: { denkmal: true, isos: true, belastet: 2, baugesuche: 9, oev: 'A', gemeinde: 'Muster', land: { m: 900 }, stwe: { m: 500_000, q75: 600_000 } },
       hand: { vergleiche: [{ flaeche: 50, miete: 2000 }] } });
-    for (const satz of [...o.chancen, ...o.risiken]) {
+    const hang = bewerten({ ...leer, umfeld: { neigung: 15.4 } });
+    expect(hang.risiken).toContain('Hanglage: das Gelände steigt um 15 %, die Baukosten sind 10 % höher gerechnet.');
+    for (const satz of [...o.chancen, ...o.risiken, ...hang.risiken]) {
       expect(satz).not.toMatch(/ß|–|—| - /);
       // «CHF 1.75 Mio.» am Satzende: ein Punkt, nicht zwei.
       expect(satz).not.toMatch(/\.\./);
@@ -263,5 +275,77 @@ describe('CALC YOU LATER: Angebot', () => {
   it('ohne Namen bleibt die Anrede neutral', () => {
     expect(angebotEntwurf({ adresse: 'Teststrasse 1', preis: 500_000 }).startsWith('Guten Tag\n\n')).toBe(true);
     expect(betrag(1234.4)).toMatch(/^CHF 1['’]234$/);
+  });
+});
+
+describe('CALC YOU LATER: Baukosten nach Julians Vorgaben (16. November)', () => {
+  it('je m² Nutzfläche nach Verkaufspreis, gleitend durch die Mitte jeder Stufe', () => {
+    // «unter 15k 6000, über 15k 7000, über 20k 8000, über 25k 9000»
+    expect(baukostenNachErloes(9_500)).toBe(6000);
+    expect(baukostenNachErloes(12_500)).toBe(6000);
+    expect(baukostenNachErloes(15_000)).toBe(6500);
+    expect(baukostenNachErloes(17_500)).toBe(7000);
+    expect(baukostenNachErloes(20_000)).toBe(7500);
+    expect(baukostenNachErloes(22_500)).toBe(8000);
+    expect(baukostenNachErloes(25_000)).toBe(8500);
+    expect(baukostenNachErloes(27_500)).toBe(9000);
+    expect(baukostenNachErloes(40_000)).toBe(9000);
+    // Stadt Zürich, Neubauten 2025: CHF 18 229 je m².
+    expect(baukostenNachErloes(18_229)).toBe(7150);
+  });
+
+  it('Hanglage: ab 10 % Steigung +10 %, ab 20 % +20 %', () => {
+    expect(hangZuschlag(null)).toBe(0);
+    expect(hangZuschlag(7.9)).toBe(0);
+    expect(hangZuschlag(10)).toBe(0.1);
+    expect(hangZuschlag(19.9)).toBe(0.1);
+    expect(hangZuschlag(20)).toBe(0.2);
+  });
+
+  it('Nähe zu Zürich: +10 % am Hauptbahnhof, 0 % ab 25 km', () => {
+    expect(zuerichZuschlag(0)).toBe(0.1);
+    expect(zuerichZuschlag(12.5)).toBe(0.05);
+    expect(zuerichZuschlag(25)).toBe(0);
+    expect(zuerichZuschlag(40)).toBe(0);
+    // Hochweidstrasse 9, Kilchberg: 6.7 km vom Hauptbahnhof.
+    expect(zuerichKm(2683174, 1241352)).toBeCloseTo(6.714, 3);
+    expect(zuerichZuschlag(6.7)).toBe(0.073);
+  });
+
+  it('Gewinn 20 %, Zuschläge auf die Baukosten, von Hand ohne Zuschläge', () => {
+    expect(CALC_ANNAHMEN.marge).toBe(0.2);
+    // Kilchberg: Verkaufspreis 25 000, eben (7.9 %), 6.7 km von Zürich.
+    const k = bewerten({ ...leer, annahmen: { ...CALC_ANNAHMEN, erloes: 25_000 }, umfeld: { neigung: 7.9, zuerichKm: 6.7 } }).neubau!;
+    expect(k.kosten).toEqual({ grund: 8500, hang: 0, zuerich: 0.073, jeM2: 9120, vonHand: false });
+    const hang = bewerten({ ...leer, annahmen: { ...CALC_ANNAHMEN, erloes: 25_000 }, umfeld: { neigung: 22, zuerichKm: 6.7 } }).neubau!;
+    // 8 500 × 1.2 × 1.073 = 10 944.6
+    expect(hang.baukostenJeM2).toBe(10_940);
+    const hand = bewerten({ ...leer, annahmen: { ...CALC_ANNAHMEN, baukostenHnf: 7000 }, umfeld: { neigung: 22, zuerichKm: 1 } }).neubau!;
+    expect(hand.kosten).toEqual({ grund: 7000, hang: 0, zuerich: 0, jeM2: 7000, vonHand: true });
+  });
+});
+
+describe('CALC YOU LATER: Neubau zum Vermieten', () => {
+  it('Ertragswert der neuen Wohnungen minus Baukosten 6 500 je m², Abbruch und Gewinn', () => {
+    const m = bewerten(leer).neubauMiete!;
+    // Zürich, Baujahre ab 2021: CHF 27.10 je m² und Monat (BFS 2024).
+    expect(m.miete).toBe(27.1);
+    expect(m.mieteQuelle).toBe('Durchschnitt Kanton ZH für Baujahre ab 2021, BFS 2024');
+    expect(m.ertrag).toBeCloseTo(199_822.392, 3);
+    expect(m.wert).toBeCloseTo(4_995_559.8, 1);
+    expect(m.baukostenJeM2).toBe(6500);
+    expect(m.baukosten).toBeCloseTo(3_993_990, 3);
+    expect(m.gewinn).toBeCloseTo(999_111.96, 2);
+    expect(m.landwert).toBeCloseTo(2_457.84, 2);
+  });
+
+  it('mit Inseraten gilt deren Miete, und er kann massgebend werden', () => {
+    const o = bewerten({ ...leer, hand: { vergleiche: [{ flaeche: 100, miete: 4000 }] } });
+    expect(o.neubauMiete!.miete).toBe(40);
+    expect(o.neubauMiete!.mieteQuelle).toBe('Median der eingetragenen Inserate');
+    // 614.46 × 40 × 12 ÷ 0.04 = 7 373 520; minus 3 993 990 Bau und 1 474 704 Gewinn.
+    expect(o.neubauMiete!.landwert).toBeCloseTo(1_904_826, 0);
+    expect(o.massgebend).toBe('miete');
+    expect(o.empfehlung).toBe(1_710_000);
   });
 });

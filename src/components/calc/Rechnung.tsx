@@ -7,7 +7,9 @@ import { Ergebnis, Objektkopf } from '@/components/calc/Ergebnis';
 import { useName } from '@/components/calc/name';
 import { FENSTER } from '@/lib/fenster';
 import { adresseWaehlen } from '@/lib/adresswahl';
-import { bewerten, CALC_ANNAHMEN, median, type CalcAnnahmen, type CalcEingabe, type Umfeld, type Vergleich, type VonHand } from '@/lib/calc';
+import { bewerten, CALC_ANNAHMEN, ERLOES_ANNAHME, median, type CalcAnnahmen, type CalcEingabe, type ErloesQuelle, type Kauf, type Umfeld, type Vergleich, type VonHand } from '@/lib/calc';
+import { ERLOES_AMTLICH } from '@/lib/erloes-daten';
+import { ERLOES_ANGABEN } from '@/lib/erloes-angaben';
 import { entwurfLoeschen, entwurfSpeichern, schritt, type Kalkulation } from '@/lib/calc-ablauf';
 import { adressen, leadLaden, objektLaden, portalLinks, umfeldLaden, type Adresse } from '@/lib/calc-daten';
 import { grundlageLaden } from '@/lib/machbarkeit-daten';
@@ -65,6 +67,7 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
   const [gewaehlt, setGewaehlt] = useState<Adresse | null>(alt?.adresse ?? null);
   const [annahmen, setAnnahmen] = useState<CalcAnnahmen>(alt?.eingabe.annahmen ?? CALC_ANNAHMEN);
   const [hand, setHand] = useState<VonHand>(alt?.eingabe.hand ?? {});
+  const [erloesQuelle, setErloesQuelle] = useState<ErloesQuelle>(alt?.eingabe.erloesQuelle ?? ERLOES_ANNAHME);
   const [kontakt, setKontakt] = useState(entwurf?.kontakt ?? '');
   const [test, setTest] = useState(entwurf?.test ?? false);
   const [name, setName] = useName();
@@ -98,6 +101,20 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
     queryFn: () => objektLaden(gewaehlt!, CALC_ANNAHMEN.grenzabstand),
     enabled: !!gewaehlt && !alt, staleTime: 10 * 60 * 1000, retry: 1,
   });
+  // Wo der Verkaufspreis je m² bekannt ist, gilt er statt der Annahme:
+  // amtlich (Stadt Zürich), sonst was Julian aus dem Markt kennt.
+  useEffect(() => {
+    const bfs = objekt.data?.bfs ? String(Number(objekt.data.bfs)) : null;
+    const amtlich = bfs ? ERLOES_AMTLICH[bfs] : null;
+    const angabe = bfs ? ERLOES_ANGABEN[bfs] : null;
+    if (amtlich) {
+      setAnnahmen(a => ({ ...a, erloes: amtlich.m2 }));
+      setErloesQuelle({ art: 'amtlich', text: amtlich.text });
+    } else if (angabe) {
+      setAnnahmen(a => ({ ...a, erloes: Math.round((angabe.von + angabe.bis) / 2) }));
+      setErloesQuelle({ art: 'angabe', text: `Angabe Julian vom ${angabe.am}: ${angabe.gemeinde} ${de(angabe.von)} bis ${de(angabe.bis)} je m², gerechnet mit der Mitte` });
+    }
+  }, [objekt.data]);
   const umfeld = useQuery({
     queryKey: ['calc-umfeld', objekt.data?.egrid, objekt.data?.punkt[0], objekt.data?.punkt[1]],
     queryFn: () => umfeldLaden(objekt.data!), enabled: !!objekt.data, staleTime: 10 * 60 * 1000, retry: 0,
@@ -130,11 +147,12 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
 
   const eingabe: CalcEingabe | null = useMemo(() => basis && {
     grundlage: { ...basis.grundlage, bebaubarM2: huelle.data?.umriss_da ? huelle.data.bebaubar_m2 : basis.grundlage.bebaubarM2 },
-    annahmen, kanton: basis.kanton, hand, umfeld: basis.umfeld,
-  }, [basis, huelle.data, annahmen, hand]);
+    annahmen, kanton: basis.kanton, hand, umfeld: basis.umfeld, erloesQuelle,
+  }, [basis, huelle.data, annahmen, hand, erloesQuelle]);
   const b = useMemo(() => (eingabe ? bewerten(eingabe) : null), [eingabe]);
 
-  const andere = () => { setGewaehlt(null); setText(''); setGesucht(''); setHand({}); setAnnahmen(CALC_ANNAHMEN); setFehler(null); };
+  const andere = () => { setGewaehlt(null); setText(''); setGesucht(''); setHand({}); setAnnahmen(CALC_ANNAHMEN); setErloesQuelle(ERLOES_ANNAHME); setFehler(null); };
+  const erloesSetzen = (erloes: number, quelle: ErloesQuelle) => { setAnnahmen(a => ({ ...a, erloes })); setErloesQuelle(quelle); };
 
   const speichern = async (einreichen: boolean) => {
     if (!basis || !eingabe || !b) return;
@@ -166,6 +184,10 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
   const vergleiche = hand.vergleiche ?? [];
   const setVergleich = (i: number, teil: Partial<Vergleich>) => vonHand({ vergleiche: vergleiche.map((v, j) => (j === i ? { ...v, ...teil } : v)) });
   const marktmiete = median(vergleiche.filter(v => v.flaeche > 0 && v.miete > 0).map(v => v.miete / v.flaeche));
+  const kaeufe = hand.kaeufe ?? [];
+  const setKauf = (i: number, teil: Partial<Kauf>) => vonHand({ kaeufe: kaeufe.map((k, j) => (j === i ? { ...k, ...teil } : k)) });
+  const kaufMedian = median(kaeufe.filter(k => k.flaeche > 0 && k.preis > 0).map(k => k.preis / k.flaeche));
+  const zonenplanAus = !alt && !!objekt.data?.zonenplanAus;
   const zone = basis?.grundlage.zone;
   const zoneText = zone ? [zone.bezeichnung, zone.abkuerzung && `(${zone.abkuerzung})`, zone.quelle === 'kanton' ? '· Zonenplan des Kantons' : '· eigene Liste'].filter(Boolean).join(' ') : null;
 
@@ -226,8 +248,13 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
       <Objektkopf adresse={basis.adresse} parzelleNr={basis.parzelleNr} flaeche={basis.grundlage.flaeche} zone={zoneText} eigentuemer={basis.eigentuemer} gebaeude={basis.grundlage.gebaeude}
         rechts={!entwurf && <button type="button" className={KNOPF} onClick={andere}><X className="h-4 w-4" /> Andere Adresse</button>} />
       {basis.luecken.length > 0 && <p className="text-sm text-destructive">{basis.luecken.join(' ')}</p>}
+      {zonenplanAus && (
+        <button type="button" className={KNOPF} disabled={objekt.isFetching} onClick={() => void objekt.refetch()}>
+          {objekt.isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Zonenplan noch einmal fragen
+        </button>
+      )}
 
-      <Ergebnis b={b} annahmen={annahmen} />
+      <Ergebnis b={b} annahmen={annahmen} onErloes={erloesSetzen} />
 
       <section className="space-y-3">
         <div>
@@ -235,8 +262,9 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
           <p className="text-sm text-muted-foreground">Erfahrungswerte, die du ändern kannst. Die Rechnung folgt sofort.</p>
         </div>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Zahl titel="Erlös je m² Nutzfläche" wert={annahmen.erloes} einheit="CHF" min={2000} max={40000} schritt={100} setWert={n => setze({ erloes: n })} />
-          <Zahl titel="Baukosten je m² Geschossfläche" wert={annahmen.baukosten} einheit="CHF" min={1000} max={12000} schritt={100} setWert={n => setze({ baukosten: n })} />
+          <Zahl titel="Erlös je m² Nutzfläche" wert={annahmen.erloes} einheit="CHF" min={2000} max={60000} schritt={100} setWert={n => erloesSetzen(n, { art: 'hand', text: 'von Hand eingegeben' })} />
+          <Offen titel="Baukosten je m² Nutzfläche" wert={annahmen.baukostenHnf} einheit="CHF" platz={b.neubau ? de(b.neubau.baukostenJeM2) : undefined} setWert={n => setze({ baukostenHnf: n })} />
+          <Zahl titel="Baukosten Mietwohnungen je m²" wert={annahmen.baukostenMiete} einheit="CHF" min={2000} max={15000} schritt={100} setWert={n => setze({ baukostenMiete: n })} />
           <Zahl titel="Gewinn vom Erlös" wert={Math.round(annahmen.marge * 1000) / 10} einheit="%" min={0} max={50} schritt={1} setWert={n => setze({ marge: n / 100 })} />
           <Zahl titel="Abschlag auf den Wert" wert={Math.round(annahmen.abschlag * 1000) / 10} einheit="%" min={0} max={50} schritt={1} setWert={n => setze({ abschlag: n / 100 })} />
           <Zahl titel="Grenzabstand" wert={annahmen.grenzabstand} einheit="m" min={0} max={30} schritt={0.5} setWert={n => setze({ grenzabstand: n })} />
@@ -244,6 +272,17 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
           <Zahl titel="Abbruch je m² Bestand" wert={annahmen.abbruch} einheit="CHF" min={0} max={2000} schritt={10} setWert={n => setze({ abbruch: n })} />
           <Zahl titel="Rendite des Käufers" wert={Math.round(annahmen.rendite * 1000) / 10} einheit="%" min={1} max={12} schritt={0.1} setWert={n => setze({ rendite: n / 100 })} />
         </div>
+        {/* Woraus die Baukosten bestehen: die Stufe nach Verkaufspreis und die Zuschläge. */}
+        {b.neubau && (
+          <p className="text-sm text-muted-foreground">
+            {b.neubau.kosten.vonHand
+              ? <>Baukosten von Hand: CHF {de(b.neubau.baukostenJeM2)} je m² Nutzfläche. Leer lassen, dann gelten Preisstufe und Zuschläge.</>
+              : <>Baukosten inklusive Nebenkosten: CHF {de(b.neubau.kosten.grund)} je m² bei einem Verkaufspreis von CHF {de(annahmen.erloes)}
+                {b.neubau.kosten.hang > 0 && `, +${Math.round(b.neubau.kosten.hang * 100)} % Hanglage (${de(basis.umfeld.neigung ?? 0, 1)} % Steigung)`}
+                {b.neubau.kosten.zuerich > 0 && `, +${de(b.neubau.kosten.zuerich * 100, 1)} % Nähe zu Zürich (${de(basis.umfeld.zuerichKm ?? 0, 1)} km)`}
+                {' '}= CHF {de(b.neubau.baukostenJeM2)}.{basis.umfeld.neigung != null && b.neubau.kosten.hang === 0 && ` Gelände eben (${de(basis.umfeld.neigung, 1)} % Steigung).`} Abbruch kommt dazu.</>}
+          </p>
+        )}
         {/* Woran sich der Erlös messen lässt: was Eigentumswohnungen in der Gemeinde wirklich kosten. */}
         {basis.umfeld.stwe && (
           <p className="text-sm text-muted-foreground">
@@ -251,6 +290,34 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
           </p>
         )}
       </section>
+
+      <div className="space-y-2 rounded-[3px] border bg-card p-4">
+        <p className="font-medium">Was Wohnungen hier kosten</p>
+        <p className="text-sm text-muted-foreground">
+          Erlös heute: CHF {de(annahmen.erloes)} je m², {erloesQuelle.text}. Am besten zeigen ihn zwei, drei neue Eigentumswohnungen in der Nähe: Fläche und Kaufpreis eintragen.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {portalLinks(basis.adresse, 'kaufen').map(l => (
+            <a key={l.titel} href={l.adresse} target={FENSTER.extern} className={KNOPF_LEISE}><ExternalLink className="h-4 w-4" /> {l.titel}</a>
+          ))}
+        </div>
+        {kaeufe.map((k, i) => (
+          <div key={i} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_44px] items-end gap-2">
+            <Offen titel="Fläche" wert={k.flaeche || null} einheit="m²" setWert={n => setKauf(i, { flaeche: n ?? 0 })} />
+            <Offen titel="Kaufpreis" wert={k.preis || null} einheit="CHF" setWert={n => setKauf(i, { preis: n ?? 0 })} />
+            <button type="button" aria-label="Wohnung entfernen" className="grid h-11 w-11 place-items-center rounded-[3px] text-muted-foreground hover:bg-secondary"
+                    onClick={() => vonHand({ kaeufe: kaeufe.filter((_, j) => j !== i) })}><X className="h-4 w-4" /></button>
+          </div>
+        ))}
+        <div className="flex flex-wrap items-center gap-3">
+          <button type="button" className={KNOPF} onClick={() => vonHand({ kaeufe: [...kaeufe, { flaeche: 0, preis: 0 }] })}><Plus className="h-4 w-4" /> Wohnung eintragen</button>
+          {kaufMedian != null && (
+            <button type="button" className={KNOPF_HAUPT} onClick={() => erloesSetzen(Math.round(kaufMedian / 100) * 100, { art: 'inserate', text: `Median aus ${kaeufe.filter(k => k.flaeche > 0 && k.preis > 0).length} Kaufinseraten` })}>
+              Median CHF {de(Math.round(kaufMedian / 100) * 100)} als Erlös übernehmen
+            </button>
+          )}
+        </div>
+      </div>
 
       <section className="space-y-3">
         <div>
@@ -293,6 +360,7 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
           <h3 className="text-lg">Zone von Hand</h3>
           <p className="text-sm text-muted-foreground">
             {zone?.quelle === 'kanton' ? 'Der Zonenplan des Kantons ist gelesen. Nur ausfüllen, wenn die Bauordnung etwas anderes sagt.'
+              : basis.kanton === 'ZH' ? 'Der Zonenplan des Kantons hat nicht geantwortet: gerechnet ist mit der eigenen Liste. Oben noch einmal fragen, oder Ziffer und Geschosse aus der Bauordnung eintragen.'
               : 'Für diesen Ort ist kein amtlicher Zonenplan angebunden. Ziffer und Geschosse stehen in der Bauordnung der Gemeinde.'}
           </p>
         </div>

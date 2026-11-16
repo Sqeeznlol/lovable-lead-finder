@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
 import { Marke } from '@/components/rahmen';
 import { chf, m2, type Art, type Gebaeude } from '@/lib/machbarkeit';
-import type { Bewertung, CalcAnnahmen } from '@/lib/calc';
+import type { Bewertung, CalcAnnahmen, ErloesQuelle } from '@/lib/calc';
 import { betrag } from '@/lib/calc-ablauf';
 import type { Adresse } from '@/lib/calc-daten';
 import { luftbildLv95 } from '@/lib/luftbild';
+import { KNOPF } from '@/components/rahmen';
 
 /**
  * Was CALC YOU LATER zu einer Adresse zeigt: ein Satz mit dem Preis, die
@@ -18,6 +19,9 @@ import { luftbildLv95 } from '@/lib/luftbild';
 const de = (n: number, stellen = 0) => n.toLocaleString('de-CH', { maximumFractionDigits: stellen, minimumFractionDigits: stellen });
 const ART: Record<Art, string> = { amtlich: 'amtlich', berechnet: 'berechnet', annahme: 'Annahme' };
 const ETIKETT = 'text-[11px] uppercase tracking-wide text-muted-foreground';
+const QUELLE: Record<ErloesQuelle['art'], string> = { annahme: 'Annahme', amtlich: 'amtlich', angabe: 'Angabe Julian', hand: 'von Hand', inserate: 'aus Inseraten', land: 'aus dem Landpreis' };
+/** Ein Betrag mit Vorzeichen, wie man es liest: «− CHF 473'000» statt «CHF -473'000». */
+const mitZeichen = (x: number) => (x < 0 ? `− ${chf(-x)}` : chf(x));
 
 /** Der Ort, um den es geht: Luftbild, Adresse und was die Register dazu sagen. */
 export function Objektkopf({ adresse, parzelleNr, flaeche, zone, eigentuemer, gebaeude, rechts }: {
@@ -64,17 +68,22 @@ function Zeile({ titel, wert, fett, minus }: { titel: string; wert: string; fett
   );
 }
 
-export function Ergebnis({ b, annahmen }: { b: Bewertung; annahmen: CalcAnnahmen }) {
-  const n = b.neubau, h = b.bestand, s = b.studie;
+/**
+ * onErloes: nur in der laufenden Rechnung. Dann lässt sich ein am Markt
+ * gemessener Erlös mit einem Tipp übernehmen; in der eingereichten
+ * Kalkulation steht der Abgleich nur da.
+ */
+export function Ergebnis({ b, annahmen, onErloes }: { b: Bewertung; annahmen: CalcAnnahmen; onErloes?: (erloes: number, quelle: ErloesQuelle) => void }) {
+  const n = b.neubau, m = b.neubauMiete, h = b.bestand, s = b.studie;
   const eck: [string, string, string][] = n ? [
     ['Grundstück', m2(s.flaeche), 'laut Amtlicher Vermessung'],
     ['Mögliche Hauptnutzfläche', m2(n.hnf), `${m2(n.gf)} Geschossfläche`],
     ['Kubatur', `${de(Math.round(n.kubatur))} m³`, 'über Boden'],
     ['Wohnungen', `rund ${de(n.wohnungen)}`, `je ${de(annahmen.wohnungM2)} m²`],
-    ['Baukosten', chf(n.baukosten + n.abbruch), n.abbruch ? `davon ${chf(n.abbruch)} Abbruch` : `CHF ${de(Math.round(n.jeM3 / 10) * 10)} je m³`],
-    ['Verkaufserlös', chf(n.erloes), `CHF ${de(annahmen.erloes)} je m² Nutzfläche`],
+    ['Baukosten', chf(n.baukosten + n.abbruch), `CHF ${de(n.baukostenJeM2)} je m² Nutzfläche${n.abbruch ? `, dazu ${chf(n.abbruch)} Abbruch` : ''}`],
+    ['Verkaufserlös', chf(n.erloes), `CHF ${de(annahmen.erloes)} je m² Nutzfläche · ${QUELLE[b.erloesQuelle.art]}`],
     ['Gewinn', chf(n.gewinn), `${de(annahmen.marge * 100)} % des Erlöses`],
-    ['Landwert', chf(n.landwert), `CHF ${de(Math.round(n.jeM2 / 10) * 10)} je m² Grundstück`],
+    ['Landwert', mitZeichen(n.landwert), `CHF ${de(Math.round(n.jeM2 / 10) * 10)} je m² Grundstück`],
   ] : [];
 
   return (
@@ -86,7 +95,9 @@ export function Ergebnis({ b, annahmen }: { b: Bewertung; annahmen: CalcAnnahmen
           <span className="text-muted-foreground">
             {b.massgebend === 'bestand'
               ? <>Massgebend ist der Bestand: mit den heutigen Mieten ist das Haus {chf(b.wert!)} wert.</>
-              : <>Massgebend ist der Neubau: {chf(b.wert!)} bleiben für das Land.</>}
+              : b.massgebend === 'miete'
+              ? <>Massgebend ist ein Neubau zum Vermieten: {chf(b.wert!)} bleiben für das Land.</>
+              : <>Massgebend ist ein Neubau zum Verkaufen: {chf(b.wert!)} bleiben für das Land.</>}
             {' '}Davon gehen {de(annahmen.abschlag * 100)} % Abschlag ab.
           </span>
         </p>
@@ -98,6 +109,29 @@ export function Ergebnis({ b, annahmen }: { b: Bewertung; annahmen: CalcAnnahmen
           </span>
         </p>
       )}
+
+      {/* Der grösste Hebel gleich unter dem Preis: womit gerechnet ist und was der Markt sagt. */}
+      {n && (() => {
+        const weit = (x: number | null) => x != null && Math.abs(x / annahmen.erloes - 1) > 0.15;
+        const land = weit(b.erloesLand) ? b.erloesLand : null;
+        const inserate = weit(b.erloesInserate) ? Math.round(b.erloesInserate! / 100) * 100 : null;
+        if (!land && !inserate) return null;
+        return (
+          <div className="space-y-2 border-l-2 border-accent pl-4">
+            <p className="text-sm">
+              Gerechnet ist mit einem Erlös von CHF {de(annahmen.erloes)} je m² ({b.erloesQuelle.text}).
+              {land != null && <> Zum Bauland, das in der Gemeinde bezahlt wird{b.landMarkt ? ` (Median CHF ${de(b.landMarkt.jeM2)} je m²)` : ''}, passt CHF {de(land)}.</>}
+              {inserate != null && <> {b.kaeufe} {b.kaeufe === 1 ? 'Kaufinserat verlangt' : 'Kaufinserate verlangen'} im Median CHF {de(inserate)}.</>}
+            </p>
+            {onErloes && (
+              <div className="flex flex-wrap gap-2 print:hidden">
+                {inserate != null && <button type="button" className={KNOPF} onClick={() => onErloes(inserate, { art: 'inserate', text: `Median aus ${b.kaeufe} Kaufinseraten` })}>CHF {de(inserate)} aus den Inseraten übernehmen</button>}
+                {land != null && <button type="button" className={KNOPF} onClick={() => onErloes(land, { art: 'land', text: 'zurückgerechnet aus dem bezahlten Landpreis der Gemeinde' })}>CHF {de(land)} aus dem Landpreis übernehmen</button>}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {eck.length > 0 && (
         <dl className="grid grid-cols-2 gap-px overflow-hidden rounded border bg-border lg:grid-cols-4">
@@ -111,20 +145,38 @@ export function Ergebnis({ b, annahmen }: { b: Bewertung; annahmen: CalcAnnahmen
         </dl>
       )}
 
-      {/* Zwei Bewertungen: die höhere bestimmt den Preis. */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      {/* Drei Bewertungen: die höchste bestimmt den Preis. */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <div className="rounded-[3px] border bg-card p-4">
-          <p className="flex items-center justify-between gap-2 font-medium">Neubau {b.massgebend === 'neubau' && <Marke art="lila">massgebend</Marke>}</p>
-          <p className="text-sm text-muted-foreground">Was für das Land bleibt, wenn man das Mögliche baut und verkauft.</p>
+          <p className="flex items-center justify-between gap-2 font-medium">Neubau zum Verkaufen {b.massgebend === 'neubau' && <Marke art="lila">massgebend</Marke>}</p>
+          <p className="text-sm text-muted-foreground">Was für das Land bleibt, wenn man das Mögliche baut und als Eigentum verkauft.</p>
           {n ? (
             <dl className="mt-3 space-y-1.5 text-sm">
               <Zeile titel="Verkaufserlös" wert={chf(n.erloes)} />
-              <Zeile titel="Baukosten" wert={chf(n.baukosten)} minus />
+              <Zeile titel={`Baukosten, CHF ${de(n.baukostenJeM2)} je m²`} wert={chf(n.baukosten)} minus />
               {n.abbruch > 0 && <Zeile titel="Abbruch" wert={chf(n.abbruch)} minus />}
               <Zeile titel="Gewinn" wert={chf(n.gewinn)} minus />
-              <Zeile titel="Bleibt für das Land" wert={chf(n.landwert)} fett />
+              <Zeile titel="Bleibt für das Land" wert={mitZeichen(n.landwert)} fett />
             </dl>
           ) : <p className="mt-3 text-sm text-muted-foreground">Nicht rechenbar: {s.grund}</p>}
+        </div>
+        <div className="rounded-[3px] border bg-card p-4">
+          <p className="flex items-center justify-between gap-2 font-medium">Neubau zum Vermieten {b.massgebend === 'miete' && <Marke art="lila">massgebend</Marke>}</p>
+          <p className="text-sm text-muted-foreground">Was ein Anleger für die neuen Mietwohnungen zahlt, minus Bau und Gewinn.</p>
+          {m ? (
+            <>
+              <dl className="mt-3 space-y-1.5 text-sm">
+                <Zeile titel="Miete je m² und Monat" wert={`CHF ${de(m.miete, 2)}`} />
+                <Zeile titel="Mietertrag im Jahr" wert={chf(m.ertrag)} />
+                <Zeile titel={`Wert bei ${de(annahmen.rendite * 100, 1)} % Rendite`} wert={chf(m.wert)} />
+                <Zeile titel={`Baukosten, CHF ${de(m.baukostenJeM2)} je m²`} wert={chf(m.baukosten)} minus />
+                {m.abbruch > 0 && <Zeile titel="Abbruch" wert={chf(m.abbruch)} minus />}
+                <Zeile titel="Gewinn" wert={chf(m.gewinn)} minus />
+                <Zeile titel="Bleibt für das Land" wert={mitZeichen(m.landwert)} fett />
+              </dl>
+              <p className="mt-2 text-xs text-muted-foreground">Miete: {m.mieteQuelle}.</p>
+            </>
+          ) : <p className="mt-3 text-sm text-muted-foreground">Nicht rechenbar: {s.grund ?? 'keine Miete bekannt.'}</p>}
         </div>
         <div className="rounded-[3px] border bg-card p-4">
           <p className="flex items-center justify-between gap-2 font-medium">Bestand {b.massgebend === 'bestand' && <Marke art="lila">massgebend</Marke>}</p>
