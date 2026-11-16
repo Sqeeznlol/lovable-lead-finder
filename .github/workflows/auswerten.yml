@@ -64,6 +64,7 @@ on:
           - umrisse      # Wie viele Parzellen je Kanton einen Umriss und einen Punkt haben (nur Zählungen)
           - machbarkeit  # Ob machbarkeit_grundlage für echte Parzellen plausible Flächen liefert (nur Zahlen)
           - besucher     # Ob die Zahlen unter «Leads» stimmen: Besucher je Domain und Tag, Leads gegen Anfragen, Bots (nur Zählungen)
+          - suche-daten  # Für die Suche: wie Zonen in vier Gemeinden heissen und welche Angaben je Parzelle gefüllt sind (nur Zählungen und Zonennamen)
           - last         # Was die Datenbank gerade belastet: laufende Anweisungen nach Art und Dauer, Aufräumen, Verbindungen (nie der Wortlaut)
       egrid:
         description: 'Nur für "objekt": die EGRID, z.B. CH707709971116'
@@ -872,6 +873,65 @@ jobs:
               select count(*) as gebaeude, count(*) filter (where klasse between 1110 and 1130) as wohngebaeude,
                      count(*) filter (where klasse between 1110 and 1130 and heizung_energie in (7520, 7530) and baujahr < 1980) as wohn_fossil_vor1980
               from gebaeude;"
+          elif [ "$FRAGE" = "suche-daten" ]; then
+            # Julian, 16. November: eine Suche, die «Alle W2 in Dietikon»
+            # versteht. Die Zonen stehen im Bestand als Fliesstext mit dem
+            # Flächenanteil je Parzelle; was «W2» dort heisst, lässt sich
+            # nicht raten. Gelesen wird über den Index auf gemeinde, nie die
+            # ganze Tabelle. Ausgegeben werden Zonennamen und Zählungen --
+            # keine Adressen, keine Eigentümer.
+            frage "Gemeinden, wie sie geschrieben sind" "
+              select gemeinde, kanton, total from public.gemeinde_stats_mv
+               where gemeinde ~* '^(Dietikon|Uster|Kloten|Frauenfeld)' order by 1;"
+            frage "Zonen ohne Klammerzusatz, je Gemeinde die 30 häufigsten" "
+              set local statement_timeout = '30s';
+              with g as (select gemeinde from public.gemeinde_stats_mv where gemeinde ~* '^(Dietikon|Uster|Kloten|Frauenfeld)'),
+                   z as (select p.gemeinde, btrim(regexp_replace(coalesce(p.zone, '(leer)'), '\([^)]*\)', ' ', 'g')) as zone, count(*) as parzellen
+                           from public.properties p join g on g.gemeinde = p.gemeinde group by 1, 2),
+                   r as (select *, row_number() over (partition by gemeinde order by parzellen desc) as nr from z)
+              select gemeinde, zone, parzellen from r where nr <= 30 order by gemeinde, parzellen desc;"
+            frage "Was je Parzelle gefüllt ist" "
+              set local statement_timeout = '30s';
+              with g as (select gemeinde from public.gemeinde_stats_mv where gemeinde ~* '^(Dietikon|Uster|Kloten|Frauenfeld)')
+              select p.gemeinde, count(*) as parzellen, count(p.address) as adresse, count(p.area) as flaeche, count(p.zone) as zone,
+                     count(p.baujahr) as baujahr, count(p.geschosse) as geschosse, count(p.vollgeschosse) as vollgeschosse,
+                     count(p.vollgeschosse_zulaessig) as vg_zulaessig, count(p.ausnuetzung) as ausnuetzung,
+                     count(p.hnf_delta) as hnf_delta, count(*) filter (where p.hnf_delta > 0) as hnf_delta_positiv,
+                     count(p.gebaeudeart) as gebaeudeart, count(p.wohnungen) as wohnungen, count(p.gebaeudeflaeche) as gebaeudeflaeche,
+                     count(nullif(btrim(p.denkmalschutz), '')) as denkmalschutz, count(nullif(btrim(p.isos), '')) as isos,
+                     count(p.owner_name) as eigentuemer, count(p.geometrie) as umriss, count(p.egrid) as egrid,
+                     count(*) filter (where p.ausgeschlossen) as ausgeschlossen
+                from public.properties p join g on g.gemeinde = p.gemeinde group by 1 order by 1;" 
+            frage "Parzellen mit Gebäude aus dem Register, und was dort gefüllt ist" "
+              set local statement_timeout = '30s';
+              with g as (select gemeinde from public.gemeinde_stats_mv where gemeinde ~* '^(Dietikon|Uster|Kloten|Frauenfeld)'),
+                   pg as (select p.gemeinde, p.id, (select count(*) from public.gebaeude b where b.egrid = p.egrid) as geb,
+                                 (select count(b.baujahr) from public.gebaeude b where b.egrid = p.egrid) as mit_baujahr,
+                                 (select count(b.geschosse) from public.gebaeude b where b.egrid = p.egrid) as mit_geschossen,
+                                 (select count(b.heizung_energie) from public.gebaeude b where b.egrid = p.egrid) as mit_heizung
+                            from public.properties p join g on g.gemeinde = p.gemeinde where p.egrid is not null)
+              select gemeinde, count(*) as parzellen, count(*) filter (where geb > 0) as mit_gebaeude, count(*) filter (where geb > 1) as mit_mehreren,
+                     count(*) filter (where mit_baujahr > 0) as baujahr, count(*) filter (where mit_geschossen > 0) as geschosse,
+                     count(*) filter (where mit_heizung > 0) as heizung
+                from pg group by 1 order by 1;"
+            frage "Denkmalschutz und ISOS: welche Werte vorkommen" "
+              set local statement_timeout = '30s';
+              with g as (select gemeinde from public.gemeinde_stats_mv where gemeinde ~* '^(Dietikon|Uster|Kloten|Frauenfeld)')
+              select 'denkmalschutz' as feld, left(p.denkmalschutz, 60) as wert, count(*) from public.properties p join g on g.gemeinde = p.gemeinde
+               where nullif(btrim(p.denkmalschutz), '') is not null group by 1, 2
+              union all
+              select 'isos', left(p.isos, 60), count(*) from public.properties p join g on g.gemeinde = p.gemeinde
+               where nullif(btrim(p.isos), '') is not null group by 1, 2
+              order by 1, 3 desc limit 40;"
+            frage "Gebäudeart und Kategorie: welche Werte vorkommen (Dietikon)" "
+              set local statement_timeout = '30s';
+              select 'gebaeudeart' as feld, left(gebaeudeart, 50) as wert, count(*) from public.properties where gemeinde in (select gemeinde from public.gemeinde_stats_mv where gemeinde ~* '^Dietikon') group by 1, 2
+              union all
+              select 'kategorie', left(kategorie, 50), count(*) from public.properties where gemeinde in (select gemeinde from public.gemeinde_stats_mv where gemeinde ~* '^Dietikon') group by 1, 2
+              order by 1, 3 desc limit 40;"
+            frage "Heizungen im Register: Kode und Text" "
+              select merkmal, code, text from public.gwr_kode where merkmal in ('GENH', 'GWAERZH') order by 1, 2;"
+
           elif [ "$FRAGE" = "last" ]; then
             # Am 16. November antwortete die Seite eine halbe Stunde lang
             # träge, obwohl kein Lauf mehr lief -- und nichts zeigte, was die
