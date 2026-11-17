@@ -27,7 +27,7 @@ import { gemeindePreise, type GemeindePreise } from '@/lib/preise';
 import { zusatzAbfragen } from '@/lib/parzelle-zusatz';
 import { istVorhanden } from '@/lib/potential';
 import type { Gebaeude, ZonenRegeln } from '@/lib/machbarkeit';
-import { CALC_ANNAHMEN, hnfPraxis, zuerichKm, type NachbarTeil } from '@/lib/calc';
+import { CALC_ANNAHMEN, nachbarArt, zuerichKm, type NachbarTeil } from '@/lib/calc';
 import { bundParzelle, mitte } from '@/lib/bund-parzelle';
 
 // Die erzeugten Typen kennen Tabelle und Funktion noch nicht.
@@ -287,8 +287,6 @@ export async function leadLaden(id: string): Promise<{ id: string; name: string 
 /** Eine Nachbarparzelle mit allem, was die gemeinsame Rechnung braucht. */
 export interface NachbarDaten extends NachbarTeil {
   kanton: string | null;
-  /** Ob die Praxisformel hier rechnen kann (Bauzone mit Ziffer und Geschossen). */
-  bebaubar: boolean;
 }
 
 /** Ein Ort aus dem eigenen Bestand: die Zone, wo kein amtlicher Zonenplan angebunden ist. */
@@ -314,20 +312,19 @@ async function nachbarLaden(egrid: string): Promise<NachbarDaten | null> {
     registerBund(egrid).catch(() => null),
     kanton === 'ZH' ? zoneZh(e, n, undefined, 12000).catch(() => null) : zoneAusListe(egrid).catch(() => null),
   ]);
-  return {
-    egrid, nummer: a.number ? String(a.number) : null, flaeche, zone, gebaeude: register?.gebaeude ?? [], kanton,
-    bebaubar: !!hnfPraxis(flaeche, zone, CALC_ANNAHMEN),
-  };
+  return { egrid, nummer: a.number ? String(a.number) : null, flaeche, zone, gebaeude: register?.gebaeude ?? [], kanton };
 }
 
 /**
  * Die Nachbarparzellen beim Bund: wer an die Parzelle grenzt (Kataster),
- * mit Fläche, Zone und Gebäuden. Strassen und Parzellen ohne Bauzone
- * kommen mit, sind aber nicht bebaubar. Höchstens zwölf.
+ * mit Fläche, Zone und Gebäuden. Parzellen ohne Bauzone kommen mit, sind
+ * aber nicht wählbar (nachbarArt). Zuerst, was eine eigene Ziffer hat,
+ * dann die Bauzonen ohne Ziffer. Höchstens zwölf.
  */
 export async function nachbarnLaden(egrid: string): Promise<NachbarDaten[]> {
   const b = await bundParzelle(egrid);
   if (!b) throw new Error('Der Kataster des Bundes hat nicht geantwortet.');
   const alle = await Promise.all(b.nachbarn.slice(0, 12).map(nachbarLaden));
-  return alle.filter((x): x is NachbarDaten => !!x).sort((x, y) => Number(y.bebaubar) - Number(x.bebaubar) || y.flaeche - x.flaeche);
+  const rang = (x: NachbarDaten) => ({ ziffer: 0, dichte: 1, keine: 2 })[nachbarArt(x.flaeche, x.zone, CALC_ANNAHMEN)];
+  return alle.filter((x): x is NachbarDaten => !!x).sort((x, y) => rang(x) - rang(y) || y.flaeche - x.flaeche);
 }

@@ -153,7 +153,14 @@ Danach in 24 Stunden: Kaufpreis prüfen, freigeben, Angebot schreiben,
 senden. Alles Weitere in `docs/calc-you-later.md`.
 
   * Comparis und Homegate werden nicht automatisch ausgelesen: beide
-    verbieten es. Die Seite öffnet die Suche, ein Mensch trägt ein.
+    verbieten es und sperren Programme aus (Wortlaut und Sperren am
+    17. November nachgesehen, siehe Dokument). Die Seite öffnet die
+    Suche, ein Mensch trägt ein. Automatisch nur über eine Quelle, die es
+    erlaubt (Popety.io, dort besteht ein Abo; oder eine Lizenz).
+  * Nachbarn in einer Bauzone ohne Ziffer (Quartiererhaltung, Kernzone)
+    lassen sich ankreuzen: sie rechnen mit der Dichte der Hauptparzelle,
+    als Annahme gekennzeichnet (17. November: in Aussersihl waren alle
+    Nachbarn gesperrt).
   * Reihenfolge und Uhr erzwingt die Datenbank (`kalkulation_schritt`).
     Wer die Migration ändert, lässt `tools/kalkulation-probe.sh` laufen.
   * Keine Zahl ohne Herkunft: amtlich, berechnet oder Annahme. Neue

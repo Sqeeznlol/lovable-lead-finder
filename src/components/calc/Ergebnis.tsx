@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { Marke } from '@/components/rahmen';
 import { chf, m2, type Art, type Gebaeude } from '@/lib/machbarkeit';
 import { parzellenText, type Bewertung, type CalcAnnahmen, type ErloesQuelle } from '@/lib/calc';
@@ -238,8 +239,13 @@ export function Ergebnis({ b, annahmen, onErloes }: { b: Bewertung; annahmen: Ca
       </div>
 
       {(s.rechenbar || n) && (
-        <details className="rounded-[3px] border bg-card print:hidden">
-          <summary className="flex min-h-11 cursor-pointer items-center px-4 text-sm font-medium">Herkunft jeder Zahl</summary>
+        <details className="group rounded-[3px] border bg-card print:hidden">
+          {/* Mit Pfeil: als Zeile ohne Zeichen sah man nicht, dass sie aufgeht (Julian, 17. November, im Bild
+              markiert statt geöffnet). Der Text lässt sich nicht markieren, sonst schliesst ein Doppelklick gleich wieder. */}
+          <summary className="flex min-h-11 cursor-pointer select-none list-none items-center justify-between gap-3 px-4 text-sm font-medium [&::-webkit-details-marker]:hidden">
+            Herkunft jeder Zahl
+            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden />
+          </summary>
           <div className="space-y-4 border-t p-4">
             {(b.herkunft ?? s.abschnitte).map(a => (
               <div key={a.titel} className="space-y-1.5">

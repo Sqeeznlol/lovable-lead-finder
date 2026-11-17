@@ -47,6 +47,13 @@ export interface ZonenRegeln {
   rechtsstatus: string | null;
   dokument: string | null;
   /**
+   * Ob hier privat gebaut wird: Wohn-, Arbeits-, Misch- und Zentrumszonen.
+   * Nicht: Zonen für öffentliche Bauten, Erholung, Freihaltung, Strassen,
+   * Bahn, Wald, Gewässer. Fehlt die Angabe (ältere Entwürfe), entscheidet,
+   * ob die Zone Geschosse nennt.
+   */
+  bauzone?: boolean | null;
+  /**
    * kanton: Zonenplan des Kantons (amtlich). bestand: aus der eigenen
    * Liste, ohne Gewähr. hand: von einem Menschen eingegeben, wo kein
    * Zonenplan angebunden ist (CALC YOU LATER).

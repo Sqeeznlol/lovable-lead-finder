@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { vi } from 'vitest';
 vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
-import { baukostenNachErloes, bewerten, CALC_ANNAHMEN, hangZuschlag, hnfPraxis, median, mieteStatistik, zoneMitHand, zuerichKm, zuerichZuschlag, type CalcEingabe } from '@/lib/calc';
+import { baukostenNachErloes, bewerten, CALC_ANNAHMEN, hangZuschlag, hnfPraxis, median, mieteStatistik, nachbarArt, zoneMitHand, zuerichKm, zuerichZuschlag, type CalcEingabe } from '@/lib/calc';
 import { angebotEntwurf, betrag, uhr } from '@/lib/calc-ablauf';
 import type { ZonenRegeln } from '@/lib/machbarkeit';
 
@@ -423,5 +423,82 @@ describe('CALC YOU LATER: Nachbarparzelle dazukaufen', () => {
     const o = bewerten({ ...leer, nachbarn: [{ ...nachbar(2500), gebaeude: [{ grundflaeche: 400, geschosse: 4, baujahr: 2015, wohnungen: 16 }] }] });
     expect(o.zusammen!.lohnt).toBe(false);
     expect(o.empfehlung).toBe(o.empfehlungAllein);
+  });
+});
+
+/**
+ * Julian, 17. November, Zürich Aussersihl: alle Nachbarn gesperrt, «keine
+ * Bauzone mit Ziffer». Die Quartiererhaltungszone QI/5a nennt laut
+ * Zonenplan des Kantons fünf Vollgeschosse und keine Ziffer.
+ */
+describe('CALC YOU LATER: Nachbar in einer Bauzone ohne Ziffer', () => {
+  const quartier: ZonenRegeln = { ...zone, bezeichnung: 'Quartiererhaltungszone I', abkuerzung: 'QI/5a', az: null, vollgeschosse: 5, dachgeschosse: 2 };
+  const strasse: ZonenRegeln = { ...zone, bezeichnung: 'Strassen', abkuerzung: null, az: null, vollgeschosse: null, bauzone: false };
+  const nachbar = (flaeche: number, z: ZonenRegeln | null, nummer = 'AU1344') => ({ egrid: `CH${nummer}`, nummer, flaeche, zone: z, gebaeude: [] });
+
+  it('unterscheidet eigene Ziffer, Bauzone ohne Ziffer und keine Bauzone', () => {
+    expect(nachbarArt(1000, zone, CALC_ANNAHMEN)).toBe('ziffer');
+    expect(nachbarArt(358, quartier, CALC_ANNAHMEN)).toBe('dichte');
+    expect(nachbarArt(358, strasse, CALC_ANNAHMEN)).toBe('keine');
+    expect(nachbarArt(358, null, CALC_ANNAHMEN)).toBe('keine');
+    expect(nachbarArt(0, quartier, CALC_ANNAHMEN)).toBe('keine');
+    // Quartiererhaltungszone III: laut Zonenplan Bauzone, aber ohne Ziffer und ohne Geschosse.
+    expect(nachbarArt(2563, { ...quartier, abkuerzung: 'QIII', vollgeschosse: null, bauzone: true }, CALC_ANNAHMEN)).toBe('dichte');
+    // Schulhaus nebenan: die Zone für öffentliche Bauten nennt eine Ziffer, zu kaufen ist es nicht.
+    expect(nachbarArt(3000, { ...zone, bezeichnung: 'Zone für öffentliche Bauten', bauzone: false }, CALC_ANNAHMEN)).toBe('keine');
+    // Ein älterer Entwurf kennt die Angabe nicht: Geschosse genügen, ohne sie nichts.
+    expect(nachbarArt(358, { ...quartier, bauzone: undefined, vollgeschosse: null }, CALC_ANNAHMEN)).toBe('keine');
+  });
+
+  it('rechnet mit der Dichte der Hauptparzelle und sagt es', () => {
+    const o = bewerten({ ...leer, nachbarn: [nachbar(500, quartier)] });
+    const z = o.zusammen!;
+    // Hauptparzelle: 614.46 m² Nutzfläche auf 1 000 m² Land, also 0.61446 je m². Der Nachbar: 500 × 0.61446 = 307.23 m².
+    expect(z.dichte).toBeCloseTo(0.61446, 6);
+    expect(z.teile[0].hnf).toBeCloseTo(307.23, 6);
+    expect(z.teile[0].geliehen).toBe(true);
+    // Sein eigener Wert: 307.23 × (9 500 × 0.8 − 6 000) = 491 568. Zusammen 921.69 × 1 600 = 1 474 704.
+    expect(z.nachbarWert).toBeCloseTo(491_568, 3);
+    expect(z.landwert).toBeCloseTo(1_474_704, 3);
+    // Ohne Arealbonus bleibt für diese Parzelle dasselbe wie allein.
+    expect(z.fuerUns).toBeCloseTo(983_136, 3);
+    expect(z.lohnt).toBe(false);
+    expect(o.risiken).toContain('Für Parzelle AU1344 nennt die Zone keine Ziffer: gerechnet mit der Dichte dieser Parzelle (0.61 m² Nutzfläche je m² Land), eine Annahme.');
+  });
+
+  it('mit Arealbonus wird das Angebot besser, der Nachbar bekommt seinen Wert', () => {
+    const o = bewerten({ ...leer, nachbarn: [nachbar(2500, quartier)] });
+    const z = o.zusammen!;
+    // Wie mit eigener Ziffer bei gleicher Dichte: (614.46 + 1 536.15) × 1.1 × 1 600 = 3 785 073.6.
+    expect(z.bonus).toBe(0.1);
+    expect(z.landwert).toBeCloseTo(3_785_073.6, 1);
+    expect(z.nachbarWert).toBeCloseTo(2_457_840, 1);
+    expect(o.empfehlung).toBe(1_190_000);
+  });
+
+  it('mehrere Nachbarn ohne Ziffer in einem Satz; wer eine eigene Ziffer hat, rechnet damit', () => {
+    const o = bewerten({ ...leer, nachbarn: [nachbar(358, quartier, 'AU1344'), nachbar(358, quartier, 'AU6598'), nachbar(1000, zone, 'AU1')] });
+    expect(o.zusammen!.teile.map(t => !!t.geliehen)).toEqual([true, true, false]);
+    expect(o.zusammen!.teile[2].hnf).toBeCloseTo(614.46, 6);
+    expect(o.risiken.some(r => r.startsWith('Für Parzellen AU1344 und AU6598 nennt die Zone keine Ziffer:'))).toBe(true);
+  });
+
+  it('ohne Bauzone zählt die Parzelle nicht mit', () => {
+    const o = bewerten({ ...leer, nachbarn: [nachbar(800, strasse)] });
+    expect(o.zusammen).toBeNull();
+    expect(o.empfehlung).toBe(880_000);
+  });
+
+  it('ist die Hauptparzelle selbst nicht rechenbar, gibt es keine gemeinsame Rechnung', () => {
+    const o = bewerten({ ...leer, grundlage: { ...leer.grundlage, zone: quartier, bebaubarM2: null }, nachbarn: [nachbar(358, quartier)] });
+    expect(o.neubau).toBeNull();
+    expect(o.zusammen).toBeNull();
+  });
+
+  it('von Hand eingetragene Ausnützung der Hauptparzelle gilt auch für den Nachbarn in derselben Zone', () => {
+    const o = bewerten({ ...leer, grundlage: { ...leer.grundlage, zone: quartier, bebaubarM2: null }, hand: { az: 2 }, nachbarn: [nachbar(500, quartier)] });
+    // Praxisformel: 1 000 × 2 ÷ 5 × 5.66 × 0.77 = 1 743.28 m², also 1.74328 je m² Land; der Nachbar 871.64 m².
+    expect(o.neubau!.hnf).toBeCloseTo(1743.28, 6);
+    expect(o.zusammen!.teile[0].hnf).toBeCloseTo(871.64, 6);
   });
 });

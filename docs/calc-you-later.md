@@ -58,6 +58,24 @@ Angekreuzt wird, was sich dazukaufen lässt. Die Regel:
 Hochweidstrasse 9 mit den Parzellen 3947, 4903 und 4902 (zusammen
 3'434 m²): Empfehlung CHF 9.72 Mio. statt 7.78 Mio. allein.
 
+**Nachbarn in einer Bauzone ohne Ziffer.** Am 17. November waren in
+Zürich Aussersihl alle Nachbarn gesperrt («keine Bauzone mit Ziffer»).
+Die Quartiererhaltungs- und Kernzonen nennen im Zonenplan des Kantons
+fast nie eine Ziffer (gezählt an 3'300 Zonenflächen um Zürich, Kilchberg
+und Uster: 1 von 971 Quartiererhaltungszonen, 5 von 187 Kernzonen),
+manche nicht einmal Geschosse. Bauzonen sind es trotzdem. Seither:
+
+  * Ein Nachbar ohne eigene Ziffer rechnet mit der Dichte dieser Parzelle
+    (ihre Nutzfläche je m² Land). Das ist eine Annahme und steht so da:
+    in der Zeile des Nachbarn, in der gemeinsamen Rechnung und als Satz
+    bei den Risiken.
+  * Ist diese Parzelle selbst nicht gerechnet (keine Ziffer, kein Umriss),
+    verlangt die Seite zuerst die Ausnützung unter «Zone von Hand».
+  * Ob eine Zone Bauzone ist, sagt der Code des Kantons (C11 bis C14:
+    Wohnen, Gewerbe, Misch- und Zentrumszonen). Öffentliche Bauten,
+    Erholung, Strassen, Bahn und Wald lassen sich nicht ankreuzen, auch
+    wenn sie eine Ziffer nennen.
+
 ### Vorgaben von Julian (16. November)
 
   * **Gewinn** 20 % des Erlöses (beim Vermieten: des Werts).
@@ -129,6 +147,28 @@ Inseraten an der Adresse), und ein Mensch überträgt zwei, drei
 vergleichbare Wohnungen: Fläche und Netto-Miete. Der Median je m² ist
 die Marktmiete. Der Test `calc-daten.test.ts` wird rot, wenn Code diese
 Seiten selbst abruft.
+
+Nachgesehen am 17. November (Julian: «wieso nicht? was brauchst du,
+damit das geht»):
+
+  * Homegate antwortet einem Programm schon auf `robots.txt` mit der
+    Sperre von Cloudflare (403), Comparis auf die Mietsuche mit 403.
+  * Homegate, Disclaimer: die Informationen sind «nur für Browsingzwecke
+    für den privaten Eigengebrauch» frei; der Benutzer erklärt sich
+    einverstanden, sie «weder zu kopieren, noch zu veröffentlichen».
+  * Comparis, rechtliche Hinweise: der Benutzer unterlässt es, «die
+    zugänglichen Daten zu kopieren»; bei Verstössen behält sich Comparis
+    rechtliche Schritte vor.
+
+Automatisch geht es darum nur mit einer Quelle, die es erlaubt:
+
+  * Popety.io: dort besteht ein bezahltes Abo mit Schnittstelle (Projekt
+    Maradona). Das Angebot nennt Anzeigen und Transaktionen. Ob die
+    Schnittstelle Inserate mit Fläche und Preis liefert, steht nicht auf
+    der öffentlichen Seite: dazu braucht es den Schlüssel als
+    GitHub-Secret und einen Blick in die Dokumentation.
+  * Eine Lizenz der Portale selbst oder eines Datenanbieters. Kostet
+    Geld; das entscheidet Julian.
 
 ## Chancen und Risiken
 

@@ -56,11 +56,24 @@ const HOEHEN: [string, string][] = [
   ['gesamthoehe', 'Gesamthöhe'], ['firsthoehe_max', 'Firsthöhe'],
 ];
 
+/**
+ * Die Zonenarten des Kantons, in denen privat gebaut wird. Nachgesehen am
+ * 17. November an 3'300 Zonenflächen um Zürich, Kilchberg und Uster:
+ * C11 Wohnzonen, C12 Industrie und Gewerbe, C13 Wohnzonen mit
+ * Gewerbeerleichterung, Quartiererhaltungs- und Kernzonen, C14
+ * Zentrumszonen. Nicht dazu gehören C15 öffentliche Bauten, C16 Erholung,
+ * C2 Landwirtschaft, C3 Freihaltung und Gewässer, C4 Bahn, Strassen,
+ * Reserve, Wald. Eine Ziffer nennen von 971 Quartiererhaltungszonen eine
+ * und von 187 Kernzonen fünf: Bauzonen sind es trotzdem.
+ */
+export const istBauzoneZh = (code: string | null): boolean | null => (code ? /^C1[1-4]/.test(code) : null);
+
 /** Eine Zonenfläche des Zürcher Dienstes in die Regeln der Studie übersetzen. */
 export function regelnAusZh(p: Record<string, unknown>): ZonenRegeln {
   const hoehen = HOEHEN.map(([feld, titel]) => ({ wert: zahl(p[feld]), titel })).filter(h => h.wert != null && h.wert > 0);
   const hoehe = hoehen.sort((a, b) => a.wert! - b.wert!)[0];
   return {
+    bauzone: istBauzoneZh(text(p.typ_zh_code)),
     bezeichnung: text(p.typ_gde_bezeichnung) ?? text(p.typ_zh_bezeichnung),
     abkuerzung: text(p.typ_gde_abkuerzung),
     gemeinde: text(p.typ_gemeindename),
@@ -122,7 +135,7 @@ export function zoneAusBestand(p: { zone?: string | null; ausnuetzung?: number |
       bezeichnung: p.zone.replace(/\s*\(.*\)\s*$/, ''), abkuerzung: parsed.kurz ?? null, gemeinde: p.gemeinde ?? null,
       az, bmz: null, uez: parsed.ueberbauungsziffer ? parsed.ueberbauungsziffer / 100 : null,
       vollgeschosse: vg, dachgeschosse: null, untergeschosse: null, hoehe: null, hoeheArt: null, wohnanteilMin: null,
-      rechtsstatus: null, dokument: null, quelle: 'bestand',
+      rechtsstatus: null, dokument: null, quelle: 'bestand', bauzone: true,
     },
     bauzoneM2: parsed.zonenflaeche ?? null,
   };

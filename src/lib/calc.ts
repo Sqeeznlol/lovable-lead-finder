@@ -92,13 +92,39 @@ export function parzellenText(teile: { nummer: string | null }[]): string {
 export interface NachbarTeil { egrid: string; nummer: string | null; flaeche: number; zone: ZonenRegeln | null; gebaeude: Gebaeude[] }
 
 /**
+ * Wie ein Nachbar gerechnet wird. Mit eigener Ziffer nach der Praxisformel.
+ * Nennt seine Bauzone Geschosse, aber keine Ziffer, mit der Dichte der
+ * Hauptparzelle (Nutzfläche je m² Land). Ohne Bauzone gar nicht.
+ *
+ * Julian, 17. November, Zürich Aussersihl: alle sechs Nachbarn gesperrt
+ * («keine Bauzone mit Ziffer»). Nachgesehen im Zonenplan des Kantons: die
+ * Quartiererhaltungszone QI/5a nennt fünf Vollgeschosse und verweist für
+ * alles Weitere auf die Bauordnung -- eine Bauzone, nur ohne Ziffer. Die
+ * QIII daneben nennt nicht einmal Geschosse.
+ */
+export type NachbarArt = 'ziffer' | 'dichte' | 'keine';
+export function nachbarArt(flaeche: number, zone: ZonenRegeln | null, a: Pick<Annahmen, 'geschosshoehe' | 'hnfFaktor' | 'dachFaktor'>): NachbarArt {
+  // Schulhaus, Strasse, Wald: auch mit Ziffer nichts zum Dazukaufen.
+  if (!(flaeche > 0) || !zone || zone.bauzone === false) return 'keine';
+  if (hnfPraxis(flaeche, zone, a)) return 'ziffer';
+  // Ob Bauzone, sagt der Zonenplan; wo die Angabe fehlt (ältere Entwürfe), die Geschosse.
+  return zone.bauzone ?? pos(zone.vollgeschosse) != null ? 'dichte' : 'keine';
+}
+
+/**
  * Mit Nachbarn zusammen (Julian, 16. November: «Parzelle nebenan, wenn
  * man kaufen kann: dazukaufen, besseres Angebot»). Die Regel: der Nachbar
  * bekommt, was seine Parzelle allein wert ist; was die gemeinsame Rechnung
  * darüber hinaus hergibt, steht für diese Parzelle zur Verfügung.
  */
 export interface Zusammen {
-  teile: { egrid: string; nummer: string | null; flaeche: number; hnf: number | null; wertAllein: number }[];
+  teile: {
+    egrid: string; nummer: string | null; flaeche: number; hnf: number | null; wertAllein: number;
+    /** Die Zone nennt keine Ziffer: gerechnet mit der Dichte der Hauptparzelle. */
+    geliehen?: boolean;
+  }[];
+  /** Nutzfläche je m² Land der Hauptparzelle -- gesetzt, wenn ein Nachbar damit gerechnet ist. */
+  dichte?: number | null;
   flaeche: number; hnfOhneBonus: number; bonus: number; hnf: number; abbruch: number;
   landwert: number; nachbarWert: number; fuerUns: number; mehr: number; lohnt: boolean; empfehlung: number | null;
 }
@@ -206,6 +232,11 @@ export interface CalcEingabe {
   jahr?: number;
   /** Woher der Erlös stammt; ohne Angabe eine Annahme. */
   erloesQuelle?: ErloesQuelle;
+  /**
+   * Nutzfläche je m² Land, geliehen von der Hauptparzelle: nur für einen
+   * Nachbarn, dessen Bauzone keine Ziffer nennt (nachbarArt).
+   */
+  dichte?: number | null;
 }
 
 export interface Neubau {
@@ -333,7 +364,7 @@ export function zoneMitHand(zone: ZonenRegeln | null, hand: VonHand): ZonenRegel
     az: az ?? zone?.az ?? null, bmz: zone?.bmz ?? null, uez: zone?.uez ?? null,
     vollgeschosse: vg ?? zone?.vollgeschosse ?? null, dachgeschosse: zone?.dachgeschosse ?? null, untergeschosse: zone?.untergeschosse ?? null,
     hoehe: zone?.hoehe ?? null, hoeheArt: zone?.hoeheArt ?? null, wohnanteilMin: zone?.wohnanteilMin ?? null,
-    rechtsstatus: zone?.rechtsstatus ?? null, dokument: zone?.dokument ?? null, quelle: 'hand',
+    rechtsstatus: zone?.rechtsstatus ?? null, dokument: zone?.dokument ?? null, quelle: 'hand', bauzone: zone?.bauzone ?? null,
   };
 }
 
@@ -347,9 +378,11 @@ export function bewerten(e: CalcEingabe): Bewertung {
   // die Machbarkeit mit Hülle und Grenzabständen.
   const bauzone = pos(g.bauzoneM2) && g.bauzoneM2! < flaeche * 0.98 ? g.bauzoneM2! : flaeche;
   const praxis = hnfPraxis(bauzone, zone, a);
-  const rechenbar = !!praxis || studie.rechenbar;
-  const hnf = praxis?.hnf ?? (studie.rechenbar ? studie.hnfNeu : 0);
-  const gf = praxis ? praxis.hnf / a.hnfFaktor : studie.gfNeu;
+  // Ein Nachbar ohne eigene Ziffer und ohne Umriss: die Dichte der Hauptparzelle.
+  const geliehen = !praxis && !studie.rechenbar && pos(e.dichte) && nachbarArt(flaeche, zone, a) === 'dichte' ? flaeche * e.dichte! : null;
+  const rechenbar = !!praxis || studie.rechenbar || geliehen != null;
+  const hnf = praxis?.hnf ?? (studie.rechenbar ? studie.hnfNeu : geliehen ?? 0);
+  const gf = praxis ? praxis.hnf / a.hnfFaktor : studie.rechenbar ? studie.gfNeu : (geliehen ?? 0) / a.hnfFaktor;
   const wohnungenNeu = Math.floor(hnf / a.wohnungM2);
 
   // ---- Neubau: was für das Land bleibt
@@ -371,7 +404,7 @@ export function bewerten(e: CalcEingabe): Bewertung {
     const landwert = erloes - baukosten - abbruch - erloes * a.marge;
     neubau = {
       gf, hnf, kubatur, wohnungen: wohnungenNeu, baukosten, abbruch, erloes,
-      hnfText: praxis ? `Praxisformel: ${praxis.text}` : 'Machbarkeit: Ziffer und Hülle, die engere gilt',
+      hnfText: praxis ? `Praxisformel: ${praxis.text}` : geliehen != null ? 'Annahme: dieselbe Dichte wie die Hauptparzelle' : 'Machbarkeit: Ziffer und Hülle, die engere gilt',
       gewinn: erloes * a.marge, landwert, jeM2: flaeche ? landwert / flaeche : 0,
       jeM3: kubatur > 0 ? baukosten / kubatur : 0, wohnungPreis: a.erloes * a.wohnungM2,
       baukostenJeM2: kosten.jeM2, kosten,
@@ -434,11 +467,14 @@ export function bewerten(e: CalcEingabe): Bewertung {
 
   // ---- mit Nachbarn zusammen
   let zusammen: Zusammen | null = null;
-  const nachbarn = (e.nachbarn ?? []).filter(n => n.flaeche > 0);
-  if (nachbarn.length && neubau) {
+  const nachbarn = (e.nachbarn ?? []).filter(n => nachbarArt(n.flaeche, n.zone, a) !== 'keine');
+  if (nachbarn.length && neubau && flaeche > 0) {
+    // Was diese Parzelle je m² Land hergibt: damit rechnet ein Nachbar, dessen Zone keine Ziffer nennt.
+    const dichte = hnf / flaeche;
     const teile = nachbarn.map(n => {
-      const allein = bewerten({ ...e, grundlage: { flaeche: n.flaeche, bebaubarM2: null, zone: n.zone, gebaeude: n.gebaeude, registerVollstaendig: true }, hand: {}, nachbarn: [] });
-      return { egrid: n.egrid, nummer: n.nummer, flaeche: n.flaeche, hnf: hnfPraxis(n.flaeche, n.zone, a)?.hnf ?? null,
+      const eigen = hnfPraxis(n.flaeche, n.zone, a)?.hnf ?? null;
+      const allein = bewerten({ ...e, grundlage: { flaeche: n.flaeche, bebaubarM2: null, zone: n.zone, gebaeude: n.gebaeude, registerVollstaendig: true }, hand: {}, nachbarn: [], dichte });
+      return { egrid: n.egrid, nummer: n.nummer, flaeche: n.flaeche, hnf: eigen ?? n.flaeche * dichte, geliehen: eigen == null,
         wertAllein: allein.wert ?? 0, gfBestand: bestandGf(n.gebaeude) ?? 0 };
     });
     const flaecheZ = flaeche + teile.reduce((s, t) => s + t.flaeche, 0);
@@ -451,7 +487,8 @@ export function bewerten(e: CalcEingabe): Bewertung {
     const fuerUns = landwert - nachbarWert;
     const mehr = fuerUns - (wert ?? 0);
     zusammen = {
-      teile: teile.map(({ gfBestand: _, ...t }) => t), flaeche: flaecheZ, hnfOhneBonus, bonus, hnf: hnfZ, abbruch: abbruchZ,
+      teile: teile.map(({ gfBestand: _, ...t }) => t), dichte: teile.some(t => t.geliehen) ? dichte : null,
+      flaeche: flaecheZ, hnfOhneBonus, bonus, hnf: hnfZ, abbruch: abbruchZ,
       // Erst ab CHF 10'000 mehr zählt es als besseres Angebot, nicht wegen Rundung.
       landwert, nachbarWert, fuerUns, mehr, lohnt: mehr >= 10000, empfehlung: runden(fuerUns),
     };
@@ -560,6 +597,11 @@ export function bewerten(e: CalcEingabe): Bewertung {
     const areal = zusammen.bonus > 0 ? `, mit Arealüberbauung (+${prozent(zusammen.bonus)} % ab ${m2(a.arealMin)})` : '';
     if (zusammen.lohnt) chancen.push(`Mit ${wer} dazugekauft: ${chf(zusammen.mehr)} mehr für diese Parzelle${areal}, wenn ${verkauft}.`);
     else risiken.push(`Mit ${wer} dazugekauft bleibt für diese Parzelle nicht mehr als allein${zusammen.bonus > 0 ? '' : ` (gemeinsam ${m2(zusammen.flaeche)}, eine Arealüberbauung gilt hier erst ab ${m2(a.arealMin)})`}.`);
+    const ohne = zusammen.teile.filter(t => t.geliehen);
+    if (ohne.length && zusammen.dichte) {
+      const fuer = ohne.length === 1 ? (ohne[0].nummer ? `Parzelle ${ohne[0].nummer}` : 'die Nachbarparzelle') : parzellenText(ohne);
+      risiken.push(`Für ${fuer} nennt die Zone keine Ziffer: gerechnet mit der Dichte dieser Parzelle (${de(zusammen.dichte, 2)} m² Nutzfläche je m² Land), eine Annahme.`);
+    }
   }
   if (neubau && !neubau.kosten.vonHand && neubau.kosten.hang > 0) {
     risiken.push(`Hanglage: das Gelände steigt um ${de(Math.round(u.neigung!))} %, die Baukosten sind ${prozent(neubau.kosten.hang)} % höher gerechnet.`);

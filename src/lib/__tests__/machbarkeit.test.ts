@@ -131,6 +131,16 @@ describe('Machbarkeit', () => {
     expect(studieRechnen(eingabe({ zone: r })).gfNachZiffer).toBeCloseTo(700, 5);
   });
 
+  // Nachgesehen am 17. November an 3'300 Zonenflächen: die Codes und ihre Namen.
+  it('erkennt am Code des Kantons, wo privat gebaut wird', () => {
+    const bauzone = (code: string | null) => regelnAusZh({ typ_zh_code: code }).bauzone;
+    // Wohnzone, Gewerbe, Quartiererhaltung, Kernzone, Zentrumszone.
+    for (const code of ['C1102', 'C1201', 'C1306', 'C1307', 'C1401']) expect(bauzone(code)).toBe(true);
+    // Öffentliche Bauten, Erholung, Landwirtschaft, Freihaltung, Gewässer, Bahn, Strassen, Reserve, Wald, nicht zugewiesen.
+    for (const code of ['C1501', 'C1601', 'C2101', 'C3102', 'C3201', 'C4202', 'C4203', 'C4301', 'C4401', 'C4901']) expect(bauzone(code)).toBe(false);
+    expect(bauzone(null)).toBeNull();
+  });
+
   it('ohne amtlichen Zonenplan: die eigene Liste, als solche gekennzeichnet', () => {
     const z = zoneAusBestand({ zone: 'Wohnzone 2/50 (rechtskräftig, 600m², 60%)', gemeinde: 'TEST' });
     expect(z?.regeln.quelle).toBe('bestand');
