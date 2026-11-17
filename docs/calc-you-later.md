@@ -137,6 +137,20 @@ das BFS nichts. Neu holen:
     # https://dam-api.bfs.admin.ch/hub/api/dam/assets?orderNr=je-d-09.03.03.06
     python3 -I tools/mieten.py <datei.xlsx> src/lib/mieten-daten.ts
 
+## Adresse, Parzelle oder EGRID
+
+Gesucht wird beim Bund (geo.admin.ch, Adressen aus dem Gebäude- und
+Wohnungsregister, Parzellen aus der Amtlichen Vermessung).
+
+  * Eine Hausnummer, die es nicht gibt, sagt die Seite so und bietet die
+    nächsten Nummern derselben Strasse an. «Rechnen» nimmt dann keine
+    still. Am 17. November: «Dietlikerstrasse 55 in Kloten» gibt es nicht,
+    daneben 54, 56 und 57. Vorher fand die Suche wegen «in» und Komma die
+    Lindenstrasse 55, und «Rechnen» hätte sie genommen.
+  * Ohne Adresse geht es über die Parzelle: «Kloten 2061», «Parzelle 2061
+    Kloten» oder die EGRID. Die Postleitzahl für Homegate kommt dann aus
+    dem Register der Gebäude auf der Parzelle.
+
 ## Comparis und Homegate
 
 Beide verbieten das automatische Auslesen und sperren Programme aus.

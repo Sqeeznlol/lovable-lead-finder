@@ -6,7 +6,7 @@ import { Zahl } from '@/components/Machbarkeit';
 import { Ergebnis, Objektkopf } from '@/components/calc/Ergebnis';
 import { useName } from '@/components/calc/name';
 import { FENSTER } from '@/lib/fenster';
-import { adresseWaehlen } from '@/lib/adresswahl';
+import { adresseWaehlen, suchtext } from '@/lib/adresswahl';
 import { bewerten, CALC_ANNAHMEN, ERLOES_ANNAHME, median, nachbarArt, type CalcAnnahmen, type CalcEingabe, type ErloesQuelle, type Kauf, type NachbarTeil, type Umfeld, type Vergleich, type VonHand } from '@/lib/calc';
 import { ERLOES_AMTLICH } from '@/lib/erloes-daten';
 import { ERLOES_ANGABEN } from '@/lib/erloes-angaben';
@@ -65,6 +65,8 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
   const alt = entwurf?.eingaben;
   const [text, setText] = useState(start ?? '');
   const [gesucht, setGesucht] = useState(start ?? '');
+  /** «Rechnen» getippt, aber nicht eindeutig: die Seite bittet, einen Vorschlag anzutippen. */
+  const [waehlen, setWaehlen] = useState(false);
   const [gewaehlt, setGewaehlt] = useState<Adresse | null>(alt?.adresse ?? null);
   const [annahmen, setAnnahmen] = useState<CalcAnnahmen>(alt?.eingabe.annahmen ?? CALC_ANNAHMEN);
   const [hand, setHand] = useState<VonHand>(alt?.eingabe.hand ?? {});
@@ -80,7 +82,7 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
   const vonHand = (teil: Partial<VonHand>) => setHand(h => ({ ...h, ...teil }));
 
   // Erst tippen lassen, dann fragen -- sonst eine Abfrage je Zeichen.
-  useEffect(() => { const t = setTimeout(() => setGesucht(text), 300); return () => clearTimeout(t); }, [text]);
+  useEffect(() => { setWaehlen(false); const t = setTimeout(() => setGesucht(text), 300); return () => clearTimeout(t); }, [text]);
   const vorschlaege = useQuery({ queryKey: ['calc-adressen', gesucht.trim()], queryFn: () => adressen(gesucht), enabled: !gewaehlt && gesucht.trim().length >= 4, staleTime: 5 * 60 * 1000 });
 
   // Aus einem Lead geöffnet: Name und Adresse stehen schon da.
@@ -93,9 +95,11 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
   // Kam die Adresse von aussen und ist sie eindeutig, wird gleich gerechnet.
   const [vonAussen, setVonAussen] = useState(!!start || !!anfrageId);
   useEffect(() => {
-    if (!vonAussen || gewaehlt || !vorschlaege.data?.length) return;
-    const wahl = adresseWaehlen(gesucht, vorschlaege.data.map(v => v.label));
-    if ('index' in wahl) setGewaehlt(vorschlaege.data[wahl.index]);
+    const liste = vorschlaege.data?.treffer ?? [];
+    if (!vonAussen || gewaehlt || !vorschlaege.data) return;
+    const wahl = adresseWaehlen(suchtext(gesucht), liste.map(v => v.label));
+    // Fehlt die Hausnummer, steht die Liste der Nachbarn da: keine davon still nehmen.
+    if ('index' in wahl && !vorschlaege.data.fehlt) setGewaehlt(liste[wahl.index]);
     setVonAussen(false);
   }, [vonAussen, gewaehlt, vorschlaege.data, gesucht]);
 
@@ -201,27 +205,36 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
 
   // ---- noch keine Adresse gewählt
   if (!gewaehlt) {
-    const liste = vorschlaege.data ?? [];
+    const liste = vorschlaege.data?.treffer ?? [];
+    const fehlt = vorschlaege.data?.fehlt ?? null;
     return (
       <div className="space-y-3">
         <form role="search" className="flex gap-2" onSubmit={e => {
           e.preventDefault();
           if (!liste.length) return;
-          const wahl = adresseWaehlen(text, liste.map(v => v.label));
-          setGewaehlt(liste['index' in wahl ? wahl.index : 0]);
+          const wahl = adresseWaehlen(suchtext(text), liste.map(v => v.label));
+          // Nie still den ersten Vorschlag: bei «Dietlikerstrasse 55 in Kloten» wäre das die Lindenstrasse 55 gewesen.
+          if ('index' in wahl && !fehlt) setGewaehlt(liste[wahl.index]); else setWaehlen(true);
         }}>
           <label className="relative min-w-0 flex-1">
             <span className="sr-only">Adresse</span>
             <Search aria-hidden className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
             {/* 17 px: unter 16 px vergrössert Safari auf dem iPhone die Seite beim Tippen. */}
             <input value={text} onChange={e => setText(e.target.value)} type="search" enterKeyHint="search" autoComplete="off"
-                   placeholder="Strasse, Nummer und Ort" aria-label="Adresse"
+                   placeholder="Adresse, Parzelle oder EGRID" aria-label="Adresse"
                    className="h-14 w-full min-w-0 rounded-[3px] border border-input bg-card pl-12 pr-4 text-[17px] placeholder:text-muted-foreground focus:border-foreground focus:outline-none" />
           </label>
           <button type="submit" className={`${KNOPF_HAUPT} h-14 px-5 sm:px-7`} disabled={!liste.length}>Rechnen</button>
         </form>
         {vorschlaege.isFetching && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Adressen werden gesucht …</p>}
         {vorschlaege.error && <p className="text-sm text-destructive">Der Suchdienst des Bundes antwortet gerade nicht. Bitte später noch einmal.</p>}
+        {fehlt && !vorschlaege.isFetching && (
+          <p className="text-[15px]">
+            <span className="font-medium">{fehlt.strasse} {fehlt.nummer}</span> gibt es im Gebäude- und Wohnungsregister des Bundes nicht.
+            {liste.length ? ' Die nächsten Nummern an dieser Strasse:' : ''}
+          </p>
+        )}
+        {!fehlt && waehlen && liste.length > 1 && !vorschlaege.isFetching && <p className="text-[15px]">Welche ist gemeint? Bitte antippen.</p>}
         {liste.length > 0 && (
           <ul className={LISTE}>
             {liste.map(v => (
@@ -233,6 +246,9 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
         )}
         {gesucht.trim().length >= 4 && !vorschlaege.isFetching && !vorschlaege.error && liste.length === 0 && (
           <p className="text-sm text-muted-foreground">Keine Adresse gefunden. Strasse, Hausnummer und Ort ausschreiben.</p>
+        )}
+        {(fehlt || (gesucht.trim().length >= 4 && !vorschlaege.isFetching && liste.length === 0)) && (
+          <p className="text-sm text-muted-foreground">Ohne Adresse geht es über die Parzelle: Gemeinde und Parzellennummer, zum Beispiel «Kloten 2061», oder die EGRID.</p>
         )}
       </div>
     );

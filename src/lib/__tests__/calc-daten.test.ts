@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
-import { adresseLesen, comparisOrt, gebaeudeAusRegister, neigungAus, portalLinks } from '@/lib/calc-daten';
+import { adresseLesen, comparisOrt, gebaeudeAusRegister, neigungAus, parzelleLesen, portalLinks } from '@/lib/calc-daten';
 
 /**
  * Was CALC YOU LATER vom Bund liest. Die Beispiele sind echte Antworten
@@ -82,5 +82,22 @@ describe('CALC YOU LATER: Kauf und Gelände', () => {
     expect(neigungAus({ n: 508.2, s: 510.5, o: 508.3, w: 508.9 })).toBe(7.9);
     expect(neigungAus({ n: 500, s: 500, o: 500, w: 500 })).toBe(0);
     expect(neigungAus({ n: 506, s: 500, o: 500, w: 500 })).toBe(20);
+  });
+});
+
+// Echte Antworten der Parzellensuche des Bundes, 17. November.
+describe('CALC YOU LATER: eine Parzelle statt einer Adresse', () => {
+  it('liest Nummer, Ort und Gemeindenummer', () => {
+    expect(parzelleLesen('<b>Kloten</b> 2061 (CH 4105 7008 7781)', '2061 kloten 62 ch410570087781', 2686769, 1255481.625))
+      .toEqual({ label: 'Parzelle 2061, Kloten', strasse: 'Parzelle 2061', plz: null, ort: 'Kloten', e: 2686769, n: 1255481.625, kanton: null, bfs: '62' });
+    expect(parzelleLesen('<b>Zürich</b> AU1344 (CH 6191 2299 7880)', 'au1344 zuerich 261 ch619122997880', 1, 2)!.label).toBe('Parzelle AU1344, Zürich');
+  });
+  it('ohne Ort oder Nummer keine Parzelle', () => {
+    expect(parzelleLesen('Kloten 2061', '', 1, 2)).toBeNull();
+    expect(parzelleLesen('<b>Kloten</b>', '', 1, 2)).toBeNull();
+  });
+  it('für eine Parzelle keine Suche nach Inseraten an der Adresse', () => {
+    const p = parzelleLesen('<b>Kloten</b> 2061 (CH 4105 7008 7781)', '2061 kloten 62 ch410570087781', 1, 2)!;
+    expect(portalLinks(p).map(l => l.titel)).toEqual(['Comparis: Wohnungen in Kloten']);
   });
 });

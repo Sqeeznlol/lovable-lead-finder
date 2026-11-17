@@ -29,6 +29,7 @@ import { istVorhanden } from '@/lib/potential';
 import type { Gebaeude, ZonenRegeln } from '@/lib/machbarkeit';
 import { CALC_ANNAHMEN, nachbarArt, zuerichKm, type NachbarTeil } from '@/lib/calc';
 import { bundParzelle, mitte } from '@/lib/bund-parzelle';
+import { hausnummerLesen, nummerFehlt, suchtext } from '@/lib/adresswahl';
 
 // Die erzeugten Typen kennen Tabelle und Funktion noch nicht.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -70,14 +71,73 @@ export function adresseLesen(label: string, detail: string, e: number, n: number
   };
 }
 
-/** Vorschläge des Bundes zu einer getippten Adresse. */
-export async function adressen(text: string): Promise<Adresse[]> {
-  if (text.trim().length < 4) return [];
-  const j = await holen(`${API}/ech/SearchServer?type=locations&origins=address&limit=6&sr=2056&lang=de&searchText=${encodeURIComponent(text.trim())}`) as { results?: { attrs?: Record<string, unknown> }[] };
-  return (j?.results ?? [])
-    // Mit sr=2056 steht der Ostwert in y, der Nordwert in x.
-    .map(x => adresseLesen(String(x.attrs?.label ?? ''), String(x.attrs?.detail ?? ''), Number(x.attrs?.y), Number(x.attrs?.x)))
-    .filter(a => a.label && Number.isFinite(a.e) && Number.isFinite(a.n));
+/**
+ * Eine Parzelle aus der Suche des Bundes als Ort zum Rechnen. Label und
+ * Detail am 17. November nachgesehen: «<b>Kloten</b> 2061 (CH 4105 7008
+ * 7781)» und «2061 kloten 62 ch410570087781». Der Punkt der Suche lag in
+ * fünf von fünf Stichproben (Kloten, Zürich, Kilchberg) in der Parzelle.
+ */
+export function parzelleLesen(label: string, detail: string, e: number, n: number): Adresse | null {
+  const ort = label.match(/<b>(.*?)<\/b>/)?.[1]?.trim();
+  const nummer = label.replace(/<b>.*?<\/b>/, '').replace(/\(.*\)/, '').trim();
+  if (!ort || !nummer) return null;
+  const bfs = detail.match(/\s(\d{1,4})\s+ch\d{12}\s*$/)?.[1] ?? null;
+  return { label: `Parzelle ${nummer}, ${ort}`, strasse: `Parzelle ${nummer}`, plz: null, ort, e, n, kanton: null, bfs };
+}
+
+type Treffer = { attrs?: Record<string, unknown> }[];
+const suchen = async (text: string, origins: string, limit: number) =>
+  ((await holen(`${API}/ech/SearchServer?type=locations&origins=${origins}&limit=${limit}&sr=2056&lang=de&searchText=${encodeURIComponent(text)}`)) as { results?: Treffer })?.results ?? [];
+// Mit sr=2056 steht der Ostwert in y, der Nordwert in x.
+const alsAdressen = (t: Treffer) => t
+  .map(x => adresseLesen(String(x.attrs?.label ?? ''), String(x.attrs?.detail ?? ''), Number(x.attrs?.y), Number(x.attrs?.x)))
+  .filter(a => a.label && Number.isFinite(a.e) && Number.isFinite(a.n));
+const alsParzellen = (t: Treffer) => t
+  .map(x => parzelleLesen(String(x.attrs?.label ?? ''), String(x.attrs?.detail ?? ''), Number(x.attrs?.y), Number(x.attrs?.x)))
+  .filter((a): a is Adresse => !!a && Number.isFinite(a.e) && Number.isFinite(a.n));
+
+export interface AdressSuche {
+  treffer: Adresse[];
+  /** Die getippte Hausnummer gibt es an dieser Strasse nicht; die Treffer sind dann ihre Nachbarn. */
+  fehlt: { strasse: string; nummer: string } | null;
+}
+
+/**
+ * Vorschläge des Bundes zu einer Eingabe: Adresse, Parzelle («Kloten
+ * 2061», «Parzelle 2061 Kloten») oder EGRID. Gibt es die Hausnummer
+ * nicht, kommen die nächsten Nummern derselben Strasse -- und die Seite
+ * sagt, dass die gesuchte fehlt, statt still eine andere anzubieten.
+ */
+export async function adressen(text: string): Promise<AdressSuche> {
+  const t = suchtext(text);
+  if (t.length < 4) return { treffer: [], fehlt: null };
+  // Die Parzellensuche kennt «2061 Kloten» und die EGRID ohne Leerschläge, nicht das Wort «Parzelle».
+  const parzelle = t.replace(/\b(parzelle|grundstück|kataster(?:nummer)?|kat\.?-?nr\.?)\b/gi, ' ').replace(/\b(CH)\s*(\d{4})\s*(\d{4})\s*(\d{4})\b/i, '$1$2$3$4').replace(/\s+/g, ' ').trim();
+  const mitZahl = /\d/.test(t);
+  // Eine EGRID ist nie eine Adresse: als Adresse fand «CH410570087781» Weiler im Kanton Schaffhausen.
+  const egrid = /^CH\d{12}$/i.test(parzelle);
+  const [a, p] = await Promise.all([
+    egrid ? Promise.resolve([] as Adresse[]) : suchen(t, 'address', 6).then(alsAdressen),
+    mitZahl ? suchen(parzelle, 'parcel', 3).then(alsParzellen).catch(() => [] as Adresse[]) : Promise.resolve([] as Adresse[]),
+  ]);
+  const fehlt = nummerFehlt(t, a.map(x => x.label));
+  if (fehlt) {
+    // Die Nachbarn der fehlenden Nummer: «Dietlikerstrasse 5 Kloten» bringt 50 bis 59.
+    const h = hausnummerLesen(t)!;
+    const vorne = String(Math.floor(Number(h.nummer.match(/^\d+/)![0]) / 10) || '');
+    const umgebung = alsAdressen(await suchen(`${h.strasse} ${vorne} ${h.rest}`.replace(/\s+/g, ' ').trim(), 'address', 12).catch(() => []));
+    const noch = nummerFehlt(t, umgebung.map(x => x.label));
+    const naechste = noch ? noch.naechste.map(i => umgebung[i]) : fehlt.naechste.map(i => a[i]);
+    return { treffer: [...naechste, ...p], fehlt: { strasse: fehlt.strasse, nummer: fehlt.nummer } };
+  }
+  // Wer eine Parzelle meint, bekommt sie zuerst: «Kloten 2061» findet als
+  // Adresse nur Strassen mit der Nummer 1 (am 17. November gesehen).
+  const h = hausnummerLesen(t);
+  const strasse = h?.strasse.toLowerCase().replace(/str\.$/, 'strasse');
+  const strasseDa = !!strasse && a.some(x => x.strasse.toLowerCase().startsWith(`${strasse} `));
+  // Ist es eine Parzelle, sind die Adressen daneben Zufall: «Kloten 2061» fand Hausnummer 2061 in Sfazù und Pratteln.
+  if (!strasseDa && p.length) return { treffer: p, fehlt: null };
+  return { treffer: [...a, ...p], fehlt: null };
 }
 
 interface BundParzelle { kanton: string | null; nummer: string | null; egrid: string | null; flaeche: number | null }
@@ -108,7 +168,7 @@ export function gebaeudeAusRegister(a: Record<string, unknown>): Gebaeude | null
   return { grundflaeche: zahl(a.garea), geschosse: zahl(a.gastw), baujahr: zahl(a.gbauj), wohnungen: zahl(a.ganzwhg) };
 }
 
-interface Register { gebaeude: Gebaeude[]; kanton: string | null; bfs: string | null; gemeinde: string | null }
+interface Register { gebaeude: Gebaeude[]; kanton: string | null; bfs: string | null; gemeinde: string | null; plz: string | null }
 
 async function registerBund(egrid: string): Promise<Register> {
   const q = new URLSearchParams({ layer: 'ch.bfs.gebaeude_wohnungs_register', searchField: 'egrid', searchText: egrid, contains: 'false', returnGeometry: 'false' });
@@ -120,6 +180,8 @@ async function registerBund(egrid: string): Promise<Register> {
     kanton: typeof erster.gdekt === 'string' ? erster.gdekt : null,
     bfs: erster.ggdenr != null ? String(erster.ggdenr) : null,
     gemeinde: typeof erster.ggdename === 'string' ? erster.ggdename : null,
+    // Die Postleitzahl der Gebäude: über die Parzelle gesucht, hat die Adresse keine (Homegate sucht nach ihr).
+    plz: (alle.map(x => String(x.dplz4 ?? '')).find(x => /^\d{4}$/.test(x))) ?? null,
   };
 }
 
@@ -189,7 +251,7 @@ export async function objektLaden(a: Adresse, abstand: number): Promise<Objekt> 
   const gebaeude = register?.gebaeude ?? ausBestand ?? ausListe ?? [];
 
   return {
-    adresse: a, kanton: kanton ?? null, bfs: bfs ?? null,
+    adresse: a.plz || !register?.plz ? a : { ...a, plz: register.plz }, kanton: kanton ?? null, bfs: bfs ?? null,
     gemeinde: (eigen?.gemeinde as string | undefined) ?? register?.gemeinde ?? a.ort,
     egrid, parzelleNr: bund?.nummer ?? (eigen?.parzelle as string | undefined) ?? null, parzelleId,
     flaeche: zahl(eigen?.area) ?? grundlage?.flaeche_umriss ?? bund?.flaeche ?? null,
@@ -262,7 +324,8 @@ export function portalLinks(a: Pick<Adresse, 'strasse' | 'plz' | 'ort'>, art: 'm
   const slug = comparisOrt(a.ort);
   if (slug) aus.push({ titel: `Comparis: Wohnungen in ${a.ort}`, adresse: `https://www.comparis.ch/immobilien/marktplatz/${slug}/wohnung/${art}` });
   else if (a.ort) aus.push({ titel: `Comparis: Wohnungen in ${a.ort}`, adresse: google(`site:comparis.ch Wohnung ${art} ${a.plz ?? ''} ${a.ort}`.replace(/\s+/g, ' ')) });
-  aus.push({ titel: 'Inserate an dieser Adresse', adresse: google(`"${a.strasse}" ${a.plz ?? ''} ${a.ort ?? ''} ${art} (site:homegate.ch OR site:comparis.ch OR site:immoscout24.ch)`.replace(/\s+/g, ' ')) });
+  // Eine Parzelle ohne Adresse hat keine Inserate, nach denen sich suchen liesse.
+  if (!/^Parzelle /.test(a.strasse)) aus.push({ titel: 'Inserate an dieser Adresse', adresse: google(`"${a.strasse}" ${a.plz ?? ''} ${a.ort ?? ''} ${art} (site:homegate.ch OR site:comparis.ch OR site:immoscout24.ch)`.replace(/\s+/g, ' ')) });
   return aus;
 }
 
