@@ -4,7 +4,11 @@ import { useNavigate } from 'react-router-dom';
 import { ExternalLink, Loader2, Printer } from 'lucide-react';
 import { FELD, KNOPF, KNOPF_HAUPT } from '@/components/rahmen';
 import { FENSTER } from '@/lib/fenster';
-import { ANNAHMEN, chf, m2, studieRechnen, type Annahmen, type Art, type Variante } from '@/lib/machbarkeit';
+import { chf, m2, studieRechnen, type Art } from '@/lib/machbarkeit';
+import { bewerten, CALC_ANNAHMEN, ERLOES_ANNAHME, zuerichKm, type CalcAnnahmen, type ErloesQuelle, type Neubau } from '@/lib/calc';
+import { neigungLaden } from '@/lib/calc-daten';
+import { ERLOES_AMTLICH } from '@/lib/erloes-daten';
+import { ERLOES_ANGABEN } from '@/lib/erloes-angaben';
 import { grundlageLaden, zeichnung, zoneAusBestand, zoneZh } from '@/lib/machbarkeit-daten';
 import { gemeindePreise, landText, wohnungText } from '@/lib/preise';
 import { drucken } from '@/lib/drucken';
@@ -51,18 +55,32 @@ export function Zahl({ titel, wert, einheit, setWert, min, max, schritt }: { tit
   );
 }
 
-function VarianteTafel({ v }: { v: Variante }) {
+/**
+ * Was es wert ist, mit denselben Zahlen wie CALC YOU LATER: Nutzfläche
+ * nach Julians Praxisformel, Baukosten je m² Nutzfläche nach Preisstufe,
+ * 20 % Gewinn (calc.ts). Vorher rechnete die Objektansicht mit eigenen
+ * Werten (3'200 je m² Geschossfläche, 15 %) und zeigte für dieselbe
+ * Parzelle eine andere Zahl als die Kalkulation.
+ */
+function NeubauTafel({ n, annahmen }: { n: Neubau; annahmen: CalcAnnahmen }) {
+  const zeile = (titel: string, wert: string, fett = false) => (
+    <div className={`flex justify-between gap-3 ${fett ? 'border-t pt-1.5 font-medium' : ''}`}>
+      <dt className={fett ? '' : 'text-muted-foreground'}>{titel}</dt><dd className="tabular-nums">{wert}</dd>
+    </div>
+  );
   return (
     <div className="rounded-[3px] border p-4">
-      <p className="font-medium">{v.titel}</p>
-      <p className="text-sm text-muted-foreground">{v.text}</p>
+      <p className="font-medium">{n.abbruch > 0 ? 'Ersatzneubau' : 'Neubau'}</p>
+      <p className="text-sm text-muted-foreground">{n.abbruch > 0 ? 'Bestand abbrechen, das Mögliche neu bauen und verkaufen.' : 'Das Mögliche bauen und als Eigentum verkaufen.'}</p>
       <dl className="mt-3 space-y-1.5 text-sm">
-        <div className="flex justify-between gap-3"><dt className="text-muted-foreground">Geschossfläche</dt><dd className="tabular-nums">{m2(v.gf)}</dd></div>
-        <div className="flex justify-between gap-3"><dt className="text-muted-foreground">Wohnungen</dt><dd className="tabular-nums">rund {de(v.wohnungen)}</dd></div>
-        <div className="flex justify-between gap-3"><dt className="text-muted-foreground">Erlös</dt><dd className="tabular-nums">{chf(v.erloes)}</dd></div>
-        <div className="flex justify-between gap-3"><dt className="text-muted-foreground">Kosten</dt><dd className="tabular-nums">{chf(v.kosten)}</dd></div>
-        <div className="flex justify-between gap-3 border-t pt-1.5 font-medium"><dt>{v.ergebnisTitel}</dt><dd className="tabular-nums">{chf(v.ergebnis)}</dd></div>
-        {v.jeM2 != null && <div className="flex justify-between gap-3"><dt className="text-muted-foreground">je m² Grundstück</dt><dd className="tabular-nums">CHF {de(Math.round(v.jeM2 / 10) * 10)}</dd></div>}
+        {zeile('Nutzfläche', m2(n.hnf))}
+        {zeile('Wohnungen', `rund ${de(n.wohnungen)}`)}
+        {zeile('Erlös', chf(n.erloes))}
+        {zeile(`Baukosten, CHF ${de(n.baukostenJeM2)} je m²`, `− ${chf(n.baukosten)}`)}
+        {n.abbruch > 0 && zeile('Abbruch', `− ${chf(n.abbruch)}`)}
+        {zeile(`Gewinn ${de(annahmen.marge * 100)} %`, `− ${chf(n.gewinn)}`)}
+        {zeile('Bleibt für das Land', n.landwert < 0 ? `− ${chf(-n.landwert)}` : chf(n.landwert), true)}
+        {zeile('je m² Grundstück', `CHF ${de(Math.round(n.jeM2 / 10) * 10)}`)}
       </dl>
     </div>
   );
@@ -71,10 +89,20 @@ function VarianteTafel({ v }: { v: Variante }) {
 export function Machbarkeit({ parzelle }: { parzelle: Parzelle }) {
   const navigate = useNavigate();
   const [auf, setAuf] = useState(false);
-  const [annahmen, setAnnahmen] = useState<Annahmen>(ANNAHMEN);
-  const setze = (teil: Partial<Annahmen>) => setAnnahmen(a => ({ ...a, ...teil }));
+  const bfs = parzelle.bfs_nr != null ? String(Number(parzelle.bfs_nr)) : null;
+  // Wo der Verkaufspreis je m² bekannt ist, gilt er statt der Annahme (wie in CALC YOU LATER).
+  const vorgabe = useMemo((): { annahmen: CalcAnnahmen; quelle: ErloesQuelle } => {
+    const amtlich = bfs ? ERLOES_AMTLICH[bfs] : null, angabe = bfs ? ERLOES_ANGABEN[bfs] : null;
+    if (amtlich) return { annahmen: { ...CALC_ANNAHMEN, erloes: amtlich.m2 }, quelle: { art: 'amtlich', text: amtlich.text } };
+    if (angabe) return { annahmen: { ...CALC_ANNAHMEN, erloes: Math.round((angabe.von + angabe.bis) / 2) },
+      quelle: { art: 'angabe', text: `Angabe Julian vom ${angabe.am}: ${angabe.gemeinde} ${de(angabe.von)} bis ${de(angabe.bis)} je m², Mitte` } };
+    return { annahmen: CALC_ANNAHMEN, quelle: ERLOES_ANNAHME };
+  }, [bfs]);
+  const [annahmen, setAnnahmen] = useState<CalcAnnahmen>(vorgabe.annahmen);
+  const [erloesQuelle, setErloesQuelle] = useState<ErloesQuelle>(vorgabe.quelle);
+  const setze = (teil: Partial<CalcAnnahmen>) => setAnnahmen(a => ({ ...a, ...teil }));
   // Eine andere Parzelle: zu, und mit den Ausgangswerten.
-  useEffect(() => { setAuf(false); setAnnahmen(ANNAHMEN); }, [parzelle.id]);
+  useEffect(() => { setAuf(false); setAnnahmen(vorgabe.annahmen); setErloesQuelle(vorgabe.quelle); }, [parzelle.id, vorgabe]);
 
   const grundlage = useQuery({
     queryKey: ['machbarkeit-grundlage', parzelle.id, annahmen.grenzabstand],
@@ -89,6 +117,8 @@ export function Machbarkeit({ parzelle }: { parzelle: Parzelle }) {
     enabled: auf && !!punkt && parzelle.kanton === 'ZH', staleTime: 60 * 60 * 1000, retry: 1,
   });
   const preise = useQuery({ queryKey: ['gemeinde-preise', parzelle.bfs_nr], queryFn: () => gemeindePreise(parzelle.bfs_nr), enabled: auf, staleTime: Infinity });
+  // Hanglage: die Steigung aus dem Geländemodell des Bundes, für den Zuschlag auf die Baukosten.
+  const neigung = useQuery({ queryKey: ['neigung', punkt?.[0], punkt?.[1]], queryFn: () => neigungLaden(punkt![0], punkt![1]), enabled: auf && !!punkt, staleTime: Infinity });
 
   const liste = useMemo(() => zoneAusBestand(parzelle), [parzelle]);
   const wartetAufZone = parzelle.kanton === 'ZH' && !!punkt && amtlich.isLoading;
@@ -97,14 +127,20 @@ export function Machbarkeit({ parzelle }: { parzelle: Parzelle }) {
   const ausRegister = grundlage.data?.gebaeude ?? [];
   const ausListe = !ausRegister.length && parzelle.gebaeudeflaeche && parzelle.geschosse
     ? [{ grundflaeche: parzelle.gebaeudeflaeche, geschosse: parzelle.geschosse, baujahr: parzelle.baujahr ?? null, wohnungen: parzelle.wohnungen ?? null }] : null;
-  const studie = useMemo(() => studieRechnen({
+  const eingabe = useMemo(() => ({
     flaeche: parzelle.area ?? grundlage.data?.flaeche_umriss ?? null,
     bauzoneM2: amtlich.data ? null : liste?.bauzoneM2,
     bebaubarM2: grundlage.data?.umriss_da ? grundlage.data.bebaubar_m2 : null,
-    zone, gebaeude: ausListe ?? ausRegister, bestandQuelle: ausListe ? 'liste' : 'register',
-    registerVollstaendig: REGISTER_GELADEN.includes(parzelle.kanton ?? ''), annahmen,
+    zone, gebaeude: ausListe ?? ausRegister, bestandQuelle: (ausListe ? 'liste' : 'register') as 'liste' | 'register',
+    registerVollstaendig: REGISTER_GELADEN.includes(parzelle.kanton ?? ''),
   // eslint-disable-next-line react-hooks/exhaustive-deps -- ausListe und ausRegister folgen aus parzelle und grundlage.data
-  }), [parzelle, grundlage.data, amtlich.data, liste, zone, annahmen]);
+  }), [parzelle, grundlage.data, amtlich.data, liste, zone]);
+  const studie = useMemo(() => studieRechnen({ ...eingabe, annahmen }), [eingabe, annahmen]);
+  const b = useMemo(() => bewerten({
+    grundlage: eingabe, annahmen, kanton: parzelle.kanton ?? null, hand: {}, erloesQuelle,
+    umfeld: { gemeinde: preise.data?.name ?? parzelle.gemeinde, land: preise.data?.land ?? null, stwe: preise.data?.stwe ?? null, efh: preise.data?.efh ?? null,
+      neigung: neigung.data ?? null, zuerichKm: punkt ? zuerichKm(punkt[0], punkt[1]) : null },
+  }), [eingabe, annahmen, parzelle.kanton, parzelle.gemeinde, erloesQuelle, preise.data, neigung.data, punkt]);
   const bild = useMemo(() => (grundlage.data ? zeichnung(grundlage.data) : null), [grundlage.data]);
 
   if (!auf) {
@@ -130,8 +166,11 @@ export function Machbarkeit({ parzelle }: { parzelle: Parzelle }) {
 
   const laedt = grundlage.isLoading || wartetAufZone;
   const land = preise.data?.land, wohnung = preise.data?.stwe;
-  const neu = studie.varianten[0];
+  const n = b.neubau;
+  const rechenbar = studie.rechenbar || !!n;
   const titel = `Machbarkeit ${parzelle.address ?? parzelle.egrid ?? ''}`.trim();
+  const praxis = !!n?.hnfText?.startsWith('Praxisformel');
+  const kosten = n?.kosten;
 
   return (
     <section className="bericht-druck space-y-5">
@@ -141,22 +180,27 @@ export function Machbarkeit({ parzelle }: { parzelle: Parzelle }) {
           <p className="hidden text-sm print:block">{[parzelle.address, parzelle.gemeinde].filter(Boolean).join(', ')} · Stand {new Date().toLocaleDateString('de-CH')}</p>
         </div>
         <div className="flex gap-2 print:hidden">
-          {studie.rechenbar && <button type="button" className={KNOPF} onClick={() => drucken(titel)}><Printer className="h-4 w-4" /> Als PDF</button>}
+          {rechenbar && <button type="button" className={KNOPF} onClick={() => drucken(titel)}><Printer className="h-4 w-4" /> Als PDF</button>}
           <button type="button" className={KNOPF} onClick={() => setAuf(false)}>Schliessen</button>
         </div>
       </div>
 
       {laedt && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Umriss und Zonenplan werden geholt …</p>}
       {grundlage.error && <p className="text-sm text-destructive">Die Grundlage liess sich nicht laden. Später nochmals versuchen.</p>}
-      {!laedt && !grundlage.error && !studie.rechenbar && <p className="text-sm text-muted-foreground">Nicht rechenbar: {studie.grund}</p>}
+      {!laedt && !grundlage.error && !rechenbar && <p className="text-sm text-muted-foreground">Nicht rechenbar: {studie.grund}</p>}
 
-      {!laedt && studie.rechenbar && (
+      {!laedt && rechenbar && n && (
         <>
           {/* Ein Satz mit der Zahl, wie im Cockpit. */}
           <p className="text-[22px] leading-snug tracking-tight">
-            Möglich sind rund <span className="font-semibold">{m2(studie.gfNeu)}</span> Geschossfläche
-            {studie.gfBestand != null ? <>, heute stehen {m2(studie.gfBestand)}</> : null}.{' '}
-            <span className="text-muted-foreground">{studie.begrenzt === 'huelle' ? 'Die Abstände und Geschosse begrenzen, nicht die Ziffer.' : 'Die Ziffer der Zone begrenzt.'}</span>
+            Möglich sind rund <span className="font-semibold">{m2(n.hnf)}</span> Nutzfläche{praxis ? ' nach der Praxisformel' : ''}
+            {studie.gfBestand != null ? <>, heute stehen {m2(studie.gfBestand)} Geschossfläche</> : null}.{' '}
+            <span className="text-muted-foreground">
+              {/* Nur wenn wirklich die Abstände begrenzen: in Baumassen-Zonen ist die Machbarkeit auch ohne Abstände kleiner (Dach in der Baumasse, kein Attika). */}
+              {praxis && studie.rechenbar && studie.begrenzt === 'huelle' && studie.hnfNeu < n.hnf * 0.9
+                ? `Zwischen den Grenzabständen haben nur ${m2(studie.hnfNeu)} Platz.`
+                : praxis ? 'Die Ziffer der Zone begrenzt.' : 'Die Zone nennt keine Ziffer: gerechnet ist mit Abständen und Geschossen.'}
+            </span>
           </p>
 
           {amtlich.isError && parzelle.kanton === 'ZH' && (
@@ -185,16 +229,25 @@ export function Machbarkeit({ parzelle }: { parzelle: Parzelle }) {
             <div className="space-y-4 print:hidden">
               <p className="text-sm text-muted-foreground">Annahmen, die Sie ändern können. Die Rechnung folgt sofort.</p>
               <div className="grid grid-cols-2 gap-3">
-                <Zahl titel="Grenzabstand" wert={annahmen.grenzabstand} einheit="m" min={0} max={30} schritt={0.5} setWert={n => setze({ grenzabstand: n })} />
-                <Zahl titel="Wohnungsgrösse" wert={annahmen.wohnungM2} einheit="m²" min={30} max={250} schritt={5} setWert={n => setze({ wohnungM2: n })} />
-                <Zahl titel="Erlös je m² Nutzfläche" wert={annahmen.erloes} einheit="CHF" min={2000} max={40000} schritt={100} setWert={n => setze({ erloes: n })} />
-                <Zahl titel="Baukosten je m² Geschossfläche" wert={annahmen.baukosten} einheit="CHF" min={1000} max={12000} schritt={100} setWert={n => setze({ baukosten: n })} />
+                <Zahl titel="Grenzabstand" wert={annahmen.grenzabstand} einheit="m" min={0} max={30} schritt={0.5} setWert={x => setze({ grenzabstand: x })} />
+                <Zahl titel="Wohnungsgrösse" wert={annahmen.wohnungM2} einheit="m²" min={30} max={250} schritt={5} setWert={x => setze({ wohnungM2: x })} />
+                <Zahl titel="Erlös je m² Nutzfläche" wert={annahmen.erloes} einheit="CHF" min={2000} max={60000} schritt={100}
+                      setWert={x => { setze({ erloes: x }); setErloesQuelle({ art: 'hand', text: 'von Hand eingegeben' }); }} />
+                <Zahl titel="Gewinn vom Erlös" wert={Math.round(annahmen.marge * 1000) / 10} einheit="%" min={0} max={50} schritt={1} setWert={x => setze({ marge: x / 100 })} />
               </div>
+              <p className="text-sm text-muted-foreground">Erlös: {erloesQuelle.text}.</p>
+              {kosten && (
+                <p className="text-sm text-muted-foreground">
+                  Baukosten inklusive Nebenkosten: CHF {de(kosten.grund)} je m² Nutzfläche bei diesem Erlös
+                  {kosten.hang > 0 && `, +${Math.round(kosten.hang * 100)} % Hanglage`}
+                  {kosten.zuerich > 0 && `, +${de(kosten.zuerich * 100, 1)} % Nähe zu Zürich`} = CHF {de(n.baukostenJeM2)}.
+                </p>
+              )}
               {wohnung && <p className="text-sm text-muted-foreground">Eigentumswohnungen in {preise.data!.name}: {wohnungText(wohnung)} (Statistik {preise.data!.k}).</p>}
             </div>
           </div>
 
-          {studie.abschnitte.map(a => (
+          {b.herkunft.map(a => (
             <div key={a.titel} className="space-y-1.5">
               <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{a.titel}</p>
               <dl className="divide-y rounded-[3px] border">
@@ -211,17 +264,17 @@ export function Machbarkeit({ parzelle }: { parzelle: Parzelle }) {
 
           <div className="space-y-1.5">
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Was es wert ist</p>
-            <div className="grid gap-3 sm:grid-cols-2">{studie.varianten.map(v => <VarianteTafel key={v.titel} v={v} />)}</div>
+            <div className="grid gap-3 sm:grid-cols-2"><NeubauTafel n={n} annahmen={annahmen} /></div>
             <p className="text-xs text-muted-foreground">
-              Annahme: Erlös CHF {de(annahmen.erloes)} je m² Hauptnutzfläche, Baukosten CHF {de(annahmen.baukosten)} je m² Geschossfläche,
-              Abbruch CHF {de(annahmen.abbruch)} je m² Bestand, {de(annahmen.marge * 100)} % des Erlöses als Marge des Entwicklers.
+              Wie in CALC YOU LATER: Erlös CHF {de(annahmen.erloes)} je m² Nutzfläche, Baukosten CHF {de(n.baukostenJeM2)} je m² Nutzfläche
+              inklusive Nebenkosten, Abbruch CHF {de(annahmen.abbruch)} je m² Bestand, {de(annahmen.marge * 100)} % des Erlöses als Gewinn.
             </p>
             {/* Der Massstab: was in der Gemeinde für Land wirklich bezahlt wurde. */}
-            {land && neu?.jeM2 != null && (
+            {land && (
               <p className="text-sm">
                 Zum Vergleich, bezahltes Wohnbauland in {preise.data!.name}: {landText(land)} (amtlich, Statistik {preise.data!.k}).{' '}
-                {neu.jeM2 > (land.q75 ?? land.m) * 1.25 ? 'Die Rechnung liegt deutlich darüber: Erlös und Kosten prüfen, bevor die Zahl hält.'
-                  : neu.jeM2 < (land.q25 ?? land.m) * 0.75 ? 'Die Rechnung liegt deutlich darunter: zu diesem Landpreis trägt das Projekt nicht.'
+                {n.jeM2 > (land.q75 ?? land.m) * 1.25 ? 'Die Rechnung liegt deutlich darüber: Erlös und Kosten prüfen, bevor die Zahl hält.'
+                  : n.jeM2 < (land.q25 ?? land.m) * 0.75 ? 'Die Rechnung liegt deutlich darunter: zu diesem Landpreis trägt das Projekt nicht.'
                   : 'Die Rechnung liegt im Rahmen dessen, was bezahlt wird.'}
               </p>
             )}

@@ -135,6 +135,12 @@ nachts.
     (04:20 bis 08:20), mit dem Eintrag 05:23 immer.
   * Ob ein geplanter Lauf wirklich gelaufen ist, steht in der Liste der
     Läufe, nicht im Zeitplan.
+  * Gemessen in der Nacht auf den 17. November, der ersten mit dieser
+    Einrichtung: «Nachbarschaft» startete um 00:11, 02:35 und 05:02 UTC
+    (in der Reihenfolge der Einträge 16:07, 19:37 und 23:07, also 8 h 04,
+    6 h 58 und 5 h 55 zu spät), «Zählen» um 04:14 (Eintrag 21:57,
+    6 h 17), «Reiter prüfen» um 04:49 (Eintrag 22:50, 5 h 59). Je ein
+    Lauf traf sein Fenster; die übrigen endeten nach Sekunden.
 
 Der Test `zeitplan.test.ts` rechnet die Abdeckung nach.
 

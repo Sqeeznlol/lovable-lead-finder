@@ -213,7 +213,7 @@ export function neigungAus(h: { n: number; s: number; o: number; w: number }, ab
   return Math.round(Math.hypot(gx, gy) * 1000) / 10;
 }
 
-async function neigungLaden(e: number, n: number): Promise<number | null> {
+export async function neigungLaden(e: number, n: number): Promise<number | null> {
   const hoehe = async (x: number, y: number) => {
     const j = await holen(`${API}/height?easting=${Math.round(x)}&northing=${Math.round(y)}&sr=2056`) as { height?: string };
     const h = Number(j?.height);
