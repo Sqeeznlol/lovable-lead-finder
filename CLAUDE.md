@@ -163,6 +163,34 @@ senden. Alles Weitere in `docs/calc-you-later.md`.
     Vorgaben für Baukosten, Gewinn und Zuschläge stehen im Dokument;
     nicht eigenmächtig ändern.
 
+## 3D-Karte
+
+Am 17. November (Julian: «die 3D-Ansicht ist mega langsam und dann stockt
+die ganze Webseite») waren es zwei Dinge, beide erst durch Messen gefunden:
+
+  * Nach «Zurück» aus der 3D-Karte war die ganze Seite leer, seit dem
+    3. November. Beim Verlassen wird zuerst der Viewer zerstört, ein
+    späteres Aufräumen fasste ihn noch an, und der Fehler riss alles mit:
+    der Auffang eines Bereichs verschwindet beim Wechsel mit ihm. Darum
+    prüft jedes Aufräumen `isDestroyed()`, und um die ganze Anwendung
+    liegt ein letzter Auffang (`App.tsx`).
+  * Die Karte zeichnete auf einem Bildschirm mit doppelter Dichte 4.9 Mio.
+    Bildpunkte mit vierfacher Kantenglättung (Cesiums Vorgabe) und weichen
+    Schatten: gut fünfmal so teuer wie die sparsamste Einstellung. Teuer
+    sind die Bildpunkte, nicht die Kacheln. Wie dicht, wie geglättet und
+    ob mit Schatten, steht in `src/lib/karte3d-guete.ts`; kommt ein Gerät
+    nicht mit, geht die Karte selbst Stufe um Stufe zurück und merkt sich
+    das einen Tag.
+
+Geprüft ist ein Bereich erst, wenn man ihn auch wieder verlassen hat,
+ohne neu zu laden. «Reiter prüfen» lädt jeden Reiter frisch und sah den
+Fehler in keinem Lauf; seither geht er einmal von der Karte in die
+3D-Karte und mit «Zurück» wieder hinaus.
+
+Der Browser der Prüfung hat keine Grafikkarte. Zeiten der 3D-Karte lassen
+sich dort nur untereinander vergleichen, nicht als Tempo auf einem echten
+Gerät angeben.
+
 ## Gestaltung
 
 Wie die Seite aussieht, steht in `DESIGN.md` -- vor jeder Arbeit an der

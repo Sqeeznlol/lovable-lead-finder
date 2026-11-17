@@ -15,6 +15,7 @@ import { umrissVomBund } from '@/hooks/use-portfolio';
 import { parallel } from '@/lib/parallel';
 import { ellipsoidUeberMeer } from '@/lib/koordinaten';
 import { Suche3D } from '@/components/karte3d/Suche3D';
+import { guete, sparsamer, stufeLesen, stufeMerken, Taktmesser, type Geraet } from '@/lib/karte3d-guete';
 import { useUrlSetzen } from '@/hooks/use-url-wert';
 import {
   BAUJAHR_STUFEN, baujahrFarbe, egidAmOrt, FOTO_MOEGLICH, GEBAEUDE_URL, GEBAEUDE_ZH_URL, gebaeudeLaden, hausKennung, inZuerich, GELAENDE_URL, GOOGLE_KEY, HEIZ_GRUPPEN, heizGruppe, HOEHE_STUFEN,
@@ -131,7 +132,15 @@ export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende,
   const zonenQuelle = useRef<GeoJsonDataSource | null>(null);
   const daten = useRef(new Map<number, Gebaeude>());
   const reserve = useRef(new Map<string, number>());
+  /** Parzellen, deren Reserve noch nicht gefragt ist -- geholt erst für die Färbung «Reserve». */
+  const egridOffen = useRef(new Set<string>());
   const offen = useRef(new Set<number>());
+  /** Die Karte ist verlassen: nichts mehr nachladen, nichts mehr anfassen. */
+  const verlassen = useRef(false);
+  /** Wie aufwendig gezeichnet wird; die Karte nimmt sich selbst zurück (lib/karte3d-guete). */
+  const stufe = useRef(-1);
+  // Einmal lesen, nicht bei jedem Zeichnen der Bedienung.
+  if (stufe.current < 0) stufe.current = stufeLesen();
   const gewaehlt = useRef<number | null>(null);
   /** Das gewählte Haus über seine UUID -- für Kacheln ohne EGID. */
   const gewaehltHaus = useRef<string | null>(null);
@@ -174,17 +183,31 @@ export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende,
   useEffect(() => {
     if (!box.current) return;
     let weg = false;
-    const v = new Viewer(box.current, {
+    verlassen.current = false;
+    const kasten = box.current;
+    const warteschlange = offen.current;
+    const geraet = (): Geraet => ({ dpr: window.devicePixelRatio || 1, breite: kasten.clientWidth, hoehe: kasten.clientHeight, gross: GROSS() });
+    const soll = () => guete(stufe.current, geraet());
+    const v = new Viewer(kasten, {
       animation: false, timeline: false, baseLayerPicker: false, geocoder: false, homeButton: false,
       sceneModePicker: false, navigationHelpButton: false, fullscreenButton: false, infoBox: false,
       selectionIndicator: false, baseLayer: false, requestRenderMode: true, maximumRenderTimeChange: Infinity,
       shadows: false, skyBox: false,
       // Cesium zeichnet sonst mit einfacher Pixeldichte -- auf dem iPhone
-      // (Faktor 3) unscharf. Höchstens doppelt: mehr kostet Akku, ohne
-      // dass man es sieht.
+      // (Faktor 3) unscharf. Wie dicht, steht in lib/karte3d-guete.
       useBrowserRecommendedResolution: false,
+      // Cesiums Vorgabe ist 4, auch bei doppelter Dichte: dort unnötig und teuer.
+      msaaSamples: soll().glaettung,
     });
-    v.resolutionScale = Math.min(window.devicePixelRatio || 1, 2) / (window.devicePixelRatio || 1);
+    /** Dichte, Kantenglättung und Schatten nach der Stufe setzen -- auch wenn das Fenster seine Grösse ändert. */
+    const gueteSetzen = () => {
+      if (v.isDestroyed()) return;
+      const g = soll();
+      v.resolutionScale = g.pixel / (window.devicePixelRatio || 1);
+      v.scene.msaaSamples = g.glaettung;
+      v.shadows = g.schatten;
+      v.scene.requestRender();
+    };
     viewer.current = v;
     v.scene.globe.depthTestAgainstTerrain = true;
     v.scene.globe.baseColor = Color.fromCssColorString('#E9E6DF');
@@ -212,14 +235,36 @@ export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende,
     if (v.scene.sun) v.scene.sun.show = false;
     if (v.scene.moon) v.scene.moon.show = false;
     // Desktop: Sonne und Schatten machen die Höhen lesbar. Auf dem Handy
-    // kosten sie zu viel Akku.
-    const gross = GROSS();
-    if (gross) {
-      v.shadows = true;
-      v.shadowMap.softShadows = true;
-      v.shadowMap.darkness = 0.55;
-      v.scene.globe.enableLighting = false;
-    }
+    // kosten sie zu viel Akku. Ob sie an sind, entscheidet die Stufe.
+    v.shadowMap.softShadows = true;
+    v.shadowMap.darkness = 0.55;
+    v.scene.globe.enableLighting = false;
+    gueteSetzen();
+    const groesse = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(gueteSetzen);
+    groesse?.observe(kasten);
+
+    // Kommt das Gerät nicht mit, wird die Karte sparsamer statt zu ruckeln
+    // (Julian, 17. November: "mega langsam"). Gemessen wird jedes gezeichnete
+    // Bild vom Beginn bis zum nächsten Takt des Browsers: bremst die
+    // Grafikkarte, kommt der Takt später. preUpdate läuft in jedem Takt,
+    // postRender nur, wenn gezeichnet wurde.
+    const takt = new Taktmesser();
+    let beginn = 0, gezeichnet = false;
+    v.scene.preUpdate.addEventListener(() => {
+      const jetzt = performance.now();
+      if (gezeichnet) {
+        gezeichnet = false;
+        if (!document.hidden && takt.bild(jetzt - beginn, jetzt)) {
+          const neu = sparsamer(stufe.current, geraet());
+          if (neu !== stufe.current) { stufe.current = neu; stufeMerken(neu); gueteSetzen(); }
+        }
+      }
+      beginn = jetzt;
+    });
+    v.scene.postRender.addEventListener(() => { gezeichnet = true; });
+    // Im Hintergrund hält der Browser den Takt an: das ist keine langsame Karte.
+    const pause = () => { gezeichnet = false; takt.neu(); };
+    document.addEventListener('visibilitychange', pause);
     v.creditDisplay.addStaticCredit(new Credit('© swisstopo, Kanton Zürich'));
     // Cesium beschriftet den Nachweis englisch; sichtbar wird er im Foto.
     v.creditDisplay.container.querySelector('.cesium-credit-expand-link')?.replaceChildren('Quellen');
@@ -250,7 +295,16 @@ export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende,
     v.screenSpaceEventHandler.removeInputAction(ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
     const klick = new ScreenSpaceEventHandler(v.scene.canvas);
     klick.setInputAction((ev: { position: Cartesian2 }) => void waehlen(hausUnterZeiger(ev.position)), ScreenSpaceEventType.LEFT_CLICK);
-    return () => { weg = true; klick.destroy(); v.destroy(); viewer.current = null; tiles.current = null; };
+    return () => {
+      weg = true;
+      // Das Register nicht weiter fragen: ohne Karte braucht es niemand mehr.
+      verlassen.current = true;
+      if (zeitgeber.current) { window.clearTimeout(zeitgeber.current); zeitgeber.current = null; }
+      warteschlange.clear();
+      groesse?.disconnect();
+      document.removeEventListener('visibilitychange', pause);
+      klick.destroy(); v.destroy(); viewer.current = null; tiles.current = null;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -429,6 +483,11 @@ export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende,
     tiles.current?.makeStyleDirty();
     return () => {
       weg = true; umrisse.current = [];
+      // Beim Verlassen ist der Viewer schon zerstört (das Aufräumen läuft in
+      // der Reihenfolge der Effekte). Ihn dann noch anzufassen wirft einen
+      // Fehler, und der leerte die ganze Seite: ihr Auffang verschwindet im
+      // selben Zug (gemessen am 17. November: nach "Zurück" 0 Zeichen).
+      if (v.isDestroyed()) return;
       eigene.forEach(e => v.entities.remove(e)); tiles.current?.makeStyleDirty(); v.scene.requestRender();
     };
   }, [markiert, bereit]);
@@ -438,6 +497,12 @@ export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende,
     tiles.current?.makeStyleDirty();
     viewer.current?.scene.requestRender();
   }, [faerbung, kodes, geladen]);
+
+  // Wechselt die Färbung oder kommt eine Markierung dazu, kann das Register
+  // jetzt nötig sein, das bisher niemand brauchte (nachladen).
+  useEffect(() => {
+    if (bereit) nachladen();
+  }, [faerbung, markiert, bereit]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // --------------------------------------------------------------- Foto
   // Fotorealistisch: die Kacheln von Google sind Boden, Häuser und Bäume
@@ -541,7 +606,7 @@ export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende,
     // Für den Darstellungstest: Kacheln, Kamera und Häuser nachzählen statt raten.
     if (import.meta.env.DEV) {
       (window as unknown as { karte3d: unknown }).karte3d = {
-        v, ts, quelle: url, get foto() { return fotoKacheln.current; },
+        v, ts, quelle: url, get foto() { return fotoKacheln.current; }, get stufe() { return stufe.current; },
         // Der Klick im Foto, ohne Maus -- für den Darstellungstest.
         haus: (x: number, y: number) => hausUnterZeiger(new Cartesian2(x, y)),
       };
@@ -750,30 +815,52 @@ export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende,
     }
     nachladen();
   }
+  /**
+   * Das Register braucht nur, wer danach färbt (Heizung, Baujahr, Reserve)
+   * oder die Häuser markierter Parzellen einfärbt. Im Modell, nach Höhe und
+   * im Foto zeigt die Karte davon nichts -- ein Klick fragt das eine Haus
+   * selbst (einzelheiten). Gemessen am 17. November: die Karte fragte beim
+   * blossen Ansehen in 40 Sekunden 56 Mal das Register und 56 Mal die
+   * Reserve, und zeichnete nach jeder Antwort alle Häuser neu. Die
+   * Datenbank bedient aber die ganze Seite (CLAUDE.md).
+   */
+  const registerNoetig = () => faerbungRef.current === 'heizung' || faerbungRef.current === 'baujahr'
+    || faerbungRef.current === 'reserve' || markierteFarbe.current.size > 0;
+  const reserveNoetig = () => intern && faerbungRef.current === 'reserve';
   const zeitgeber = useRef<number | null>(null);
   function nachladen() {
-    if (zeitgeber.current) return;
+    if (zeitgeber.current || verlassen.current) return;
+    if (!(registerNoetig() && offen.current.size) && !(reserveNoetig() && egridOffen.current.size)) return;
     zeitgeber.current = window.setTimeout(async () => {
       zeitgeber.current = null;
-      const liste = [...offen.current].slice(0, 2000);
-      liste.forEach(e => offen.current.delete(e));
-      if (!liste.length) return;
+      if (verlassen.current) return;
       try {
-        const rows = await gebaeudeLaden(liste);
-        rows.forEach(g => daten.current.set(Number(g.egid), g));
-        // Unbekannte nicht erneut fragen.
-        liste.forEach(e => { if (!daten.current.has(e)) daten.current.set(e, { egid: e } as Gebaeude); });
-        if (intern) {
-          const egrids = [...new Set(rows.map(g => g.egrid).filter((x): x is string => !!x && !reserve.current.has(x)))];
-          for (let i = 0; i < egrids.length; i += 150) {
+        const liste = registerNoetig() ? [...offen.current].slice(0, 2000) : [];
+        liste.forEach(e => offen.current.delete(e));
+        if (liste.length) {
+          const rows = await gebaeudeLaden(liste);
+          if (verlassen.current) return;
+          rows.forEach(g => {
+            daten.current.set(Number(g.egid), g);
+            if (g.egrid && !reserve.current.has(g.egrid)) egridOffen.current.add(g.egrid);
+          });
+          // Unbekannte nicht erneut fragen.
+          liste.forEach(e => { if (!daten.current.has(e)) daten.current.set(e, { egid: e } as Gebaeude); });
+        }
+        if (reserveNoetig()) {
+          const egrids = [...egridOffen.current];
+          egridOffen.current.clear();
+          for (let i = 0; i < egrids.length && !verlassen.current; i += 150) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const r = await (supabase as any).from('properties').select('egrid, hnf_delta').in('egrid', egrids.slice(i, i + 150));
             ((r.data ?? []) as { egrid: string; hnf_delta: number | null }[]).forEach(p => reserve.current.set(p.egrid, p.hnf_delta ?? 0));
           }
         }
+        if (verlassen.current) return;
         setGeladen(x => x + 1);
       } catch { /* Register noch nicht geladen: die Häuser bleiben weiss */ }
-      if (offen.current.size) nachladen();
+      // Was inzwischen dazugekommen ist; ohne Arbeit endet es hier.
+      nachladen();
     }, 350);
   }
 

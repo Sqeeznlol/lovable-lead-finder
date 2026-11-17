@@ -191,6 +191,42 @@ async function pruefen(browser, geraet, zeilen) {
       abgelehnt: [...new Set(abgelehnt)], langsam: langsame(), spaet: spaete(), breite: 0, merkmale: [], leer: false, notiz: ergebnis });
   }
 
+  // Von der Karte in die 3D-Karte und mit «Zurück» wieder hinaus, ohne neu
+  // zu laden -- so, wie ein Mensch es tut. Die Schleife oben lädt jeden
+  // Reiter frisch und merkt darum nie, was beim Verlassen bricht. Am
+  // 17. November war nach «Zurück» aus der 3D-Karte die ganze Seite leer
+  // (Julian: «dann stockt die ganze Webseite»), seit dem 3. November und
+  // in jedem Lauf dieser Prüfung unbemerkt.
+  if (geraet.name === 'Computer') {
+    fehler = []; abgelehnt = [];
+    const start = Date.now();
+    await seite.goto(`${ADRESSE}/karte`, { waitUntil: 'domcontentloaded' });
+    await seite.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    // Wie ein Tipp auf «3D»: derselbe Wechsel im Programm, ohne die Seite neu zu laden.
+    await seite.evaluate(() => {
+      history.pushState({ idx: (history.state?.idx ?? 0) + 1 }, '', '/karte3d');
+      window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }));
+    });
+    // Erst wenn die Karte steht, gibt es beim Verlassen etwas aufzuräumen.
+    const steht = await seite.waitForFunction(() => !!document.querySelector('canvas') && !/3D-Modell wird geladen/.test(document.body.innerText), null, { timeout: 60000 }).then(() => true).catch(() => false);
+    let ergebnis = '3D-Karte wird nicht bereit';
+    // Lädt sie nicht (Dienst des Bundes nicht erreichbar), gäbe es nichts
+    // aufzuräumen, und die Prüfung wäre bestanden, ohne etwas zu prüfen.
+    if (steht && /liess sich nicht laden/.test(await seite.evaluate(() => document.body.innerText || ''))) ergebnis = '3D-Karte lädt nicht';
+    else if (steht) {
+      await seite.waitForTimeout(3000);
+      await seite.getByRole('button', { name: 'Zurück' }).first().click();
+      await seite.waitForTimeout(2500);
+      const danach = await seite.evaluate(() => ({ text: document.body.innerText || '', ort: location.pathname }));
+      ergebnis = danach.text.trim().length < 40 ? 'nach «Zurück» ist die Seite leer'
+        : /konnte nicht angezeigt werden/.test(danach.text) ? 'nach «Zurück» steht eine Fehlermeldung'
+          : danach.ort === '/karte3d' ? '«Zurück» führt nicht hinaus' : 'zurück auf der Karte';
+    }
+    const gut = ergebnis === 'zurück auf der Karte';
+    zeilen.push({ geraet: geraet.name, reiter: '3d verlassen', ms: Date.now() - start, fehler: [...new Set(fehler)].concat(gut ? [] : [ergebnis]),
+      abgelehnt: [...new Set(abgelehnt)], langsam: langsame(), spaet: spaete(), breite: 0, merkmale: [], leer: false, notiz: ergebnis });
+  }
+
   // CALC YOU LATER einmal ganz: eine Adresse rechnen (Suchdienst, Kataster
   // und Register des Bundes, Zonenplan des Kantons), als Entwurf speichern
   // und wieder löschen. So zeigt sich mit echter Anmeldung, ob die Rechte
@@ -282,7 +318,7 @@ const TRAEGE_MS = 4000;
   }
   // Jeder Durchgang unter seinem Namen: am 16. November stand das Ergebnis
   // von CALC YOU LATER unter «Machbarkeit an einer Zürcher Parzelle».
-  const DURCHGANG = { 'objekt und machbarkeit': 'Machbarkeit an einer Zürcher Parzelle', kalkulation: 'CALC YOU LATER an einer Zürcher Adresse' };
+  const DURCHGANG = { 'objekt und machbarkeit': 'Machbarkeit an einer Zürcher Parzelle', kalkulation: 'CALC YOU LATER an einer Zürcher Adresse', '3d verlassen': 'Von der Karte in die 3D-Karte und zurück' };
   for (const z of zeilen.filter(z => z.notiz)) aus.push('', `${DURCHGANG[z.reiter] ?? z.reiter}: ${z.notiz}.`);
   // Der Browser war beschäftigt, die Datenbank nicht: zur Einordnung.
   for (const z of zeilen.filter(z => (z.spaet || []).length)) {

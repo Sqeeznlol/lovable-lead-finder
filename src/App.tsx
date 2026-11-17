@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/hooks/use-theme";
 import { CantonProvider } from "@/hooks/use-canton";
 import { AuthProvider } from "@/hooks/use-auth";
 import { Torwaechter } from "@/components/Torwaechter";
+import { Auffang } from "@/components/Auffang";
 const Index = lazy(() => import("./pages/Index.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 const FondsSeite = lazy(() => import("./pages/Fonds.tsx"));
@@ -37,6 +38,11 @@ const App = () => (
         {/* Die Liste enthält Adressen und Eigentümernamen von Menschen,
             die nie um ihre Aufnahme gebeten haben. Sie gehört hinter eine
             Anmeldung -- alle Seiten. */}
+        {/* Das letzte Netz. Die Bereiche haben ihren eigenen Auffang, aber
+            der verschwindet beim Wechsel des Bereichs mit -- ein Fehler beim
+            Aufräumen des alten Bereichs leerte darum die ganze Seite
+            (17. November, nach "Zurück" aus der 3D-Karte: 0 Zeichen). */}
+        <Auffang bereich="Die Seite" ganz>
         <BrowserRouter>
           <Suspense fallback={<div className="min-h-screen bg-background" />}>
             <Routes>
@@ -61,6 +67,7 @@ const App = () => (
             </Routes>
           </Suspense>
         </BrowserRouter>
+        </Auffang>
       </TooltipProvider>
     </CantonProvider>
     </AuthProvider>
