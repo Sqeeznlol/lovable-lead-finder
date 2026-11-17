@@ -52,6 +52,24 @@ jobs:
           git push -q origin HEAD:akquise
           echo "Geschrieben und gepusht." >> "$GITHUB_STEP_SUMMARY"
 
+      # Die Preise der letzten Jahre für CALC YOU LATER und die Machbarkeit
+      # (tools/preise_reihen.py): Reihen je Gemeinde, Regionen, die Stadt
+      # Zürich je Quartier und die Wohnfläche aus dem Gebäuderegister.
+      # Julian, 17. November: «schaue genau alle Preise an, die letzten
+      # paar Jahre, und begründe es auch».
+      - name: Preise der letzten Jahre
+        run: |
+          set -euo pipefail
+          z=https://daten.statistik.zh.ch/ogd/daten/ressourcen/KTZH_00003158_0000
+          for n in 6784 6781 6780; do curl -sSfL --retry 4 -o /tmp/p/zh_$n.csv "${z}$n.csv"; done
+          curl -sSfL --retry 4 -o /tmp/p/zh_6783.xlsx "${z}6783.xlsx"
+          # Die Stadt leitet von data.stadt-zuerich.ch weiter: -L folgt.
+          curl -sSfL --retry 4 -o /tmp/p/stzh_5155.csv "https://data.stadt-zuerich.ch/dataset/bau_hae_preis_stockwerkeigentum_zimmerzahl_stadtquartier_od5155/download/BAU515OD5155.csv"
+          curl -sSfL --retry 4 -o /tmp/p/stzh_5158.csv "https://data.stadt-zuerich.ch/dataset/bau_hae_preis_stockwerkeigentum_gebaeudealter_od5158/download/BAU515OD5158.csv"
+          curl -sSfL --retry 4 -o /tmp/gwr.zip "https://public.madd.bfs.admin.ch/zh.zip"
+          mkdir -p /tmp/gwr && unzip -q -o /tmp/gwr.zip gebaeude_batiment_edificio.csv wohnung_logement_abitazione.csv -d /tmp/gwr
+          python3 -I tools/preise_reihen.py /tmp/p /tmp/gwr public/preise-reihen.json | tee -a "$GITHUB_STEP_SUMMARY"
+
       # Aurora braucht dieselben Preise für die Machbarkeitsstudie: was
       # nach der Rechnung für das Land bleibt, steht dort neben dem, was
       # in der Gemeinde bezahlt wurde.
@@ -59,10 +77,10 @@ jobs:
         run: |
           set -euo pipefail
           cp akquise/public/preise.json public/preise.json
-          if git diff --quiet -- public/preise.json; then echo "Webseite: unverändert." >> "$GITHUB_STEP_SUMMARY"; exit 0; fi
+          if git diff --quiet -- public/preise.json public/preise-reihen.json; then echo "Webseite: unverändert." >> "$GITHUB_STEP_SUMMARY"; exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/preise.json
+          git add public/preise.json public/preise-reihen.json
           git commit -q -m "Preise je Gemeinde aufgefrischt (Ablauf Preise)"
           git push -q origin HEAD:main
           echo "Webseite: geschrieben und gepusht." >> "$GITHUB_STEP_SUMMARY"

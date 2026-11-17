@@ -157,6 +157,12 @@ senden. Alles Weitere in `docs/calc-you-later.md`.
     17. November nachgesehen, siehe Dokument). Die Seite öffnet die
     Suche, ein Mensch trägt ein. Automatisch nur über eine Quelle, die es
     erlaubt (Popety.io, dort besteht ein Abo; oder eine Lizenz).
+  * Der Verkaufspreis je m² kommt aus den Preisen der letzten Jahre und
+    steht begründet auf der Seite (17. November, Julian: «die Preise
+    stimmen nicht ... begründe es auch»): Stadt Zürich amtlich je
+    Quartier, übriger Kanton aus Preis je Wohnung ÷ Wohnfläche aus dem
+    Register, geeicht an der Stadt. Methode in `docs/calc-you-later.md`,
+    Daten `public/preise-reihen.json` (Ablauf «Preise», monatlich).
   * Nachbarn in einer Bauzone ohne Ziffer (Quartiererhaltung, Kernzone)
     lassen sich ankreuzen: sie rechnen mit der Dichte der Hauptparzelle,
     als Annahme gekennzeichnet (17. November: in Aussersihl waren alle

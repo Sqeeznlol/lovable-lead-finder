@@ -137,6 +137,40 @@ das BFS nichts. Neu holen:
     # https://dam-api.bfs.admin.ch/hub/api/dam/assets?orderNr=je-d-09.03.03.06
     python3 -I tools/mieten.py <datei.xlsx> src/lib/mieten-daten.ts
 
+## Verkaufspreis je m²: aus den Preisen der letzten Jahre
+
+Julian, 17. November: «Die Preise stimmen nicht ... schaue genau alle
+Preise an, die letzten paar Jahre, und begründe es auch.» Bis dahin galt
+in der Stadt Zürich das Mittel der Neubauten der ganzen Stadt und sonst
+eine Annahme von CHF 9'500. Seither (`src/lib/preis-herleitung.ts`,
+Daten `public/preise-reihen.json` aus `tools/preise_reihen.py`, monatlich
+im Ablauf «Preise»):
+
+  * **Stadt Zürich, amtlich je Quartier.** Statistik Stadt Zürich nennt
+    den Preis je m² Wohnfläche im Stockwerkeigentum je Quartier und Jahr.
+    Gerechnet wird mit 2023 bis 2025, jedes Jahr mit dem Trend der ganzen
+    Stadt auf 2025 gebracht und nach Verkäufen gewichtet. Unter 30
+    Verkäufen im Quartier gilt der Kreis, sonst die ganze Stadt; die Seite
+    sagt es. Die Quartiere liegen 2023 bis 2025 zwischen CHF 13'300
+    (Affoltern, Schwamendingen) und 24'400 (Fluntern).
+  * **Übriger Kanton Zürich, berechnet.** Der Kanton veröffentlicht nur
+    den Median je Wohnung. Geteilt wird durch die Fläche der verkauften
+    Wohnungen: der Median der Wohnungen in Mehrfamilienhäusern ab 1980 aus
+    dem Gebäuderegister, geeicht an der Stadt Zürich, wo beides amtlich
+    ist (die verkauften Wohnungen waren 2023 bis 2025 2.7 % grösser).
+    Drei Jahre, jedes mit dem Trend der Marktregion (Gerade durch zehn
+    Jahre) auf 2025 gebracht und nach Verkäufen gewichtet.
+  * **Neubauten ohne Zuschlag.** In der Stadt Zürich kosteten sie je m²
+    2021 bis 2025 zwischen 94 und 103 % des Durchschnitts aller Wohnungen.
+  * **Prüfung.** Kilchberg ergibt CHF 26'050, in Julians Spanne von 20'000
+    bis 30'000 (16. November). Der Test `preis-herleitung.test.ts` hält
+    das fest und rechnet ein kleines Beispiel von Hand nach.
+  * Auf der Seite steht unter dem Preis «Warum CHF … je m² Verkaufspreis»:
+    jeder Schritt als Satz, dazu die Preise der letzten elf Jahre
+    (Wohnung, je m², Bauland, Einfamilienhaus) mit der Zahl der Verkäufe.
+  * Ausserhalb des Kantons Zürich gibt es keine solchen Zahlen: dort
+    bleibt die Annahme, als solche gekennzeichnet.
+
 ## Adresse, Parzelle oder EGRID
 
 Gesucht wird beim Bund (geo.admin.ch, Adressen aus dem Gebäude- und

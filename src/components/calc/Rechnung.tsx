@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ExternalLink, Loader2, Plus, Search, X } from 'lucide-react';
 import { FELD, KNOPF, KNOPF_HAUPT, KNOPF_LEISE, LISTE } from '@/components/rahmen';
@@ -10,6 +10,7 @@ import { adresseWaehlen, suchtext } from '@/lib/adresswahl';
 import { bewerten, CALC_ANNAHMEN, ERLOES_ANNAHME, median, nachbarArt, type CalcAnnahmen, type CalcEingabe, type ErloesQuelle, type Kauf, type NachbarTeil, type Umfeld, type Vergleich, type VonHand } from '@/lib/calc';
 import { ERLOES_AMTLICH } from '@/lib/erloes-daten';
 import { ERLOES_ANGABEN } from '@/lib/erloes-angaben';
+import { angabePruefen, erloesHerleiten, quartierLaden, reihenLaden } from '@/lib/preis-herleitung';
 import { entwurfLoeschen, entwurfSpeichern, schritt, type Kalkulation } from '@/lib/calc-ablauf';
 import { adressen, leadLaden, nachbarnLaden, objektLaden, portalLinks, umfeldLaden, type Adresse } from '@/lib/calc-daten';
 import { chf } from '@/lib/machbarkeit';
@@ -71,6 +72,8 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
   const [annahmen, setAnnahmen] = useState<CalcAnnahmen>(alt?.eingabe.annahmen ?? CALC_ANNAHMEN);
   const [hand, setHand] = useState<VonHand>(alt?.eingabe.hand ?? {});
   const [erloesQuelle, setErloesQuelle] = useState<ErloesQuelle>(alt?.eingabe.erloesQuelle ?? ERLOES_ANNAHME);
+  const erloesQuelleRef = useRef(erloesQuelle);
+  erloesQuelleRef.current = erloesQuelle;
   const [nachbarn, setNachbarn] = useState<NachbarTeil[]>(alt?.eingabe.nachbarn ?? []);
   const [nachbarnAuf, setNachbarnAuf] = useState((alt?.eingabe.nachbarn?.length ?? 0) > 0);
   const [kontakt, setKontakt] = useState(entwurf?.kontakt ?? '');
@@ -108,20 +111,34 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
     queryFn: () => objektLaden(gewaehlt!, CALC_ANNAHMEN.grenzabstand),
     enabled: !!gewaehlt && !alt, staleTime: 10 * 60 * 1000, retry: 1,
   });
-  // Wo der Verkaufspreis je m² bekannt ist, gilt er statt der Annahme:
-  // amtlich (Stadt Zürich), sonst was Julian aus dem Markt kennt.
+  // Der Verkaufspreis je m² aus den Preisen der letzten Jahre, begründet
+  // (lib/preis-herleitung). In der Stadt Zürich je Quartier.
+  const reihen = useQuery({ queryKey: ['preise-reihen'], queryFn: reihenLaden, staleTime: Infinity, enabled: !alt });
+  const bfsObjekt = objekt.data?.bfs ? String(Number(objekt.data.bfs)) : null;
+  const quartier = useQuery({
+    queryKey: ['quartier', objekt.data?.punkt[0], objekt.data?.punkt[1]],
+    queryFn: () => quartierLaden(objekt.data!.punkt[0], objekt.data!.punkt[1]),
+    enabled: bfsObjekt === '261', staleTime: Infinity, retry: 0,
+  });
   useEffect(() => {
-    const bfs = objekt.data?.bfs ? String(Number(objekt.data.bfs)) : null;
-    const amtlich = bfs ? ERLOES_AMTLICH[bfs] : null;
-    const angabe = bfs ? ERLOES_ANGABEN[bfs] : null;
-    if (amtlich) {
+    if (!objekt.data || reihen.isLoading || (bfsObjekt === '261' && quartier.isLoading)) return;
+    // Wer den Preis selbst gesetzt hat (von Hand, aus Inseraten, aus dem Landpreis), behält ihn.
+    if (['hand', 'inserate', 'land'].includes(erloesQuelleRef.current.art)) return;
+    const h = erloesHerleiten(reihen.data, bfsObjekt, quartier.data ?? null);
+    const angabe = bfsObjekt ? ERLOES_ANGABEN[bfsObjekt] : null;
+    const amtlich = bfsObjekt ? ERLOES_AMTLICH[bfsObjekt] : null;
+    if (h) {
+      setAnnahmen(a => ({ ...a, erloes: h.m2 }));
+      setErloesQuelle({ art: h.art, text: h.kurz, begruendung: angabe ? [...h.saetze, angabePruefen(h, angabe)] : h.saetze, verlauf: h.verlauf, spanne: h.spanne, spalten: h.spalten });
+    } else if (amtlich) {
+      // Ohne die Datei der Reihen: wie bisher die Neubauten der ganzen Stadt.
       setAnnahmen(a => ({ ...a, erloes: amtlich.m2 }));
       setErloesQuelle({ art: 'amtlich', text: amtlich.text });
     } else if (angabe) {
       setAnnahmen(a => ({ ...a, erloes: Math.round((angabe.von + angabe.bis) / 2) }));
       setErloesQuelle({ art: 'angabe', text: `Angabe Julian vom ${angabe.am}: ${angabe.gemeinde} ${de(angabe.von)} bis ${de(angabe.bis)} je m², gerechnet mit der Mitte` });
     }
-  }, [objekt.data]);
+  }, [objekt.data, reihen.data, reihen.isLoading, quartier.data, quartier.isLoading, bfsObjekt]);
   const umfeld = useQuery({
     queryKey: ['calc-umfeld', objekt.data?.egrid, objekt.data?.punkt[0], objekt.data?.punkt[1]],
     queryFn: () => umfeldLaden(objekt.data!), enabled: !!objekt.data, staleTime: 10 * 60 * 1000, retry: 0,

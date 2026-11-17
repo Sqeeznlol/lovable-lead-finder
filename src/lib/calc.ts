@@ -26,6 +26,7 @@
  */
 import { ANNAHMEN, bestandGf, chf, m2, studieRechnen, type Annahmen, type Eingabe, type Gebaeude, type Posten, type Studie, type ZonenRegeln } from '@/lib/machbarkeit';
 import { MIETEN, MIETEN_JAHR } from '@/lib/mieten-daten';
+import type { Spalten, VerlaufZeile } from '@/lib/preis-herleitung';
 
 export interface CalcAnnahmen extends Annahmen {
   /** Bruttorendite, zu der ein Käufer ein Mehrfamilienhaus kauft (0 bis 1). */
@@ -175,7 +176,16 @@ export interface Kauf { flaeche: number; preis: number }
  * am 16. November rechnete die Hochweidstrasse 9 in Kilchberg mit
  * CHF 9'500, wo neue Wohnungen über CHF 20'000 je m² kosten.
  */
-export interface ErloesQuelle { art: 'annahme' | 'amtlich' | 'angabe' | 'hand' | 'inserate' | 'land'; text: string }
+export interface ErloesQuelle {
+  art: 'annahme' | 'amtlich' | 'berechnet' | 'angabe' | 'hand' | 'inserate' | 'land';
+  text: string;
+  /** Warum diese Zahl: Satz für Satz aus den Preisen der letzten Jahre (lib/preis-herleitung). */
+  begruendung?: string[];
+  verlauf?: VerlaufZeile[];
+  spanne?: [number, number] | null;
+  spalten?: Spalten;
+}
+export type { VerlaufZeile };
 export const ERLOES_ANNAHME: ErloesQuelle = { art: 'annahme', text: 'Annahme, nicht für diesen Ort gemessen' };
 
 /** Was ein Mensch weiss und die Register nicht. Leer heisst: nicht bekannt. */

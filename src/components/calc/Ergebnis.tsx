@@ -20,7 +20,7 @@ import { KNOPF } from '@/components/rahmen';
 const de = (n: number, stellen = 0) => n.toLocaleString('de-CH', { maximumFractionDigits: stellen, minimumFractionDigits: stellen });
 const ART: Record<Art, string> = { amtlich: 'amtlich', berechnet: 'berechnet', annahme: 'Annahme' };
 const ETIKETT = 'text-[11px] uppercase tracking-wide text-muted-foreground';
-const QUELLE: Record<ErloesQuelle['art'], string> = { annahme: 'Annahme', amtlich: 'amtlich', angabe: 'Angabe Julian', hand: 'von Hand', inserate: 'aus Inseraten', land: 'aus dem Landpreis' };
+const QUELLE: Record<ErloesQuelle['art'], string> = { annahme: 'Annahme', amtlich: 'amtlich', berechnet: 'berechnet', angabe: 'Angabe Julian', hand: 'von Hand', inserate: 'aus Inseraten', land: 'aus dem Landpreis' };
 /** Ein Betrag mit Vorzeichen, wie man es liest: «− CHF 473'000» statt «CHF -473'000». */
 const mitZeichen = (x: number) => (x < 0 ? `− ${chf(-x)}` : chf(x));
 
@@ -142,6 +142,8 @@ export function Ergebnis({ b, annahmen, onErloes }: { b: Bewertung; annahmen: Ca
           </div>
         );
       })()}
+
+      {n && b.erloesQuelle.begruendung?.length ? <ErloesBegruendung q={b.erloesQuelle} erloes={annahmen.erloes} /> : null}
 
       {eck.length > 0 && (
         <dl className="grid grid-cols-2 gap-px overflow-hidden rounded border bg-border lg:grid-cols-4">
@@ -269,5 +271,66 @@ export function Ergebnis({ b, annahmen, onErloes }: { b: Bewertung; annahmen: Ca
         </details>
       )}
     </div>
+  );
+}
+
+const mio = (x: number | null | undefined) => (x == null ? '–' : x >= 1e6 ? `${de(x / 1e6, 2)} Mio.` : de(Math.round(x / 1000) * 1000));
+
+/**
+ * Warum dieser Verkaufspreis je m²: die Sätze der Herleitung und die
+ * Preise der letzten Jahre (Julian, 17. November: «schaue genau alle
+ * Preise an, die letzten paar Jahre, und begründe es auch»). Gilt der
+ * Preis nicht mehr (von Hand oder aus Inseraten übernommen), steht die
+ * Herleitung trotzdem da -- mit dem Hinweis, womit jetzt gerechnet wird.
+ */
+function ErloesBegruendung({ q, erloes }: { q: ErloesQuelle; erloes: number }) {
+  const v = q.verlauf ?? [];
+  const sp = q.spalten;
+  const mitHaus = v.some(z => z.haus != null) && !!sp?.haus;
+  return (
+    <section className="space-y-3">
+      <h3 className="text-lg">Warum CHF {de(erloes)} je m² Verkaufspreis</h3>
+      <ol className="list-decimal space-y-1.5 pl-5 text-[15px] leading-relaxed marker:text-muted-foreground">
+        {q.begruendung!.map(s => <li key={s}>{s}</li>)}
+      </ol>
+      {v.length > 0 && sp && (
+        <details className="group rounded-[3px] border bg-card" open>
+          <summary className="flex min-h-11 cursor-pointer select-none list-none items-center justify-between gap-3 px-4 text-sm font-medium [&::-webkit-details-marker]:hidden">
+            Preise der letzten {v.length} Jahre
+            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden />
+          </summary>
+          <div className="overflow-x-auto border-t">
+            <table className="w-full text-sm tabular-nums">
+              <thead>
+                <tr className="text-left">
+                  <th className={`${ETIKETT} px-3 py-2 font-normal`}>Jahr</th>
+                  <th className={`${ETIKETT} px-3 py-2 text-right font-normal`}>{sp.m2}</th>
+                  <th className={`${ETIKETT} px-3 py-2 text-right font-normal`}>{sp.wohnung}</th>
+                  <th className={`${ETIKETT} px-3 py-2 text-right font-normal`}>{sp.land}</th>
+                  {mitHaus && <th className={`${ETIKETT} px-3 py-2 text-right font-normal max-sm:hidden`}>{sp.haus}</th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {v.map(z => (
+                  <tr key={z.jahr}>
+                    <td className="px-3 py-2">{z.jahr}</td>
+                    <td className="px-3 py-2 text-right font-medium">{z.m2 != null ? de(z.m2) : '–'}</td>
+                    <td className="px-3 py-2 text-right">
+                      {mio(z.wohnung)}
+                      {z.wohnungN != null && <span className="block text-xs text-muted-foreground">{z.wohnungZeit ? `${z.wohnungZeit}, ` : ''}{de(z.wohnungN)} Verkäufe</span>}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      {z.land != null ? de(z.land) : '–'}
+                      {z.landArt && <span className="block text-xs text-muted-foreground">{z.landArt}</span>}
+                    </td>
+                    {mitHaus && <td className="px-3 py-2 text-right max-sm:hidden">{mio(z.haus)}</td>}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      )}
+    </section>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { ExternalLink, Loader2, Printer } from 'lucide-react';
@@ -9,6 +9,7 @@ import { bewerten, CALC_ANNAHMEN, ERLOES_ANNAHME, zuerichKm, type CalcAnnahmen, 
 import { neigungLaden } from '@/lib/calc-daten';
 import { ERLOES_AMTLICH } from '@/lib/erloes-daten';
 import { ERLOES_ANGABEN } from '@/lib/erloes-angaben';
+import { angabePruefen, erloesHerleiten, quartierLaden, reihenLaden } from '@/lib/preis-herleitung';
 import { grundlageLaden, zeichnung, zoneAusBestand, zoneZh } from '@/lib/machbarkeit-daten';
 import { gemeindePreise, landText, wohnungText } from '@/lib/preise';
 import { drucken } from '@/lib/drucken';
@@ -91,18 +92,40 @@ export function Machbarkeit({ parzelle }: { parzelle: Parzelle }) {
   const [auf, setAuf] = useState(false);
   const bfs = parzelle.bfs_nr != null ? String(Number(parzelle.bfs_nr)) : null;
   // Wo der Verkaufspreis je m² bekannt ist, gilt er statt der Annahme (wie in CALC YOU LATER).
+  const reihen = useQuery({ queryKey: ['preise-reihen'], queryFn: reihenLaden, staleTime: Infinity });
+  // In der Stadt Zürich je Quartier: der Punkt kommt erst mit der Grundlage, das Quartier danach.
+  const [quartierPunkt, setQuartierPunkt] = useState<[number, number] | null>(null);
+  const quartier = useQuery({
+    queryKey: ['quartier', quartierPunkt?.[0], quartierPunkt?.[1]],
+    queryFn: () => quartierLaden(quartierPunkt![0], quartierPunkt![1]),
+    enabled: bfs === '261' && !!quartierPunkt, staleTime: Infinity, retry: 0,
+  });
   const vorgabe = useMemo((): { annahmen: CalcAnnahmen; quelle: ErloesQuelle } => {
     const amtlich = bfs ? ERLOES_AMTLICH[bfs] : null, angabe = bfs ? ERLOES_ANGABEN[bfs] : null;
+    const h = erloesHerleiten(reihen.data, bfs, quartier.data ?? null);
+    if (h) {
+      return { annahmen: { ...CALC_ANNAHMEN, erloes: h.m2 },
+        quelle: { art: h.art, text: h.kurz, begruendung: angabe ? [...h.saetze, angabePruefen(h, angabe)] : h.saetze, verlauf: h.verlauf, spanne: h.spanne, spalten: h.spalten } };
+    }
     if (amtlich) return { annahmen: { ...CALC_ANNAHMEN, erloes: amtlich.m2 }, quelle: { art: 'amtlich', text: amtlich.text } };
     if (angabe) return { annahmen: { ...CALC_ANNAHMEN, erloes: Math.round((angabe.von + angabe.bis) / 2) },
       quelle: { art: 'angabe', text: `Angabe Julian vom ${angabe.am}: ${angabe.gemeinde} ${de(angabe.von)} bis ${de(angabe.bis)} je m², Mitte` } };
     return { annahmen: CALC_ANNAHMEN, quelle: ERLOES_ANNAHME };
-  }, [bfs]);
+  }, [bfs, reihen.data, quartier.data]);
   const [annahmen, setAnnahmen] = useState<CalcAnnahmen>(vorgabe.annahmen);
   const [erloesQuelle, setErloesQuelle] = useState<ErloesQuelle>(vorgabe.quelle);
+  const erloesQuelleRef = useRef(erloesQuelle);
+  erloesQuelleRef.current = erloesQuelle;
   const setze = (teil: Partial<CalcAnnahmen>) => setAnnahmen(a => ({ ...a, ...teil }));
   // Eine andere Parzelle: zu, und mit den Ausgangswerten.
-  useEffect(() => { setAuf(false); setAnnahmen(vorgabe.annahmen); setErloesQuelle(vorgabe.quelle); }, [parzelle.id, vorgabe]);
+  useEffect(() => { setAuf(false); setAnnahmen(CALC_ANNAHMEN); setErloesQuelle(ERLOES_ANNAHME); }, [parzelle.id]);
+  // Kommen Preise oder Quartier nach, folgt der Erlös -- die Studie bleibt offen, und was
+  // jemand von Hand eingetragen hat, bleibt stehen.
+  useEffect(() => {
+    if (erloesQuelleRef.current.art === 'hand') return;
+    setAnnahmen(a => ({ ...a, erloes: vorgabe.annahmen.erloes }));
+    setErloesQuelle(vorgabe.quelle);
+  }, [vorgabe]);
 
   const grundlage = useQuery({
     queryKey: ['machbarkeit-grundlage', parzelle.id, annahmen.grenzabstand],
@@ -110,6 +133,7 @@ export function Machbarkeit({ parzelle }: { parzelle: Parzelle }) {
     enabled: auf, staleTime: 5 * 60 * 1000, placeholderData: alt => alt,
   });
   const punkt = grundlage.data?.punkt ?? null;
+  useEffect(() => { if (punkt && (!quartierPunkt || punkt[0] !== quartierPunkt[0] || punkt[1] !== quartierPunkt[1])) setQuartierPunkt(punkt); }, [punkt, quartierPunkt]);
   // Der amtliche Zonenplan ist nur für Zürich angebunden; fällt er aus, gilt die eigene Liste.
   const amtlich = useQuery({
     queryKey: ['machbarkeit-zone', punkt?.[0], punkt?.[1]],
@@ -236,6 +260,12 @@ export function Machbarkeit({ parzelle }: { parzelle: Parzelle }) {
                 <Zahl titel="Gewinn vom Erlös" wert={Math.round(annahmen.marge * 1000) / 10} einheit="%" min={0} max={50} schritt={1} setWert={x => setze({ marge: x / 100 })} />
               </div>
               <p className="text-sm text-muted-foreground">Erlös: {erloesQuelle.text}.</p>
+              {erloesQuelle.begruendung?.length ? (
+                <details className="text-sm text-muted-foreground">
+                  <summary className="min-h-11 cursor-pointer py-2 font-medium text-foreground">Warum CHF {de(annahmen.erloes)} je m²</summary>
+                  <ol className="list-decimal space-y-1 pl-5">{erloesQuelle.begruendung.map(t => <li key={t}>{t}</li>)}</ol>
+                </details>
+              ) : null}
               {kosten && (
                 <p className="text-sm text-muted-foreground">
                   Baukosten inklusive Nebenkosten: CHF {de(kosten.grund)} je m² Nutzfläche bei diesem Erlös
