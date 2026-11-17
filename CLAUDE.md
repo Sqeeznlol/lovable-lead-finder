@@ -51,6 +51,12 @@ taugt als Merkmal nicht -- er hängt auch an den Umgebungsvariablen.
 Das ganze Vorgehen steht in `docs/morgen.md` unter
 "Wie gepusht und ausgeliefert wird".
 
+Ein Bereich, der erst mit seinem Reiter kommt, entsteht mit
+`nachladen()` aus `src/lib/neue-fassung.ts`, nie mit `lazy` direkt.
+Fehlt mitten in einer Auslieferung sein Programmteil, wartet er, bis
+die Seite neu geladen ist (17. November, Admin-Reiter: «Fehler im
+Bereich Die Seite»). «Reiter prüfen» spielt das am Kalender durch.
+
 Bringt ein Push eine neue Tabelle oder Funktion mit, steht die Seite
 live, bevor die Migration eingespielt ist, und «Reiter prüfen» wird rot
 (16. November, CALC YOU LATER: «kalkulation 404»). Darum gleich nach dem

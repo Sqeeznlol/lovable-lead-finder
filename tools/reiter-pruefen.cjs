@@ -227,6 +227,41 @@ async function pruefen(browser, geraet, zeilen) {
       abgelehnt: [...new Set(abgelehnt)], langsam: langsame(), spaet: spaete(), breite: 0, merkmale: [], leer: false, notiz: ergebnis });
   }
 
+  // Mitten in einer Auslieferung: die Seite ist offen, der Programmteil
+  // des nächsten Reiters gehört zur alten Fassung und ist weg. Am
+  // 17. November stand so im Admin-Reiter «Fehler im Bereich Die Seite»,
+  // weil Vite den Import beim Neuladen mit `undefined` enden lässt
+  // (src/lib/neue-fassung.ts). Richtig ist: einmal neu laden, der Reiter
+  // steht, keine Meldung.
+  if (geraet.name === 'Computer') {
+    fehler = []; abgelehnt = [];
+    const start = Date.now();
+    await seite.goto(`${ADRESSE}/`, { waitUntil: 'domcontentloaded' });
+    await seite.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    let weg = 0, geladen = 0;
+    const teil = /\/assets\/Kalender-[^/]*\.js$/;
+    await seite.route(teil, r => (weg++ === 0 ? r.fulfill({ status: 404, body: 'weg' }) : r.continue()));
+    const zaehlen = f => { if (f === seite.mainFrame()) geladen++; };
+    seite.on('framenavigated', zaehlen);
+    await seite.evaluate(() => {
+      history.pushState({ idx: (history.state?.idx ?? 0) + 1 }, '', '/kalender');
+      window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }));
+    });
+    // Ein Reiter steht, wenn sein Programmteil geladen und die Seite voll ist.
+    await seite.waitForFunction(() => (document.body.innerText || '').trim().length > 40 && !document.querySelector('.animate-pulse'), null, { timeout: 20000 }).catch(() => {});
+    await seite.waitForTimeout(1500);
+    seite.off('framenavigated', zaehlen);
+    await seite.unroute(teil);
+    const danach = await seite.evaluate(() => ({ text: document.body.innerText || '', ort: location.pathname }));
+    const ergebnis = weg === 0 ? 'der Reiter hat keinen eigenen Programmteil mehr (Prüfung anpassen)'
+      : /konnte nicht angezeigt werden/.test(danach.text) ? 'Fehlermeldung statt Reiter'
+        : danach.text.trim().length < 40 ? 'Seite leer'
+          : danach.ort !== '/kalender' ? 'falscher Reiter' : geladen ? 'einmal neu geladen, Reiter steht' : 'Reiter steht ohne Neuladen';
+    const gut = /Reiter steht/.test(ergebnis);
+    zeilen.push({ geraet: geraet.name, reiter: 'neue fassung', ms: Date.now() - start, fehler: [...new Set(fehler)].concat(gut ? [] : [ergebnis]),
+      abgelehnt: [...new Set(abgelehnt)], langsam: langsame(), spaet: spaete(), breite: 0, merkmale: [], leer: false, notiz: ergebnis });
+  }
+
   // CALC YOU LATER einmal ganz: eine Adresse rechnen (Suchdienst, Kataster
   // und Register des Bundes, Zonenplan des Kantons), als Entwurf speichern
   // und wieder löschen. So zeigt sich mit echter Anmeldung, ob die Rechte
@@ -318,7 +353,7 @@ const TRAEGE_MS = 4000;
   }
   // Jeder Durchgang unter seinem Namen: am 16. November stand das Ergebnis
   // von CALC YOU LATER unter «Machbarkeit an einer Zürcher Parzelle».
-  const DURCHGANG = { 'objekt und machbarkeit': 'Machbarkeit an einer Zürcher Parzelle', kalkulation: 'CALC YOU LATER an einer Zürcher Adresse', '3d verlassen': 'Von der Karte in die 3D-Karte und zurück' };
+  const DURCHGANG = { 'objekt und machbarkeit': 'Machbarkeit an einer Zürcher Parzelle', kalkulation: 'CALC YOU LATER an einer Zürcher Adresse', '3d verlassen': 'Von der Karte in die 3D-Karte und zurück', 'neue fassung': 'Ein Reiter, dessen Programmteil mitten in einer Auslieferung fehlt' };
   for (const z of zeilen.filter(z => z.notiz)) aus.push('', `${DURCHGANG[z.reiter] ?? z.reiter}: ${z.notiz}.`);
   // Der Browser war beschäftigt, die Datenbank nicht: zur Einordnung.
   for (const z of zeilen.filter(z => (z.spaet || []).length)) {

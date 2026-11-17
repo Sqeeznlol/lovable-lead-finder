@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -9,9 +9,10 @@ import { CantonProvider } from "@/hooks/use-canton";
 import { AuthProvider } from "@/hooks/use-auth";
 import { Torwaechter } from "@/components/Torwaechter";
 import { Auffang } from "@/components/Auffang";
-const Index = lazy(() => import("./pages/Index.tsx"));
-const NotFound = lazy(() => import("./pages/NotFound.tsx"));
-const FondsSeite = lazy(() => import("./pages/Fonds.tsx"));
+import { nachladen } from "@/lib/neue-fassung";
+const Index = nachladen(() => import("./pages/Index.tsx"), "default");
+const NotFound = nachladen(() => import("./pages/NotFound.tsx"), "default");
+const FondsSeite = nachladen(() => import("./pages/Fonds.tsx"), "default");
 
 // Die Akquise (Eigentümerabfrage, Nummern, Pipedrive, Erweiterung,
 // Check-Seiten, Ratgeber, Anfrage-Seiten) ist seit dem 7. November ein

@@ -1,5 +1,6 @@
 import { PortfolioBericht } from '@/components/PortfolioBericht';
-import { lazy, Suspense, useMemo, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
+import { nachladen } from '@/lib/neue-fassung';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarDays, Check, ChevronDown, ExternalLink, HardHat, MessageSquare, Search, Sparkles, Trash2 } from 'lucide-react';
 import { Abschnitt, FELD, KNOPF, KNOPF_HAUPT, KNOPF_LEISE, Leer, LISTE, Marke, Reiter, Seite, Strichbalken } from '@/components/rahmen';
@@ -47,7 +48,7 @@ export interface BereichProps {
 
 // =========================================================== Karte
 // Cesium ist gross (1,1 MB) -- erst laden, wenn jemand auf "3D" tippt.
-const Karte3D = lazy(() => import('@/components/karte3d/Karte3D').then(m => ({ default: m.Karte3D })));
+const Karte3D = nachladen(() => import('@/components/karte3d/Karte3D'), 'Karte3D');
 // Nachgemessen (iPhone 13, iPhone SE, Desktop 900 px): Die Karte beginnt
 // unter Kopf und Umschalter bei 155 px und soll über der unteren Leiste
 // enden. 420 px Mindesthöhe schoben sie auf dem SE 68 px darunter.

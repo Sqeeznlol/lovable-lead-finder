@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { nachladen } from '@/lib/neue-fassung';
 import { Building2, X, Shield, Share, Plus, Map, Target, BarChart3, Gauge, HardHat, MoreHorizontal, Briefcase, LogOut, Orbit, CalendarDays, Inbox, Combine, Flame, Search, Calculator } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { KontoMenu } from '@/components/KontoMenu';
@@ -10,28 +11,28 @@ import { supabase } from '@/integrations/supabase/client';
 import { PropertyDetailDialog } from '@/components/PropertyDetailDialog';
 import { useSchliessen, useUrlWert } from '@/hooks/use-url-wert';
 import { Skeleton } from '@/components/ui/skeleton';
-const Auswertung = lazy(() => import('@/components/Auswertung').then(m => ({ default: m.Auswertung })));
-const Arrondierung = lazy(() => import('@/components/Arrondierung').then(m => ({ default: m.Arrondierung })));
-const Leads = lazy(() => import('@/components/Leads').then(m => ({ default: m.Leads })));
-const Cockpit = lazy(() => import('@/components/Cockpit').then(m => ({ default: m.Cockpit })));
-const LeadListen = lazy(() => import('@/components/LeadListen').then(m => ({ default: m.LeadListen })));
-const Baugesuche = lazy(() => import('@/components/Baugesuche').then(m => ({ default: m.Baugesuche })));
-const Gelegenheiten = lazy(() => import('@/components/Gelegenheiten').then(m => ({ default: m.Gelegenheiten })));
-const Karte3DSeite = lazy(() => import('@/components/karte3d/Karte3DSeite').then(m => ({ default: m.Karte3DSeite })));
-const Kalender = lazy(() => import('@/components/Kalender').then(m => ({ default: m.Kalender })));
-const Nachbarschaft = lazy(() => import('@/components/Nachbarschaft').then(m => ({ default: m.Nachbarschaft })));
-const Suche = lazy(() => import('@/components/Suche').then(m => ({ default: m.Suche })));
-const CalcYouLater = lazy(() => import('@/components/CalcYouLater').then(m => ({ default: m.CalcYouLater })));
+const Auswertung = nachladen(() => import('@/components/Auswertung'), 'Auswertung');
+const Arrondierung = nachladen(() => import('@/components/Arrondierung'), 'Arrondierung');
+const Leads = nachladen(() => import('@/components/Leads'), 'Leads');
+const Cockpit = nachladen(() => import('@/components/Cockpit'), 'Cockpit');
+const LeadListen = nachladen(() => import('@/components/LeadListen'), 'LeadListen');
+const Baugesuche = nachladen(() => import('@/components/Baugesuche'), 'Baugesuche');
+const Gelegenheiten = nachladen(() => import('@/components/Gelegenheiten'), 'Gelegenheiten');
+const Karte3DSeite = nachladen(() => import('@/components/karte3d/Karte3DSeite'), 'Karte3DSeite');
+const Kalender = nachladen(() => import('@/components/Kalender'), 'Kalender');
+const Nachbarschaft = nachladen(() => import('@/components/Nachbarschaft'), 'Nachbarschaft');
+const Suche = nachladen(() => import('@/components/Suche'), 'Suche');
+const CalcYouLater = nachladen(() => import('@/components/CalcYouLater'), 'CalcYouLater');
 // Die Karte zieht Leaflet nach -- das gehoert nicht ins erste
 // Buendel, sondern wird geholt, wenn jemand den Reiter oeffnet.
-const Karte = lazy(() => import('@/components/Karte').then(m => ({ default: m.Karte })));
+const Karte = nachladen(() => import('@/components/Karte'), 'Karte');
 // Was nur ein Reiter braucht, kommt erst mit dem Reiter: das erste
 // Bündel trägt nur den Rahmen und das Cockpit.
-const Zentrale = lazy(() => import('@/components/Zentrale').then(m => ({ default: m.Zentrale })));
-const Protokoll = lazy(() => import('@/components/Protokoll').then(m => ({ default: m.Protokoll })));
-const Anmeldungen = lazy(() => import('@/components/Anmeldungen').then(m => ({ default: m.Anmeldungen })));
-const Teams = lazy(() => import('@/components/Teams').then(m => ({ default: m.Teams })));
-const AdminSettings = lazy(() => import('@/components/AdminSettings').then(m => ({ default: m.AdminSettings })));
+const Zentrale = nachladen(() => import('@/components/Zentrale'), 'Zentrale');
+const Protokoll = nachladen(() => import('@/components/Protokoll'), 'Protokoll');
+const Anmeldungen = nachladen(() => import('@/components/Anmeldungen'), 'Anmeldungen');
+const Teams = nachladen(() => import('@/components/Teams'), 'Teams');
+const AdminSettings = nachladen(() => import('@/components/AdminSettings'), 'AdminSettings');
 import { Parzellensuche } from '@/components/Parzellensuche';
 import { useCanton } from '@/hooks/use-canton';
 import { AdminZugang } from '@/components/AdminZugang';

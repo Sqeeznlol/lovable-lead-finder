@@ -1,3 +1,5 @@
+import { lazy, type ComponentType, type LazyExoticComponent } from 'react';
+
 /**
  * Nach einer Auslieferung heissen die Programmteile anders (der Name
  * hängt am Inhalt). Wer die Seite vorher geöffnet hat, verlangt beim
@@ -22,4 +24,27 @@ export function neuLadenEinmal(jetzt = Date.now()): boolean {
   try { sessionStorage.setItem(SCHLUESSEL, String(jetzt)); } catch { /* egal */ }
   window.location.reload();
   return true;
+}
+
+/**
+ * Ein Bereich, der erst mit seinem Reiter geladen wird.
+ *
+ * Lädt main.tsx wegen eines fehlenden Programmteils neu, hält es Vite mit
+ * `preventDefault` vom Fehler ab -- und Vite lässt den Import dann mit
+ * `undefined` enden. React las daraus `.default` und zeigte «Fehler im
+ * Bereich Die Seite», bevor das Neuladen griff («Reiter prüfen»,
+ * 17. November, Admin-Reiter mitten in einer Auslieferung). Darum wartet
+ * ein Bereich in diesem Fall mit seiner Ladeanzeige, bis die Seite neu
+ * geladen ist. Kommt das Neuladen nicht, meldet er nach 15 Sekunden die
+ * fehlende Fassung, und der Auffang bietet «Nochmals versuchen» an.
+ */
+export function nachladen<K extends string, M extends { [P in K]: ComponentType<never> }>(
+  laden: () => Promise<M>, name: K, frist = 15_000,
+): LazyExoticComponent<M[K]> {
+  return lazy(async () => {
+    const m = await laden();
+    if (m) return { default: m[name] };
+    return new Promise<never>((_, nein) => setTimeout(
+      () => nein(new Error('Failed to fetch dynamically imported module: die Seite wurde nicht neu geladen')), frist));
+  });
 }
