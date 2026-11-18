@@ -46,6 +46,36 @@ export function alsAdressTreffer(a: Attrs): Attrs | null {
   return { ...a, origin: 'address', label: `${m[1]} <b>${m[2]} ${m[3]}</b>`, y: Number(p[1]), x: Number(p[2]), kanton: kt ? kt[1].toUpperCase() : null, quelle: 'register' };
 }
 
+const glatt = (t: string) => t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+function teile(text: string, treffer: Attrs) {
+  const m = String(treffer.label ?? '').replace(/<[^>]+>/g, '').match(/^(.*?)\s+(\d+\s?[a-zA-Z]?)\s+\d{4}\s/);
+  const worte = glatt(text).replace(/[,.]/g, ' ').split(/\s+/).filter(Boolean);
+  return {
+    strasse: m ? glatt(m[1]).split(/[\s-]+/) : null, nummer: m ? glatt(m[2]).replace(/\s/g, '') : '',
+    // Vier Ziffern ohne Buchstaben sind eine Postleitzahl oder eine Parzelle, keine Hausnummer.
+    nummern: worte.filter(w => /^\d{1,3}[a-z]?$/.test(w) || /^\d{4}[a-z]$/.test(w)),
+    namen: worte.filter(w => /^[a-z]{3,}/.test(w)),
+  };
+}
+
+/**
+ * Ob ein Treffer des Registers an der getippten Strasse liegt: ein
+ * getipptes Wort beginnt ein Wort der Strasse. Die Volltextsuche ist
+ * grosszügig: «Kloten 2061» (eine Parzelle) brachte Verenagasse 7 und
+ * Kirchgasse 20 in Kloten (18. November).
+ */
+export function strassePasst(text: string, treffer: Attrs): boolean {
+  const t = teile(text, treffer);
+  return !!t.strasse && t.nummern.length > 0 && t.namen.some(w => t.strasse!.some(s2 => s2.startsWith(w)));
+}
+
+/** Ob die Hausnummer des Treffers so beginnt wie die getippte. */
+export function nummerPasst(text: string, treffer: Attrs): boolean {
+  const t = teile(text, treffer);
+  return t.nummern.some(z => t.nummer.startsWith(z));
+}
+
 // Ohne Angabe ist ein Treffer der Adresssuche eine Adresse.
 const art = (a: Attrs) => String(a.origin ?? 'address');
 const schluessel = (a: Attrs) => `${art(a)}|${String(a.label ?? '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().toLowerCase()}`;
@@ -74,8 +104,11 @@ export async function adressSuche(text: string, o: { limit: number; origins?: st
       (f: unknown) => ({ treffer: [] as Attrs[], ungefaehr: true, fehler: f })),
     adressenGefragt && mitHausnummer(text)
       ? holen(`${API}/ech/SearchServer?${r}`).then(
-        j => (((j as { results?: { attrs?: Attrs }[] })?.results) ?? []).map(x => alsAdressTreffer(x.attrs ?? {})).filter((x): x is Attrs => !!x),
+        j => (((j as { results?: { attrs?: Attrs }[] })?.results) ?? []).map(x => alsAdressTreffer(x.attrs ?? {})).filter((x): x is Attrs => !!x && strassePasst(text, x)),
         () => [] as Attrs[])
+        // Gibt es die Nummer nicht, bleiben die Nachbarn derselben Strasse: CALC sagt dann,
+        // dass sie fehlt, und bietet 54, 56 und 57 an («Dietlikerstrasse 55 Kloten»).
+        .then(t => (t.some(x => nummerPasst(text, x)) ? t.filter(x => nummerPasst(text, x)) : t))
       : Promise.resolve([] as Attrs[]),
   ]);
   if (bund.fehler && !register.length) throw bund.fehler;

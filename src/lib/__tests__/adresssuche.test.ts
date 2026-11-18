@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
-import { adressSuche, alsAdressTreffer, mitHausnummer } from '@/lib/adresssuche';
+import { adressSuche, alsAdressTreffer, mitHausnummer, nummerPasst, strassePasst } from '@/lib/adresssuche';
 
 /**
  * 18. November: Die Adresssuche des Bundes kannte nur noch Liechtenstein.
@@ -21,6 +21,28 @@ describe('Adresssuche mit dem Gebäuderegister', () => {
     expect(alsAdressTreffer(REGISTER.results[0].attrs)).toMatchObject({
       origin: 'address', label: 'Bahnhofstrasse 1 <b>8001 Zürich</b>', y: 2683187.1, x: 1246861.9, kanton: 'ZH', lat: 47.3667, featureId: '2378430_0' });
     expect(alsAdressTreffer({ label: 'Bahnhofstrasse 1 8001 Zürich' })).toBeNull();
+  });
+
+  it('lässt aus dem Register nur gelten, was zu Strasse und Nummer passt', () => {
+    const t = (label: string) => ({ label });
+    const passtZurEingabe = (e: string, x: { label: string }) => strassePasst(e, x) && nummerPasst(e, x);
+    expect(passtZurEingabe('Dietlikerstrasse 54 Kloten', t('Dietlikerstrasse 54 <b>8302 Kloten</b>'))).toBe(true);
+    expect(passtZurEingabe('dietlikerstr. 5', t('Dietlikerstrasse 54 <b>8302 Kloten</b>'))).toBe(true);
+    expect(passtZurEingabe('Ramistrasse 101', t('Rämistrasse 101 <b>8006 Zürich</b>'))).toBe(true);
+    expect(passtZurEingabe('Seestrasse 23 a', t('Seestrasse 23a <b>8700 Küsnacht ZH</b>'))).toBe(true);
+    expect(passtZurEingabe('8302 Kloten Dietlikerstrasse 54', t('Dietlikerstrasse 54 <b>8302 Kloten</b>'))).toBe(true);
+    // Echte Antwort des Registers auf «Kloten 2061», eine Parzelle:
+    expect(passtZurEingabe('Kloten 2061', t('Verenagasse 7 <b>8302 Kloten</b>'))).toBe(false);
+    expect(passtZurEingabe('Dietlikerstrasse 54 Kloten', t('Dietlikerstrasse 56 <b>8302 Kloten</b>'))).toBe(false);
+    expect(strassePasst('Dietlikerstrasse 55 Kloten', t('Dietlikerstrasse 56 <b>8302 Kloten</b>'))).toBe(true);
+  });
+
+  it('gibt es die Nummer nicht, bleiben die Nachbarn derselben Strasse', async () => {
+    const reg = { results: ['54', '56', '57'].map(z => ({ attrs: { label: `Dietlikerstrasse ${z} 8302 Kloten`, geom_st_box2d: 'BOX(2686764.6 1255483.5,2686764.6 1255483.5)' } })) };
+    const r = await adressSuche('Dietlikerstrasse 55 Kloten', { limit: 6, holen: holen({ fuzzy: 'true', results: [] }, reg) });
+    expect(r.map(a => a.label)).toEqual(['Dietlikerstrasse 54 <b>8302 Kloten</b>', 'Dietlikerstrasse 56 <b>8302 Kloten</b>', 'Dietlikerstrasse 57 <b>8302 Kloten</b>']);
+    const genau = await adressSuche('Dietlikerstrasse 56 Kloten', { limit: 6, holen: holen({ fuzzy: 'true', results: [] }, reg) });
+    expect(genau.map(a => a.label)).toEqual(['Dietlikerstrasse 56 <b>8302 Kloten</b>']);
   });
 
   it('fragt das Register nur mit Hausnummer', () => {
