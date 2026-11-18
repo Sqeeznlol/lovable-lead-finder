@@ -15,7 +15,7 @@ import { PortfolioImport } from '@/components/PortfolioImport';
 import { Gespraeche } from '@/components/Gespraeche';
 import { eigentuemerParzellen, eigentuemerSuchen, type EigentuemerTreffer } from '@/hooks/use-eigentuemer-suche';
 import { supabase } from '@/integrations/supabase/client';
-import { FENSTER } from '@/lib/fenster';
+import { FENSTER, oeffne } from '@/lib/fenster';
 import { ARTEN, FLAECHEN, MARGEN, OHNE_FILTER, filterAktiv, passtFilter, type KartenFilter } from '@/lib/kartenfilter';
 import { BAUZONEN, GRENZEN, GRUNDKARTEN, WMS_MAX, wmsAdresse, type Ebene, type Grund } from '@/lib/karte-ebenen';
 import { adressSuche } from '@/lib/adresssuche';
@@ -1160,8 +1160,8 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
                     swisstopo bleibt darum die Karte. Der Ort ist der Umriss,
                     wenn er da ist -- sonst stünde nach "aus der Liste
                     öffnen" die Kartenmitte da. */}
-                <button type="button" className="knopf" onClick={() => window.open(googleLink(auswahlOrt(), false), FENSTER.karte)}>Google Maps</button>
-                <button type="button" className="knopf" onClick={() => window.open(googleLink(auswahlOrt(), true), FENSTER.karte)}>Street View</button>
+                <button type="button" className="knopf" onClick={() => oeffne(googleLink(auswahlOrt(), false))}>Google Maps</button>
+                <button type="button" className="knopf" onClick={() => oeffne(googleLink(auswahlOrt(), true))}>Street View</button>
                 <a className="knopf" href={geoadminLink(auswahl.lat, auswahl.lon, 12)} target={FENSTER.karte}>Bundes-GIS</a>
                 <Kopieren wert={`${gr(lv.E)} / ${gr(lv.N)}`} text="LV95" />
               </div>

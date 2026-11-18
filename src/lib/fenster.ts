@@ -1,37 +1,33 @@
 /**
- * Zwei Tabs, nicht zwanzig.
+ * Fremde Seiten öffnen in einem neuen Tab, und zwar jedes Mal.
  *
- * Jeder Aufruf mit "_blank" macht einen neuen Tab auf. Nach zehn
- * Abfragen steht die Leiste voll, und niemand weiss mehr, welcher
- * Thurgau und welcher Bauraum ist.
+ * Seit September trugen sie feste Namen ("bauraum-portal",
+ * "bauraum-karte", ...), damit die Leiste nicht volläuft. Am
+ * 18. November nachgemessen: nur der erste Klick öffnete einen Tab. Jeder
+ * weitere Klick lud still in diesem Tab im Hintergrund, und vorne
+ * geschah nichts (Julian: «uf die andere Buttons genauso nüt»). Google
+ * Maps war nicht betroffen, weil Google den Namen des Tabs löscht. Ein
+ * neuer Tab dagegen erscheint sofort, auf dem Computer wie auf dem
+ * iPhone.
  *
- * Ein Fenster mit Namen dagegen wird wiederverwendet: derselbe Name
- * landet im selben Tab. Also zwei feste Namen -- einer für die
- * Anwendung, einer für das Portal des Kantons -- und die Leiste bleibt,
- * wie sie ist.
- *
- * Die Namen stehen auch im Lesezeichen; ändert man sie hier, muss man
- * sie dort mitändern (src/lib/lesezeichen.ts).
+ * Die Rollen bleiben als Schlüssel, damit jede Stelle sagt, was sie
+ * öffnet; alle zeigen auf einen neuen Tab. Moderne Browser geben einem
+ * Link mit "_blank" von selbst kein window.opener mit.
  */
 export const FENSTER = {
+  // Der eigene Tab behält seinen Namen (benenneEigenenTab).
   app: 'bauraum-app',
-  portal: 'bauraum-portal',
-  karte: 'bauraum-karte',
-  suche: 'bauraum-suche',
+  portal: '_blank',
+  karte: '_blank',
+  suche: '_blank',
   // Seiten von Veranstaltern und anderen Fremden (Immo-Kalender).
-  extern: 'bauraum-extern',
+  extern: '_blank',
 } as const;
 
-export type Fenstername = typeof FENSTER[keyof typeof FENSTER];
-
 /**
- * Der eigene Tab braucht auch einen Namen.
- *
- * Ein Tab heisst nur dann so, wie man ihn genannt hat, wenn er selbst
- * benannt geoeffnet wurde. Der Tab, in dem die Anwendung von Hand
- * aufgemacht wird, hat keinen -- und deshalb landete das Lesezeichen
- * jedes Mal in einem neuen "Bauraum"-Tab statt in diesem hier. Ein Tab
- * darf sich selbst benennen; genau das passiert beim Start.
+ * Der eigene Tab bekommt einen Namen, damit ihn ein Lesezeichen der
+ * Akquise wiederfindet. Ein Tab darf sich selbst benennen; genau das
+ * passiert beim Start.
  */
 export function benenneEigenenTab(): void {
   if (typeof window !== 'undefined' && window.name !== FENSTER.app) {
@@ -39,14 +35,7 @@ export function benenneEigenenTab(): void {
   }
 }
 
-/**
- * Eine Adresse in ihrem Fenster öffnen.
- *
- * "noopener" fehlt hier mit Absicht: mit ihm gibt der Browser keinen
- * Verweis auf das Fenster zurück, und dann lässt sich nicht erkennen,
- * ob ein Sperrer den Aufruf verhindert hat. Beide Ziele sind eigene
- * Seiten, keine fremden Links.
- */
-export function oeffne(adresse: string, name: Fenstername): Window | null {
-  return window.open(adresse, name);
+/** Eine fremde Adresse aus einem Knopf heraus öffnen: neuer Tab, ohne Rückgriff auf diese Seite. */
+export function oeffne(adresse: string): void {
+  window.open(adresse, '_blank', 'noopener');
 }
