@@ -7,6 +7,9 @@ import { Ergebnis, Objektkopf } from '@/components/calc/Ergebnis';
 import { useName } from '@/components/calc/name';
 import { FENSTER } from '@/lib/fenster';
 import { adresseWaehlen, suchtext } from '@/lib/adresswahl';
+import type { Projekt } from '@/lib/bauprojekt';
+import { ProjektHinweis } from '@/components/ProjektHinweis';
+import { aufParzelle, useGesucheParzelle } from '@/components/BaugesucheParzelle';
 import { bewerten, CALC_ANNAHMEN, ERLOES_ANNAHME, median, nachbarArt, type CalcAnnahmen, type CalcEingabe, type ErloesQuelle, type Kauf, type NachbarTeil, type Umfeld, type Vergleich, type VonHand } from '@/lib/calc';
 import { ERLOES_AMTLICH } from '@/lib/erloes-daten';
 import { ERLOES_ANGABEN } from '@/lib/erloes-angaben';
@@ -31,6 +34,7 @@ interface Basis {
   adresse: Adresse; parzelleNr: string | null; eigentuemer: string | null; luecken: string[];
   egrid: string | null; parzelleId: string | null; gemeinde: string | null; kanton: string | null;
   grundlage: CalcEingabe['grundlage']; umfeld: Umfeld;
+  projekt: Projekt | null;
 }
 
 const de = (n: number, stellen = 0) => n.toLocaleString('de-CH', { maximumFractionDigits: stellen, minimumFractionDigits: stellen });
@@ -147,7 +151,8 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
   const basis: Basis | null = useMemo(() => {
     if (alt) {
       return { adresse: alt.adresse, parzelleNr: alt.parzelleNr, eigentuemer: alt.eigentuemer, luecken: alt.luecken, egrid: entwurf!.egrid,
-        parzelleId: entwurf!.parzelle_id, gemeinde: entwurf!.gemeinde, kanton: alt.eingabe.kanton, grundlage: alt.eingabe.grundlage, umfeld: alt.eingabe.umfeld };
+        parzelleId: entwurf!.parzelle_id, gemeinde: entwurf!.gemeinde, kanton: alt.eingabe.kanton, grundlage: alt.eingabe.grundlage, umfeld: alt.eingabe.umfeld,
+        projekt: alt.eingabe.projekt ?? null };
     }
     const o = objekt.data;
     if (!o) return null;
@@ -158,6 +163,7 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
         zone: o.zone, gebaeude: o.gebaeude, bestandQuelle: o.bestandQuelle, registerVollstaendig: o.registerDa },
       umfeld: { gemeinde: o.preise?.name ?? o.gemeinde, land: o.preise?.land ?? null, stwe: o.preise?.stwe ?? null, efh: o.preise?.efh ?? null,
         denkmal: o.denkmal, isos: o.isos, ...(umfeld.data ?? {}) },
+      projekt: o.projekt,
     };
   }, [alt, entwurf, objekt.data, umfeld.data]);
 
@@ -171,7 +177,7 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
 
   const eingabe: CalcEingabe | null = useMemo(() => basis && {
     grundlage: { ...basis.grundlage, bebaubarM2: huelle.data?.umriss_da ? huelle.data.bebaubar_m2 : basis.grundlage.bebaubarM2 },
-    annahmen, kanton: basis.kanton, hand, umfeld: basis.umfeld, erloesQuelle, nachbarn,
+    annahmen, kanton: basis.kanton, hand, umfeld: basis.umfeld, erloesQuelle, nachbarn, projekt: basis.projekt,
   }, [basis, huelle.data, annahmen, hand, erloesQuelle, nachbarn]);
   // Die Nachbarparzellen erst auf Wunsch: das sind bis zu zwölf Abfragen beim Bund.
   const nachbarListe = useQuery({
@@ -179,6 +185,9 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
     enabled: nachbarnAuf && !!basis?.egrid, staleTime: 30 * 60 * 1000, retry: 1,
   });
   const b = useMemo(() => (eingabe ? bewerten(eingabe) : null), [eingabe]);
+  // Das letzte Baugesuch auf der Parzelle, für den Knopf aufs Projekt.
+  const gesuche = useGesucheParzelle(basis?.parzelleId ?? null, basis?.egrid ?? null);
+  const gesuch = basis ? (gesuche.data ?? []).find(g => aufParzelle(g, basis.parzelleId, basis.egrid)) ?? null : null;
 
   const andere = () => { setGewaehlt(null); setText(''); setGesucht(''); setHand({}); setAnnahmen(CALC_ANNAHMEN); setErloesQuelle(ERLOES_ANNAHME); setNachbarn([]); setNachbarnAuf(false); setFehler(null); };
   const erloesSetzen = (erloes: number, quelle: ErloesQuelle) => { setAnnahmen(a => ({ ...a, erloes })); setErloesQuelle(quelle); };
@@ -289,6 +298,7 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
       <Objektkopf adresse={basis.adresse} parzelleNr={basis.parzelleNr} flaeche={basis.grundlage.flaeche} zone={zoneText} eigentuemer={basis.eigentuemer} gebaeude={basis.grundlage.gebaeude}
         rechts={!entwurf && <button type="button" className={KNOPF} onClick={andere}><X className="h-4 w-4" /> Andere Adresse</button>} />
       {basis.luecken.length > 0 && <p className="text-sm text-destructive">{basis.luecken.join(' ')}</p>}
+      <ProjektHinweis projekt={basis.projekt} gesuch={gesuch} wo="Die Kalkulation" />
       {zonenplanAus && (
         <button type="button" className={KNOPF} disabled={objekt.isFetching} onClick={() => void objekt.refetch()}>
           {objekt.isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Zonenplan noch einmal fragen
@@ -319,7 +329,7 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
               const art = nachbarArt(n.flaeche, n.zone, annahmen);
               const dichte = b.neubau && b.studie.flaeche > 0 ? b.neubau.hnf / b.studie.flaeche : null;
               const waehlbar = art === 'ziffer' || (art === 'dichte' && dichte != null);
-              const allein = waehlbar ? bewerten({ ...eingabe, grundlage: { flaeche: n.flaeche, bebaubarM2: null, zone: n.zone, gebaeude: n.gebaeude, registerVollstaendig: true }, hand: {}, nachbarn: [], dichte }).wert : null;
+              const allein = waehlbar ? bewerten({ ...eingabe, grundlage: { flaeche: n.flaeche, bebaubarM2: null, zone: n.zone, gebaeude: n.gebaeude, registerVollstaendig: true }, hand: {}, nachbarn: [], dichte, projekt: null }).wert : null;
               const hinweis = art === 'ziffer' ? null
                 : art === 'keine' ? 'keine Wohn-, Misch- oder Arbeitszone'
                   : waehlbar ? 'ohne Ziffer, gerechnet wie diese Parzelle'

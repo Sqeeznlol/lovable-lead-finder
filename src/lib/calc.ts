@@ -27,6 +27,7 @@
 import { ANNAHMEN, bestandGf, chf, m2, studieRechnen, type Annahmen, type Eingabe, type Gebaeude, type Posten, type Studie, type ZonenRegeln } from '@/lib/machbarkeit';
 import { MIETEN, MIETEN_JAHR } from '@/lib/mieten-daten';
 import type { Spalten, VerlaufZeile } from '@/lib/preis-herleitung';
+import { projektSatz, projektZaehlt, type Projekt } from '@/lib/bauprojekt';
 
 export interface CalcAnnahmen extends Annahmen {
   /** Bruttorendite, zu der ein Käufer ein Mehrfamilienhaus kauft (0 bis 1). */
@@ -247,6 +248,12 @@ export interface CalcEingabe {
    * Nachbarn, dessen Bauzone keine Ziffer nennt (nachbarArt).
    */
   dichte?: number | null;
+  /**
+   * Was auf der Parzelle geplant, bewilligt oder im Bau ist (Gebäuderegister).
+   * Ist es bewilligt oder im Bau, rechnet der Neubau mit seiner Wohnfläche
+   * statt mit der Formel (Julian, 18. November).
+   */
+  projekt?: Projekt | null;
 }
 
 export interface Neubau {
@@ -262,8 +269,12 @@ export interface Neubau {
   jeM3: number;
   /** Was eine Wohnung mittlerer Grösse in dieser Rechnung kostet. */
   wohnungPreis: number;
-  /** Wie die Nutzfläche gerechnet ist: Praxisformel, sonst Machbarkeit (Hülle). */
+  /** Wie die Nutzfläche gerechnet ist: bewilligtes Projekt, Praxisformel, sonst Machbarkeit (Hülle). */
   hnfText: string;
+  /** Gerechnet mit der Wohnfläche eines bewilligten Projekts (Gebäuderegister). */
+  projekt: boolean;
+  /** Was die Formel ohne Projekt ergäbe, m² Nutzfläche. */
+  hnfFormel: number;
   /** Baukosten je m² Nutzfläche mit Zuschlägen, und woraus sie bestehen. */
   baukostenJeM2: number;
   kosten: Kosten;
@@ -390,10 +401,13 @@ export function bewerten(e: CalcEingabe): Bewertung {
   const praxis = hnfPraxis(bauzone, zone, a);
   // Ein Nachbar ohne eigene Ziffer und ohne Umriss: die Dichte der Hauptparzelle.
   const geliehen = !praxis && !studie.rechenbar && pos(e.dichte) && nachbarArt(flaeche, zone, a) === 'dichte' ? flaeche * e.dichte! : null;
-  const rechenbar = !!praxis || studie.rechenbar || geliehen != null;
-  const hnf = praxis?.hnf ?? (studie.rechenbar ? studie.hnfNeu : geliehen ?? 0);
-  const gf = praxis ? praxis.hnf / a.hnfFaktor : studie.rechenbar ? studie.gfNeu : (geliehen ?? 0) / a.hnfFaktor;
-  const wohnungenNeu = Math.floor(hnf / a.wohnungM2);
+  // Ein bewilligtes Projekt hat seine eigenen Zahlen: sie gelten vor jeder Formel.
+  const projekt = projektZaehlt(e.projekt) ? e.projekt : null;
+  const formelHnf = praxis?.hnf ?? (studie.rechenbar ? studie.hnfNeu : geliehen ?? 0);
+  const rechenbar = !!projekt || !!praxis || studie.rechenbar || geliehen != null;
+  const hnf = projekt ? projekt.wohnflaeche : formelHnf;
+  const gf = projekt ? hnf / a.hnfFaktor : praxis ? praxis.hnf / a.hnfFaktor : studie.rechenbar ? studie.gfNeu : (geliehen ?? 0) / a.hnfFaktor;
+  const wohnungenNeu = projekt && projekt.wohnungen ? projekt.wohnungen : Math.floor(hnf / a.wohnungM2);
 
   // ---- Neubau: was für das Land bleibt
   const zuschlag = (1 + hangZuschlag(u.neigung)) * (1 + zuerichZuschlag(u.zuerichKm));
@@ -413,8 +427,9 @@ export function bewerten(e: CalcEingabe): Bewertung {
     const kubatur = gf * a.geschosshoehe;
     const landwert = erloes - baukosten - abbruch - erloes * a.marge;
     neubau = {
-      gf, hnf, kubatur, wohnungen: wohnungenNeu, baukosten, abbruch, erloes,
-      hnfText: praxis ? `Praxisformel: ${praxis.text}` : geliehen != null ? 'Annahme: dieselbe Dichte wie die Hauptparzelle' : 'Machbarkeit: Ziffer und Hülle, die engere gilt',
+      gf, hnf, kubatur, wohnungen: wohnungenNeu, baukosten, abbruch, erloes, projekt: !!projekt, hnfFormel: formelHnf,
+      hnfText: projekt ? `${projektSatz(projekt)} (Gebäuderegister${projekt.stand ? `, Stand ${projekt.stand}` : ''})`
+        : praxis ? `Praxisformel: ${praxis.text}` : geliehen != null ? 'Annahme: dieselbe Dichte wie die Hauptparzelle' : 'Machbarkeit: Ziffer und Hülle, die engere gilt',
       gewinn: erloes * a.marge, landwert, jeM2: flaeche ? landwert / flaeche : 0,
       jeM3: kubatur > 0 ? baukosten / kubatur : 0, wohnungPreis: a.erloes * a.wohnungM2,
       baukostenJeM2: kosten.jeM2, kosten,
@@ -483,7 +498,8 @@ export function bewerten(e: CalcEingabe): Bewertung {
     const dichte = hnf / flaeche;
     const teile = nachbarn.map(n => {
       const eigen = hnfPraxis(n.flaeche, n.zone, a)?.hnf ?? null;
-      const allein = bewerten({ ...e, grundlage: { flaeche: n.flaeche, bebaubarM2: null, zone: n.zone, gebaeude: n.gebaeude, registerVollstaendig: true }, hand: {}, nachbarn: [], dichte });
+      // Das Projekt gehört zu dieser Parzelle, nicht zum Nachbarn.
+      const allein = bewerten({ ...e, grundlage: { flaeche: n.flaeche, bebaubarM2: null, zone: n.zone, gebaeude: n.gebaeude, registerVollstaendig: true }, hand: {}, nachbarn: [], dichte, projekt: null });
       return { egrid: n.egrid, nummer: n.nummer, flaeche: n.flaeche, hnf: eigen ?? n.flaeche * dichte, geliehen: eigen == null,
         wertAllein: allein.wert ?? 0, gfBestand: bestandGf(n.gebaeude) ?? 0 };
     });
@@ -525,6 +541,13 @@ export function bewerten(e: CalcEingabe): Bewertung {
   // ---- Chancen und Risiken: jeder Satz mit seiner Zahl
   const chancen: string[] = [], risiken: string[] = [];
   const jahr = e.jahr ?? new Date().getFullYear();
+  const registerStand = e.projekt?.stand ? `, Stand ${e.projekt.stand}` : '';
+  if (projekt) {
+    chancen.push(`${satz(projektSatz(projekt))} Gerechnet ist mit diesem Projekt (Gebäuderegister${registerStand})${formelHnf > 0 ? `; die Formel ergäbe ${m2(formelHnf)} Nutzfläche` : ''}.`);
+  } else if (e.projekt) {
+    // Eingereicht, aber nicht bewilligt: es kann noch scheitern, darum rechnet die Formel.
+    risiken.push(`${satz(projektSatz(e.projekt))} So plant der Eigentümer selbst (Gebäuderegister${registerStand}); gerechnet ist nach der Formel${formelHnf > 0 ? ` mit ${m2(formelHnf)} Nutzfläche` : ''}.`);
+  }
 
   if (neubau) {
     const unbebaut = studie.gfBestand == null && g.gebaeude.length === 0 && g.registerVollstaendig !== false;
@@ -556,14 +579,14 @@ export function bewerten(e: CalcEingabe): Bewertung {
       }
     }
     if (neubau.landwert <= 0) risiken.push('Mit diesen Annahmen bleibt nach Baukosten und Gewinn nichts für das Land.');
-    if (studie.begrenzt === 'huelle') {
+    if (!projekt && studie.begrenzt === 'huelle') {
       risiken.push(`Die Grenzabstände begrenzen das Volumen, nicht die Ziffer: gerechnet mit ${de(a.grenzabstand, 1)} m rundum, die Bauordnung kann mehr verlangen.`);
     }
-    if (g.bebaubarM2 == null) risiken.push('Ohne Umriss gerechnet: ob das Volumen zwischen den Grenzabständen Platz hat, ist offen.');
+    if (!projekt && g.bebaubarM2 == null) risiken.push('Ohne Umriss gerechnet: ob das Volumen zwischen den Grenzabständen Platz hat, ist offen.');
     if (zone?.quelle === 'hand') risiken.push('Ziffer oder Geschosse sind von Hand eingegeben: in der Bauordnung nachsehen.');
     else if (zone?.quelle === 'bestand') risiken.push('Die Zone stammt aus der eigenen Liste, nicht aus dem amtlichen Zonenplan.');
-    if (!studie.ziffer) risiken.push('Die Zone nennt keine Ziffer: es entscheiden Gestaltungsvorschriften und der Einzelfall.');
-    if (studie.ausgenuetzt != null && studie.ausgenuetzt > 1) risiken.push('Der Bestand ist grösser als heute erlaubt: ein Neubau fiele kleiner aus.');
+    if (!projekt && !studie.ziffer) risiken.push('Die Zone nennt keine Ziffer: es entscheiden Gestaltungsvorschriften und der Einzelfall.');
+    if (!projekt && studie.ausgenuetzt != null && studie.ausgenuetzt > 1) risiken.push('Der Bestand ist grösser als heute erlaubt: ein Neubau fiele kleiner aus.');
     if (neubau.landwert > 0 && neubau.wohnungen < 3) {
       risiken.push(`Nur rund ${neubau.wohnungen} ${neubau.wohnungen === 1 ? 'Wohnung' : 'Wohnungen'}: Planung und Nebenkosten fallen stärker ins Gewicht.`);
     }
@@ -598,7 +621,7 @@ export function bewerten(e: CalcEingabe): Bewertung {
     risiken.push(`Die Kaufinserate verlangen CHF ${de(Math.round(erloesInserate / 100) * 100)} je m², gerechnet ist mit CHF ${de(a.erloes)}.`);
   }
   // Die Praxisformel kennt keine Grenzabstände. Sind sie enger, steht es hier.
-  if (praxis && studie.rechenbar && studie.begrenzt === 'huelle' && studie.hnfNeu < praxis.hnf * 0.9) {
+  if (!projekt && praxis && studie.rechenbar && studie.begrenzt === 'huelle' && studie.hnfNeu < praxis.hnf * 0.9) {
     risiken.push(`Mit ${de(a.grenzabstand, 1)} m Grenzabstand rundum haben nur ${m2(studie.hnfNeu)} Nutzfläche Platz; gerechnet ist nach der Praxisformel mit ${m2(praxis.hnf)}.`);
   }
   if (zusammen) {
@@ -627,6 +650,13 @@ export function bewerten(e: CalcEingabe): Bewertung {
   // ---- jede Zahl mit ihrer Herkunft: die Machbarkeit, dazu die Praxisformel
   const amtlich = zone?.quelle === 'kanton' ? 'amtlich' : 'annahme';
   const herkunft: Bewertung['herkunft'] = [
+    ...(e.projekt ? [{ titel: `${e.projekt.status === 'projektiert' ? 'Eingereichtes' : e.projekt.status === 'im Bau' ? 'Begonnenes' : 'Bewilligtes'} Projekt (Gebäuderegister)`, zeilen: [
+      { titel: 'Stand', wert: e.projekt.status, art: 'amtlich' as const, quelle: `Gebäuderegister des Bundes${registerStand}` },
+      { titel: 'Neubauten mit Wohnungen', wert: de(e.projekt.gebaeude), art: 'amtlich' as const, quelle: 'Gebäuderegister' },
+      { titel: 'Wohnungen', wert: de(e.projekt.wohnungen), art: 'amtlich' as const, quelle: 'Gebäuderegister' },
+      ...(e.projekt.wohnflaeche ? [{ titel: 'Wohnfläche', wert: m2(e.projekt.wohnflaeche), art: 'amtlich' as const, quelle: 'Summe der Wohnungsflächen im Register' }] : []),
+      ...(e.projekt.geschosse ? [{ titel: 'Geschosse', wert: de(e.projekt.geschosse), art: 'amtlich' as const, quelle: 'Gebäuderegister' }] : []),
+    ] }] : []),
     ...studie.abschnitte.map(s => (s.titel === 'Was Platz hat'
       ? { titel: 'Was zwischen den Grenzabständen Platz hat (Machbarkeit)', zeilen: s.zeilen.filter(z => z.titel !== 'Wohnungen') }
       : s)),
@@ -638,7 +668,7 @@ export function bewerten(e: CalcEingabe): Bewertung {
       { titel: 'Attika', wert: praxis.attika ? `${de(praxis.attika, 2)} Vollgeschoss` : 'keines', art: 'annahme' as const,
         quelle: praxis.attika ? 'Praxisformel' : 'die Zone erlaubt kein Dachgeschoss' },
       { titel: 'Hauptnutzfläche', wert: m2(praxis.hnf), art: 'berechnet' as const, quelle: praxis.text },
-      { titel: 'Wohnungen', wert: `rund ${de(wohnungenNeu)}`, art: 'annahme' as const, quelle: `je ${de(a.wohnungM2)} m² Hauptnutzfläche` },
+      { titel: 'Wohnungen', wert: `rund ${de(Math.floor(praxis.hnf / a.wohnungM2))}`, art: 'annahme' as const, quelle: `je ${de(a.wohnungM2)} m² Hauptnutzfläche` },
     ] }] : []),
   ];
 

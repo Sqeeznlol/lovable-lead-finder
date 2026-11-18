@@ -20,7 +20,7 @@ import { BetroffeneParzellen } from '@/components/BetroffeneParzellen';
 // Typ und Belege liegen in src/lib/baugesuch-belege.ts, damit die
 // Objektansicht sie nutzen kann, ohne diese ganze Seite mitzuladen.
 export { belege, type Gesuch } from '@/lib/baugesuch-belege';
-import { belege, type Gesuch } from '@/lib/baugesuch-belege';
+import { belege, nichtMehrOeffentlich, type Gesuch } from '@/lib/baugesuch-belege';
 import { useUrlSetzen, useUrlWert } from '@/hooks/use-url-wert';
 import { useNavigate } from 'react-router-dom';
 
@@ -218,6 +218,11 @@ export function Baugesuche() {
                       </a>
                     )}
                   </div>
+                  {nichtMehrOeffentlich(g) && g.publikation_id && (
+                    <p className="col-span-2 text-sm text-muted-foreground sm:col-span-4">
+                      Das Amtsblatt zeigt die Publikation nur ein Jahr; Pläne und Bewilligung liegen bei der Gemeinde. Was gebaut wird, steht im Gebäuderegister (Parzelle im Bundes-GIS).
+                    </p>
+                  )}
                   <div className="col-span-2 sm:col-span-4"><BetroffeneParzellen g={g} /></div>
                 </dl>
               )}

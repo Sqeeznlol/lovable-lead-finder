@@ -181,6 +181,15 @@ senden. Alles Weitere in `docs/calc-you-later.md`.
     ÷ VG × (VG + 0.66) × 0.77), wie die Potenzialrechnung. Seine
     Vorgaben für Baukosten, Gewinn und Zuschläge stehen im Dokument;
     nicht eigenmächtig ändern.
+  * Ein bewilligtes Projekt geht der Formel vor (18. November, Julian:
+    «nöd das Aurora rechnet und debi gits es bewilligts Projekt mit
+    anderne Zahle»). Das Gebäuderegister führt projektierte, bewilligte
+    und begonnene Bauten mit Wohnungen und Wohnflächen
+    (`src/lib/bauprojekt.ts`); Machbarkeit und CALC zeigen sie über jeder
+    Rechnung mit dem Knopf «Projekt ansehen» und rechnen bei «bewilligt»
+    und «im Bau» mit dieser Wohnfläche. Das Amtsblatt zeigt eine
+    Publikation nur bis zu ihrem Ablauf (ein Jahr); danach führt der
+    Knopf ins Register. `bauprojekt.test.ts` wacht darüber.
 
 ## 3D-Karte
 

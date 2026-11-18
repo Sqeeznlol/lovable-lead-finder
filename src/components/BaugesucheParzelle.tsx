@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { ExternalLink, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { belege, type Gesuch } from '@/lib/baugesuch-belege';
+import { belege, nichtMehrOeffentlich, type Gesuch } from '@/lib/baugesuch-belege';
 import { Marke } from '@/components/rahmen';
 import { FENSTER } from '@/lib/fenster';
+import { parzelleLink } from '@/lib/bauprojekt';
 
 // Die erzeugten Typen kennen die Plattform-Tabellen noch nicht.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -20,8 +21,9 @@ const datum = (s: string) => new Date(s + 'T00:00:00').toLocaleDateString('de-CH
  * Nachbar heisst: die EGRID dieser Parzelle steht in den Nachbarn, die
  * der Ablauf "Baugesuche" zum Gesuch beim Bund geholt hat.
  */
-export function BaugesucheParzelle({ parzelleId, egrid }: { parzelleId: string | null; egrid: string | null }) {
-  const { data, isLoading } = useQuery({
+export function useGesucheParzelle(parzelleId: string | null, egrid: string | null) {
+  // Derselbe Schlüssel für die Liste und den Hinweis aufs Projekt: eine Abfrage für beide.
+  return useQuery({
     queryKey: ['baugesuche', 'parzelle', parzelleId, egrid],
     queryFn: async () => {
       // Ohne Parzelle im Bestand (Lead ausserhalb ZH/TG) genügt die EGRID.
@@ -31,7 +33,7 @@ export function BaugesucheParzelle({ parzelleId, egrid }: { parzelleId: string |
       if (egrid && /^[A-Z0-9]+$/.test(egrid)) bedingung.push(`egrid.eq.${egrid}`, `nachbar_egrids.cs.{${egrid}}`);
       if (!bedingung.length) return [] as Gesuch[];
       const r = await db().from('baugesuch')
-        .select('id, publiziert_am, gemeinde, adresse, parzelle_nr, egrid, beschreibung, bauherrschaft, parzelle_id, nachbar_egrids, erfasst_am, quelle, publikation_nr, publikation_id, einsprache_bis, quelle_url')
+        .select('id, publiziert_am, gemeinde, adresse, parzelle_nr, egrid, beschreibung, bauherrschaft, parzelle_id, nachbar_egrids, erfasst_am, quelle, publikation_nr, publikation_id, einsprache_bis, publiziert_bis, quelle_url')
         .or(bedingung.join(','))
         .order('publiziert_am', { ascending: false })
         .limit(50);
@@ -40,8 +42,15 @@ export function BaugesucheParzelle({ parzelleId, egrid }: { parzelleId: string |
     },
     staleTime: 5 * 60 * 1000,
   });
+}
 
-  const hier = (g: Gesuch) => (!!parzelleId && g.parzelle_id === parzelleId) || (!!egrid && g.egrid === egrid);
+/** Ob ein Gesuch die Parzelle selbst betrifft, nicht nur einen Nachbarn. */
+export const aufParzelle = (g: Gesuch, parzelleId: string | null, egrid: string | null) =>
+  (!!parzelleId && g.parzelle_id === parzelleId) || (!!egrid && g.egrid === egrid);
+
+export function BaugesucheParzelle({ parzelleId, egrid }: { parzelleId: string | null; egrid: string | null }) {
+  const { data, isLoading } = useGesucheParzelle(parzelleId, egrid);
+  const hier = (g: Gesuch) => aufParzelle(g, parzelleId, egrid);
   const liste = data ?? [];
 
   return (
@@ -57,7 +66,9 @@ export function BaugesucheParzelle({ parzelleId, egrid }: { parzelleId: string |
       {liste.length > 0 && (
         <ul className="divide-y rounded-[3px] border bg-card">
           {liste.map(g => {
-            const b = belege(g);
+            const vorbei = nichtMehrOeffentlich(g);
+            // Nach dem Ablauf führt der Weg zum Projekt über das Gebäuderegister.
+            const b = [...belege(g), ...(vorbei && g.egrid ? [{ titel: 'Projekt im Gebäuderegister', zeile: 'map.geo.admin.ch', url: parzelleLink(g.egrid) }] : [])];
             return (
               <li key={g.id} className="space-y-2 px-4 py-3">
                 <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -67,6 +78,9 @@ export function BaugesucheParzelle({ parzelleId, egrid }: { parzelleId: string |
                 </div>
                 <p className="font-medium">{[g.adresse, g.gemeinde].filter(Boolean).join(', ') || 'Ohne Adresse'}</p>
                 {g.beschreibung && <p className="line-clamp-3 text-sm text-muted-foreground">{g.beschreibung}</p>}
+                {vorbei && g.publikation_id && (
+                  <p className="text-sm text-muted-foreground">Im Amtsblatt bis {datum(vorbei)} öffentlich; die Akten liegen bei der Gemeinde.</p>
+                )}
                 {b.length > 0 && (
                   <div className="flex flex-wrap gap-x-4">
                     {b.map(x => (

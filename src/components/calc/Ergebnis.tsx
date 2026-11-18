@@ -78,9 +78,11 @@ export function Ergebnis({ b, annahmen, onErloes }: { b: Bewertung; annahmen: Ca
   const n = b.neubau, m = b.neubauMiete, h = b.bestand, s = b.studie;
   const eck: [string, string, string][] = n ? [
     ['Grundstück', m2(s.flaeche), 'laut Amtlicher Vermessung'],
-    ['Mögliche Hauptnutzfläche', m2(n.hnf), `${n.hnfText?.startsWith('Praxisformel') ? 'Praxisformel, ' : ''}${m2(n.gf)} Geschossfläche`],
+    n.projekt
+      ? ['Bewilligte Wohnfläche', m2(n.hnf), `Gebäuderegister; die Formel ergäbe ${m2(n.hnfFormel)}`]
+      : ['Mögliche Hauptnutzfläche', m2(n.hnf), `${n.hnfText?.startsWith('Praxisformel') ? 'Praxisformel, ' : ''}${m2(n.gf)} Geschossfläche`],
     ['Kubatur', `${de(Math.round(n.kubatur))} m³`, 'über Boden'],
-    ['Wohnungen', `rund ${de(n.wohnungen)}`, `je ${de(annahmen.wohnungM2)} m²`],
+    n.projekt ? ['Wohnungen', de(n.wohnungen), 'laut Projekt'] : ['Wohnungen', `rund ${de(n.wohnungen)}`, `je ${de(annahmen.wohnungM2)} m²`],
     ['Baukosten', chf(n.baukosten + n.abbruch), `CHF ${de(n.baukostenJeM2)} je m² Nutzfläche${n.abbruch ? `, dazu ${chf(n.abbruch)} Abbruch` : ''}`],
     ['Verkaufserlös', chf(n.erloes), `CHF ${de(annahmen.erloes)} je m² Nutzfläche · ${QUELLE[b.erloesQuelle.art]}`],
     ['Gewinn', chf(n.gewinn), `${de(annahmen.marge * 100)} % des Erlöses`],

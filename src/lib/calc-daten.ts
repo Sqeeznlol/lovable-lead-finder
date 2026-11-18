@@ -21,6 +21,7 @@
  * diese Angabe, und die Rechnung sagt es -- sie wartet nicht.
  */
 import { supabase } from '@/integrations/supabase/client';
+import { projektAus, type Projekt } from '@/lib/bauprojekt';
 import { flaecheLv95 } from '@/lib/ortsabfrage';
 import { grundlageLaden, ZONEN_FRIST_MS, zoneAusBestand, zoneZh, type Grundlage } from '@/lib/machbarkeit-daten';
 import { gemeindePreise, type GemeindePreise } from '@/lib/preise';
@@ -172,15 +173,17 @@ export function gebaeudeAusRegister(a: Record<string, unknown>): Gebaeude | null
   return { grundflaeche: zahl(a.garea), geschosse: zahl(a.gastw), baujahr: zahl(a.gbauj), wohnungen: zahl(a.ganzwhg) };
 }
 
-interface Register { gebaeude: Gebaeude[]; kanton: string | null; bfs: string | null; gemeinde: string | null; plz: string | null }
+interface Register { gebaeude: Gebaeude[]; projekt: Projekt | null; kanton: string | null; bfs: string | null; gemeinde: string | null; plz: string | null }
 
 async function registerBund(egrid: string): Promise<Register> {
   const q = new URLSearchParams({ layer: 'ch.bfs.gebaeude_wohnungs_register', searchField: 'egrid', searchText: egrid, contains: 'false', returnGeometry: 'false' });
-  const j = await holen(`${API}/all/MapServer/find?${q}`) as { results?: { attributes?: Record<string, unknown> }[] };
+  const j = await holen(`${API}/all/MapServer/find?${q}`) as { results?: { attributes?: Record<string, unknown>; featureId?: string }[] };
   const alle = (j?.results ?? []).map(r => r.attributes ?? {});
   const erster = alle[0] ?? {};
   return {
     gebaeude: alle.map(gebaeudeAusRegister).filter((g): g is Gebaeude => !!g),
+    // Was hier geplant, bewilligt oder im Bau ist: dieselbe Antwort, kein zweiter Weg zum Bund.
+    projekt: projektAus(j?.results ?? []),
     kanton: typeof erster.gdekt === 'string' ? erster.gdekt : null,
     bfs: erster.ggdenr != null ? String(erster.ggdenr) : null,
     gemeinde: typeof erster.ggdename === 'string' ? erster.ggdename : null,
@@ -206,6 +209,8 @@ export interface Objekt {
   gebaeude: Gebaeude[]; bestandQuelle: 'register' | 'liste';
   /** Das Register hat geantwortet: «kein Gebäude» heisst dann «unbebaut». */
   registerDa: boolean;
+  /** Geplant, bewilligt oder im Bau laut Gebäuderegister; null, wenn nichts eingetragen ist. */
+  projekt: Projekt | null;
   denkmal: boolean; isos: boolean;
   eigentuemer: string | null;
   preise: GemeindePreise | null;
@@ -261,7 +266,7 @@ export async function objektLaden(a: Adresse, abstand: number): Promise<Objekt> 
     flaeche: zahl(eigen?.area) ?? grundlage?.flaeche_umriss ?? bund?.flaeche ?? null,
     punkt, grundlage,
     zone: zone ?? liste?.regeln ?? null, bauzoneM2: zone ? null : liste?.bauzoneM2 ?? null, zonenplanAus,
-    gebaeude, bestandQuelle: register || ausBestand ? 'register' : 'liste', registerDa: !!register,
+    gebaeude, bestandQuelle: register || ausBestand ? 'register' : 'liste', registerDa: !!register, projekt: register?.projekt ?? null,
     denkmal: istVorhanden(eigen?.denkmalschutz as string | undefined), isos: istVorhanden(eigen?.isos as string | undefined),
     eigentuemer: (eigen?.owner_name as string | undefined) ?? null,
     preise, luecken,

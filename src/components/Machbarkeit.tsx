@@ -13,6 +13,9 @@ import { angabePruefen, erloesHerleiten, quartierLaden, reihenLaden } from '@/li
 import { grundlageLaden, zeichnung, zoneAusBestand, zoneZh } from '@/lib/machbarkeit-daten';
 import { gemeindePreise, landText, wohnungText } from '@/lib/preise';
 import { drucken } from '@/lib/drucken';
+import { projektLaden } from '@/lib/bauprojekt';
+import { aufParzelle, useGesucheParzelle } from '@/components/BaugesucheParzelle';
+import { ProjektHinweis } from '@/components/ProjektHinweis';
 
 /**
  * Die Machbarkeitsstudie in der Objektansicht (Julian, 15. November:
@@ -71,10 +74,13 @@ function NeubauTafel({ n, annahmen }: { n: Neubau; annahmen: CalcAnnahmen }) {
   );
   return (
     <div className="rounded-[3px] border p-4">
-      <p className="font-medium">{n.abbruch > 0 ? 'Ersatzneubau' : 'Neubau'}</p>
-      <p className="text-sm text-muted-foreground">{n.abbruch > 0 ? 'Bestand abbrechen, das Mögliche neu bauen und verkaufen.' : 'Das Mögliche bauen und als Eigentum verkaufen.'}</p>
+      <p className="font-medium">{n.projekt ? 'Bewilligtes Projekt' : n.abbruch > 0 ? 'Ersatzneubau' : 'Neubau'}</p>
+      <p className="text-sm text-muted-foreground">
+        {n.projekt ? `${n.abbruch > 0 ? 'Bestand abbrechen, ' : ''}das bewilligte Projekt bauen und als Eigentum verkaufen.`
+          : n.abbruch > 0 ? 'Bestand abbrechen, das Mögliche neu bauen und verkaufen.' : 'Das Mögliche bauen und als Eigentum verkaufen.'}
+      </p>
       <dl className="mt-3 space-y-1.5 text-sm">
-        {zeile('Nutzfläche', m2(n.hnf))}
+        {zeile(n.projekt ? 'Wohnfläche laut Projekt' : 'Nutzfläche', m2(n.hnf))}
         {zeile('Wohnungen', `rund ${de(n.wohnungen)}`)}
         {zeile('Erlös', chf(n.erloes))}
         {zeile(`Baukosten, CHF ${de(n.baukostenJeM2)} je m²`, `− ${chf(n.baukosten)}`)}
@@ -144,6 +150,15 @@ export function Machbarkeit({ parzelle }: { parzelle: Parzelle }) {
   // Hanglage: die Steigung aus dem Geländemodell des Bundes, für den Zuschlag auf die Baukosten.
   const neigung = useQuery({ queryKey: ['neigung', punkt?.[0], punkt?.[1]], queryFn: () => neigungLaden(punkt![0], punkt![1]), enabled: auf && !!punkt, staleTime: Infinity });
 
+  // Was hier schon geplant ist, gleich beim Öffnen: es entscheidet, ob die eigene Rechnung überhaupt zählt.
+  const projekt = useQuery({
+    queryKey: ['bauprojekt', parzelle.egrid], queryFn: ({ signal }) => projektLaden(parzelle.egrid!, signal),
+    enabled: !!parzelle.egrid, staleTime: 60 * 60 * 1000, retry: 1,
+  });
+  const gesuche = useGesucheParzelle(parzelle.id, parzelle.egrid ?? null);
+  const gesuch = (gesuche.data ?? []).find(g => aufParzelle(g, parzelle.id, parzelle.egrid ?? null)) ?? null;
+  const hinweis = <ProjektHinweis projekt={projekt.data} gesuch={gesuch} wo="Die Machbarkeit" />;
+
   const liste = useMemo(() => zoneAusBestand(parzelle), [parzelle]);
   const wartetAufZone = parzelle.kanton === 'ZH' && !!punkt && amtlich.isLoading;
   const zone = amtlich.data ?? liste?.regeln ?? null;
@@ -161,14 +176,16 @@ export function Machbarkeit({ parzelle }: { parzelle: Parzelle }) {
   }), [parzelle, grundlage.data, amtlich.data, liste, zone]);
   const studie = useMemo(() => studieRechnen({ ...eingabe, annahmen }), [eingabe, annahmen]);
   const b = useMemo(() => bewerten({
-    grundlage: eingabe, annahmen, kanton: parzelle.kanton ?? null, hand: {}, erloesQuelle,
+    grundlage: eingabe, annahmen, kanton: parzelle.kanton ?? null, hand: {}, erloesQuelle, projekt: projekt.data ?? null,
     umfeld: { gemeinde: preise.data?.name ?? parzelle.gemeinde, land: preise.data?.land ?? null, stwe: preise.data?.stwe ?? null, efh: preise.data?.efh ?? null,
       neigung: neigung.data ?? null, zuerichKm: punkt ? zuerichKm(punkt[0], punkt[1]) : null },
-  }), [eingabe, annahmen, parzelle.kanton, parzelle.gemeinde, erloesQuelle, preise.data, neigung.data, punkt]);
+  }), [eingabe, annahmen, parzelle.kanton, parzelle.gemeinde, erloesQuelle, preise.data, neigung.data, punkt, projekt.data]);
   const bild = useMemo(() => (grundlage.data ? zeichnung(grundlage.data) : null), [grundlage.data]);
 
   if (!auf) {
     return (
+      <div className="space-y-3">
+      {hinweis}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="text-lg">Machbarkeit</h3>
@@ -184,6 +201,7 @@ export function Machbarkeit({ parzelle }: { parzelle: Parzelle }) {
             </button>
           )}
         </div>
+      </div>
       </div>
     );
   }
@@ -209,13 +227,20 @@ export function Machbarkeit({ parzelle }: { parzelle: Parzelle }) {
         </div>
       </div>
 
+      {hinweis}
       {laedt && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Umriss und Zonenplan werden geholt …</p>}
       {grundlage.error && <p className="text-sm text-destructive">Die Grundlage liess sich nicht laden. Später nochmals versuchen.</p>}
       {!laedt && !grundlage.error && !rechenbar && <p className="text-sm text-muted-foreground">Nicht rechenbar: {studie.grund}</p>}
 
       {!laedt && rechenbar && n && (
         <>
-          {/* Ein Satz mit der Zahl, wie im Cockpit. */}
+          {/* Ein Satz mit der Zahl, wie im Cockpit. Mit bewilligtem Projekt dessen Zahl. */}
+          {n.projekt ? (
+            <p className="text-[22px] leading-snug tracking-tight">
+              Bewilligt sind rund <span className="font-semibold">{m2(n.hnf)}</span> Wohnfläche in {de(n.wohnungen)} {n.wohnungen === 1 ? 'Wohnung' : 'Wohnungen'}.{' '}
+              {n.hnfFormel > 0 && <span className="text-muted-foreground">Die Formel ergäbe {m2(n.hnfFormel)} Nutzfläche; es zählt das Projekt.</span>}
+            </p>
+          ) : (
           <p className="text-[22px] leading-snug tracking-tight">
             Möglich sind rund <span className="font-semibold">{m2(n.hnf)}</span> Nutzfläche{praxis ? ' nach der Praxisformel' : ''}
             {studie.gfBestand != null ? <>, heute stehen {m2(studie.gfBestand)} Geschossfläche</> : null}.{' '}
@@ -226,6 +251,7 @@ export function Machbarkeit({ parzelle }: { parzelle: Parzelle }) {
                 : praxis ? 'Die Ziffer der Zone begrenzt.' : 'Die Zone nennt keine Ziffer: gerechnet ist mit Abständen und Geschossen.'}
             </span>
           </p>
+          )}
 
           {amtlich.isError && parzelle.kanton === 'ZH' && (
             <p className="text-sm text-muted-foreground">Der Zonenplan des Kantons antwortet gerade nicht; gerechnet ist mit der eigenen Liste.</p>
