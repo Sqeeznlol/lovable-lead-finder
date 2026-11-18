@@ -101,6 +101,41 @@ describe('Die Datenbank bedient die Seite', () => {
     expect(haupt).toMatch(/ms >= TRAEGE_MS\) \{[\s\S]*?process\.exit\(1\)/);
   });
 
+  // 18. November: «Kanton laden» legte bei jedem Lauf Zwischentabellen in
+  // public neu an (ohne Zeilenschutz: die Lücke vom 15. November wäre
+  // wieder offen gewesen) und schrieb 137'000 Zeilen mit einer Anweisung
+  // von bis zu 30 Minuten. Jetzt rechnet der Runner, und geschrieben wird
+  // nur über den Helfer, stückweise mit Frist und Pause.
+  it('«Kanton laden» schreibt nur stückweise und legt keine Tabelle in public an', () => {
+    const roh = lesen('kanton-laden.yml');
+    const t = ohneKommentare(roh);
+    expect(t).not.toMatch(/create table (if not exists )?public\./i);
+    expect(/^concurrency:\s*\n\s+group:\s*(\S+)/m.exec(roh)?.[1]).toBe('datenbank-laden');
+    const schreibt = [...t.matchAll(/(insert into|update) public\.(properties|parzelle_punkt)\b/g)];
+    expect(schreibt.length).toBeGreaterThanOrEqual(7);
+    const ausserhalb = schreibt.filter(m => {
+      const vor = t.slice(0, m.index);
+      return vor.lastIndexOf('tools/in_portionen.sh') < vor.lastIndexOf('psql "$DB"');
+    });
+    expect(ausserhalb.map(m => m[0])).toEqual([]);
+
+    const helfer = readFileSync('tools/in_portionen.sh', 'utf8');
+    expect(helfer).toContain("set statement_timeout = '2min';");
+    expect(helfer).toMatch(/sleep "\$dauer"/);
+    expect(helfer).toMatch(/-ge "\$GRENZE_MB"/);
+    expect(helfer).toMatch(/-gt "\$LANGSAM"/);
+    expect(helfer).toContain('create temp table');
+  });
+
+  // Das Protokoll ist öffentlich; psql nennt bei Verbindungsfehlern den Server.
+  it('der Helfer schwärzt jede Fehlermeldung der Datenbank', () => {
+    const helfer = readFileSync('tools/in_portionen.sh', 'utf8');
+    const aufrufe = helfer.split('psql "$DB"').slice(1).map(a => a.split('\n\n')[0]);
+    expect(aufrufe.length).toBeGreaterThanOrEqual(2);
+    expect(aufrufe.filter(a => !a.includes('2>"$ordner/fehler"'))).toEqual([]);
+    expect(helfer).toMatch(/schwaerzen "\$ordner\/fehler"/);
+  });
+
   it('Fehlermeldungen der Datenbank erscheinen in «Nachbarschaft» nie im Protokoll', () => {
     const t = ohneKommentare(lesen('nachbarschaft.yml'));
     const aufrufe = t.split('psql "$DB"').slice(1).map(a => a.split(/psql "\$LOKAL"|\n\s*\n/)[0]);

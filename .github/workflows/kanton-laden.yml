@@ -38,7 +38,11 @@ on:
       grenze_mb:
         description: 'Abbrechen, wenn die Datenbank so gross ist (MB)'
         required: false
-        default: '1080'
+        # 1080 stammte aus der Zeit vor Supabase Pro (bei 1107 MB
+        # schaltete sie auf nur-lesen). Heute ist sie 1.5 GB gross, und
+        # 1080 hätte jeden Lauf vor dem ersten Stück beendet. 4000 wie
+        # «Umrisse laden».
+        default: '4000'
       schritt:
         description: 'Was ausgeführt werden soll'
         required: true
@@ -61,8 +65,17 @@ on:
           - gwr          # Gebäuderegister ansehen: Adressen, Baujahr, Geschosse
           - gwr-probe    # Register laden und zeigen, was sich verbinden liesse
           - gwr-schreiben          # Adressen und Gebäudedaten übernehmen
+          - gwr-anlegen            # Parzellen aus dem Register neu anlegen (Luzern: ohne freie Vermessung)
+          - zonen-punkte           # Zone am Haus aus der Nutzungsplanung (Probelauf, für Luzern)
+          - zonen-punkte-schreiben # dasselbe, aber tatsächlich schreiben
           - zonennamen   # Schlüssel durch Zonennamen ersetzen (Probelauf)
           - zonennamen-schreiben   # dasselbe, aber tatsächlich schreiben
+
+# Nie zwei Läufe zugleich, die in die Datenbank schreiben (wie
+# «Umrisse laden» und «Nachbarschaft»).
+concurrency:
+  group: datenbank-laden
+  cancel-in-progress: false
 
 jobs:
   laden:
@@ -141,11 +154,31 @@ jobs:
 
           # Ohne Parzellen ist alles Weitere sinnlos -- lieber hier
           # abbrechen als später mit halben Daten weiterrechnen.
+          #
+          # Gemessen wird gegen die Zahl, die geodienste.ch selbst für den
+          # Kanton meldet, nicht gegen eine feste Zahl: die alte Schwelle
+          # von 50'000 Grundstücken passte zum Thurgau und liess Zug
+          # (25'462 Grundstücke, 24'646 Liegenschaften) am 18. November
+          # scheitern, obwohl alle elf Gemeinden vollständig gelesen waren.
           anzahl=$(ogrinfo -so /tmp/parzellen.gpkg grundstueck 2>/dev/null \
                    | grep -oP 'Feature Count: \K[0-9]+' | head -1)
-          echo "Grundstücke: ${anzahl:-0}"
-          if [ "${anzahl:-0}" -lt 50000 ]; then
-            echo "Zu wenige Grundstücke -- erwartet werden über 100'000." >&2
+          liegenschaften=$(ogrinfo -so /tmp/parzellen.gpkg liegenschaft 2>/dev/null \
+                   | grep -oP 'Feature Count: \K[0-9]+' | head -1)
+          filter="<fes:Filter xmlns:fes=\"http://www.opengis.net/fes/2.0\"><fes:PropertyIsEqualTo><fes:ValueReference>Kanton</fes:ValueReference><fes:Literal>$KANTON</fes:Literal></fes:PropertyIsEqualTo></fes:Filter>"
+          soll=$(curl -sS --retry 3 -G "https://geodienste.ch/db/av_0/deu" \
+                   --data-urlencode "SERVICE=WFS" --data-urlencode "VERSION=2.0.0" \
+                   --data-urlencode "REQUEST=GetFeature" --data-urlencode "TYPENAMES=ms:RESF" \
+                   --data-urlencode "RESULTTYPE=hits" --data-urlencode "FILTER=$filter" \
+                   | grep -oP 'numberMatched="\K[0-9]+' || true)
+          echo "Grundstücke: ${anzahl:-0}, Liegenschaften: ${liegenschaften:-0}, laut Dienst: ${soll:-unbekannt}"
+          if [ -n "${soll:-}" ] && [ "$soll" -gt 0 ]; then
+            # Eine Liegenschaft aus mehreren Stücken zählt im Dienst mehrfach.
+            if [ $(( ${liegenschaften:-0} * 100 )) -lt $(( soll * 99 )) ]; then
+              echo "Zu wenige Liegenschaften: ${liegenschaften:-0} von $soll." >&2
+              exit 1
+            fi
+          elif [ "${anzahl:-0}" -lt 10000 ]; then
+            echo "Zu wenige Grundstücke, und der Dienst nennt keine Zahl." >&2
             exit 1
           fi
 
@@ -187,8 +220,11 @@ jobs:
                 && inputs.schritt != 'geometrie-schreiben' }}
         run: |
           set -euo pipefail
-          xtf=$(find /tmp/npl -name '*.xtf' | head -1)
-          echo "Datei: $xtf"
+          # Zug liefert je Gemeinde eine Datei (elf), Thurgau eine. Hier
+          # wird nur die erste angesehen; umgewandelt werden alle.
+          echo "Dateien: $(find /tmp/npl -name '*.xtf' | wc -l)"
+          xtf=$(find /tmp/npl -name '*.xtf' | sort | head -1)
+          echo "Angesehen: $xtf"
           echo
           echo "### Klassen und Objektzahlen"
           # ogrinfo listet die Ebenen mit Geometrietyp und Anzahl.
@@ -198,7 +234,8 @@ jobs:
 
       - name: Zonen umwandeln
         if: ${{ inputs.schritt == 'zonen' || inputs.schritt == 'alles'
-                || inputs.schritt == 'verschneiden' }}
+                || inputs.schritt == 'verschneiden'
+                || startsWith(inputs.schritt, 'zonen-punkte') }}
         run: |
           set -euo pipefail
 
@@ -218,18 +255,27 @@ jobs:
           #
           # Also: Umrisse von GDAL, Namen von ili2gpkg.
 
-          xtf=$(find /tmp/npl -name '*.xtf' | head -1)
-          ebene=$(ogrinfo -so "$xtf,/tmp/Nutzungsplanung_V1_2.ili" 2>/dev/null \
-            | grep -o '[A-Za-z_0-9.]*Grundnutzung_Zonenflaeche' | head -1)
-          echo "Ebene: ${ebene:-nicht gefunden}"
-          if [ -z "$ebene" ]; then
-            echo "Die Ebene mit den Zonen liess sich nicht finden." >&2
-            exit 1
-          fi
-
-          ogr2ogr -f GPKG /tmp/zonen.gpkg \
-            "$xtf,/tmp/Nutzungsplanung_V1_2.ili" \
-            -nln zonen "$ebene"
+          # Alle Dateien der Lieferung. Bis zum 18. November las dieser
+          # Schritt nur die erste: für Thurgau (eine Datei) genügte das,
+          # für Zug (eine je Gemeinde) wären es die Zonen von Baar allein
+          # gewesen, ohne Fehlermeldung. Die Kennungen sind über alle
+          # Dateien eindeutig (Zug: 5'534 Zonenflächen, 5'534 Kennungen).
+          rm -f /tmp/zonen.gpkg
+          dateien=0
+          for xtf in $(find /tmp/npl -name '*.xtf' | sort); do
+            ebene=$(ogrinfo -so "$xtf,/tmp/Nutzungsplanung_V1_2.ili" 2>/dev/null \
+              | grep -o '[A-Za-z_0-9.]*Grundnutzung_Zonenflaeche' | head -1)
+            if [ -z "$ebene" ]; then
+              echo "Keine Zonen in $(basename "$xtf")." >&2
+              exit 1
+            fi
+            if [ -f /tmp/zonen.gpkg ]; then anhaengen="-append"; else anhaengen=""; fi
+            ogr2ogr -f GPKG /tmp/zonen.gpkg $anhaengen \
+              "$xtf,/tmp/Nutzungsplanung_V1_2.ili" \
+              -nln zonen "$ebene"
+            dateien=$(( dateien + 1 ))
+          done
+          echo "Dateien: $dateien"
 
           ls -lh /tmp/zonen.gpkg
           n=$(ogrinfo -so -al /tmp/zonen.gpkg 2>/dev/null \
@@ -247,7 +293,7 @@ jobs:
           # XTF-Datei ist XML -- die Tabelle wird direkt gelesen.
           # Ohne Namen ist die Liste schlechter, aber nicht wertlos --
           # der Lauf darf daran nicht scheitern.
-          python3 tools/zonentypen.py "$xtf" /tmp/zonentypen.csv || true
+          python3 tools/zonentypen.py $(find /tmp/npl -name '*.xtf' | sort) /tmp/zonentypen.csv || true
           head -4 /tmp/zonentypen.csv
 
       - name: Ergebnis bereitstellen
@@ -522,93 +568,51 @@ jobs:
           [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
 
           groesse() {
-            psql "$DB" -X -q -t -A -c \
-              "select pg_size_pretty(pg_database_size(current_database()));"
+            psql "$DB" -X -q -t -A -c "set statement_timeout = '30s';" \
+              -c "select pg_size_pretty(pg_database_size(current_database()));"
           }
 
-          megabyte() {
-            psql "$DB" -X -q -t -A -c \
-              "select (pg_database_size(current_database())/1024/1024)::int;"
-          }
-
-          # Am 31. Oktober stand die Datenbank bei 1107 MB auf
-          # nur-lesen -- und dann speichert auch die Webseite nichts
-          # mehr. Hier wird vorher abgebrochen. Was liegenbleibt,
-          # holt der naechste Lauf: beide Schleifen nehmen nur, was
-          # noch offen ist.
-          GRENZE_MB=${GRENZE_MB:-1080}
-          zu_voll() {
-            mb=$(megabyte)
-            if [ "$mb" -ge "$GRENZE_MB" ]; then
-              echo "ABBRUCH: Datenbank bei ${mb} MB, Grenze ${GRENZE_MB} MB." \
-                | tee -a "$GITHUB_STEP_SUMMARY"
-              echo "Der Rest bleibt offen und laeuft beim naechsten Mal weiter." \
-                | tee -a "$GITHUB_STEP_SUMMARY"
-              return 0
-            fi
-            return 1
-          }
-
+          # Die Grenze der Grösse prüft der Helfer vor jedem Stück.
           echo "### Vorher" | tee -a "$GITHUB_STEP_SUMMARY"
           echo "Datenbank: $(groesse)" | tee -a "$GITHUB_STEP_SUMMARY"
 
           # ----------------------------------------------- in Stuecke
-          # Kein grosses Zwischenlager mehr. Der erste Versuch legte
-          # alle 137'269 Umrisse als Text in eine Tabelle -- 82 MB,
-          # die nach dem Absturz liegenblieben und die Datenbank auf
-          # nur-lesen brachten. Jetzt wandert jedes Stueck einzeln
-          # durch eine Sitzungstabelle, die mit der Sitzung vergeht.
-          rm -f /tmp/teil_*
-          tail -n +2 /tmp/geometrie.csv | split -l 2000 - /tmp/teil_
-          stuecke=$(ls /tmp/teil_* | wc -l)
-          echo "Stuecke zu je 2000: $stuecke" | tee -a "$GITHUB_STEP_SUMMARY"
-
-          grenze=${MENGE:-0}
-          gesamt=0
-          nummer=0
-          for f in /tmp/teil_*; do
-            nummer=$(( nummer + 1 ))
-            if [ "$grenze" -gt 0 ] && [ "$gesamt" -ge "$grenze" ]; then
-              echo "Grenze von $grenze erreicht -- Rest bleibt offen."
-              break
-            fi
-            if zu_voll; then break; fi
-            n=$(psql "$DB" -v ON_ERROR_STOP=1 -X -q -t -A \
-              -c "set statement_timeout = '10min';" \
-              -c "create temp table eingang (wkt text, egrid text);" \
-              -c "\copy eingang(wkt, egrid) from '$f' with (format csv)" \
-              -c "
-                with kand as (
-                  select e.egrid, e.wkt
-                    from eingang e
-                    join public.properties p on p.egrid = e.egrid
-                   where p.geometrie is null
-                     and (e.wkt like 'POLYGON%' or e.wkt like 'MULTIPOLYGON%')
-                ), gesetzt as (
-                  update public.properties p
-                     set geometrie        = ST_Multi(ST_GeomFromText(k.wkt, 2056)),
-                         geometrie_quelle = 'geodienste.ch AV',
-                         geometrie_stand  = now()
-                    from kand k
-                   where k.egrid = p.egrid
-                  returning 1
-                )
-                select count(*) from gesetzt;")
-            gesamt=$(( gesamt + n ))
-            if [ $(( nummer % 10 )) -eq 0 ]; then
-              echo "  Stueck $nummer/$stuecke -- $gesamt zugeordnet, Datenbank $(groesse)"
-            fi
-          done
-          echo "Zugeordnet: $gesamt" | tee -a "$GITHUB_STEP_SUMMARY"
+          # Kein grosses Zwischenlager: der erste Versuch legte alle
+          # 137'269 Umrisse als Text in eine Tabelle -- 82 MB, die nach
+          # dem Absturz liegenblieben und die Datenbank auf nur-lesen
+          # brachten. Jedes Stück wandert durch eine Sitzungstabelle, mit
+          # Pause danach (tools/in_portionen.sh, wie «Umrisse laden»).
+          # ST_MakeValid: ein sich selbst schneidender Umriss liesse
+          # später ST_Touches scheitern.
+          if [ "${MENGE:-0}" -gt 0 ]; then
+            head -n $(( MENGE + 1 )) /tmp/geometrie.csv > /tmp/geometrie_teil.csv
+            echo "Höchstens $MENGE Umrisse." | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            cp /tmp/geometrie.csv /tmp/geometrie_teil.csv
+          fi
+          tools/in_portionen.sh /tmp/geometrie_teil.csv \
+            "create temp table eingang (wkt text, egrid text);" "
+            with kand as (
+              select e.egrid, ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_GeomFromText(e.wkt, 2056)), 3)) as g
+                from eingang e
+                join public.properties p on p.egrid = e.egrid
+               where p.geometrie is null
+                 and (e.wkt like 'POLYGON%' or e.wkt like 'MULTIPOLYGON%')
+            ), gesetzt as (
+              update public.properties p
+                 set geometrie        = k.g,
+                     geometrie_quelle = 'geodienste.ch AV',
+                     geometrie_stand  = now()
+                from kand k
+               where k.egrid = p.egrid and not ST_IsEmpty(k.g)
+              returning 1
+            )
+            select count(*) from gesetzt;" | tee -a "$GITHUB_STEP_SUMMARY"
           echo "Datenbank nach den Umrissen: $(groesse)" \
             | tee -a "$GITHUB_STEP_SUMMARY"
 
-          psql "$DB" -X -c \
-            "select kanton,
-                    count(*) filter (where geometrie is not null) as mit_umriss,
-                    count(*) as objekte
-               from public.properties group by 1 order by 1;" \
-            | tee -a "$GITHUB_STEP_SUMMARY"
+          # Gezählt wird nicht hier: über alle Parzellen zu zählen liest die
+          # ganze Tabelle. Den Stand zeigt Auswerten «parzellen-vier».
 
           # ------------------------------------------- Nachbarschaft
           # Hier wird sie nicht mehr gerechnet. In der Datenbank
@@ -860,111 +864,83 @@ jobs:
         env:
           DB: ${{ secrets.SUPABASE_DB_URL }}
           KANTON: ${{ inputs.kanton }}
+          GRENZE_MB: ${{ inputs.grenze_mb }}
         run: |
           set -euo pipefail
           [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
           sudo apt-get install -y -qq postgresql-client
 
-          ls -lh /tmp/verschnitten.csv
-          echo "Zeilen: $(( $(wc -l < /tmp/verschnitten.csv) - 1 ))"
-          head -3 /tmp/verschnitten.csv
+          echo "Zeilen im Verschnitt: $(( $(wc -l < /tmp/verschnitten.csv) - 1 ))"
 
-          # Erst in eine eigene Tabelle laden. Was dort steht, lässt
-          # sich zählen und ansehen, bevor es die 259'000 bestehenden
-          # Zeilen berührt.
-          psql "$DB" -v ON_ERROR_STOP=1 -X -q -c "
-            drop table if exists public.verschnitt_tg;
-            create table public.verschnitt_tg (
-              egrid text, parzelle text, vermessungskreis text, art text,
-              flaeche_m2 numeric, zone_typ text,
-              zone_name text, zone_kurz text,
-              zone_m2 numeric, anteil_prozent numeric);"
-
-          # Die Kopfzeile entscheidet, welche Spalten es gibt: ohne
-          # Zonennamen fehlen zwei davon.
-          kopf=$(head -1 /tmp/verschnitten.csv)
-          echo "Spalten: $kopf"
-          psql "$DB" -v ON_ERROR_STOP=1 -X -q \
-            -c "\\copy public.verschnitt_tg ($kopf) from '/tmp/verschnitten.csv' with (format csv, header true)"
-
-          # Ohne Index vergleicht die Datenbank 193'642 Zeilen mit
-          # 259'057 -- derselbe Fehler wie beim Verschneiden, nur eine
-          # Ebene höher. Der erste Versuch brach nach zwei Minuten ab.
-          # Und die Voreinstellung bricht jede längere Abfrage ab;
-          # 137'000 Zeilen einzufügen dauert länger als das.
-          psql "$DB" -v ON_ERROR_STOP=1 -X -q -c "
-            create index on public.verschnitt_tg (egrid);
-            analyze public.verschnitt_tg;"
-
-          echo "### Was geladen wurde"
-          psql "$DB" -X -q -c "
-            select count(*) as zeilen,
-                   count(distinct egrid) as parzellen,
-                   count(*) filter (where zone_name is not null) as mit_zonenname
-            from public.verschnitt_tg;"
+          # Die Rechnung läuft hier, auf dem Runner: je Parzelle die
+          # grösste Zone, mit Fläche und Anteil. Bis zum 18. November lud
+          # dieser Schritt den ganzen Verschnitt in eine Tabelle der
+          # Datenbank (verschnitt_tg, ohne Zeilenschutz neu angelegt) und
+          # rechnete dort mit einer Anweisung von bis zu 30 Minuten.
+          # Die BFS-Nummer kommt aus der Vermessung (Sekunden, ohne Umriss).
+          python3 tools/av_liste.py "$KANTON" /tmp/av.csv
+          python3 tools/kanton_haupt.py /tmp/verschnitten.csv /tmp/av.csv /tmp/haupt.csv
 
           echo "### Die zehn häufigsten Zonen"
-          psql "$DB" -X -q -c "
-            select coalesce(zone_name, zone_typ) as zone, count(*)
-            from public.verschnitt_tg group by 1 order by 2 desc limit 10;"
+          python3 - <<'PY'
+          import csv, re
+          from collections import Counter
+          z = Counter(re.sub(r' \([^)]*\)$', '', r['zone']) for r in csv.DictReader(open('/tmp/haupt.csv', encoding='utf-8')))
+          for name, n in z.most_common(10):
+              print(f'{n:>8}  {name or "(ohne)"}')
+          PY
+
+          tabelle="create temp table eingang (egrid text, parzelle text, bfs_nr text, flaeche numeric, zone text, notiz text);"
 
           if [ "${{ inputs.schritt }}" != "einspielen-schreiben" ]; then
             echo "### Was geschrieben würde"
-            # Ein Join, kein Unterausdruck je Zeile: sonst schlägt die
-            # Datenbank 137'000 Mal in 259'057 Zeilen nach.
-            psql "$DB" -X -q -c "
-              set local statement_timeout = '15min';
-              with haupt as (
-                select distinct on (egrid) egrid
-                from public.verschnitt_tg
-                where egrid is not null and egrid <> ''
-                order by egrid, zone_m2 desc nulls last)
-              select count(*) as neue_objekte,
-                     count(p.egrid) as davon_schon_vorhanden
-              from haupt h
-              left join public.properties p on p.egrid = h.egrid;"
+            psql "$DB" -v ON_ERROR_STOP=1 -X -q \
+              -c "set statement_timeout = '2min';" \
+              -c "$tabelle" \
+              -c "\\copy eingang from '/tmp/haupt.csv' with (format csv, header true)" \
+              -c "
+                select count(*)                                    as parzellen,
+                       count(*) - count(p.id)                      as neu,
+                       count(p.id)                                 as schon_da,
+                       count(*) filter (where p.id is not null and p.kanton is distinct from '$KANTON') as anderer_kanton,
+                       count(*) filter (where p.id is not null and nullif(p.zone, '') is null and e.zone is not null) as zone_dazu,
+                       count(*) filter (where p.id is not null and p.area is null and e.flaeche is not null) as flaeche_dazu
+                  from eingang e
+                  left join public.properties p on p.egrid = e.egrid;"
             echo ""
             echo "**Probelauf** -- die Tabelle properties wurde nicht berührt."
             exit 0
           fi
 
-          echo "### Schreiben"
-          # 137'000 Zeilen, und an jeder hängt der Auslöser, der
-          # Ausnützung und Marge rechnet. Das dauert länger als die
-          # voreingestellte Frist einer Abfrage.
-          psql "$DB" -v ON_ERROR_STOP=1 -X -q -c "
-            set local statement_timeout = '30min';
-            with haupt as (
-              select distinct on (egrid) *
-              from public.verschnitt_tg
-              where egrid is not null and egrid <> ''
-              order by egrid, zone_m2 desc nulls last)
-            insert into public.properties
-              (address, egrid, plot_number, parzelle, bfs_nr, kanton,
-               area, zone, notes)
-            select
-              'Parzelle ' || coalesce(h.parzelle, '?'),
-              h.egrid, h.parzelle, h.parzelle,
-              nullif(regexp_replace(coalesce(h.vermessungskreis,''),
-                                    '\\D', '', 'g'), ''),
-              '$KANTON',
-              h.flaeche_m2,
-              coalesce(nullif(h.zone_name, ''), h.zone_typ),
-              'Zonenanteil ' || coalesce(h.zone_m2::text,'?') || ' m2 ('
-                || coalesce(h.anteil_prozent::text,'?') || '%)'
-            from haupt h
-            on conflict (egrid) where egrid is not null do update set
-              parzelle    = coalesce(public.properties.parzelle, excluded.parzelle),
-              plot_number = coalesce(public.properties.plot_number, excluded.plot_number),
-              bfs_nr      = coalesce(public.properties.bfs_nr, excluded.bfs_nr),
-              kanton      = coalesce(public.properties.kanton, excluded.kanton),
-              area        = coalesce(public.properties.area, excluded.area),
-              zone        = coalesce(public.properties.zone, excluded.zone);"
-
-          echo "### Ergebnis"
-          psql "$DB" -X -q -c "
-            select kanton, count(*) from public.properties
-            group by 1 order by 2 desc;"
+          echo "### Schreiben" | tee -a "$GITHUB_STEP_SUMMARY"
+          # Neue Parzellen kommen dazu; bei bestehenden wird nur ergänzt,
+          # was fehlt und hier steht. Eine vollständige Zeile bleibt
+          # unberührt: jede Änderung legt eine neue Fassung der Zeile an
+          # und weckt den Auslöser, der das Potenzial rechnet.
+          tools/in_portionen.sh /tmp/haupt.csv "$tabelle" "
+            with g as (
+              insert into public.properties
+                (address, egrid, plot_number, parzelle, bfs_nr, kanton, area, zone, notes)
+              select 'Parzelle ' || coalesce(e.parzelle, '?'), e.egrid, e.parzelle, e.parzelle,
+                     e.bfs_nr, '$KANTON', e.flaeche, e.zone, e.notiz
+                from eingang e
+              on conflict (egrid) where egrid is not null do update set
+                parzelle    = coalesce(public.properties.parzelle, excluded.parzelle),
+                plot_number = coalesce(public.properties.plot_number, excluded.plot_number),
+                bfs_nr      = coalesce(public.properties.bfs_nr, excluded.bfs_nr),
+                kanton      = coalesce(public.properties.kanton, excluded.kanton),
+                area        = coalesce(public.properties.area, excluded.area),
+                zone        = coalesce(nullif(public.properties.zone, ''), excluded.zone)
+              where (public.properties.parzelle is null and excluded.parzelle is not null)
+                 or (public.properties.plot_number is null and excluded.plot_number is not null)
+                 or (public.properties.bfs_nr is null and excluded.bfs_nr is not null)
+                 or (public.properties.kanton is null)
+                 or (public.properties.area is null and excluded.area is not null)
+                 or (nullif(public.properties.zone, '') is null and excluded.zone is not null)
+              returning 1)
+            select count(*) from g;" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Umrisse danach mit «Umrisse laden» ($KANTON), Adressen und Gebäude mit Schritt gwr-schreiben." \
+            | tee -a "$GITHUB_STEP_SUMMARY"
 
       # =============================================================
       # Gebäude- und Wohnungsregister
@@ -1007,148 +983,138 @@ jobs:
       # Register in die Datenbank
       # =============================================================
       # Je Parzelle stehen mehrere Gebäude im Register. Zusammengefasst
-      # wird so, wie beim Anruf gefragt wird: die Adresse und das
-      # Baujahr des grössten Hauses -- danach sucht man die Liegenschaft
-      # --, die höchste Geschosszahl, und Wohnungen wie Grundfläche
-      # aufsummiert, weil beides zusammen die Parzelle beschreibt.
+      # wird auf dem Runner (tools/gwr_parzellen.py): Adresse und Baujahr
+      # des grössten Hauses, die höchste Geschosszahl, Wohnungen und
+      # Grundfläche aufsummiert. In die Datenbank geht nur das Ergebnis,
+      # stückweise (tools/in_portionen.sh).
       #
-      # Die Kennzahlen sind Schlüssel, keine Wörter: 1004 heisst
-      # "Bestehend". Die Übersetzung liegt derselben Lieferung bei.
+      #   gwr-probe      zählen, was sich verbinden liesse
+      #   gwr-schreiben  bestehende Parzellen ergänzen (nur, was fehlt)
+      #   gwr-anlegen    Parzellen, die es noch nicht gibt, aus dem
+      #                  Register anlegen. Für Luzern: dort gibt der
+      #                  Kanton die Vermessung nur gegen Gebühr ab, das
+      #                  Register ist frei. Es kennt die bebauten
+      #                  Parzellen mit EGRID, Nummer, Adresse und Lage
+      #                  des Hauses, aber weder Fläche noch Umriss.
       - name: Register einspielen
         if: ${{ startsWith(inputs.schritt, 'gwr-') }}
         env:
           DB: ${{ secrets.SUPABASE_DB_URL }}
           KANTON: ${{ inputs.kanton }}
+          GRENZE_MB: ${{ inputs.grenze_mb }}
         run: |
           set -euo pipefail
           [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
           sudo apt-get install -y -qq postgresql-client
 
           klein=$(echo "$KANTON" | tr 'A-Z' 'a-z')
-          curl -sSL -o /tmp/gwr.zip \
+          curl -sSL --retry 4 -o /tmp/gwr.zip \
             "https://public.madd.bfs.admin.ch/${klein}.zip"
           mkdir -p /tmp/gwr && unzip -o -q /tmp/gwr.zip -d /tmp/gwr
+          python3 tools/gwr_parzellen.py /tmp/gwr /tmp/gwr_parzellen.csv | tee -a "$GITHUB_STEP_SUMMARY"
 
-          psql "$DB" -v ON_ERROR_STOP=1 -X -q -c "
-            drop table if exists public.gwr_gebaeude;
-            drop table if exists public.gwr_eingang;
-            drop table if exists public.gwr_kodes;
-            create table public.gwr_gebaeude (
-              egid text, gdekt text, ggdenr text, ggdename text, egrid text,
-              lgbkr text, lparz text, lparzsx text, ltyp text, gebnr text,
-              gbez text, gkode text, gkodn text, gksce text, gstat text,
-              gkat text, gklas text, gbauj text, gbaum text, gbaup text,
-              gabbj text, garea text, gvol text, gvolnorm text, gvolsce text,
-              gastw text, ganzwhg text, gazzi text, gschutzr text, gebf text,
-              gwaerzh1 text, genh1 text, gwaersceh1 text, gwaerdath1 text,
-              gwaerzh2 text, genh2 text, gwaersceh2 text, gwaerdath2 text,
-              gwaerzw1 text, genw1 text, gwaerscew1 text, gwaerdatw1 text,
-              gwaerzw2 text, genw2 text, gwaerscew2 text, gwaerdatw2 text,
-              gexpdat text);
-            create table public.gwr_eingang (
-              egid text, edid text, egaid text, deinr text, esid text,
-              strname text, strnamk text, strindx text, strsp text,
-              stroffiziel text, dplz4 text, dplzz text, dplzname text,
-              dkode text, dkodn text, doffadr text, dexpdat text);
-            create table public.gwr_kodes (
-              cecodid text, cmerkm text, codtxtld text, codtxtkd text,
-              codtxtlf text, codtxtkf text, codtxtli text, codtxtki text,
-              cexpdat text);"
+          tabelle="create temp table eingang (egrid text, parzelle text, egid text, adresse text, plz text, ort text,
+                     gemeinde text, bfs_nr text, baujahr int, geschosse numeric, wohnungen numeric, flaeche numeric,
+                     anzahl int, geb_status text, gebaeudeart text, e numeric, n numeric);"
 
-          for t in gebaeude:gebaeude_batiment_edificio \
-                   eingang:eingang_entree_entrata \
-                   kodes:kodes_codes_codici; do
-            ziel="public.gwr_${t%%:*}"; datei="/tmp/gwr/${t##*:}.csv"
-            echo "-- $ziel aus $(basename "$datei")"
-            psql "$DB" -v ON_ERROR_STOP=1 -X -q \
-              -c "\\copy $ziel from '$datei' with (format csv, header true, delimiter E'\\t')"
-          done
+          echo "### Wie viele Parzellen sich verbinden lassen" | tee -a "$GITHUB_STEP_SUMMARY"
+          psql "$DB" -v ON_ERROR_STOP=1 -X -q \
+            -c "set statement_timeout = '2min';" \
+            -c "$tabelle" \
+            -c "\\copy eingang from '/tmp/gwr_parzellen.csv' with (format csv, header true)" \
+            -c "
+              select count(*)                                              as im_register,
+                     count(p.id)                                           as im_bestand,
+                     count(*) filter (where p.id is not null and p.kanton = '$KANTON') as im_bestand_dieses_kantons,
+                     count(*) - count(p.id)                                as nicht_im_bestand,
+                     count(*) filter (where p.address like 'Parzelle %' and e.adresse is not null) as adresse_dazu,
+                     count(*) filter (where p.id is not null and p.baujahr is null and e.baujahr is not null) as baujahr_dazu
+                from eingang e
+                left join public.properties p on p.egrid = e.egrid;" | tee -a "$GITHUB_STEP_SUMMARY"
 
-          psql "$DB" -v ON_ERROR_STOP=1 -X -q -c "
-            create index on public.gwr_gebaeude (egrid);
-            create index on public.gwr_eingang (egid);
-            analyze public.gwr_gebaeude; analyze public.gwr_eingang;"
-
-          echo "### Was geladen wurde"
-          psql "$DB" -X -q -c "
-            select (select count(*) from public.gwr_gebaeude) as gebaeude,
-                   (select count(distinct egrid) from public.gwr_gebaeude
-                    where egrid <> '') as parzellen,
-                   (select count(*) from public.gwr_eingang) as eingaenge;"
-
-          echo "### Wie viele Objekte lassen sich verbinden"
-          psql "$DB" -X -q -c "
-            set local statement_timeout = '15min';
-            select count(*) as treffer
-            from public.properties p
-            join public.gwr_gebaeude g on g.egrid = p.egrid
-            where p.kanton = '$KANTON';"
-
-          if [ "${{ inputs.schritt }}" != "gwr-schreiben" ]; then
-            echo ""
-            echo "**Probelauf** -- properties wurde nicht berührt."
-            exit 0
-          fi
-
-          echo "### Schreiben"
-          psql "$DB" -v ON_ERROR_STOP=1 -X -q -c "
-            set local statement_timeout = '30min';
-            with haupt as (
-              -- Das grösste Gebäude gibt Adresse und Baujahr; danach
-              -- sucht man die Liegenschaft.
-              select distinct on (g.egrid)
-                     g.egrid, g.egid, g.ggdename, g.ggdenr,
-                     nullif(g.gbauj,'')::int  as baujahr,
-                     nullif(g.gstat,'')       as gstat,
-                     nullif(g.gkat,'')        as gkat,
-                     e.strname, e.deinr, e.dplz4, e.dplzname
-              from public.gwr_gebaeude g
-              left join public.gwr_eingang e
-                     on e.egid = g.egid and e.edid = '0'
-              where g.egrid <> ''
-              order by g.egrid, nullif(g.garea,'')::numeric desc nulls last),
-            summe as (
-              select egrid,
-                     count(*)                                as anzahl,
-                     max(nullif(gastw,'')::int)              as geschosse,
-                     sum(nullif(ganzwhg,'')::int)            as wohnungen,
-                     sum(nullif(garea,'')::numeric)          as flaeche
-              from public.gwr_gebaeude where egrid <> '' group by egrid)
-            update public.properties p set
-              address     = case when p.address like 'Parzelle %'
-                                  and h.strname is not null
-                                 then trim(h.strname || ' ' ||
-                                           coalesce(h.deinr,''))
-                                 else p.address end,
-              plz         = coalesce(p.plz, h.dplz4),
-              gemeinde    = coalesce(p.gemeinde, h.ggdename),
-              bfs_nr      = coalesce(p.bfs_nr, h.ggdenr),
-              gwr_egid    = coalesce(p.gwr_egid, h.egid),
-              baujahr     = coalesce(p.baujahr, h.baujahr),
-              geschosse   = coalesce(p.geschosse, s.geschosse),
-              wohnungen   = coalesce(p.wohnungen, s.wohnungen),
-              gebaeudeflaeche = coalesce(p.gebaeudeflaeche, s.flaeche),
-              gebaeude_anzahl = coalesce(p.gebaeude_anzahl, s.anzahl),
-              geb_status  = coalesce(p.geb_status, (
-                              select k.codtxtld from public.gwr_kodes k
-                              where k.cmerkm = 'GSTAT'
-                                and k.cecodid = h.gstat)),
-              gebaeudeart = coalesce(p.gebaeudeart, (
-                              select k.codtxtld from public.gwr_kodes k
-                              where k.cmerkm = 'GKAT'
-                                and k.cecodid = h.gkat))
-            from haupt h join summe s on s.egrid = h.egrid
-            where p.egrid = h.egrid and p.kanton = '$KANTON';"
-
-          echo "### Ergebnis"
-          psql "$DB" -X -q -c "
-            select count(*) as objekte,
-                   count(*) filter (where address not like 'Parzelle %')
-                     as mit_adresse,
-                   count(baujahr) as mit_baujahr,
-                   count(geschosse) as mit_geschossen,
-                   count(wohnungen) as mit_wohnungen
-            from public.properties where kanton = '$KANTON';"
+          case "${{ inputs.schritt }}" in
+            gwr-schreiben)
+              echo "### Ergänzen" | tee -a "$GITHUB_STEP_SUMMARY"
+              tools/in_portionen.sh /tmp/gwr_parzellen.csv "$tabelle" "
+                with g as (
+                  update public.properties p set
+                    address         = case when p.address like 'Parzelle %' and e.adresse is not null
+                                           then e.adresse else p.address end,
+                    plz             = coalesce(p.plz, e.plz),
+                    gemeinde        = coalesce(p.gemeinde, e.gemeinde),
+                    bfs_nr          = coalesce(p.bfs_nr, e.bfs_nr),
+                    gwr_egid        = coalesce(p.gwr_egid, e.egid),
+                    baujahr         = coalesce(p.baujahr, e.baujahr),
+                    geschosse       = coalesce(p.geschosse, e.geschosse),
+                    wohnungen       = coalesce(p.wohnungen, e.wohnungen),
+                    gebaeudeflaeche = coalesce(p.gebaeudeflaeche, e.flaeche),
+                    geb_status      = coalesce(p.geb_status, e.geb_status),
+                    gebaeudeart     = coalesce(p.gebaeudeart, e.gebaeudeart)
+                  from eingang e
+                  where p.egrid = e.egrid and p.kanton = '$KANTON'
+                    and ((p.address like 'Parzelle %' and e.adresse is not null)
+                         or (p.plz is null and e.plz is not null)
+                         or (p.gemeinde is null and e.gemeinde is not null)
+                         or (p.bfs_nr is null and e.bfs_nr is not null)
+                         or (p.gwr_egid is null and e.egid is not null)
+                         or (p.baujahr is null and e.baujahr is not null)
+                         or (p.geschosse is null and e.geschosse is not null)
+                         or (p.wohnungen is null and e.wohnungen is not null)
+                         or (p.gebaeudeflaeche is null and e.flaeche is not null)
+                         or (p.geb_status is null and e.geb_status is not null)
+                         or (p.gebaeudeart is null and e.gebaeudeart is not null))
+                  returning 1)
+                select count(*) from g;" | tee -a "$GITHUB_STEP_SUMMARY"
+              ;;
+            gwr-anlegen)
+              # Nur, wo die Vermessung nicht frei ist. Das Register hängt
+              # Häuser auf Baurecht an das Baurecht, nicht an die Parzelle
+              # darunter: in Zug sind 747 der 757 EGRID, die in der
+              # Vermessung als Liegenschaft fehlen, Baurechte (18. November,
+              # in der Lieferung nachgesehen). Wo die Vermessung frei ist,
+              # legt «einspielen» die Parzellen an, und Baurechte entstünden
+              # hier als falsche zweite Parzellen.
+              filter="<fes:Filter xmlns:fes=\"http://www.opengis.net/fes/2.0\"><fes:PropertyIsEqualTo><fes:ValueReference>Kanton</fes:ValueReference><fes:Literal>$KANTON</fes:Literal></fes:PropertyIsEqualTo></fes:Filter>"
+              frei=$(curl -sS --retry 3 -G "https://geodienste.ch/db/av_0/deu" \
+                       --data-urlencode "SERVICE=WFS" --data-urlencode "VERSION=2.0.0" \
+                       --data-urlencode "REQUEST=GetFeature" --data-urlencode "TYPENAMES=ms:RESF" \
+                       --data-urlencode "RESULTTYPE=hits" --data-urlencode "FILTER=$filter" \
+                       | grep -oP 'numberMatched="\K[0-9]+' || echo "unbekannt")
+              if [ "$frei" != "0" ]; then
+                echo "Für $KANTON führt geodienste.ch die Vermessung frei ($frei Liegenschaften) oder antwortet nicht." | tee -a "$GITHUB_STEP_SUMMARY"
+                echo "Dort legt «einspielen» die Parzellen an; hier entstünden Baurechte als Parzellen." | tee -a "$GITHUB_STEP_SUMMARY"
+                exit 1
+              fi
+              echo "### Neu anlegen" | tee -a "$GITHUB_STEP_SUMMARY"
+              # Die Lage des Hauses wird zum Punkt der Parzelle, damit sie
+              # auf der Karte steht, solange kein Umriss da ist.
+              tools/in_portionen.sh /tmp/gwr_parzellen.csv "$tabelle" "
+                with neu as (
+                  insert into public.properties
+                    (address, egrid, plot_number, parzelle, bfs_nr, kanton, plz, gemeinde, gwr_egid,
+                     baujahr, geschosse, wohnungen, gebaeudeflaeche, gebaeude_anzahl, geb_status, gebaeudeart, notes)
+                  select coalesce(e.adresse, 'Parzelle ' || coalesce(e.parzelle, '?')), e.egrid, e.parzelle, e.parzelle,
+                         e.bfs_nr, '$KANTON', e.plz, e.gemeinde, e.egid, e.baujahr, e.geschosse, e.wohnungen,
+                         e.flaeche, coalesce(e.anzahl, 1), e.geb_status, e.gebaeudeart,
+                         'Aus dem Gebäuderegister angelegt: Fläche und Umriss fehlen, kann ein Baurecht sein'
+                    from eingang e
+                   where e.egrid like 'CH%'
+                  on conflict (egrid) where egrid is not null do nothing
+                  returning id, egrid),
+                punkt as (
+                  insert into public.parzelle_punkt (parzelle_id, e, n, quelle)
+                  select neu.id, e.e, e.n, 'gebäuderegister'
+                    from neu join eingang e on e.egrid = neu.egrid
+                   where e.e is not null and e.n is not null
+                  on conflict (parzelle_id) do nothing
+                  returning 1)
+                select count(*) from neu;" | tee -a "$GITHUB_STEP_SUMMARY"
+              ;;
+            *)
+              echo ""
+              echo "**Probelauf** -- properties wurde nicht berührt."
+              ;;
+          esac
 
       # =============================================================
       # Zonennamen nachziehen
@@ -1172,44 +1138,23 @@ jobs:
           [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
           sudo apt-get install -y -qq postgresql-client
 
-          for f in $(find /tmp/npl \( -name '*.xtf' -o -name '*.xml' \) | sort); do
-            python3 tools/zonentypen.py "$f" "/tmp/typen_$(basename "$f").csv" \
-              2>&1 | head -3 || true
-          done
-          # Die grösste Ausgabe gewinnt: die Zonenflächen-Datei trägt
-          # die 2'202 Typen, der Katalog nur die 34 des Bundes.
-          erg=$(ls -S /tmp/typen_*.csv 2>/dev/null | head -1)
-          [ -n "$erg" ] || { echo "Keine Typen gefunden."; exit 1; }
-          echo "Verwende $erg mit $(( $(wc -l < "$erg") - 1 )) Typen"
-          head -5 "$erg"
+          # Alle Dateien zugleich: Zug liefert eine je Gemeinde. Bis zum
+          # 18. November gewann die grösste Ausgabe -- in Zug wären das
+          # die Typen der Stadt allein gewesen.
+          python3 tools/zonentypen.py $(find /tmp/npl -name '*.xtf' | sort) /tmp/zonentypen.csv
+          [ "$(wc -l < /tmp/zonentypen.csv)" -gt 1 ] || { echo "Keine Typen gefunden."; exit 1; }
 
-          psql "$DB" -v ON_ERROR_STOP=1 -X -q -c "
-            drop table if exists public.zonentypen;
-            create table public.zonentypen (
-              typ_id text, code text, bezeichnung text, abkuerzung text);"
-          psql "$DB" -v ON_ERROR_STOP=1 -X -q \
-            -c "\\copy public.zonentypen from '$erg' with (format csv, header true)"
-          psql "$DB" -v ON_ERROR_STOP=1 -X -q -c "
-            create index on public.zonentypen (typ_id);
-            analyze public.zonentypen;"
-
+          tabelle="create temp table eingang (typ_id text, code text, bezeichnung text, abkuerzung text);"
           echo "### Wie viele Objekte tragen noch einen Schlüssel"
-          psql "$DB" -X -q -c "
-            set local statement_timeout = '15min';
-            select count(*) as mit_schluessel,
-                   count(t.typ_id) as davon_uebersetzbar
-            from public.properties p
-            left join public.zonentypen t on t.typ_id = p.zone
-            where p.kanton = '$KANTON' and p.zone like 'x%_gngde';"
-
-          echo "### Beispiele"
-          psql "$DB" -X -q -c "
-            select p.zone as schluessel, t.abkuerzung, t.bezeichnung,
-                   count(*)
-            from public.properties p
-            join public.zonentypen t on t.typ_id = p.zone
-            where p.kanton = '$KANTON'
-            group by 1,2,3 order by 4 desc limit 12;"
+          psql "$DB" -v ON_ERROR_STOP=1 -X -q \
+            -c "set statement_timeout = '2min';" \
+            -c "$tabelle" \
+            -c "\\copy eingang from '/tmp/zonentypen.csv' with (format csv, header true)" \
+            -c "
+              select count(*) as mit_schluessel, count(t.typ_id) as davon_uebersetzbar
+                from public.properties p
+                left join eingang t on t.typ_id = p.zone
+               where p.kanton = '$KANTON' and p.zone like 'x%_gngde';"
 
           if [ "${{ inputs.schritt }}" != "zonennamen-schreiben" ]; then
             echo ""
@@ -1219,18 +1164,129 @@ jobs:
 
           echo "### Schreiben"
           # Das Kürzel voran, wie es in den Zürcher Zonen steht: beim
-          # Telefonieren nennt man "W2", nicht den ganzen Satz.
-          psql "$DB" -v ON_ERROR_STOP=1 -X -q -c "
-            set local statement_timeout = '30min';
-            update public.properties p
-               set zone = trim(coalesce(nullif(t.abkuerzung,'') || ' ', '')
-                               || coalesce(nullif(t.bezeichnung,''),
-                                           t.abkuerzung))
-            from public.zonentypen t
-            where t.typ_id = p.zone and p.kanton = '$KANTON'
-              and coalesce(nullif(t.bezeichnung,''), t.abkuerzung) is not null;"
+          # Telefonieren nennt man "W2", nicht den ganzen Satz. Stückweise
+          # über die Typen: je Stück nur die Objekte dieser Typen.
+          tools/in_portionen.sh /tmp/zonentypen.csv "$tabelle" "
+            with g as (
+              update public.properties p
+                 set zone = trim(coalesce(nullif(t.abkuerzung,'') || ' ', '')
+                                 || coalesce(nullif(t.bezeichnung,''), t.abkuerzung))
+                from eingang t
+               where t.typ_id = p.zone and p.kanton = '$KANTON'
+                 and coalesce(nullif(t.bezeichnung,''), t.abkuerzung) is not null
+              returning 1)
+            select count(*) from g;"
 
-          echo "### Die zehn häufigsten Zonen danach"
-          psql "$DB" -X -q -c "
-            select zone, count(*) from public.properties
-            where kanton = '$KANTON' group by 1 order by 2 desc limit 10;"
+      # =============================================================
+      # Zone am Haus
+      # =============================================================
+      # Für Luzern. Dort gibt der Kanton die Vermessung nur gegen Gebühr
+      # ab (Geodatenshop, 18. November: «AV Liegenschaften», 120'601
+      # Flächen, gebührenpflichtig), die Nutzungsplanung aber frei. Ohne
+      # Umriss lässt sich keine Parzelle mit den Zonen verschneiden; das
+      # Haus aus dem Register hat aber seine Lage. Die Zone unter dem
+      # grössten Haus wird zur Zone der Parzelle -- als Annahme: liegt die
+      # Parzelle über zwei Zonen, steht hier nur die eine, und ohne Fläche
+      # rechnet kein Potenzial.
+      #
+      # Gerechnet wird auf dem Runner, in SpatiaLite wie beim
+      # Verschneiden; in die Datenbank kommt nur das Ergebnis, stückweise,
+      # und nur dort, wo noch keine Zone steht.
+      - name: Zone am Haus
+        if: ${{ startsWith(inputs.schritt, 'zonen-punkte') }}
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+          KANTON: ${{ inputs.kanton }}
+          GRENZE_MB: ${{ inputs.grenze_mb }}
+        run: |
+          set -euo pipefail
+          [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
+          sudo apt-get install -y -qq postgresql-client
+
+          klein=$(echo "$KANTON" | tr 'A-Z' 'a-z')
+          curl -sSL --retry 4 -o /tmp/gwr.zip "https://public.madd.bfs.admin.ch/${klein}.zip"
+          mkdir -p /tmp/gwr && unzip -o -q /tmp/gwr.zip -d /tmp/gwr
+          python3 tools/gwr_parzellen.py /tmp/gwr /tmp/gwr_parzellen.csv
+
+          rm -f /tmp/haeuser.sqlite
+          ogr2ogr -f SQLite /tmp/haeuser.sqlite -dsco SPATIALITE=YES -lco SPATIAL_INDEX=YES \
+            -nln punkte -a_srs EPSG:2056 \
+            -oo X_POSSIBLE_NAMES=e -oo Y_POSSIBLE_NAMES=n -oo KEEP_GEOM_COLUMNS=NO \
+            /tmp/gwr_parzellen.csv
+          ogr2ogr -f SQLite /tmp/haeuser.sqlite -append -lco SPATIAL_INDEX=YES \
+            -nln zonen /tmp/zonen.gpkg zonen
+          namen_wahl="NULL AS zone_name, NULL AS zone_kurz,"
+          namen_join=""
+          if [ -s /tmp/zonentypen.csv ]; then
+            ogr2ogr -f SQLite /tmp/haeuser.sqlite -append -nln zonentyp /tmp/zonentypen.csv
+            namen_wahl="t.bezeichnung AS zone_name, t.abkuerzung AS zone_kurz,"
+            namen_join="LEFT JOIN zonentyp t ON t.typ_id = z.typ"
+          fi
+          spalte() {
+            ogrinfo -q /tmp/haeuser.sqlite -sql \
+              "SELECT f_geometry_column FROM geometry_columns WHERE f_table_name = '$1'" 2>/dev/null \
+              | sed -n 's/.*= //p' | head -1
+          }
+          gsp=$(spalte punkte); gsz=$(spalte zonen)
+          echo "Geometrie: punkte.${gsp:?} zonen.${gsz:?}"
+
+          ogr2ogr -f CSV /tmp/haus_zonen.csv /tmp/haeuser.sqlite -dialect sqlite -sql "
+            SELECT p.egrid AS egrid, z.Typ AS zone_typ, $namen_wahl
+                   ROUND(ST_Area(z.$gsz)) AS zone_m2
+              FROM punkte p
+              JOIN zonen z
+              $namen_join
+             WHERE z.ROWID IN (SELECT ROWID FROM SpatialIndex
+                                WHERE f_table_name = 'zonen' AND search_frame = p.$gsp)
+               AND ST_Contains(z.$gsz, p.$gsp)"
+
+          # Eine Zone je Parzelle; liegt das Haus auf zwei (überlappende
+          # Lieferung), gewinnt die kleinere Fläche, die genauere.
+          python3 - <<'PY'
+          import csv
+          from collections import Counter
+          beste = {}
+          for r in csv.DictReader(open('/tmp/haus_zonen.csv', encoding='utf-8')):
+              kurz, name = (r.get('zone_kurz') or '').strip(), (r.get('zone_name') or '').strip()
+              text = ' '.join(t for t in (kurz, name if name != kurz else '') if t) or (r.get('zone_typ') or '').strip()
+              m2 = float(r.get('zone_m2') or 0)
+              if text and (r['egrid'] not in beste or m2 < beste[r['egrid']][0]):
+                  beste[r['egrid']] = (m2, text)
+          with open('/tmp/zone_am_haus.csv', 'w', newline='', encoding='utf-8') as f:
+              w = csv.writer(f); w.writerow(['egrid', 'zone'])
+              for e, (_, z) in sorted(beste.items()):
+                  w.writerow([e, z])
+          print(f'{len(beste)} Parzellen mit Zone am Haus')
+          for z, n in Counter(v for _, v in beste.values()).most_common(10):
+              print(f'{n:>8}  {z}')
+          PY
+
+          tabelle="create temp table eingang (egrid text, zone text);"
+          psql "$DB" -v ON_ERROR_STOP=1 -X -q \
+            -c "set statement_timeout = '2min';" \
+            -c "$tabelle" \
+            -c "\\copy eingang from '/tmp/zone_am_haus.csv' with (format csv, header true)" \
+            -c "
+              select count(*) as mit_zone_am_haus,
+                     count(p.id) as im_bestand,
+                     count(*) filter (where p.id is not null and nullif(p.zone, '') is null) as zone_dazu
+                from eingang e
+                left join public.properties p on p.egrid = e.egrid and p.kanton = '$KANTON';" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
+          if [ "${{ inputs.schritt }}" != "zonen-punkte-schreiben" ]; then
+            echo ""
+            echo "**Probelauf** -- properties wurde nicht berührt."
+            exit 0
+          fi
+
+          echo "### Schreiben" | tee -a "$GITHUB_STEP_SUMMARY"
+          tools/in_portionen.sh /tmp/zone_am_haus.csv "$tabelle" "
+            with g as (
+              update public.properties p
+                 set zone = e.zone,
+                     notes = trim(coalesce(p.notes || '; ', '') || 'Zone am grössten Haus (Annahme, ohne Umriss)')
+                from eingang e
+               where p.egrid = e.egrid and p.kanton = '$KANTON' and nullif(p.zone, '') is null
+              returning 1)
+            select count(*) from g;" | tee -a "$GITHUB_STEP_SUMMARY"

@@ -76,33 +76,47 @@ def typen(pfad: str):
 
 
 def main() -> None:
-    if len(sys.argv) < 2:
-        print('Aufruf: zonentypen.py <datei.xtf> [ausgabe.csv]', file=sys.stderr)
+    # Eine Lieferung kann aus vielen Dateien bestehen: Zug schickt je
+    # Gemeinde eine (elf Stück, 18. November nachgesehen), Thurgau eine.
+    # Die kantonalen Typen (Typ_Kt) stehen in jeder Gemeindedatei wieder:
+    # in Zug 1'395 Einträge, 382 verschiedene. Doppelt in der Liste
+    # würde jede Parzelle beim Verknüpfen doppelt gezählt; darum zählt
+    # jede Kennung einmal.
+    argumente = sys.argv[1:]
+    ziel = argumente.pop() if len(argumente) > 1 and argumente[-1].endswith('.csv') else '-'
+    if not argumente:
+        print('Aufruf: zonentypen.py <datei.xtf> [<datei.xtf> ...] [ausgabe.csv]', file=sys.stderr)
         sys.exit(1)
 
-    ziel = sys.argv[2] if len(sys.argv) > 2 else '-'
     datei = open(ziel, 'w', newline='', encoding='utf-8') \
         if ziel != '-' else sys.stdout
     schreiber = csv.writer(datei)
     schreiber.writerow(['typ_id', 'code', 'bezeichnung', 'abkuerzung'])
 
-    anzahl = 0
-    for zeile in typen(sys.argv[1]):
-        schreiber.writerow(zeile)
-        anzahl += 1
+    gesehen: set[str] = set()
+    doppelt = 0
+    for pfad in argumente:
+        for zeile in typen(pfad):
+            if zeile[0] in gesehen:
+                doppelt += 1
+                continue
+            gesehen.add(zeile[0])
+            schreiber.writerow(zeile)
     if datei is not sys.stdout:
         datei.close()
-    print(f'{anzahl} Zonentypen', file=sys.stderr)
+    anzahl = len(gesehen)
+    print(f'{anzahl} Zonentypen aus {len(argumente)} Dateien, {doppelt} doppelte übersprungen', file=sys.stderr)
 
     if anzahl == 0:
         # Auf einen Namen zu raten hat schon genug Läufe gekostet. Wenn
         # nichts gefunden wird, sagt die Datei selbst, was in ihr steht.
         print('Keine gefunden. Elemente in der Datei:', file=sys.stderr)
         gezaehlt: dict[str, int] = {}
-        for _, element in ET.iterparse(sys.argv[1], events=('end',)):
-            name = ohne_namensraum(element.tag)
-            gezaehlt[name] = gezaehlt.get(name, 0) + 1
-            element.clear()
+        for pfad in argumente:
+            for _, element in ET.iterparse(pfad, events=('end',)):
+                name = ohne_namensraum(element.tag)
+                gezaehlt[name] = gezaehlt.get(name, 0) + 1
+                element.clear()
         haeufig = sorted(gezaehlt.items(), key=lambda x: -x[1])[:60]
         for name, wieviele in haeufig:
             print(f'  {wieviele:>8}  {name}', file=sys.stderr)

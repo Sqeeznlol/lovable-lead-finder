@@ -230,6 +230,30 @@ fragt jede Adresssuche zugleich die Volltextsuche im Gebäuderegister
 Adressen sucht, geht über diesen Helfer; `adresssuche.test.ts` wird rot,
 wenn eine Stelle ihn umgeht.
 
+## Parzellen ZH, TG, LU und ZG
+
+Julian, 18. November: «schau, dass wirklich alle Parzellen drin sind
+von ZH TG LU ZUG, mit allen Daten». Massstab ist die Amtliche
+Vermessung; Auswerten «parzellen-vier» gleicht EGRID für EGRID ab und
+zählt je Angabe (`tools/parzellen_vergleich.py`).
+
+  * «Kanton laden» rechnet auf dem Runner (Hauptzone je Parzelle,
+    Register je Parzelle) und schreibt nur über `tools/in_portionen.sh`:
+    Sitzungstabelle statt Zwischentabelle in public, Frist und Pause je
+    Stück, Abbruch, wenn die Datenbank träge wird. Geschrieben wird nur,
+    was fehlt; ein abgebrochener Lauf wird einfach wiederholt.
+  * Eine Lieferung kann aus vielen Dateien bestehen (Zug: eine je
+    Gemeinde). Immer alle lesen, nie die erste mit `head -1`.
+  * Das Register hängt Häuser auf Baurecht an das Baurecht, nicht an
+    die Parzelle darunter (Zug: 747 EGRID). Parzellen aus dem Register
+    entstehen darum nur, wo die Vermessung nicht frei ist
+    (`gwr-anlegen`, Luzern).
+  * Luzern gibt die Vermessung nur gegen Gebühr ab (Geodatenshop:
+    120'601 Liegenschaften). Frei sind Register und Nutzungsplanung:
+    die bebauten Parzellen mit Adresse und Haus, die Zone am grössten
+    Haus als Annahme, ohne Fläche und Umriss. Ob gekauft wird,
+    entscheidet Julian.
+
 ## Gestaltung
 
 Wie die Seite aussieht, steht in `DESIGN.md` -- vor jeder Arbeit an der

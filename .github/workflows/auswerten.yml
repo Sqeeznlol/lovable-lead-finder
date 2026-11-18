@@ -1480,7 +1480,7 @@ jobs:
           PGOPTIONS='-c statement_timeout=600000' psql "$DB" -X -q -v ON_ERROR_STOP=1 -c "\copy (
             select kanton, coalesce(egrid, '') as egrid,
                    (area > 0) as flaeche, (nullif(trim(zone), '') is not null) as zone, (geometrie is not null) as umriss,
-                   (nullif(trim(address), '') is not null) as adresse, (bfs_nr is not null) as bfs, (baujahr is not null) as baujahr,
+                   (nullif(trim(address), '') is not null and address not like 'Parzelle %') as adresse, (bfs_nr is not null) as bfs, (baujahr is not null) as baujahr,
                    (hnf_delta is not null) as potenzial, (gebaeudeflaeche is not null) as gebaeude
             from properties where kanton in ('ZH', 'TG', 'LU', 'ZG')) to '/tmp/vgl/bestand.csv' csv header"
           {
