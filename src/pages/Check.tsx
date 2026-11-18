@@ -10,7 +10,7 @@ import type L from 'leaflet';
 import './check.css';
 import { datenbank } from '@/lib/datenbank';
 import { lv95NachWgs84 } from '@/lib/koordinaten';
-import { BETREIBER, BETREIBER_ADRESSE, markeFuerHost, markeNachId, STANDARD_MARKE, type Marke } from '@/lib/check-marken';
+import { BETREIBER, BETREIBER_ADRESSE, BETREIBER_EMAIL, BETREIBER_UID, markeFuerHost, markeNachId, STANDARD_MARKE, type Marke } from '@/lib/check-marken';
 import { KATASTER } from '@/lib/check-hintergrund';
 import { useImBild } from '@/lib/im-bild';
 import { zaehlen } from '@/lib/check-zaehlen';
@@ -395,13 +395,32 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
           {recht === 'impressum'
             ? <>
                 <p>{marke.name.join('')} ist ein Angebot von {BETREIBER}.</p>
-                <address>{BETREIBER}{BETREIBER_ADRESSE.map(z => <span key={z}>{z}</span>)}</address>
+                <address>{BETREIBER}{BETREIBER_ADRESSE.map(z => <span key={z}>{z}</span>)}
+                  {BETREIBER_EMAIL && <a href={`mailto:${BETREIBER_EMAIL}`}>{BETREIBER_EMAIL}</a>}
+                  {BETREIBER_UID && <span>UID {BETREIBER_UID}</span>}</address>
               </>
             : <>
+                <p>Verantwortlich für die Bearbeitung Ihrer Daten ist {BETREIBER}, {BETREIBER_ADRESSE.join(', ')}.</p>
                 <p>Wir speichern die Angaben, die Sie im Formular machen (Vorname, Name, E-Mail, Telefon, Adresse der Liegenschaft und Ihre Antworten), um Ihnen die Berechnung und Analyse zu erstellen und Sie zu Ihrer Liegenschaft zu kontaktieren. An Dritte geben wir sie nicht weiter.</p>
-                <p>Grundstücksdaten und Karten laden wir von geo.admin.ch (Bund), die Schriften von Google Fonts. Dabei sehen diese Dienste Ihre IP-Adresse.</p>
+                {/* Wer was sieht, ist gemessen, nicht angenommen (18. November): im Browser
+                    aufgerufen werden nur diese Seite, geo.admin.ch, Google Fonts und die
+                    Datenbank; die Datenbank steht bei Amazon in Frankfurt (eu-central-1);
+                    Vercel Inc. und Google LLC sind im Swiss-U.S. Data Privacy Framework
+                    aktiv eingetragen (dataprivacyframework.gov), Supabase überträgt mit
+                    Standardvertragsklauseln (Supabase, Data Residency and Transfers FAQ). */}
+                <h3>Wer Ihre Daten sonst sieht</h3>
+                <ul>
+                  <li>Vercel Inc. (USA) stellt diese Seite bereit und sieht dabei Ihre IP-Adresse und die aufgerufene Seite.</li>
+                  <li>Ihre Angaben aus dem Formular liegen in einer Datenbank von Supabase in einem Rechenzentrum in Frankfurt (Deutschland). Vertragspartner ist Supabase Pte. Ltd. (Singapur); für Betrieb und Unterstützung kann Supabase Inc. (USA) darauf zugreifen.</li>
+                  <li>Karten, Adressen und Grundstücksdaten kommen vom Bund (geo.admin.ch). Er sieht Ihre IP-Adresse und die Adresse, die Sie suchen.</li>
+                  <li>Google LLC (USA) liefert die Schriften (Google Fonts) und sieht dabei Ihre IP-Adresse.</li>
+                </ul>
+                <h3>Daten im Ausland</h3>
+                <p>Deutschland gewährleistet einen angemessenen Datenschutz. In den USA gilt das für Unternehmen, die im Datenschutzrahmen Schweiz–USA (Swiss-U.S. Data Privacy Framework) zertifiziert sind; der Bundesrat anerkennt ihn seit dem 15. September 2024. Vercel Inc. und Google LLC sind dort eingetragen. Supabase überträgt Daten nach Singapur und in die USA mit den Standardvertragsklauseln.</p>
+                <h3>Besuche und Werbung</h3>
                 <p>Besuche zählen wir anonym und ohne Cookie: mit einer zufälligen Nummer im Speicher dieses Browserfensters, die beim Schliessen verfällt. Den Messpunkt von Google Ads (Werbe-Cookies) laden wir nur, wenn Sie im Cookie-Hinweis zustimmen. Er meldet Google, dass nach dem Klick auf eine Anzeige eine Anfrage eingegangen ist, ohne Name, Adresse oder Nummer; für persönliche Werbung nutzen wir ihn nicht. Ihre Wahl ändern Sie jederzeit unten unter «Cookie-Einstellungen».</p>
-                <p>Verantwortlich für die Bearbeitung Ihrer Daten ist {BETREIBER}, {BETREIBER_ADRESSE.join(', ')}. Die vollständige Datenschutzerklärung mit Auftragsbearbeitern und Ländern wird ergänzt.</p>
+                <h3>Ihre Rechte</h3>
+                <p>Sie können verlangen, dass wir Ihnen sagen, welche Daten wir über Sie bearbeiten, und dass wir sie berichtigen oder löschen (Art. 25 und 32 des Datenschutzgesetzes). Schreiben Sie dafür an die Adresse oben{BETREIBER_EMAIL ? ` oder an ${BETREIBER_EMAIL}` : ''}.</p>
               </>}
           <button type="button" className="knopf" onClick={() => setRecht(null)}>Zurück</button>
         </main>

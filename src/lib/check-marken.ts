@@ -27,6 +27,10 @@ export const BETREIBER = 'Bauraum';
 // impressum»). E-Mail und UID fehlen noch; das Gesetz verlangt auch die
 // Adresse der elektronischen Post (UWG Art. 3 Abs. 1 lit. s).
 export const BETREIBER_ADRESSE = ['c/o PROJECTA SERVICES GMBH', 'Sihleggstrasse 23', '8832 Wollerau'];
+// Hier einsetzen, sobald Julian sie nennt (18. November offen). Leer erscheinen
+// sie nirgends; gefüllt stehen sie im Impressum und im Datenschutz.
+export const BETREIBER_EMAIL = '';
+export const BETREIBER_UID = '';
 
 export type Schwerpunkt = 'parzelle' | 'haus' | 'bauen' | 'reserve' | 'wert' | 'erbe' | 'alter' | 'mfh';
 
