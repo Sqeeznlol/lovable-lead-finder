@@ -8,18 +8,19 @@
  * Zonenart (ch_bez_d, z.B. "Wohnzonen"). Den eigenen Bestand fragen diese
  * Seiten bewusst nicht -- sie stehen ohne Anmeldung offen.
  */
+import { adressSuche } from './adresssuche';
+
 const API = 'https://api3.geo.admin.ch/rest/services';
 
 export interface Vorschlag { label: string; e: number; n: number }
 
 export async function adressVorschlaege(text: string): Promise<Vorschlag[]> {
   if (text.trim().length < 4) return [];
-  const r = await fetch(`${API}/ech/SearchServer?type=locations&origins=address&limit=6&sr=2056&lang=de&searchText=${encodeURIComponent(text)}`);
-  const j = await r.json();
-  return ((j?.results ?? []) as { attrs?: Record<string, unknown> }[]).map(x => ({
-    label: String(x.attrs?.label ?? '').replace(/<[^>]+>/g, '').trim(),
+  // Mit dem Gebäuderegister als zweiter Quelle (lib/adresssuche.ts, 18. November).
+  return (await adressSuche(text, { limit: 6, sr: '2056' })).map(a => ({
+    label: String(a.label ?? '').replace(/<[^>]+>/g, '').trim(),
     // Mit sr=2056 steht der Ostwert in y, der Nordwert in x.
-    e: Number(x.attrs?.y), n: Number(x.attrs?.x),
+    e: Number(a.y), n: Number(a.x),
   })).filter(v => v.label && Number.isFinite(v.e) && Number.isFinite(v.n));
 }
 

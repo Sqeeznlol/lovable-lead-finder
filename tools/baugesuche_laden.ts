@@ -8,6 +8,7 @@
 import { parallel } from '../src/lib/parallel';
 import { writeFileSync } from 'node:fs';
 import { adresseWaehlen } from '../src/lib/adresswahl';
+import { adressSuche } from '../src/lib/adresssuche';
 
 const QUELLE = 'https://daten.statistik.zh.ch/ogd/daten/ressourcen/KTZH_00002982_00006183.csv';
 const API = 'https://api3.geo.admin.ch/rest/services';
@@ -44,8 +45,8 @@ async function json(url: string) {
 
 /** Punkt der Adresse in LV95, nur wenn die Adresssuche sie eindeutig trifft. */
 export async function ortZurAdresse(adresse: string): Promise<{ e: number; n: number } | null> {
-  const s = await json(`${API}/ech/SearchServer?type=locations&origins=address&limit=3&sr=2056&lang=de&searchText=${encodeURIComponent(adresse)}`);
-  const t: Record<string, unknown>[] = (s?.results ?? []).map((r: { attrs?: Record<string, unknown> }) => r.attrs ?? {});
+  // Mit dem Gebäuderegister als zweiter Quelle (src/lib/adresssuche.ts): am 18. November kannte die Adresssuche nur Liechtenstein.
+  const t = await adressSuche(adresse, { limit: 3, sr: '2056', holen: json }).catch(() => [] as Record<string, unknown>[]);
   const w = adresseWaehlen(adresse, t.map(x => String(x.label ?? '')));
   if (!('index' in w)) return null;
   return { e: Number(t[w.index].y), n: Number(t[w.index].x) };

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
-import { adresseLesen, comparisOrt, gebaeudeAusRegister, neigungAus, parzelleLesen, portalLinks } from '@/lib/calc-daten';
+import { adresseLesen, adressen, comparisOrt, gebaeudeAusRegister, neigungAus, parzelleLesen, portalLinks } from '@/lib/calc-daten';
 
 /**
  * Was CALC YOU LATER vom Bund liest. Die Beispiele sind echte Antworten
@@ -101,3 +101,46 @@ describe('CALC YOU LATER: eine Parzelle statt einer Adresse', () => {
     expect(portalLinks(p).map(l => l.titel)).toEqual(['Comparis: Wohnungen in Kloten']);
   });
 });
+
+/**
+ * 18. November: Die Adresssuche des Bundes kannte nur noch Liechtenstein.
+ * Die Antworten unten sind echt (abgefragt um 07:40 UTC), gekürzt auf die
+ * Felder, die gelesen werden.
+ */
+describe('CALC YOU LATER: Adressen auch ohne die Adresssuche des Bundes', () => {
+  const SCHAAN = { fuzzy: 'true', results: [{ attrs: { label: 'Bahnhofstrasse 1 <b>9494 Schaan</b>', detail: 'bahnhofstrasse 1 9494 schaan 7005 schaan ch', y: 2756995.87, x: 1226102.63 } }] };
+  const REGISTER = { results: [{ attrs: { label: 'Bahnhofstrasse 1 8001 Zürich', detail: 'bahnhofstrasse 1 8001 zuerich zuerich _zh_ 2378430 100125045', geom_st_box2d: 'BOX(2683187.1 1246861.9,2683187.1 1246861.9)' } }] };
+  const antwort = (j: unknown) => Promise.resolve(new Response(JSON.stringify(j), { status: 200 }));
+
+  it('nimmt das Register, wenn die Adresssuche nur Ungefähres aus Liechtenstein bringt', async () => {
+    const f = vi.fn((u: string) => antwort(u.includes('featuresearch') ? REGISTER : u.includes('origins=parcel') ? { results: [] } : SCHAAN));
+    vi.stubGlobal('fetch', f);
+    const r = await adressen('Bahnhofstrasse 1, 8001 Zürich');
+    expect(r.treffer.map(a => a.label)).toEqual(['Bahnhofstrasse 1 8001 Zürich']);
+    expect(r.treffer[0].kanton).toBe('ZH');
+    vi.unstubAllGlobals();
+  });
+
+  it('kennt die Adresssuche die Adresse, steht sie vorne und doppelt nichts', async () => {
+    const BUND = { results: [{ attrs: { label: 'Bahnhofstrasse 1 <b>8001 Zürich</b>', detail: 'bahnhofstrasse 1 8001 zuerich 261 zuerich ch zh', y: 2683187.1, x: 1246861.9 } }] };
+    vi.stubGlobal('fetch', vi.fn((u: string) => antwort(u.includes('featuresearch') ? REGISTER : u.includes('origins=parcel') ? { results: [] } : BUND)));
+    const r = await adressen('Bahnhofstrasse 1 8001 Zürich');
+    expect(r.treffer.map(a => a.label)).toEqual(['Bahnhofstrasse 1 8001 Zürich']);
+    // Die Gemeindenummer kommt aus der Adresssuche; das Register nennt sie nicht.
+    expect(r.treffer[0].bfs).toBe('261');
+    vi.unstubAllGlobals();
+  });
+
+  it('kennt auch das Register nichts, bleibt das Ungefähre stehen', async () => {
+    vi.stubGlobal('fetch', vi.fn((u: string) => antwort(u.includes('featuresearch') || u.includes('origins=parcel') ? { results: [] } : SCHAAN)));
+    expect((await adressen('Bahnhofstrasse 1 Schaan')).treffer.map(a => a.label)).toEqual(['Bahnhofstrasse 1 9494 Schaan']);
+    vi.unstubAllGlobals();
+  });
+
+  it('antwortet keine Quelle, kommt ein Fehler statt «nicht gefunden»', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response('', { status: 503 }))));
+    await expect(adressen('Bahnhofstrasse 1 8001 Zürich')).rejects.toThrow(/503/);
+    vi.unstubAllGlobals();
+  });
+});
+

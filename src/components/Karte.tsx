@@ -18,6 +18,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { FENSTER } from '@/lib/fenster';
 import { ARTEN, FLAECHEN, MARGEN, OHNE_FILTER, filterAktiv, passtFilter, type KartenFilter } from '@/lib/kartenfilter';
 import { BAUZONEN, GRENZEN, GRUNDKARTEN, WMS_MAX, wmsAdresse, type Ebene, type Grund } from '@/lib/karte-ebenen';
+import { adressSuche } from '@/lib/adresssuche';
 
 /**
  * GIS-Parzellenkarte -- nach der Vorlage "gis-karte.html", mit dem
@@ -741,8 +742,8 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
         .limit(6);
       try {
         const [j, eig, eigner] = await Promise.all([
-          fetch('https://api3.geo.admin.ch/rest/services/ech/SearchServer?type=locations&limit=6&sr=2056&lang=de&searchText='
-            + encodeURIComponent(s)).then(x => x.json()).catch(() => null),
+          // Mit dem Gebäuderegister als zweiter Quelle (lib/adresssuche.ts, 18. November).
+          adressSuche(s, { limit: 6, origins: null, sr: '2056' }).then(t => ({ results: t.map(attrs => ({ attrs })) })).catch(() => null),
           eigen,
           eigentuemerSuchen(s).catch(() => [] as EigentuemerTreffer[]),
         ]);
@@ -832,9 +833,7 @@ export function Karte({ onSchliessen }: { onSchliessen?: () => void }) {
     let lat = NaN, lon = NaN;
     try {
       const q = [t.eigen.e.adresse, t.eigen.e.gemeinde].filter(Boolean).join(' ');
-      const j = await (await fetch('https://api3.geo.admin.ch/rest/services/ech/SearchServer?type=locations&limit=1&lang=de&searchText='
-        + encodeURIComponent(q))).json();
-      const a = j?.results?.[0]?.attrs;
+      const a = (await adressSuche(q, { limit: 1, origins: null }))[0];
       if (a) { lat = Number(a.lat); lon = Number(a.lon); }
     } catch { /* ohne Ort: Angaben trotzdem zeigen */ }
     if (Number.isFinite(lat)) karte.current?.setView([lat, lon], 19);

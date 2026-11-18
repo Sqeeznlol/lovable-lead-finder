@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { lv95NachWgs84, wgs84NachLv95 } from '@/lib/koordinaten';
 import { umrissVomBund } from '@/hooks/use-portfolio';
 import { mitte } from '@/lib/bund-parzelle';
+import { adressSuche } from '@/lib/adresssuche';
 
 /**
  * Daten und Farben der 3D-Karte (Julian, 3. November: "genau so die 3D-Map
@@ -210,7 +211,6 @@ export interface Ort {
   /** Wie weit die Kamera weg bleibt: ein Haus nah, eine Gemeinde weit. */
   abstand: number;
 }
-const SUCHE_URL = 'https://api3.geo.admin.ch/rest/services/ech/SearchServer';
 const ohneTags = (x: unknown) => String(x ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
 export function ortLesen(a: Record<string, unknown>): Ort | null {
@@ -242,12 +242,10 @@ export function ortLesen(a: Record<string, unknown>): Ort | null {
 
 /** Adressen, Strassen, Parzellennummern, PLZ und Gemeinden beim Bund. */
 export async function ortSuchen(text: string, signal?: AbortSignal): Promise<Ort[]> {
-  const p = new URLSearchParams({ type: 'locations', origins: 'address,parcel,zipcode,gg25', limit: '8', lang: 'de', searchText: text });
-  const r = await fetch(`${SUCHE_URL}?${p}`, { signal });
-  if (!r.ok) return [];
-  const j = await r.json();
-  return ((j?.results ?? []) as { attrs?: Record<string, unknown> }[])
-    .map(x => (x.attrs ? ortLesen(x.attrs) : null)).filter((x): x is Ort => !!x);
+  // Mit dem Gebäuderegister als zweiter Quelle (lib/adresssuche.ts, 18. November); lat/lon tragen beide.
+  const holen = async (u: string) => { const r = await fetch(u, { signal }); if (!r.ok) throw new Error(String(r.status)); return r.json(); };
+  const t = await adressSuche(text, { limit: 8, origins: 'address,parcel,zipcode,gg25', holen }).catch(() => []);
+  return t.map(a => ortLesen(a)).filter((x): x is Ort => !!x);
 }
 
 /** Die amtlichen Texte der Codes (Tabelle gwr_kode). Leer, solange das Register nicht geladen ist. */

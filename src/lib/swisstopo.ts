@@ -7,6 +7,7 @@
  * aktuelles Luftbild zeigen, ohne dass Kosten entstehen.
  */
 
+import { adressSuche } from './adresssuche';
 const SEARCH_URL = 'https://api3.geo.admin.ch/rest/services/api/SearchServer';
 
 export interface GeoCoords {
@@ -44,12 +45,13 @@ export async function geocode(address: string, signal?: AbortSignal): Promise<Ge
   const cached = readCache(key);
   if (cached !== undefined) return cached;
 
-  const url = `${SEARCH_URL}?searchText=${encodeURIComponent(address)}&type=locations&origins=address&limit=1&sr=4326`;
-  const res = await fetch(url, { signal });
-  if (!res.ok) throw new Error(`geo.admin.ch antwortete mit ${res.status}`);
-
-  const json = await res.json();
-  const hit = json?.results?.[0]?.attrs;
+  // Mit dem Gebäuderegister als zweiter Quelle (lib/adresssuche.ts, 18. November); lat/lon tragen beide.
+  const holen = async (u: string) => {
+    const res = await fetch(u, { signal });
+    if (!res.ok) throw new Error(`geo.admin.ch antwortete mit ${res.status}`);
+    return res.json();
+  };
+  const hit = (await adressSuche(address, { limit: 1, sr: '4326', holen }))[0];
   const result: GeoCoords | null =
     hit && typeof hit.lat === 'number' && typeof hit.lon === 'number'
       ? { lat: hit.lat, lon: hit.lon, label: String(hit.label || '').replace(/<[^>]*>/g, '') }

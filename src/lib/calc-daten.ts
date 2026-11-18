@@ -30,6 +30,7 @@ import type { Gebaeude, ZonenRegeln } from '@/lib/machbarkeit';
 import { CALC_ANNAHMEN, nachbarArt, zuerichKm, type NachbarTeil } from '@/lib/calc';
 import { bundParzelle, mitte } from '@/lib/bund-parzelle';
 import { hausnummerLesen, nummerFehlt, suchtext } from '@/lib/adresswahl';
+import { adressSuche } from '@/lib/adresssuche';
 
 // Die erzeugten Typen kennen Tabelle und Funktion noch nicht.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -88,10 +89,13 @@ export function parzelleLesen(label: string, detail: string, e: number, n: numbe
 type Treffer = { attrs?: Record<string, unknown> }[];
 const suchen = async (text: string, origins: string, limit: number) =>
   ((await holen(`${API}/ech/SearchServer?type=locations&origins=${origins}&limit=${limit}&sr=2056&lang=de&searchText=${encodeURIComponent(text)}`)) as { results?: Treffer })?.results ?? [];
+// Die Adresssuche des Bundes kannte am 18. November nur Liechtenstein; das Register springt ein (lib/adresssuche.ts).
 // Mit sr=2056 steht der Ostwert in y, der Nordwert in x.
-const alsAdressen = (t: Treffer) => t
-  .map(x => adresseLesen(String(x.attrs?.label ?? ''), String(x.attrs?.detail ?? ''), Number(x.attrs?.y), Number(x.attrs?.x)))
-  .filter(a => a.label && Number.isFinite(a.e) && Number.isFinite(a.n));
+const adressSucheBund = async (text: string, limit: number): Promise<Adresse[]> =>
+  (await adressSuche(text, { limit, sr: '2056', holen }))
+    .map(x => ({ a: adresseLesen(String(x.label ?? ''), String(x.detail ?? ''), Number(x.y), Number(x.x)), kt: x.kanton }))
+    .map(({ a, kt }) => (a.kanton || typeof kt !== 'string' ? a : { ...a, kanton: kt }))
+    .filter(a => a.label && Number.isFinite(a.e) && Number.isFinite(a.n));
 const alsParzellen = (t: Treffer) => t
   .map(x => parzelleLesen(String(x.attrs?.label ?? ''), String(x.attrs?.detail ?? ''), Number(x.attrs?.y), Number(x.attrs?.x)))
   .filter((a): a is Adresse => !!a && Number.isFinite(a.e) && Number.isFinite(a.n));
@@ -117,7 +121,7 @@ export async function adressen(text: string): Promise<AdressSuche> {
   // Eine EGRID ist nie eine Adresse: als Adresse fand «CH410570087781» Weiler im Kanton Schaffhausen.
   const egrid = /^CH\d{12}$/i.test(parzelle);
   const [a, p] = await Promise.all([
-    egrid ? Promise.resolve([] as Adresse[]) : suchen(t, 'address', 6).then(alsAdressen),
+    egrid ? Promise.resolve([] as Adresse[]) : adressSucheBund(t, 6),
     mitZahl ? suchen(parzelle, 'parcel', 3).then(alsParzellen).catch(() => [] as Adresse[]) : Promise.resolve([] as Adresse[]),
   ]);
   const fehlt = nummerFehlt(t, a.map(x => x.label));
@@ -125,7 +129,7 @@ export async function adressen(text: string): Promise<AdressSuche> {
     // Die Nachbarn der fehlenden Nummer: «Dietlikerstrasse 5 Kloten» bringt 50 bis 59.
     const h = hausnummerLesen(t)!;
     const vorne = String(Math.floor(Number(h.nummer.match(/^\d+/)![0]) / 10) || '');
-    const umgebung = alsAdressen(await suchen(`${h.strasse} ${vorne} ${h.rest}`.replace(/\s+/g, ' ').trim(), 'address', 12).catch(() => []));
+    const umgebung = await adressSucheBund(`${h.strasse} ${vorne} ${h.rest}`.replace(/\s+/g, ' ').trim(), 12);
     const noch = nummerFehlt(t, umgebung.map(x => x.label));
     const naechste = noch ? noch.naechste.map(i => umgebung[i]) : fehlt.naechste.map(i => a[i]);
     return { treffer: [...naechste, ...p], fehlt: { strasse: fehlt.strasse, nummer: fehlt.nummer } };

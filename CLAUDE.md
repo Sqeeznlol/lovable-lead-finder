@@ -210,6 +210,17 @@ Der Browser der Prüfung hat keine Grafikkarte. Zeiten der 3D-Karte lassen
 sich dort nur untereinander vergleichen, nicht als Tempo auf einem echten
 Gerät angeben.
 
+## Adressen beim Bund
+
+Am 18. November kannte die Adresssuche des Bundes keine Schweizer
+Adresse mehr, nur Liechtenstein, auch auf map.geo.admin.ch: das Amtliche
+Gebäudeadressverzeichnis dahinter war geschrumpft. CALC YOU LATER, die
+Checker, Karte, 3D-Karte, Import und Baugesuche fanden nichts. Seither
+fragt jede Adresssuche zugleich die Volltextsuche im Gebäuderegister
+(`src/lib/adresssuche.ts`, im Zweig `akquise` dieselbe Datei). Wer
+Adressen sucht, geht über diesen Helfer; `adresssuche.test.ts` wird rot,
+wenn eine Stelle ihn umgeht.
+
 ## Gestaltung
 
 Wie die Seite aussieht, steht in `DESIGN.md` -- vor jeder Arbeit an der

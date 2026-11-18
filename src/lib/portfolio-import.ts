@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { nameNorm } from '@/hooks/use-eigentuemer-suche';
 import { adresseWaehlen } from '@/lib/adresswahl';
 import { bundParzelle } from '@/lib/bund-parzelle';
+import { adressSuche } from '@/lib/adresssuche';
 
 /**
  * Ein Kundenportfolio aus einer Adressliste anlegen -- Schritt 1 und 2
@@ -106,9 +107,8 @@ export async function zuordnen(z: Zeile): Promise<Ergebnis> {
     let gefunden: string | null = null;
     let ort: { gemeinde: string | null; kanton: string | null } = { gemeinde: null, kanton: null };
     if (!egrid) {
-      const s = await (await fetch('https://api3.geo.admin.ch/rest/services/ech/SearchServer?type=locations&origins=address&limit=3&sr=2056&lang=de&searchText='
-        + encodeURIComponent(z.roh))).json();
-      const treffer = ((s?.results ?? []) as { attrs?: Record<string, unknown> }[]).map(r => r.attrs ?? {});
+      // Mit dem Gebäuderegister als zweiter Quelle (lib/adresssuche.ts, 18. November).
+      const treffer = await adressSuche(z.roh, { limit: 3, sr: '2056' });
       const wahl = adresseWaehlen(z.roh, treffer.map(t => String(t.label ?? '')));
       if ('keine' in wahl) return { ...z, ...leer, zuordnung: 'nicht gefunden', grund: 'Adresse beim Bund nicht gefunden' };
       // Mehrere verschiedene Adressen: lieber nachfragen als raten.
@@ -118,6 +118,8 @@ export async function zuordnen(z: Zeile): Promise<Ergebnis> {
       const t = treffer[wahl.index];
       gefunden = String(t.label ?? '').replace(/<[^>]+>/g, '');
       ort = gemeindeUndKanton(String(t.detail ?? ''), String(t.label ?? ''));
+      // Das Register nennt den Kanton, aber keine Gemeindenummer im Detail.
+      if (!ort.kanton && typeof t.kanton === 'string') ort = { gemeinde: String(t.label ?? '').replace(/<[^>]+>/g, '').match(/\d{4} (.+)$/)?.[1]?.trim() ?? null, kanton: t.kanton };
       // Mit sr=2056 steht der Ostwert in y, der Nordwert in x.
       egrid = await egridAmPunkt(Number(t.y), Number(t.x));
       if (!egrid) return { ...z, ...leer, gefunden, zuordnung: 'nicht gefunden', grund: 'Keine Parzelle am Punkt' };
