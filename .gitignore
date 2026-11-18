@@ -31,4 +31,5 @@ test-results/
 
 # Zwischenstand des Kampagnenplans (plan.py schreibt ihn, pdf.cjs druckt daraus)
 docs/kampagnenplan/kampagnenplan.html
+docs/kampagnenplan/auswertung.html
 __pycache__/
