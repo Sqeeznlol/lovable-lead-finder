@@ -78,7 +78,9 @@ export function Ergebnis({ b, annahmen, onErloes }: { b: Bewertung; annahmen: Ca
   const n = b.neubau, m = b.neubauMiete, h = b.bestand, s = b.studie;
   const eck: [string, string, string][] = n ? [
     ['Grundstück', m2(s.flaeche), 'laut Amtlicher Vermessung'],
-    n.projekt
+    n.projektHand
+      ? ['Nutzfläche laut Projekt', m2(n.hnf), `von Hand${n.hnfFormel > 0 ? `; die Formel ergäbe ${m2(n.hnfFormel)}` : ''}`]
+      : n.projekt
       ? ['Bewilligte Wohnfläche', m2(n.hnf), `Gebäuderegister; die Formel ergäbe ${m2(n.hnfFormel)}`]
       : ['Mögliche Hauptnutzfläche', m2(n.hnf), `${n.hnfText?.startsWith('Praxisformel') ? 'Praxisformel, ' : ''}${m2(n.gf)} Geschossfläche`],
     ['Kubatur', `${de(Math.round(n.kubatur))} m³`, 'über Boden'],

@@ -384,8 +384,12 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Zahl titel="Erlös je m² Nutzfläche" wert={annahmen.erloes} einheit="CHF" min={2000} max={60000} schritt={100} setWert={n => erloesSetzen(n, { art: 'hand', text: 'von Hand eingegeben' })} />
           <Offen titel="Baukosten je m² Nutzfläche" wert={annahmen.baukostenHnf} einheit="CHF" platz={b.neubau ? de(b.neubau.baukostenJeM2) : undefined} setWert={n => setze({ baukostenHnf: n })} />
+          {/* Sind Pläne oder Zahlen des Bauherrn bekannt, gehen sie der Formel vor (YOMORI, 18. November). */}
+          <Offen titel="Nutzfläche laut Projekt" wert={hand.projektHnf} einheit="m²" platz={b.neubau && !b.neubau.projektHand ? de(Math.round(b.neubau.hnf)) : undefined} setWert={n => vonHand({ projektHnf: n })} />
+          <Offen titel="Baukosten laut Projekt" wert={hand.projektBaukosten} einheit="CHF" platz={b.neubau && !hand.projektBaukosten ? de(Math.round(b.neubau.baukosten / 10000) * 10000) : undefined} setWert={n => vonHand({ projektBaukosten: n })} />
           <Zahl titel="Baukosten Mietwohnungen je m²" wert={annahmen.baukostenMiete} einheit="CHF" min={2000} max={15000} schritt={100} setWert={n => setze({ baukostenMiete: n })} />
           <Zahl titel="Gewinn vom Erlös" wert={Math.round(annahmen.marge * 1000) / 10} einheit="%" min={0} max={50} schritt={1} setWert={n => setze({ marge: n / 100 })} />
+          <Zahl titel="Zuschlag kleines Projekt" wert={Math.round((annahmen.klein ?? CALC_ANNAHMEN.klein) * 1000) / 10} einheit="%" min={0} max={60} schritt={5} setWert={n => setze({ klein: n / 100 })} />
           <Zahl titel="Abschlag auf den Wert" wert={Math.round(annahmen.abschlag * 1000) / 10} einheit="%" min={0} max={50} schritt={1} setWert={n => setze({ abschlag: n / 100 })} />
           <Zahl titel="Grenzabstand" wert={annahmen.grenzabstand} einheit="m" min={0} max={30} schritt={0.5} setWert={n => setze({ grenzabstand: n })} />
           <Zahl titel="Wohnungsgrösse" wert={annahmen.wohnungM2} einheit="m²" min={30} max={250} schritt={5} setWert={n => setze({ wohnungM2: n })} />
@@ -395,11 +399,14 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
         {/* Woraus die Baukosten bestehen: die Stufe nach Verkaufspreis und die Zuschläge. */}
         {b.neubau && (
           <p className="text-sm text-muted-foreground">
-            {b.neubau.kosten.vonHand
+            {hand.projektBaukosten
+              ? <>Baukosten laut Projekt: {chf(b.neubau.baukosten)}, CHF {de(b.neubau.baukostenJeM2)} je m² Nutzfläche. Leer lassen, dann gelten Preisstufe und Zuschläge.</>
+              : b.neubau.kosten.vonHand
               ? <>Baukosten von Hand: CHF {de(b.neubau.baukostenJeM2)} je m² Nutzfläche. Leer lassen, dann gelten Preisstufe und Zuschläge.</>
               : <>Baukosten inklusive Nebenkosten: CHF {de(b.neubau.kosten.grund)} je m² bei einem Verkaufspreis von CHF {de(annahmen.erloes)}
                 {b.neubau.kosten.hang > 0 && `, +${Math.round(b.neubau.kosten.hang * 100)} % Hanglage (${de(basis.umfeld.neigung ?? 0, 1)} % Steigung)`}
                 {b.neubau.kosten.zuerich > 0 && `, +${de(b.neubau.kosten.zuerich * 100, 1)} % Nähe zu Zürich (${de(basis.umfeld.zuerichKm ?? 0, 1)} km)`}
+                {b.neubau.kosten.klein > 0 && `, +${Math.round(b.neubau.kosten.klein * 100)} % kleines Projekt (unter ${chf(annahmen.kleinGrenze ?? CALC_ANNAHMEN.kleinGrenze)} Baukosten)`}
                 {' '}= CHF {de(b.neubau.baukostenJeM2)}.{basis.umfeld.neigung != null && b.neubau.kosten.hang === 0 && ` Gelände eben (${de(basis.umfeld.neigung, 1)} % Steigung).`} Abbruch kommt dazu.</>}
           </p>
         )}

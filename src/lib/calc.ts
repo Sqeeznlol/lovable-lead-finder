@@ -46,6 +46,9 @@ export interface CalcAnnahmen extends Annahmen {
   /** Ab dieser gemeinsamen Fläche (m²) gilt eine Arealüberbauung, mit diesem Bonus auf die Nutzfläche (0 bis 1). */
   arealMin: number;
   arealBonus: number;
+  /** Zuschlag auf die Baukosten eines kleinen Projekts (0 bis 1), und bis zu welchen Baukosten ein Projekt klein ist (CHF). */
+  klein: number;
+  kleinGrenze: number;
 }
 /**
  * Julian, 16. November: «Wir brauchen eine Gewinnmarge von 20 %», und
@@ -58,6 +61,8 @@ export const CALC_ANNAHMEN: CalcAnnahmen = {
   // einer Mindestfläche, mit mehr Ausnützung. Wie viel und ab wann, steht
   // in der Bauordnung der Gemeinde; die Felder lassen sich ändern.
   arealMin: 3000, arealBonus: 0.1,
+  // Julian, 18. November (YOMORI): unter 10 Mio. Baukosten 30 % teurer.
+  klein: 0.3, kleinGrenze: 10_000_000,
 };
 
 /**
@@ -167,6 +172,20 @@ export function zuerichZuschlag(km: number | null | undefined): number {
 }
 export const zuerichKm = (e: number, n: number) => Math.hypot(e - ZUERICH_HB[0], n - ZUERICH_HB[1]) / 1000;
 
+/**
+ * Julian, 18. November, am Projekt YOMORI (Wallisellerstrasse 9, Kloten):
+ * «Bei Projekten unter 10 Mio. Baukosten sind die Baukosten 30 % höher.»
+ * Ein kleiner Bau trägt Planung, Baustelle und Erschliessung auf wenig
+ * Fläche. Gemessen wird an den Baukosten vor diesem Zuschlag. YOMORI:
+ * 724 m² für CHF 5.5 Mio., also CHF 7'600 je m²; die Preisstufe ergab
+ * dort CHF 6'410, mit Zuschlag CHF 8'330.
+ */
+export function kleinZuschlag(baukosten: number, a: Partial<Pick<CalcAnnahmen, 'klein' | 'kleinGrenze'>> = CALC_ANNAHMEN): number {
+  // Eine Kalkulation von vor dem 18. November kennt die Felder nicht: dann gilt die Vorgabe.
+  const grenze = a.kleinGrenze ?? CALC_ANNAHMEN.kleinGrenze, zuschlag = a.klein ?? CALC_ANNAHMEN.klein;
+  return baukosten > 0 && baukosten < grenze ? zuschlag : 0;
+}
+
 /** Eine Wohnung aus einem Inserat: Fläche in m² und Netto-Miete im Monat. */
 export interface Vergleich { flaeche: number; miete: number }
 /** Eine Eigentumswohnung aus einem Inserat: Fläche in m² und Kaufpreis. */
@@ -204,6 +223,15 @@ export interface VonHand {
   vergleiche?: Vergleich[];
   /** Was Kaufinserate in der Nachbarschaft verlangen, von Hand übertragen. */
   kaeufe?: Kauf[];
+  /**
+   * Die Zahlen eines bekannten Projekts (Pläne, Bauentscheid, Angebot des
+   * Bauherrn). Sie gehen Formel und Register vor (Julian, 18. November, am
+   * Projekt YOMORI: 724 m² Nutzfläche, CHF 5.5 Mio. Baukosten).
+   * Nutzfläche in m²; Baukosten in CHF gesamt, ohne Abbruch, mit allen
+   * Zuschlägen: sie ersetzen Preisstufe, Hang, Nähe zu Zürich und Grösse.
+   */
+  projektHnf?: number | null;
+  projektBaukosten?: number | null;
 }
 
 export interface Preis { m: number; q25?: number | null; q75?: number | null }
@@ -273,6 +301,8 @@ export interface Neubau {
   hnfText: string;
   /** Gerechnet mit der Wohnfläche eines bewilligten Projekts (Gebäuderegister). */
   projekt: boolean;
+  /** Gerechnet mit den Zahlen eines Projekts, von Hand eingegeben. */
+  projektHand: boolean;
   /** Was die Formel ohne Projekt ergäbe, m² Nutzfläche. */
   hnfFormel: number;
   /** Baukosten je m² Nutzfläche mit Zuschlägen, und woraus sie bestehen. */
@@ -281,7 +311,7 @@ export interface Neubau {
 }
 
 /** Die Baukosten je m² Nutzfläche und woraus sie bestehen. */
-export interface Kosten { grund: number; hang: number; zuerich: number; jeM2: number; vonHand: boolean }
+export interface Kosten { grund: number; hang: number; zuerich: number; klein: number; jeM2: number; vonHand: boolean }
 
 /** Ein Neubau mit Mietwohnungen: was ein Anleger dafür zahlt, und was für das Land bleibt. */
 export interface NeubauMiete {
@@ -403,19 +433,23 @@ export function bewerten(e: CalcEingabe): Bewertung {
   const geliehen = !praxis && !studie.rechenbar && pos(e.dichte) && nachbarArt(flaeche, zone, a) === 'dichte' ? flaeche * e.dichte! : null;
   // Ein bewilligtes Projekt hat seine eigenen Zahlen: sie gelten vor jeder Formel.
   const projekt = projektZaehlt(e.projekt) ? e.projekt : null;
+  // Zahlen eines Projekts von Hand gehen allem vor: sie stammen aus den Plänen.
+  const handHnf = pos(e.hand.projektHnf), handKosten = pos(e.hand.projektBaukosten);
   const formelHnf = praxis?.hnf ?? (studie.rechenbar ? studie.hnfNeu : geliehen ?? 0);
-  const rechenbar = !!projekt || !!praxis || studie.rechenbar || geliehen != null;
-  const hnf = projekt ? projekt.wohnflaeche : formelHnf;
-  const gf = projekt ? hnf / a.hnfFaktor : praxis ? praxis.hnf / a.hnfFaktor : studie.rechenbar ? studie.gfNeu : (geliehen ?? 0) / a.hnfFaktor;
-  const wohnungenNeu = projekt && projekt.wohnungen ? projekt.wohnungen : Math.floor(hnf / a.wohnungM2);
+  const rechenbar = !!handHnf || !!projekt || !!praxis || studie.rechenbar || geliehen != null;
+  const hnf = handHnf ?? (projekt ? projekt.wohnflaeche : formelHnf);
+  const gf = handHnf || projekt ? hnf / a.hnfFaktor : praxis ? praxis.hnf / a.hnfFaktor : studie.rechenbar ? studie.gfNeu : (geliehen ?? 0) / a.hnfFaktor;
+  const wohnungenNeu = !handHnf && projekt && projekt.wohnungen ? projekt.wohnungen : Math.floor(hnf / a.wohnungM2);
 
   // ---- Neubau: was für das Land bleibt
   const zuschlag = (1 + hangZuschlag(u.neigung)) * (1 + zuerichZuschlag(u.zuerichKm));
-  const kostenBei = (erloes: number): Kosten => {
+  // Je m² Nutzfläche, für eine Nutzfläche nf: ob ein Projekt klein ist, hängt an seiner Grösse.
+  const kostenBei = (erloes: number, nf = hnf): Kosten => {
+    if (handKosten && hnf > 0) { const je = Math.round(handKosten / hnf); return { grund: je, hang: 0, zuerich: 0, klein: 0, jeM2: je, vonHand: true }; }
+    if (a.baukostenHnf) return { grund: a.baukostenHnf, hang: 0, zuerich: 0, klein: 0, jeM2: a.baukostenHnf, vonHand: true };
     const grund = baukostenNachErloes(erloes);
-    return a.baukostenHnf
-      ? { grund: a.baukostenHnf, hang: 0, zuerich: 0, jeM2: a.baukostenHnf, vonHand: true }
-      : { grund, hang: hangZuschlag(u.neigung), zuerich: zuerichZuschlag(u.zuerichKm), jeM2: Math.round(grund * zuschlag / 10) * 10, vonHand: false };
+    const vor = grund * zuschlag, klein = kleinZuschlag(nf * vor, a);
+    return { grund, hang: hangZuschlag(u.neigung), zuerich: zuerichZuschlag(u.zuerichKm), klein, jeM2: Math.round(vor * (1 + klein) / 10) * 10, vonHand: false };
   };
   const abbruch = (studie.gfBestand ?? 0) * a.abbruch;
   // Landwert = Erlös − Baukosten − Abbruch − Gewinn, alles je m² Nutzfläche.
@@ -423,12 +457,13 @@ export function bewerten(e: CalcEingabe): Bewertung {
   let neubau: Neubau | null = null;
   if (rechenbar) {
     const kosten = kostenBei(a.erloes);
-    const erloes = hnf * a.erloes, baukosten = hnf * kosten.jeM2;
+    const erloes = hnf * a.erloes, baukosten = handKosten ?? hnf * kosten.jeM2;
     const kubatur = gf * a.geschosshoehe;
     const landwert = erloes - baukosten - abbruch - erloes * a.marge;
     neubau = {
-      gf, hnf, kubatur, wohnungen: wohnungenNeu, baukosten, abbruch, erloes, projekt: !!projekt, hnfFormel: formelHnf,
-      hnfText: projekt ? `${projektSatz(projekt)} (Gebäuderegister${projekt.stand ? `, Stand ${projekt.stand}` : ''})`
+      gf, hnf, kubatur, wohnungen: wohnungenNeu, baukosten, abbruch, erloes, projekt: !handHnf && !!projekt, projektHand: !!handHnf, hnfFormel: formelHnf,
+      hnfText: handHnf ? 'Projekt, von Hand eingegeben'
+        : projekt ? `${projektSatz(projekt)} (Gebäuderegister${projekt.stand ? `, Stand ${projekt.stand}` : ''})`
         : praxis ? `Praxisformel: ${praxis.text}` : geliehen != null ? 'Annahme: dieselbe Dichte wie die Hauptparzelle' : 'Machbarkeit: Ziffer und Hülle, die engere gilt',
       gewinn: erloes * a.marge, landwert, jeM2: flaeche ? landwert / flaeche : 0,
       jeM3: kubatur > 0 ? baukosten / kubatur : 0, wohnungPreis: a.erloes * a.wohnungM2,
@@ -443,8 +478,9 @@ export function bewerten(e: CalcEingabe): Bewertung {
   if (rechenbar && pos(a.rendite) && (neuMiete || neuStatistik)) {
     const miete = neuMiete ?? neuStatistik!.wert;
     const ertrag = hnf * miete * 12, wert = ertrag / a.rendite;
-    const baukostenJeM2 = Math.round(a.baukostenMiete * zuschlag / 10) * 10;
-    const baukosten = hnf * baukostenJeM2, gewinn = wert * a.marge;
+    const vor = a.baukostenMiete * zuschlag;
+    const baukostenJeM2 = handKosten ? Math.round(handKosten / hnf) : Math.round(vor * (1 + kleinZuschlag(hnf * vor, a)) / 10) * 10;
+    const baukosten = handKosten ?? hnf * baukostenJeM2, gewinn = wert * a.marge;
     const landwert = wert - baukosten - abbruch - gewinn;
     neubauMiete = {
       hnf, miete, mieteQuelle: neuMiete ? 'Median der eingetragenen Inserate' : neuStatistik!.text,
@@ -508,7 +544,9 @@ export function bewerten(e: CalcEingabe): Bewertung {
     const bonus = flaecheZ >= a.arealMin ? a.arealBonus : 0;
     const hnfZ = hnfOhneBonus * (1 + bonus);
     const abbruchZ = abbruch + teile.reduce((s, t) => s + t.gfBestand * a.abbruch, 0);
-    const landwert = hnfZ * (a.erloes * (1 - a.marge) - neubau.baukostenJeM2) - abbruchZ;
+    // Zusammen ist das Projekt grösser: ob es noch klein ist, entscheidet seine eigene Grösse.
+    const jeM2Z = neubau.kosten.vonHand ? neubau.baukostenJeM2 : kostenBei(a.erloes, hnfZ).jeM2;
+    const landwert = hnfZ * (a.erloes * (1 - a.marge) - jeM2Z) - abbruchZ;
     const nachbarWert = teile.reduce((s, t) => s + t.wertAllein, 0);
     const fuerUns = landwert - nachbarWert;
     const mehr = fuerUns - (wert ?? 0);
@@ -542,7 +580,9 @@ export function bewerten(e: CalcEingabe): Bewertung {
   const chancen: string[] = [], risiken: string[] = [];
   const jahr = e.jahr ?? new Date().getFullYear();
   const registerStand = e.projekt?.stand ? `, Stand ${e.projekt.stand}` : '';
-  if (projekt) {
+  if (handHnf) {
+    chancen.push(`Gerechnet mit den Zahlen des Projekts, von Hand eingegeben: ${m2(handHnf)} Nutzfläche${handKosten ? `, ${chf(handKosten)} Baukosten` : ''}${formelHnf > 0 ? `; die Formel ergäbe ${m2(formelHnf)}` : ''}.`);
+  } else if (projekt) {
     chancen.push(`${satz(projektSatz(projekt))} Gerechnet ist mit diesem Projekt (Gebäuderegister${registerStand})${formelHnf > 0 ? `; die Formel ergäbe ${m2(formelHnf)} Nutzfläche` : ''}.`);
   } else if (e.projekt) {
     // Eingereicht, aber nicht bewilligt: es kann noch scheitern, darum rechnet die Formel.
@@ -636,6 +676,9 @@ export function bewerten(e: CalcEingabe): Bewertung {
       risiken.push(`Für ${fuer} nennt die Zone keine Ziffer: gerechnet mit der Dichte dieser Parzelle (${de(zusammen.dichte, 2)} m² Nutzfläche je m² Land), eine Annahme.`);
     }
   }
+  if (neubau && !neubau.kosten.vonHand && neubau.kosten.klein > 0) {
+    risiken.push(`Kleines Projekt: unter ${chf(a.kleinGrenze ?? CALC_ANNAHMEN.kleinGrenze)} Baukosten, darum ${prozent(neubau.kosten.klein)} % teurer gerechnet (Planung und Baustelle auf wenig Fläche).`);
+  }
   if (neubau && !neubau.kosten.vonHand && neubau.kosten.hang > 0) {
     risiken.push(`Hanglage: das Gelände steigt um ${de(Math.round(u.neigung!))} %, die Baukosten sind ${prozent(neubau.kosten.hang)} % höher gerechnet.`);
   }
@@ -650,6 +693,11 @@ export function bewerten(e: CalcEingabe): Bewertung {
   // ---- jede Zahl mit ihrer Herkunft: die Machbarkeit, dazu die Praxisformel
   const amtlich = zone?.quelle === 'kanton' ? 'amtlich' : 'annahme';
   const herkunft: Bewertung['herkunft'] = [
+    ...(handHnf ? [{ titel: 'Projekt, von Hand eingegeben', zeilen: [
+      // Drei Arten kennt die Herkunft (amtlich, berechnet, Annahme): eine Zahl von Hand ist keine amtliche.
+      { titel: 'Nutzfläche', wert: m2(handHnf), art: 'annahme' as const, quelle: 'von Hand, aus Plänen oder Angaben des Bauherrn' },
+      ...(handKosten ? [{ titel: 'Baukosten', wert: chf(handKosten), art: 'annahme' as const, quelle: 'von Hand, ohne Abbruch, mit allen Zuschlägen' }] : []),
+    ] }] : []),
     ...(e.projekt ? [{ titel: `${e.projekt.status === 'projektiert' ? 'Eingereichtes' : e.projekt.status === 'im Bau' ? 'Begonnenes' : 'Bewilligtes'} Projekt (Gebäuderegister)`, zeilen: [
       { titel: 'Stand', wert: e.projekt.status, art: 'amtlich' as const, quelle: `Gebäuderegister des Bundes${registerStand}` },
       { titel: 'Neubauten mit Wohnungen', wert: de(e.projekt.gebaeude), art: 'amtlich' as const, quelle: 'Gebäuderegister' },

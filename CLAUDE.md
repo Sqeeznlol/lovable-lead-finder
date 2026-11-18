@@ -181,6 +181,11 @@ senden. Alles Weitere in `docs/calc-you-later.md`.
     ÷ VG × (VG + 0.66) × 0.77), wie die Potenzialrechnung. Seine
     Vorgaben für Baukosten, Gewinn und Zuschläge stehen im Dokument;
     nicht eigenmächtig ändern.
+  * Unter CHF 10 Mio. Baukosten rechnet CALC 30 % teurer (18. November,
+    Julian am Projekt YOMORI); bekannte Projektzahlen (Nutzfläche,
+    Baukosten) gehen Formel und Register vor. Abgleich an YOMORI im
+    Dokument: der Landwert hängt dort am Verkaufspreis, nicht an den
+    Baukosten.
   * Ein bewilligtes Projekt geht der Formel vor (18. November, Julian:
     «nöd das Aurora rechnet und debi gits es bewilligts Projekt mit
     anderne Zahle»). Das Gebäuderegister führt projektierte, bewilligte

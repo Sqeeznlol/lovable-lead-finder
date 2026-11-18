@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { vi } from 'vitest';
 vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
-import { baukostenNachErloes, bewerten, CALC_ANNAHMEN, hangZuschlag, hnfPraxis, median, mieteStatistik, nachbarArt, zoneMitHand, zuerichKm, zuerichZuschlag, type CalcEingabe } from '@/lib/calc';
+import { baukostenNachErloes, bewerten, CALC_ANNAHMEN, hangZuschlag, kleinZuschlag, hnfPraxis, median, mieteStatistik, nachbarArt, zoneMitHand, zuerichKm, zuerichZuschlag, type CalcEingabe } from '@/lib/calc';
 import { angebotEntwurf, betrag, uhr } from '@/lib/calc-ablauf';
 import type { ZonenRegeln } from '@/lib/machbarkeit';
 
@@ -14,9 +14,11 @@ const zone: ZonenRegeln = {
   bezeichnung: 'Wohnzone 2', abkuerzung: 'W2', gemeinde: 'Muster', az: 0.6, bmz: null, uez: null, vollgeschosse: 2, dachgeschosse: 1,
   untergeschosse: null, hoehe: null, hoeheArt: null, wohnanteilMin: null, rechtsstatus: 'inKraft', dokument: null, quelle: 'kanton',
 };
+// Die Rechenwege hier sind ohne den Zuschlag für kleine Projekte von Hand
+// nachgerechnet; er hat seine eigenen Tests (YOMORI, weiter unten).
 const leer: CalcEingabe = {
   grundlage: { flaeche: 1000, bebaubarM2: 500, zone, gebaeude: [], registerVollstaendig: true },
-  annahmen: CALC_ANNAHMEN, kanton: 'ZH', hand: {}, umfeld: {}, jahr: 2026,
+  annahmen: { ...CALC_ANNAHMEN, klein: 0 }, kanton: 'ZH', hand: {}, umfeld: {}, jahr: 2026,
 };
 const mfh = { grundflaeche: 200, geschosse: 3, baujahr: 1965, wohnungen: 6 };
 
@@ -316,13 +318,13 @@ describe('CALC YOU LATER: Baukosten nach Julians Vorgaben (16. November)', () =>
   it('Gewinn 20 %, Zuschläge auf die Baukosten, von Hand ohne Zuschläge', () => {
     expect(CALC_ANNAHMEN.marge).toBe(0.2);
     // Kilchberg: Verkaufspreis 25 000, eben (7.9 %), 6.7 km von Zürich.
-    const k = bewerten({ ...leer, annahmen: { ...CALC_ANNAHMEN, erloes: 25_000 }, umfeld: { neigung: 7.9, zuerichKm: 6.7 } }).neubau!;
-    expect(k.kosten).toEqual({ grund: 8500, hang: 0, zuerich: 0.073, jeM2: 9120, vonHand: false });
-    const hang = bewerten({ ...leer, annahmen: { ...CALC_ANNAHMEN, erloes: 25_000 }, umfeld: { neigung: 22, zuerichKm: 6.7 } }).neubau!;
+    const k = bewerten({ ...leer, annahmen: { ...leer.annahmen, erloes: 25_000 }, umfeld: { neigung: 7.9, zuerichKm: 6.7 } }).neubau!;
+    expect(k.kosten).toEqual({ grund: 8500, hang: 0, zuerich: 0.073, klein: 0, jeM2: 9120, vonHand: false });
+    const hang = bewerten({ ...leer, annahmen: { ...leer.annahmen, erloes: 25_000 }, umfeld: { neigung: 22, zuerichKm: 6.7 } }).neubau!;
     // 8 500 × 1.2 × 1.073 = 10 944.6
     expect(hang.baukostenJeM2).toBe(10_940);
     const hand = bewerten({ ...leer, annahmen: { ...CALC_ANNAHMEN, baukostenHnf: 7000 }, umfeld: { neigung: 22, zuerichKm: 1 } }).neubau!;
-    expect(hand.kosten).toEqual({ grund: 7000, hang: 0, zuerich: 0, jeM2: 7000, vonHand: true });
+    expect(hand.kosten).toEqual({ grund: 7000, hang: 0, zuerich: 0, klein: 0, jeM2: 7000, vonHand: true });
   });
 });
 
@@ -500,5 +502,68 @@ describe('CALC YOU LATER: Nachbar in einer Bauzone ohne Ziffer', () => {
     // Praxisformel: 1 000 × 2 ÷ 5 × 5.66 × 0.77 = 1 743.28 m², also 1.74328 je m² Land; der Nachbar 871.64 m².
     expect(o.neubau!.hnf).toBeCloseTo(1743.28, 6);
     expect(o.zusammen!.teile[0].hnf).toBeCloseTo(871.64, 6);
+  });
+});
+
+/**
+ * Julian, 18. November, am Projekt YOMORI (Wallisellerstrasse 9, Kloten,
+ * Parzelle 6315, 711 m², W4): «Bei Projekten unter 10 Mio. Baukosten sind
+ * die Baukosten 30 % höher», und die Zahlen des Projekts: 724 m²
+ * Nutzfläche, CHF 5.5 Mio. Baukosten, CHF 2.4 Mio. Landwert.
+ */
+describe('CALC YOU LATER: kleine Projekte und Zahlen eines Projekts (YOMORI)', () => {
+  const w4: ZonenRegeln = { ...zone, bezeichnung: 'Wohnzone 4', abkuerzung: 'W4', gemeinde: 'Kloten', az: 1.0, vollgeschosse: 4 };
+  const yomori: CalcEingabe = {
+    grundlage: { flaeche: 711, bebaubarM2: 400, zone: w4, gebaeude: [{ grundflaeche: 110, geschosse: 2, baujahr: 1958, wohnungen: 1 }], registerVollstaendig: true },
+    annahmen: { ...CALC_ANNAHMEN, erloes: 11_250 }, kanton: 'ZH', hand: {}, umfeld: { neigung: 7.7, zuerichKm: 8.1 }, jahr: 2026,
+  };
+
+  it('unter CHF 10 Mio. Baukosten 30 % mehr, ab 10 Mio. nicht', () => {
+    expect(CALC_ANNAHMEN.klein).toBe(0.3);
+    expect(kleinZuschlag(9_999_999)).toBe(0.3);
+    expect(kleinZuschlag(10_000_000)).toBe(0);
+    expect(kleinZuschlag(0)).toBe(0);
+    // Eine Kalkulation von vor dem 18. November kennt die Felder nicht: dann gilt die Vorgabe.
+    expect(kleinZuschlag(5_000_000, {})).toBe(0.3);
+    expect(kleinZuschlag(5_000_000, { klein: 0.2, kleinGrenze: 4_000_000 })).toBe(0);
+  });
+
+  it('YOMORI nach der Formel: 638 m², CHF 8 330 je m², 5.31 Mio. statt 5.5 Mio.', () => {
+    const n = bewerten(yomori).neubau!;
+    // 711 × 1.0 ÷ 4 × 4.66 × 0.77 = 637.8 m²
+    expect(n.hnf).toBeCloseTo(637.80, 1);
+    // 6 000 × 1.068 (8.1 km von Zürich) × 1.3 = 8 330.4
+    expect(n.kosten).toEqual({ grund: 6000, hang: 0, zuerich: 0.068, klein: 0.3, jeM2: 8330, vonHand: false });
+    expect(n.baukosten).toBeCloseTo(637.8 * 8330, -2);
+    expect(n.abbruch).toBe(55_000);
+    expect(bewerten(yomori).risiken.some(r => r.startsWith('Kleines Projekt: unter CHF 10 Mio. Baukosten, darum 30 %'))).toBe(true);
+  });
+
+  it('ein grosses Projekt bekommt keinen Zuschlag', () => {
+    const gross = bewerten({ ...yomori, grundlage: { ...yomori.grundlage, flaeche: 7110, bebaubarM2: 4000 } }).neubau!;
+    // 6 378 m² × 6 410 = 40.9 Mio.
+    expect(gross.kosten.klein).toBe(0);
+    expect(gross.baukostenJeM2).toBe(6410);
+  });
+
+  it('die Zahlen des Projekts gehen der Formel vor und ersetzen alle Zuschläge', () => {
+    const b = bewerten({ ...yomori, hand: { projektHnf: 724, projektBaukosten: 5_500_000 } });
+    const n = b.neubau!;
+    expect(n.hnf).toBe(724);
+    expect(n.projektHand).toBe(true);
+    expect(n.hnfFormel).toBeCloseTo(637.80, 1);
+    expect(n.baukosten).toBe(5_500_000);
+    expect(n.baukostenJeM2).toBe(7597);
+    expect(n.kosten.vonHand).toBe(true);
+    // 724 × 11 250 × 0.8 − 5 500 000 − 55 000 = 961 000
+    expect(n.landwert).toBeCloseTo(961_000, -1);
+    expect(b.chancen[0]).toContain('Gerechnet mit den Zahlen des Projekts, von Hand eingegeben: 724 m² Nutzfläche');
+    expect(b.herkunft[0].titel).toBe('Projekt, von Hand eingegeben');
+  });
+
+  it('der Landwert von CHF 2.4 Mio. verlangt einen Erlös von CHF 13 735 je m²', () => {
+    // (2 400 000 + 5 500 000 + 55 000) ÷ (724 × 0.8) = 13 734.5
+    const n = bewerten({ ...yomori, annahmen: { ...yomori.annahmen, erloes: 13_735 }, hand: { projektHnf: 724, projektBaukosten: 5_500_000 } }).neubau!;
+    expect(n.landwert).toBeCloseTo(2_400_000, -3);
   });
 });

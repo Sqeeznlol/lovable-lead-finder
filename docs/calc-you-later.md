@@ -91,8 +91,38 @@ manche nicht einmal Geschosse. Bauzonen sind es trotzdem. Seither:
   * **Nähe zu Zürich** teurer: +10 % am Hauptbahnhof, gleichmässig
     weniger bis 0 % in 25 km (von Julian bestätigt).
   * Die Baukosten gelten je m² verkaufbarer Nutzfläche (bestätigt).
+  * **Kleine Projekte** (18. November, am Projekt YOMORI): «Bei Projekten
+    unter 10 Mio. Baukosten sind die Baukosten 30 % höher.» Gemessen an
+    den Baukosten vor diesem Zuschlag; in der Seite als Annahme änderbar.
+    Gilt auch für Mietwohnungen; zusammen mit Nachbarn entscheidet die
+    Grösse des gemeinsamen Projekts.
   * **Kilchberg**: Verkaufspreis 20'000 bis 30'000 je m²
     (`src/lib/erloes-angaben.ts`, gerechnet mit der Mitte).
+
+### Zahlen eines bekannten Projekts
+
+Sind Pläne oder Zahlen des Bauherrn bekannt, gehören sie in «Nutzfläche
+laut Projekt» und «Baukosten laut Projekt» (gesamt, ohne Abbruch). Sie
+gehen der Formel und dem Register vor und ersetzen Preisstufe und
+Zuschläge.
+
+**Abgleich an YOMORI** (Wallisellerstrasse 9, Kloten, Parzelle 6315,
+711 m², W4), Zahlen des Projekts von Julian am 18. November:
+
+| | Nutzfläche | Baukosten | Landwert | Empfehlung |
+|---|---|---|---|---|
+| Projekt YOMORI | 724 m² | CHF 5.5 Mio. | CHF 2.4 Mio. | |
+| CALC bis 18. November (Formel) | 638 m² | CHF 4.09 Mio. | CHF 1.6 Mio. | CHF 1.43 Mio. |
+| CALC mit Zuschlag kleines Projekt | 638 m² | CHF 5.31 Mio. | CHF 0.37 Mio. | CHF 0.33 Mio. |
+| CALC mit den Zahlen des Projekts | 724 m² | CHF 5.5 Mio. | CHF 0.96 Mio. | CHF 0.86 Mio. |
+
+Gemessen in der Seite mit den Daten von Bund und Kanton; Erlös in allen
+Zeilen CHF 11'250 je m² (Verkäufe in Kloten 2023 bis 2025). Der Zuschlag
+bringt die Baukosten nahe an das Projekt (5.31 statt 5.5 Mio.), die
+Formel unterschätzt die Nutzfläche um 12 %. Den Landwert von CHF 2.4 Mio.
+erreicht die Rechnung erst mit einem Erlös von CHF 13'735 je m² (bei
+20 % Gewinn): mit welchem Verkaufspreis YOMORI rechnet, ist die offene
+Zahl. `calc.test.ts` hält die Zeilen fest.
 
 ### Der Verkaufspreis je m²
 
