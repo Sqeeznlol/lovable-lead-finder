@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CookieHinweis } from '@/components/CookieHinweis';
 import { setzeZustimmung } from '@/lib/zustimmung';
+import { sitzungsHerkunft } from '@/lib/werbe-herkunft';
 import { DATENQUELLEN, FRAGEN, SCHRITTE } from '@/lib/check-inhalt';
 import { preisZeilen, type Preise } from '@/lib/preise';
 import { umkreisLaden, umkreisSatz, umkreisZeilen, type Umkreis } from '@/lib/umkreis';
@@ -21,7 +22,7 @@ import { gebaeudeLaden, modellAus, parzelleRelativ, rechtLaden, rechtZeilen, umg
 import { Ladebild, type LadebildDaten } from '@/components/check/Ladebild';
 import { FENSTER } from '@/lib/fenster';
 import {
-  aeltestes, ANTWORT_TEXT, stockText, type Einheit, linkFuer, ortAusLink, bauzeit, befundAmOrt, heizungText, GEBAEUDEART, herkunft, leadAngaben, mailOk, nameOk, schweizerNummer, STATUS, vorschlaege,
+  aeltestes, ANTWORT_TEXT, stockText, type Einheit, linkFuer, ortAusLink, bauzeit, befundAmOrt, heizungText, GEBAEUDEART, leadAngaben, mailOk, nameOk, schweizerNummer, STATUS, vorschlaege,
   type Antwort, type Befund, type Ort, vorschlagTeile } from '@/lib/check-daten';
 
 /**
@@ -263,7 +264,7 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
     if (Date.now() - geoeffnet.current < 4000) { setFehler('Bitte prüfen Sie Ihre Angaben kurz und senden Sie dann nochmals.'); return; }
     if (heuteSchon().length >= 3) { setFehler('Von diesem Gerät sind heute schon mehrere Anfragen eingegangen. Wir melden uns bei Ihnen.'); return; }
     setSendet(true); setFehler(null);
-    const angaben = leadAngaben({ marke: marke.id, domain, antwort, befund, herkunft: window.location.search ? herkunft(window.location.search) : {}, landpreis: gemeindePreise?.land?.m ?? null });
+    const angaben = leadAngaben({ marke: marke.id, domain, antwort, befund, herkunft: sitzungsHerkunft(), landpreis: gemeindePreise?.land?.m ?? null });
     if (modus === 'heizung') angaben.thema = 'heizung';
     // Gewählte Wohnung (Stockwerkeigentum) mitgeben, knapp: die Spalte erlaubt weniger als 8 kB.
     if (wohnung) angaben.wohnung = { egid: wohnung.egid, stock: stockText(wohnung.stock), zimmer: wohnung.zimmer, flaeche: wohnung.flaeche, nr: wohnung.nr };
@@ -399,7 +400,7 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
             : <>
                 <p>Wir speichern die Angaben, die Sie im Formular machen (Vorname, Name, E-Mail, Telefon, Adresse der Liegenschaft und Ihre Antworten), um Ihnen die Berechnung und Analyse zu erstellen und Sie zu Ihrer Liegenschaft zu kontaktieren. An Dritte geben wir sie nicht weiter.</p>
                 <p>Grundstücksdaten und Karten laden wir von geo.admin.ch (Bund), die Schriften von Google Fonts. Dabei sehen diese Dienste Ihre IP-Adresse.</p>
-                <p>Besuche zählen wir anonym und ohne Cookie: mit einer zufälligen Nummer im Speicher dieses Browserfensters, die beim Schliessen verfällt. Werbe-Cookies und Messpunkte von Werbeplattformen (Meta, Google) setzen wir nur, wenn Sie im Cookie-Hinweis zustimmen. Ihre Wahl ändern Sie jederzeit unten unter «Cookie-Einstellungen».</p>
+                <p>Besuche zählen wir anonym und ohne Cookie: mit einer zufälligen Nummer im Speicher dieses Browserfensters, die beim Schliessen verfällt. Den Messpunkt von Google Ads (Werbe-Cookies) laden wir nur, wenn Sie im Cookie-Hinweis zustimmen. Er meldet Google, dass nach dem Klick auf eine Anzeige eine Anfrage eingegangen ist, ohne Name, Adresse oder Nummer; für persönliche Werbung nutzen wir ihn nicht. Ihre Wahl ändern Sie jederzeit unten unter «Cookie-Einstellungen».</p>
                 <p>Verantwortlich für die Bearbeitung Ihrer Daten ist {BETREIBER}, {BETREIBER_ADRESSE.join(', ')}. Die vollständige Datenschutzerklärung mit Auftragsbearbeitern und Ländern wird ergänzt.</p>
               </>}
           <button type="button" className="knopf" onClick={() => setRecht(null)}>Zurück</button>

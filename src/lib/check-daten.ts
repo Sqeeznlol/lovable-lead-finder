@@ -231,15 +231,7 @@ export function prioritaet(a: Antwort): 'heiss' | 'warm' | 'normal' {
 }
 
 /** Werbeherkunft aus der Adresse der Seite: UTM-Werte und Klick-Kennungen von Google und Meta. */
-export function herkunft(suche: string): Record<string, string> {
-  const u = new URLSearchParams(suche);
-  const aus: Record<string, string> = {};
-  for (const k of ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'gclid', 'fbclid']) {
-    const v = u.get(k);
-    if (v) aus[k] = v.slice(0, 200);
-  }
-  return aus;
-}
+export { herkunftAus as herkunft } from '@/lib/werbe-herkunft';
 
 /** Was in anfrage.angaben steht. Klein halten: die Spalte erlaubt weniger als 8 kB. */
 // Boden-Richtwert für Aurora (Julian, 15. November: die grossen Liegenschaften zuerst

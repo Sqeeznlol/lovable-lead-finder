@@ -17,6 +17,8 @@
 .pc .ratgeber-kopf .huelle{position: relative; max-width: 820px; padding-top: 56px; padding-bottom: 48px;}
 @media (min-width: 900px){.pc .ratgeber-kopf .huelle{padding-top: 88px; padding-bottom: 72px; margin-left: max(0px, calc((100% - 1240px) / 2));}}
 .pc .ratgeber-kopf h1{font-size: clamp(32px, 4.6vw, 54px); line-height: 1.08; letter-spacing: -0.025em; font-weight: 600; margin: 14px 0 18px; max-width: 20ch;}
+/* Lange Wörter wie «Grundstückgewinnsteuer» sind auf dem iPhone breiter als der Bildschirm (18. November): trennen statt abschneiden. */
+.ratgeber-kopf h1{-webkit-hyphens: auto; hyphens: auto; hyphenate-limit-chars: 12 5 5; overflow-wrap: break-word;}
 .pc .ratgeber-kopf .lead-text{font-size: clamp(19px, 2vw, 22px); line-height: 1.55; color: var(--tinte); margin: 0; max-width: 60ch;}
 .pc .ratgeber-kopf .meta{margin-top: 18px; font-size: 15px; color: var(--grau);}
 .pc .artikel{max-width: 820px; padding-top: 24px; padding-bottom: 72px;}

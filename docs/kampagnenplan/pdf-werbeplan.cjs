@@ -16,7 +16,7 @@ const { chromium } = require('playwright');
   await seite.pdf({
     path: `${__dirname}/Werbeplan-Check-Seiten.pdf`, format: 'A4', printBackground: true, preferCSSPageSize: true, displayHeaderFooter: true,
     headerTemplate: '<span></span>',
-    footerTemplate: '<div style="width:100%;font-family:Inter,sans-serif;font-size:7pt;color:#7b838c;padding:0 17mm;display:flex;justify-content:space-between"><span>Werbeplan Check-Seiten · November 2026</span><span><span class="pageNumber"></span> / <span class="totalPages"></span></span></div>',
+    footerTemplate: '<div style="width:100%;font-family:Inter,sans-serif;font-size:7pt;color:#7b838c;padding:0 17mm;display:flex;justify-content:space-between"><span>Werbeplan Google Ads · November 2026</span><span><span class="pageNumber"></span> / <span class="totalPages"></span></span></div>',
     margin: { top: '18mm', bottom: '18mm', left: '17mm', right: '17mm' },
   });
   await browser.close();
@@ -24,6 +24,6 @@ const { chromium } = require('playwright');
   require('child_process').execFileSync('python3', ['-I', '-c', `
 import sys, pypdf
 r = pypdf.PdfReader(sys.argv[1]); w = pypdf.PdfWriter(clone_from=r)
-w.add_metadata({'/Title': 'Werbeplan Check-Seiten', '/Author': 'Bauraum', '/Creator': 'Bauraum', '/Producer': 'Bauraum'})
+w.add_metadata({'/Title': 'Werbeplan Google Ads', '/Author': 'Bauraum', '/Creator': 'Bauraum', '/Producer': 'Bauraum'})
 w.write(sys.argv[1])`, `${__dirname}/Werbeplan-Check-Seiten.pdf`]);
 })();

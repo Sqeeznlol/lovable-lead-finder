@@ -78,6 +78,19 @@ Handy-Fassung. Gebaut wird mit `<Seite>` aus `src/components/rahmen.tsx`.
     gebaut, und was erlaubt ist, sagt die Gemeinde. «Baureserve» statt
     «Reserve», wo das Wort allein steht. Der Test `check.test.ts`
     (Wortlaut der Check-Seiten) wird rot, wenn so ein Satz zurückkommt.
+  * Werbung nur bei Google Ads, Julian und Bauraum zusammen, Budget
+    CHF 1'000 im Monat (18. November: «wir machen nur Google ADS»,
+    «budget 1000 CHF im Monat»). Kein Meta-Pixel mehr
+    (`zustimmung.test.ts` wird rot, wenn es zurückkommt). Kampagnen,
+    Keywords, Anzeigen und Standorte erzeugt
+    `docs/kampagnenplan/google_ads.py` als Importdatei für den Google Ads
+    Editor; der Werbeplan (`werbeplan.py`) nennt dieselben Zahlen. Neue
+    Anzeigentexte versprechen nur, was die Seite hält (nie «ohne
+    Anmeldung»: Ausnützung und Reserve gibt es gegen Kontaktangaben).
+  * Herkunft eines Leads (utm_*, gclid) wird beim Start gemerkt
+    (`werbe-herkunft.ts`), weil die Check-Seite ihren Link beim Wählen
+    einer Adresse umschreibt. Der Google-Tag lädt gleich nach
+    «Einverstanden» und reicht die Klick-Kennung über page_location nach.
 
 ## Sprache
 

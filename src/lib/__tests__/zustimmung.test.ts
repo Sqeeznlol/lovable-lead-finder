@@ -29,10 +29,12 @@ describe('Cookie-Zustimmung', () => {
   });
 });
 
-describe('Meta-Pixel', () => {
-  it('lädt nur nach «Einverstanden»', async () => {
-    const quelle = (await import('node:fs')).readFileSync('src/lib/meta-pixel.ts', 'utf8');
-    // Die einzige öffentliche Funktion prüft die Zustimmung, bevor sie lädt.
-    expect(quelle).toMatch(/export function pixel[\s\S]*?!darfWerben\(\)\) return;[\s\S]*?laden\(/);
+describe('Nur Google', () => {
+  // Geworben wird nur bei Google (Julian, 18. November): kein Messpunkt von Meta mehr.
+  it('kein Meta-Pixel im Programm', async () => {
+    const fs = await import('node:fs');
+    expect(fs.existsSync('src/lib/meta-pixel.ts')).toBe(false);
+    const alle = (fs.readdirSync('src', { recursive: true }) as string[]).filter(p => /\.tsx?$/.test(p) && !p.includes('__tests__'));
+    expect(alle.filter(p => /connect\.facebook\.net|fbq\(/.test(fs.readFileSync(`src/${p}`, 'utf8')))).toEqual([]);
   });
 });

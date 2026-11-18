@@ -40,12 +40,3 @@ describe('Auswertung der Check-Seiten', () => {
     expect(trichterJeSeite([z('x1', 'lead', 1)])[0].quote).toBeNull();
   });
 });
-
-describe('Meta-Pixel', () => {
-  it('Lead geht als Lead an Meta, Zwischenschritte als Standardereignisse', async () => {
-    const { PIXEL_FUER } = await import('@/lib/check-zaehlen');
-    expect(PIXEL_FUER.lead).toBe('Lead');
-    expect(PIXEL_FUER.aufruf).toBe('PageView');
-    expect(PIXEL_FUER.kontakt).toBeUndefined();
-  });
-});

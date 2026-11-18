@@ -372,8 +372,76 @@ export const ARTIKEL: Artikel[] = [
     ],
     stand: '15. November 2026',
   },
+  {
+    // Quellen am 18. November 2026 geöffnet: Steuergesetz ZH (LS 631.1, Stand
+    // 1.4.2026) §§ 208, 216 bis 226, Zürcher Steuerbuch Nr. 225.1 (Tarif),
+    // ESTV Steuermäppchen und Dossier zur Grundstückgewinnsteuer. Zielseite
+    // der Google-Kampagne «Steuer» (docs/kampagnenplan/google_ads.py).
+    slug: 'grundstueckgewinnsteuer',
+    rubrik: 'Verkaufen',
+    titel: 'Grundstückgewinnsteuer. Was beim Verkauf bleibt und warum die Besitzdauer zählt',
+    lead: 'Wer ein Haus oder Bauland mit Gewinn verkauft, zahlt darauf Grundstückgewinnsteuer. Wie viel, hängt vom Gewinn ab und davon, wie lange Sie das Grundstück besessen haben. Hier steht, wie gerechnet wird, am Beispiel des Kantons Zürich, und wann die Steuer aufgeschoben wird.',
+    lesezeit: '5 Minuten',
+    abschnitte: [
+      {
+        titel: 'Die Kantone erheben sie, der Bund nicht',
+        absaetze: [
+          'Gewinne aus dem Verkauf eines Grundstücks im Privatvermögen sind beim Bund steuerfrei. Die Kantone dagegen müssen sie mit der Grundstückgewinnsteuer erfassen, so verlangt es das Steuerharmonisierungsgesetz. Tarif, Abzüge und Fristen bestimmt jeder Kanton selbst. Kurzfristige Gewinne müssen alle stärker besteuern.',
+          'Im Kanton Zürich erheben die Gemeinden die Steuer. Zuständig ist das Steueramt der Gemeinde, in der das Grundstück liegt. Steuerpflichtig ist, wer verkauft. Für die Steuer hat die Gemeinde ein gesetzliches Pfandrecht am Grundstück, darum ist sie auch für Käufer wichtig.',
+        ],
+      },
+      {
+        titel: 'Wie der Gewinn gerechnet wird',
+        absaetze: [
+          'Gewinn ist, was der Verkaufspreis über den Anlagekosten liegt. Anlagekosten sind der damalige Kaufpreis und die anrechenbaren Aufwendungen: Ausgaben für Bauten, Umbauten und andere dauernde Verbesserungen, Beiträge für Strassen, Trottoirs und Leitungen, übliche Maklerprovisionen und Inseratekosten für Kauf und Verkauf, Abgaben bei der Handänderung und ein bezahlter Mehrwertausgleich.',
+          'Liegt der Kauf mehr als 20 Jahre zurück, dürfen Sie statt des damaligen Kaufpreises den Verkehrswert von vor 20 Jahren einsetzen. Das senkt den Gewinn, wenn das Grundstück damals schon mehr wert war als beim Kauf. Gewinne unter CHF 5’000 werden nicht besteuert.',
+          'Geerbt oder geschenkt: Dann zählt nicht die Erbschaft oder die Schenkung, sondern der letzte Kauf davor, für den Gewinn wie für die Besitzdauer. Wer ein Haus verkauft, das die Eltern vor 40 Jahren gekauft haben, rechnet mit deren Kaufpreis oder dem Wert vor 20 Jahren, und mit 40 Jahren Besitzdauer.',
+        ],
+        kasten: true,
+      },
+      {
+        titel: 'Der Tarif im Kanton Zürich',
+        absaetze: [
+          'Die Steuer steigt mit dem Gewinn: 10 Prozent auf den ersten CHF 4’000, dann 15, 20, 25, 30 und 35 Prozent auf den weiteren Stufen und 40 Prozent auf allem über CHF 100’000. Auf CHF 100’000 Gewinn sind das CHF 29’400, auf CHF 150’000 sind es CHF 49’400.',
+        ],
+      },
+      {
+        titel: 'Die Besitzdauer zählt',
+        absaetze: [
+          'Wer kurz besitzt, zahlt mehr: bei weniger als einem Jahr 50 Prozent Zuschlag, bei weniger als zwei Jahren 25 Prozent. Wer lange besitzt, zahlt weniger: nach vollen 5 Jahren 5 Prozent, danach für jedes volle Jahr 3 Prozent mehr, bis 50 Prozent nach 20 Jahren.',
+          'Ein Beispiel, vereinfacht: gekauft 2001 für CHF 600’000, für CHF 80’000 umgebaut, 2026 verkauft für CHF 1’200’000. Der Gewinn beträgt CHF 520’000, der Tarif ergibt CHF 197’400. Nach 25 Jahren Besitz halbiert sich die Steuer auf CHF 98’700. Ob der Wert von 2006 den Gewinn weiter senkt, prüft das Steueramt.',
+        ],
+      },
+      {
+        titel: 'Wann die Steuer aufgeschoben wird',
+        absaetze: [
+          'Bei Erbgang, Erbvorbezug und Schenkung wird keine Steuer fällig. Sie ist aufgeschoben, bis die neue Eigentümerin oder der neue Eigentümer verkauft. Dasselbe gilt für bestimmte Übertragungen unter Ehegatten.',
+          'Verkaufen Sie das Haus oder die Eigentumswohnung, in der Sie dauernd und ausschliesslich selbst wohnen, und kaufen oder bauen Sie innert angemessener Frist in der Schweiz wieder ein selbst bewohntes Eigenheim, wird die Steuer aufgeschoben, soweit Sie den Erlös dafür verwenden. Diesen Aufschub verlangt das Bundesrecht von allen Kantonen, die Einzelheiten regelt jeder Kanton.',
+        ],
+      },
+      {
+        titel: 'Steuererklärung innert 30 Tagen',
+        absaetze: [
+          'Im Kanton Zürich reichen Sie dem Steueramt der Gemeinde innert 30 Tagen nach dem Verkauf eine Steuererklärung für den Grundstückgewinn ein. Die Frist lässt sich erstrecken. Halten Sie den alten Kaufvertrag und die Rechnungen für Umbauten bereit: Sie belegen die Anlagekosten.',
+          'Dieser Ratgeber ersetzt keine Beratung. Verbindlich ist die Einschätzung durch die Gemeinde, und in anderen Kantonen gelten andere Tarife.',
+        ],
+      },
+    ],
+    kasten: {
+      titel: 'Bevor Sie rechnen: was steht auf Ihrem Grundstück?',
+      satz: 'Fläche, Bauzone und Gebäude aus den amtlichen Registern, für Ihre Adresse in Sekunden.',
+      knopf: 'Grundstück kostenlos prüfen',
+    },
+    quellen: [
+      { text: 'Steuergesetz Kanton Zürich, §§ 208 und 216 bis 226 (LS 631.1)', url: 'https://www.notes.zh.ch/appl/zhlex_r.nsf/WebView/A1B72A220CD6E747C1258DC4002A921E/$File/631.1_8.6.97_132.pdf' },
+      { text: 'Zürcher Steuerbuch Nr. 225.1: Tarif für die Grundstückgewinnsteuer', url: 'https://www.zh.ch/content/dam/zhweb/bilder-dokumente/themen/steuern-finanzen/steuern/vertreter/steuerbuch/zstb-nr-225-1.pdf' },
+      { text: 'Kanton Zürich: Grundstückgewinnsteuer, Zuständigkeit der Gemeinden', url: 'https://www.zh.ch/de/steuern-finanzen/steuern/steuern-natuerliche-personen/grundstueck-gewinnsteuer.html' },
+      { text: 'ESTV, Steuermäppchen: Grundstückgewinnsteuer (Art. 12 StHG)', url: 'https://www.estv2.admin.ch/stp/sm/grundstueckgewinnsteuer-de-fr.pdf' },
+      { text: 'ESTV, Dossier Steuerinformationen: Besteuerung der Grundstückgewinne', url: 'https://www.estv2.admin.ch/stp/ds/d-besteuerung-grundstueckgewinne-de.pdf' },
+    ],
+    stand: '18. November 2026',
+  },
 ];
-
 export function artikelNachSlug(slug: string | null | undefined): Artikel | null {
   return ARTIKEL.find(a => a.slug === slug) ?? null;
 }

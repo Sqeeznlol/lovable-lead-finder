@@ -8,7 +8,6 @@
  * darf die Seite nicht darunter leiden.
  */
 import { datenbank } from './datenbank';
-import { pixel, type PixelEreignis } from '@/lib/meta-pixel';
 import { googleLead } from '@/lib/google-ads';
 import { markeFuerHost } from '@/lib/check-marken';
 
@@ -50,12 +49,6 @@ function sitzungsQuelle(): { quelle: string | null; kampagne: string | null } {
 }
 
 const gesendet = new Set<string>();
-
-// Unsere Schritte als Standardereignisse von Meta. "Lead" ist das, worauf
-// die Werbung optimiert; die Schritte davor zeigen Meta, wer nahe dran war.
-export const PIXEL_FUER: Partial<Record<Ereignis, PixelEreignis>> = {
-  aufruf: 'PageView', ratgeber: 'PageView', suche: 'Search', ergebnis: 'ViewContent', rechner: 'InitiateCheckout', lead: 'Lead',
-};
 
 /**
  * Gezählt wird nur auf einer echten Marken-Domain. Bis zum 13. November
@@ -107,8 +100,7 @@ export function zaehlen(marke: string, domain: string, ereignis: Ereignis): void
   const schluessel = `${marke}|${ereignis}`;
   if (gesendet.has(schluessel)) return;
   gesendet.add(schluessel);
-  const p = PIXEL_FUER[ereignis];
-  if (p) pixel(p, { content_name: domain, content_category: marke });
+  // Geworben wird nur bei Google (Julian, 18. November); gemeldet wird allein der Lead.
   if (ereignis === 'lead') googleLead();
   const { quelle, kampagne } = sitzungsQuelle();
   const geraet = window.matchMedia?.('(max-width: 999px)').matches ? 'handy' : 'computer';

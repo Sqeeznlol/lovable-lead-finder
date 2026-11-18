@@ -65,11 +65,13 @@ Adresse, diese an zwei Stellen eintragen:
    `npm run build`, Ausgabe `dist`. Umgebungsvariablen wie in `.env`.
 2. Die Marken-Domains (hauschecker.ch, parzellenchecker.ch, ...) diesem
    Projekt hinzufügen, nicht der Webseite.
-3. Meta-Pixel für die Facebook-Werbung: bei Vercel die Umgebungsvariable
-   `VITE_META_PIXEL_ID` mit der Pixel-ID aus dem Meta-Werbekonto setzen
-   und neu bauen. Ohne sie lädt kein Pixel. Gesendet werden PageView,
-   Search, ViewContent, InitiateCheckout und Lead, je mit der Domain,
-   nie Name, Adresse oder Nummer.
+3. Google Ads (geworben wird nur dort, seit dem 18. November): bei Vercel
+   `VITE_GOOGLE_ADS_ID` (AW-…) und `VITE_GOOGLE_ADS_LABEL` aus der
+   Conversion «Lead» setzen und neu bauen. Ohne ID lädt nichts. Der
+   Messpunkt lädt erst nach «Einverstanden» im Cookie-Hinweis und meldet
+   nur den Lead, nie Name, Adresse oder Nummer. Kampagnen, Keywords und
+   Anzeigen liegen als Importdatei für den Google Ads Editor in
+   `docs/kampagnenplan/google-ads-import.csv` (erzeugt von `google_ads.py`).
 4. Die Adresse als Repository-Variable `AKQUISE_URL` eintragen; dann
    prüft "Was ist live" jeden Push.
 5. Secrets für die Abläufe: `SUPABASE_ACCESS_TOKEN` (Funktionen),

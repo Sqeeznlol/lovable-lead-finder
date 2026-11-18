@@ -72,6 +72,16 @@
       "destination": "/marken/parzellenchecker/ratgeber/liegenschaft-geerbt.html"
     },
     {
+      "source": "/ratgeber/grundstueckgewinnsteuer",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellenchecker\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellenchecker/ratgeber/grundstueckgewinnsteuer.html"
+    },
+    {
       "source": "/heizung",
       "has": [
         {
@@ -162,6 +172,16 @@
       "destination": "/marken/hauschecker/ratgeber/liegenschaft-geerbt.html"
     },
     {
+      "source": "/ratgeber/grundstueckgewinnsteuer",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(hauschecker\\.ch)"
+        }
+      ],
+      "destination": "/marken/hauschecker/ratgeber/grundstueckgewinnsteuer.html"
+    },
+    {
       "source": "/heizung",
       "has": [
         {
@@ -250,6 +270,16 @@
         }
       ],
       "destination": "/marken/wasdarfichbauen/ratgeber/liegenschaft-geerbt.html"
+    },
+    {
+      "source": "/ratgeber/grundstueckgewinnsteuer",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(was-kann-ich-bauen\\.ch)"
+        }
+      ],
+      "destination": "/marken/wasdarfichbauen/ratgeber/grundstueckgewinnsteuer.html"
     },
     {
       "source": "/heizung",
@@ -362,6 +392,16 @@
       "destination": "/marken/ausbaupotenzial/ratgeber/liegenschaft-geerbt.html"
     },
     {
+      "source": "/ratgeber/grundstueckgewinnsteuer",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(ausbaupotenzial\\.ch)"
+        }
+      ],
+      "destination": "/marken/ausbaupotenzial/ratgeber/grundstueckgewinnsteuer.html"
+    },
+    {
       "source": "/heizung",
       "has": [
         {
@@ -450,6 +490,16 @@
         }
       ],
       "destination": "/marken/erbliegenschaft/ratgeber/liegenschaft-geerbt.html"
+    },
+    {
+      "source": "/ratgeber/grundstueckgewinnsteuer",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(erbliegenschaft\\.ch)"
+        }
+      ],
+      "destination": "/marken/erbliegenschaft/ratgeber/grundstueckgewinnsteuer.html"
     },
     {
       "source": "/heizung",
@@ -542,6 +592,16 @@
       "destination": "/marken/reserverechner/ratgeber/liegenschaft-geerbt.html"
     },
     {
+      "source": "/ratgeber/grundstueckgewinnsteuer",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(ausnuetzung-check\\.ch)"
+        }
+      ],
+      "destination": "/marken/reserverechner/ratgeber/grundstueckgewinnsteuer.html"
+    },
+    {
       "source": "/heizung",
       "has": [
         {
@@ -630,6 +690,16 @@
         }
       ],
       "destination": "/marken/aufstockcheck/ratgeber/liegenschaft-geerbt.html"
+    },
+    {
+      "source": "/ratgeber/grundstueckgewinnsteuer",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(aufstockungscheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/aufstockcheck/ratgeber/grundstueckgewinnsteuer.html"
     },
     {
       "source": "/heizung",
@@ -722,6 +792,16 @@
       "destination": "/marken/verdichtungscheck/ratgeber/liegenschaft-geerbt.html"
     },
     {
+      "source": "/ratgeber/grundstueckgewinnsteuer",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(verdichtungscheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/verdichtungscheck/ratgeber/grundstueckgewinnsteuer.html"
+    },
+    {
       "source": "/heizung",
       "has": [
         {
@@ -810,6 +890,16 @@
         }
       ],
       "destination": "/marken/parzellenwert/ratgeber/liegenschaft-geerbt.html"
+    },
+    {
+      "source": "/ratgeber/grundstueckgewinnsteuer",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellenwert\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellenwert/ratgeber/grundstueckgewinnsteuer.html"
     },
     {
       "source": "/heizung",
@@ -902,6 +992,16 @@
       "destination": "/marken/landwert24/ratgeber/liegenschaft-geerbt.html"
     },
     {
+      "source": "/ratgeber/grundstueckgewinnsteuer",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(landwert24\\.ch)"
+        }
+      ],
+      "destination": "/marken/landwert24/ratgeber/grundstueckgewinnsteuer.html"
+    },
+    {
       "source": "/heizung",
       "has": [
         {
@@ -990,6 +1090,16 @@
         }
       ],
       "destination": "/marken/hauswertrechner/ratgeber/liegenschaft-geerbt.html"
+    },
+    {
+      "source": "/ratgeber/grundstueckgewinnsteuer",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(hauswertrechner\\.ch)"
+        }
+      ],
+      "destination": "/marken/hauswertrechner/ratgeber/grundstueckgewinnsteuer.html"
     },
     {
       "source": "/heizung",
@@ -1082,6 +1192,16 @@
       "destination": "/marken/grundstueckrechner/ratgeber/liegenschaft-geerbt.html"
     },
     {
+      "source": "/ratgeber/grundstueckgewinnsteuer",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellenrechner\\.ch)"
+        }
+      ],
+      "destination": "/marken/grundstueckrechner/ratgeber/grundstueckgewinnsteuer.html"
+    },
+    {
       "source": "/heizung",
       "has": [
         {
@@ -1170,6 +1290,16 @@
         }
       ],
       "destination": "/marken/bauzonencheck/ratgeber/liegenschaft-geerbt.html"
+    },
+    {
+      "source": "/ratgeber/grundstueckgewinnsteuer",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(bauzonencheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/bauzonencheck/ratgeber/grundstueckgewinnsteuer.html"
     },
     {
       "source": "/heizung",
@@ -1262,6 +1392,16 @@
       "destination": "/marken/eigentuemercheck/ratgeber/liegenschaft-geerbt.html"
     },
     {
+      "source": "/ratgeber/grundstueckgewinnsteuer",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(eigentuemercheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/eigentuemercheck/ratgeber/grundstueckgewinnsteuer.html"
+    },
+    {
       "source": "/heizung",
       "has": [
         {
@@ -1350,6 +1490,16 @@
         }
       ],
       "destination": "/marken/baurechner24/ratgeber/liegenschaft-geerbt.html"
+    },
+    {
+      "source": "/ratgeber/grundstueckgewinnsteuer",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(baurechner24\\.ch)"
+        }
+      ],
+      "destination": "/marken/baurechner24/ratgeber/grundstueckgewinnsteuer.html"
     },
     {
       "source": "/heizung",
@@ -1442,6 +1592,16 @@
       "destination": "/marken/checkmyparcel/ratgeber/liegenschaft-geerbt.html"
     },
     {
+      "source": "/ratgeber/grundstueckgewinnsteuer",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(checkmyparcel\\.ch)"
+        }
+      ],
+      "destination": "/marken/checkmyparcel/ratgeber/grundstueckgewinnsteuer.html"
+    },
+    {
       "source": "/heizung",
       "has": [
         {
@@ -1530,6 +1690,16 @@
         }
       ],
       "destination": "/marken/parzellencheck24/ratgeber/liegenschaft-geerbt.html"
+    },
+    {
+      "source": "/ratgeber/grundstueckgewinnsteuer",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellencheck24\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellencheck24/ratgeber/grundstueckgewinnsteuer.html"
     },
     {
       "source": "/heizung",
@@ -1622,6 +1792,16 @@
       "destination": "/marken/parzellepruefen/ratgeber/liegenschaft-geerbt.html"
     },
     {
+      "source": "/ratgeber/grundstueckgewinnsteuer",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellepruefen\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellepruefen/ratgeber/grundstueckgewinnsteuer.html"
+    },
+    {
       "source": "/heizung",
       "has": [
         {
@@ -1710,6 +1890,16 @@
         }
       ],
       "destination": "/marken/parzellencheck/ratgeber/liegenschaft-geerbt.html"
+    },
+    {
+      "source": "/ratgeber/grundstueckgewinnsteuer",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(parzellen-check\\.ch)"
+        }
+      ],
+      "destination": "/marken/parzellencheck/ratgeber/grundstueckgewinnsteuer.html"
     },
     {
       "source": "/heizung",
@@ -1802,6 +1992,16 @@
       "destination": "/marken/hauswert24/ratgeber/liegenschaft-geerbt.html"
     },
     {
+      "source": "/ratgeber/grundstueckgewinnsteuer",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(hauswert24\\.ch)"
+        }
+      ],
+      "destination": "/marken/hauswert24/ratgeber/grundstueckgewinnsteuer.html"
+    },
+    {
       "source": "/heizung",
       "has": [
         {
@@ -1890,6 +2090,16 @@
         }
       ],
       "destination": "/marken/hauswertcheck/ratgeber/liegenschaft-geerbt.html"
+    },
+    {
+      "source": "/ratgeber/grundstueckgewinnsteuer",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(hauswertcheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/hauswertcheck/ratgeber/grundstueckgewinnsteuer.html"
     },
     {
       "source": "/heizung",
@@ -1982,6 +2192,16 @@
       "destination": "/marken/baupotenzialcheck/ratgeber/liegenschaft-geerbt.html"
     },
     {
+      "source": "/ratgeber/grundstueckgewinnsteuer",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(baupotenzialcheck\\.ch)"
+        }
+      ],
+      "destination": "/marken/baupotenzialcheck/ratgeber/grundstueckgewinnsteuer.html"
+    },
+    {
       "source": "/heizung",
       "has": [
         {
@@ -2070,6 +2290,16 @@
         }
       ],
       "destination": "/marken/zonencheck/ratgeber/liegenschaft-geerbt.html"
+    },
+    {
+      "source": "/ratgeber/grundstueckgewinnsteuer",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?(zonen-check\\.ch)"
+        }
+      ],
+      "destination": "/marken/zonencheck/ratgeber/grundstueckgewinnsteuer.html"
     },
     {
       "source": "/heizung",
