@@ -67,6 +67,7 @@ on:
           - suche-probe  # Die Suche an echten Daten: Zonenkürzel je Gemeinde, Treffer und Tempo (nur Zählungen, keine Adressen)
           - suche-daten  # Für die Suche: wie Zonen in vier Gemeinden heissen und welche Angaben je Parzelle gefüllt sind (nur Zählungen und Zonennamen)
           - last         # Was die Datenbank gerade belastet: laufende Anweisungen nach Art und Dauer, Aufräumen, Verbindungen (nie der Wortlaut)
+          - parzellen-vier # Ob alle Parzellen von ZH, TG, LU und ZG im Bestand sind, EGRID für EGRID gegen die Amtliche Vermessung, und welche Angaben fehlen (nur Zählungen)
       egrid:
         description: 'Nur für "objekt": die EGRID, z.B. CH707709971116'
         required: false
@@ -82,6 +83,8 @@ jobs:
         run: sudo apt-get install -y -qq postgresql-client
 
       - name: Abfrage
+        # Unbekannte Fragen fallen unten auf eine schwere Standardabfrage zurück; der Abgleich hat seinen eigenen Schritt.
+        if: ${{ inputs.frage != 'parzellen-vier' }}
         env:
           DB: ${{ secrets.SUPABASE_DB_URL }}
           # Die Eingaben als Variablen, nicht als ${{ }} im Skript: GitHub
@@ -1448,4 +1451,46 @@ jobs:
               order by marge_chf desc nulls last limit 10;"
           fi
 
+          cat "$GITHUB_STEP_SUMMARY"
+
+      # Julian, 18. November: «schau, dass wirklich alle Parzellen drin sind
+      # von ZH TG LU ZUG, mit allen Daten». Massstab ist die Amtliche
+      # Vermessung bei geodienste.ch (ZH, TG, ZG frei); Luzern gibt sie
+      # nur gegen Gebühr ab, dort gilt das Gebäuderegister.
+      - name: Parzellen von ZH, TG, LU und ZG abgleichen
+        if: ${{ inputs.frage == 'parzellen-vier' }}
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
+          mkdir -p /tmp/vgl
+          for kt in ZH TG ZG; do python3 tools/av_liste.py "$kt" "/tmp/vgl/av_$kt.csv"; done
+          curl -sSL --retry 4 -o /tmp/lu.zip "https://public.madd.bfs.admin.ch/lu.zip"
+          unzip -o -q /tmp/lu.zip gebaeude_batiment_edificio.csv -d /tmp/lu
+          python3 - <<'PY'
+          import csv
+          # Bestehende, bewilligte, projektierte und begonnene Gebäude; abgebrochene zählen nicht.
+          r = csv.DictReader(open('/tmp/lu/gebaeude_batiment_edificio.csv', encoding='utf-8'), delimiter='\t')
+          eg = sorted({z['EGRID'] for z in r if z['EGRID'] and z['GSTAT'] in ('1001', '1002', '1003', '1004')})
+          with open('/tmp/vgl/gwr_lu.csv', 'w') as f:
+              f.write('egrid\n' + '\n'.join(eg) + '\n')
+          PY
+          # Ein Lesedurchgang mit Frist; nur Kennung und ob eine Angabe da ist.
+          PGOPTIONS='-c statement_timeout=600000' psql "$DB" -X -q -v ON_ERROR_STOP=1 -c "\copy (
+            select kanton, coalesce(egrid, '') as egrid,
+                   (area > 0) as flaeche, (nullif(trim(zone), '') is not null) as zone, (geometrie is not null) as umriss,
+                   (nullif(trim(address), '') is not null) as adresse, (bfs_nr is not null) as bfs, (baujahr is not null) as baujahr,
+                   (hnf_delta is not null) as potenzial, (gebaeudeflaeche is not null) as gebaeude
+            from properties where kanton in ('ZH', 'TG', 'LU', 'ZG')) to '/tmp/vgl/bestand.csv' csv header"
+          {
+            echo '### Parzellen ZH, TG, LU, ZG gegen Amtliche Vermessung und Gebäuderegister'
+            echo '```'
+            python3 tools/parzellen_vergleich.py /tmp/vgl
+            echo '```'
+            echo '### Zeilen ohne Kanton'
+            echo '```'
+            PGOPTIONS='-c statement_timeout=600000' psql "$DB" -X -q -A -t -c "select count(*) from properties where kanton is null;"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
           cat "$GITHUB_STEP_SUMMARY"
