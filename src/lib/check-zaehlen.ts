@@ -9,6 +9,7 @@
  */
 import { datenbank } from './datenbank';
 import { pixel, type PixelEreignis } from '@/lib/meta-pixel';
+import { googleLead } from '@/lib/google-ads';
 import { markeFuerHost } from '@/lib/check-marken';
 
 export type Ereignis = 'aufruf' | 'suche' | 'ergebnis' | 'rechner' | 'kontakt' | 'lead' | 'ratgeber' | 'ratgeber_klick' | 'teilen' | 'bericht';
@@ -108,6 +109,7 @@ export function zaehlen(marke: string, domain: string, ereignis: Ereignis): void
   gesendet.add(schluessel);
   const p = PIXEL_FUER[ereignis];
   if (p) pixel(p, { content_name: domain, content_category: marke });
+  if (ereignis === 'lead') googleLead();
   const { quelle, kampagne } = sitzungsQuelle();
   const geraet = window.matchMedia?.('(max-width: 999px)').matches ? 'handy' : 'computer';
    
