@@ -187,9 +187,14 @@ jobs:
           fi
 
       - name: Nutzungsplanung holen
-        if: ${{ inputs.schritt != 'parzellen'
-                && inputs.schritt != 'geometrie'
-                && inputs.schritt != 'geometrie-schreiben' }}
+        # Nur, wo die Nutzungsplanung gebraucht wird. Bis zum 18. November
+        # lief der Schritt bei allem mit ausser den Parzellen und brach für
+        # Zürich ab, dessen Nutzungsplanung geodienste.ch nicht führt.
+        if: ${{ inputs.schritt == 'pruefen' || inputs.schritt == 'zonen'
+                || inputs.schritt == 'alles' || inputs.schritt == 'verschneiden'
+                || inputs.schritt == 'zonentypen'
+                || startsWith(inputs.schritt, 'zonennamen')
+                || startsWith(inputs.schritt, 'zonen-punkte') }}
         env:
           KANTON: ${{ inputs.kanton }}
         run: |
@@ -205,9 +210,14 @@ jobs:
           find /tmp/npl -type f -printf '%p  %s Bytes\n' | head -20
 
       - name: Modell holen
-        if: ${{ inputs.schritt != 'parzellen'
-                && inputs.schritt != 'geometrie'
-                && inputs.schritt != 'geometrie-schreiben' }}
+        # Nur, wo die Nutzungsplanung gebraucht wird. Bis zum 18. November
+        # lief der Schritt bei allem mit ausser den Parzellen und brach für
+        # Zürich ab, dessen Nutzungsplanung geodienste.ch nicht führt.
+        if: ${{ inputs.schritt == 'pruefen' || inputs.schritt == 'zonen'
+                || inputs.schritt == 'alles' || inputs.schritt == 'verschneiden'
+                || inputs.schritt == 'zonentypen'
+                || startsWith(inputs.schritt, 'zonennamen')
+                || startsWith(inputs.schritt, 'zonen-punkte') }}
         run: |
           set -euo pipefail
           # GDAL braucht das Datenmodell, um die Klassen zu benennen.
@@ -219,9 +229,14 @@ jobs:
           wc -c /tmp/Nutzungsplanung_V1_2.ili
 
       - name: Nachsehen, was drinsteckt
-        if: ${{ inputs.schritt != 'parzellen'
-                && inputs.schritt != 'geometrie'
-                && inputs.schritt != 'geometrie-schreiben' }}
+        # Nur, wo die Nutzungsplanung gebraucht wird. Bis zum 18. November
+        # lief der Schritt bei allem mit ausser den Parzellen und brach für
+        # Zürich ab, dessen Nutzungsplanung geodienste.ch nicht führt.
+        if: ${{ inputs.schritt == 'pruefen' || inputs.schritt == 'zonen'
+                || inputs.schritt == 'alles' || inputs.schritt == 'verschneiden'
+                || inputs.schritt == 'zonentypen'
+                || startsWith(inputs.schritt, 'zonennamen')
+                || startsWith(inputs.schritt, 'zonen-punkte') }}
         run: |
           set -euo pipefail
           # Zug liefert je Gemeinde eine Datei (elf), Thurgau eine. Hier
