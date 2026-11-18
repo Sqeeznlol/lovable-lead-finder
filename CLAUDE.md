@@ -270,6 +270,10 @@ Handy-Fassung. Gebaut wird mit `<Seite>` aus `src/components/rahmen.tsx`.
 ## Arbeitsweise mit Julian (seine Rückmeldungen, gesammelt)
 
   * Kurz und klar antworten, keine Extrazeilen; Empfehlung statt Auswahl.
+  * Nur Hochdeutsch, ohne englische Fachwörter (18. November: «schreib
+    nur hochdeutsch»): Suchbegriffe statt Keywords, auf GitHub gestellt
+    statt gepusht, auf der Seite statt live. Bezeichnungen aus Google Ads
+    nur in Anführungszeichen, wie sie dort stehen.
   * Nie raten: selber nachsehen, messen, live prüfen (siehe oben).
   * Alles laufend selbst kontrollieren und verbessern (8. November:
     "in jeder Weise überall immer kontrollierst ... um jede Ecke
