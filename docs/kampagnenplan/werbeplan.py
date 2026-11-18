@@ -131,7 +131,7 @@ EINRICHTEN = [
     ('Datei importieren', 'Im Editor: «Konto», «Importieren», «Aus Datei», dann <code>google-ads-import.csv</code> wählen. Der Editor zeigt jede Kampagne, Anzeige und jedes Keyword, bevor etwas übernommen wird. Fragt er nach politischer Werbung in der EU: «Nein».'),
     ('Zwei Einstellungen von Hand', 'Alle sieben Kampagnen markieren: Standortoption «Präsenz» (nur Personen, die sich in den Kantonen aufhalten). Im Konto unter «Empfehlungen» die automatisch angewendeten Empfehlungen ausschalten, damit Google Keywords und Budgets nicht selbst ändert.'),
     ('Hochladen', 'Im Editor «Posten». Die Kampagnen sind jetzt im Konto, aber pausiert.'),
-    ('Einschalten', 'Wenn Bauraum meldet, dass die Messung läuft: Zone, Ausnützung, Erbe, Parzelle und Bauen einschalten. In Woche 3 Ausbau und Steuer dazu und bei allen Kampagnen die Kantone der Phase 2. Die Budgets bleiben, wie sie sind.'),
+    ('Einschalten', 'Wenn Bauraum meldet, dass die Messung läuft: Zone, Ausnützung, Erbe, Parzelle und Bauen einschalten. In Woche 3 Ausbau und Steuer dazu, bei allen Kampagnen ausser Steuer die Kantone der Phase 2, und die pausierten Keywords mit diesen Kantonen einschalten (etwa «zonenplan bern»). Steuer bleibt in Zürich: der Ratgeber erklärt Zürcher Recht. Die Budgets bleiben, wie sie sind.'),
     ('Nach 30 Leads', 'Gebotsstrategie von «Klicks maximieren» auf «Conversions maximieren» umstellen, Kampagne für Kampagne.'),
 ]
 einrichten = seite(f"""

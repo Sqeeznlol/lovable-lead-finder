@@ -35,6 +35,20 @@ ORTE = {'Zürich': 20151, 'Aargau': 20126, 'Solothurn': 20143, 'Luzern': 20137, 
 ORTE_2 = {'Bern': 20129, 'St. Gallen': 20141, 'Basel-Landschaft': 20130, 'Thurgau': 20145, 'Graubünden': 20135, 'Basel-Stadt': 20131,
           'Glarus': 20134, 'Appenzell Ausserrhoden': 20128, 'Appenzell Innerrhoden': 20127, 'Nidwalden': 20139, 'Obwalden': 20140, 'Uri': 20147}
 
+# Der Ratgeber der Kampagne Steuer erklärt Zürcher Recht (StG ZH), und die
+# Anzeige sagt das. In Luzern oder Zug gelten andere Tarife: dort bezahlte
+# Klicks fänden nicht, was sie suchen. Darum nur Zürich (18. November).
+ORTE_JE = {'Steuer': {'Zürich': 20151}}
+
+# Ein Keyword mit einem Kanton der Phase 2 («zonenplan bern») sucht jemand,
+# der dort Land hat. In Phase 1 sehen die Anzeige nur Leute in den sieben
+# Kantonen, und der Check zeigt dort noch keine Ziffer: bis Woche 3 pausiert.
+PHASE_2_WOERTER = {'bern': 'Bern', 'st gallen': 'St. Gallen', 'st. gallen': 'St. Gallen', 'thurgau': 'Thurgau', 'basel': 'Basel',
+                   'graubünden': 'Graubünden', 'glarus': 'Glarus', 'appenzell': 'Appenzell', 'nidwalden': 'Nidwalden',
+                   'obwalden': 'Obwalden', 'uri': 'Uri'}
+def phase_2(wort):
+    return next((k for w, k in PHASE_2_WOERTER.items() if re.search(rf'(^|\s){re.escape(w)}($|\s)', wort)), None)
+
 MAX_CPC = {'Erbe': 3.0, 'Steuer': 3.0, 'Ausbau': 4.0}
 REIHE = ['Zone', 'Ausnützung', 'Erbe', 'Parzelle', 'Bauen', 'Ausbau', 'Steuer']
 
@@ -142,12 +156,14 @@ for x in REIHE:
           Bid_Strategy_Type='Maximize clicks', Maximum_CPC_bid_limit=cpc, Languages='de', Campaign_Status='Paused',
           Final_URL_suffix=f"utm_source=google&utm_medium=cpc&utm_campaign={k['utm']}&utm_term={{keyword}}", EU_political_ads='No',
           Comment='einschalten in Woche 3' if x in SPAETER else 'einschalten in Woche 1')
-    for ort, gid in ORTE.items():
+    for ort, gid in ORTE_JE.get(x, ORTE).items():
         zeile(Campaign=n, Location_ID=str(gid), Comment=ort)
     zeile(Campaign=n, Ad_Group=x, Max_CPC=cpc, Ad_Group_Status='Enabled')
     for w in sorted(k['woerter'], key=lambda z: -P.v(z)):
+        kanton = phase_2(w)
         for art in ('Phrase', 'Exact'):
-            zeile(Campaign=n, Ad_Group=x, Keyword=w, Criterion_Type=art, Status='Enabled')
+            zeile(Campaign=n, Ad_Group=x, Keyword=w, Criterion_Type=art, Status='Paused' if kanton else 'Enabled',
+                  Comment=f'einschalten mit Phase 2 ({kanton})' if kanton else '')
     for a in k['aus'] + KONTO_AUS:
         zeile(Campaign=n, Keyword=a, Criterion_Type='Campaign negative')
     anzeige = dict(Campaign=n, Ad_Group=x, Status='Enabled', Ad_type='Responsive search ad', Path_1=PFAD[x][0], Path_2=PFAD[x][1], Final_URL=url(x))
