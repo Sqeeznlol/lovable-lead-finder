@@ -62,6 +62,10 @@ on:
           - zonentypen   # Nur die Zonennamen aus der Datei lesen
           - einspielen   # Verschnitt in die Datenbank (Probelauf)
           - einspielen-schreiben   # dasselbe, aber tatsächlich schreiben
+          - liste        # Liegenschaften aus der Liste der Vermessung, ohne Zone (Probelauf)
+          - liste-schreiben        # dasselbe, aber tatsächlich schreiben
+          - zh-zonen     # Zürcher Zonen aus dem Dienst des Kantons verschneiden (Probelauf)
+          - zh-zonen-schreiben     # dasselbe, aber tatsächlich schreiben
           - gwr          # Gebäuderegister ansehen: Adressen, Baujahr, Geschosse
           - gwr-probe    # Register laden und zeigen, was sich verbinden liesse
           - gwr-schreiben          # Adressen und Gebäudedaten übernehmen
@@ -590,7 +594,7 @@ jobs:
           else
             cp /tmp/geometrie.csv /tmp/geometrie_teil.csv
           fi
-          tools/in_portionen.sh /tmp/geometrie_teil.csv \
+          AUFRAEUMEN=public.properties tools/in_portionen.sh /tmp/geometrie_teil.csv \
             "create temp table eingang (wkt text, egrid text);" "
             with kand as (
               select e.egrid, ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_GeomFromText(e.wkt, 2056)), 3)) as g
@@ -859,8 +863,35 @@ jobs:
           run-id: ${{ inputs.quelllauf }}
           repository: ${{ github.repository }}
 
+      # =============================================================
+      # Zürcher Zonen
+      # =============================================================
+      # geodienste.ch führt die Zürcher Nutzungsplanung nicht («Im
+      # Aufbau»); der Kanton gibt sie selbst frei heraus (OGDZHWFS).
+      # Verschnitten wird auf dem Runner (tools/zh_zonen.py, Shapely),
+      # mit den Umrissen aus der Vermessung bei geodienste.ch. Das
+      # Ergebnis hat die Form des Verschnitts und geht durch «Einspielen».
+      - name: Zürcher Zonen verschneiden
+        if: ${{ startsWith(inputs.schritt, 'zh-zonen') }}
+        env:
+          KANTON: ${{ inputs.kanton }}
+        run: |
+          set -euo pipefail
+          [ "$KANTON" = "ZH" ] || { echo "zh-zonen gilt nur für ZH."; exit 1; }
+          # Am 15. November antwortete maps.zh.ch einem Runner nicht
+          # (Zeitüberschreitung beim Verbindungsaufbau). Lieber hier nach
+          # einer halben Minute klar enden als nach einer Stunde Warten.
+          code=$(curl -sS -m 30 -o /dev/null -w '%{http_code}' \
+                   "https://maps.zh.ch/wfs/OGDZHWFS?SERVICE=WFS&REQUEST=GetCapabilities" || echo "keine Antwort")
+          echo "maps.zh.ch: $code"
+          [ "$code" = "200" ] || { echo "Der Zürcher Dienst antwortet dem Runner nicht." >&2; exit 1; }
+          pip install -q shapely
+          python3 tools/umrisse_laden.py ZH /tmp/umrisse.csv
+          python3 tools/zh_zonen.py /tmp/umrisse.csv /tmp/verschnitten.csv
+
       - name: Einspielen
-        if: ${{ startsWith(inputs.schritt, 'einspielen') }}
+        if: ${{ startsWith(inputs.schritt, 'einspielen') || startsWith(inputs.schritt, 'liste')
+                || startsWith(inputs.schritt, 'zh-zonen') }}
         env:
           DB: ${{ secrets.SUPABASE_DB_URL }}
           KANTON: ${{ inputs.kanton }}
@@ -870,7 +901,11 @@ jobs:
           [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
           sudo apt-get install -y -qq postgresql-client
 
-          echo "Zeilen im Verschnitt: $(( $(wc -l < /tmp/verschnitten.csv) - 1 ))"
+          # «liste»: ohne Verschnitt, jede Liegenschaft der Vermessung mit
+          # Nummer, BFS-Nummer und Fläche, noch ohne Zone.
+          quelle=/tmp/verschnitten.csv
+          case "${{ inputs.schritt }}" in liste*) quelle=- ;; esac
+          [ "$quelle" = "-" ] || echo "Zeilen im Verschnitt: $(( $(wc -l < "$quelle") - 1 ))"
 
           # Die Rechnung läuft hier, auf dem Runner: je Parzelle die
           # grösste Zone, mit Fläche und Anteil. Bis zum 18. November lud
@@ -879,7 +914,7 @@ jobs:
           # rechnete dort mit einer Anweisung von bis zu 30 Minuten.
           # Die BFS-Nummer kommt aus der Vermessung (Sekunden, ohne Umriss).
           python3 tools/av_liste.py "$KANTON" /tmp/av.csv
-          python3 tools/kanton_haupt.py /tmp/verschnitten.csv /tmp/av.csv /tmp/haupt.csv
+          python3 tools/kanton_haupt.py "$quelle" /tmp/av.csv /tmp/haupt.csv
 
           echo "### Die zehn häufigsten Zonen"
           python3 - <<'PY'
@@ -892,7 +927,7 @@ jobs:
 
           tabelle="create temp table eingang (egrid text, parzelle text, bfs_nr text, flaeche numeric, zone text, notiz text);"
 
-          if [ "${{ inputs.schritt }}" != "einspielen-schreiben" ]; then
+          if [[ "${{ inputs.schritt }}" != *-schreiben ]]; then
             echo "### Was geschrieben würde"
             psql "$DB" -v ON_ERROR_STOP=1 -X -q \
               -c "set statement_timeout = '2min';" \
@@ -917,7 +952,7 @@ jobs:
           # was fehlt und hier steht. Eine vollständige Zeile bleibt
           # unberührt: jede Änderung legt eine neue Fassung der Zeile an
           # und weckt den Auslöser, der das Potenzial rechnet.
-          tools/in_portionen.sh /tmp/haupt.csv "$tabelle" "
+          AUFRAEUMEN=public.properties tools/in_portionen.sh /tmp/haupt.csv "$tabelle" "
             with g as (
               insert into public.properties
                 (address, egrid, plot_number, parzelle, bfs_nr, kanton, area, zone, notes)
@@ -930,7 +965,10 @@ jobs:
                 bfs_nr      = coalesce(public.properties.bfs_nr, excluded.bfs_nr),
                 kanton      = coalesce(public.properties.kanton, excluded.kanton),
                 area        = coalesce(public.properties.area, excluded.area),
-                zone        = coalesce(nullif(public.properties.zone, ''), excluded.zone)
+                zone        = coalesce(nullif(public.properties.zone, ''), excluded.zone),
+                notes       = case when public.properties.notes = 'Aus der Liste der Vermessung, noch ohne Zone'
+                                    and nullif(public.properties.zone, '') is null and excluded.zone is not null
+                                   then excluded.notes else public.properties.notes end
               where (public.properties.parzelle is null and excluded.parzelle is not null)
                  or (public.properties.plot_number is null and excluded.plot_number is not null)
                  or (public.properties.bfs_nr is null and excluded.bfs_nr is not null)
@@ -1035,7 +1073,7 @@ jobs:
           case "${{ inputs.schritt }}" in
             gwr-schreiben)
               echo "### Ergänzen" | tee -a "$GITHUB_STEP_SUMMARY"
-              tools/in_portionen.sh /tmp/gwr_parzellen.csv "$tabelle" "
+              AUFRAEUMEN=public.properties tools/in_portionen.sh /tmp/gwr_parzellen.csv "$tabelle" "
                 with g as (
                   update public.properties p set
                     address         = case when p.address like 'Parzelle %' and e.adresse is not null

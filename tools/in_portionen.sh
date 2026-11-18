@@ -13,7 +13,10 @@
 # abgebrochener Lauf wird darum einfach wiederholt.
 #
 # Aufruf: tools/in_portionen.sh <datei.csv> "<create temp table eingang (...)>" "<Anweisung, die eine Zahl liefert>"
-# Umgebung: DB (Pflicht), GRENZE_MB (4000), STUECK (2000 Zeilen), LANGSAM (60 s)
+# Umgebung: DB (Pflicht), GRENZE_MB (4000), STUECK (2000 Zeilen), LANGSAM (60 s),
+#   AUFRAEUMEN (Tabelle, die nach je zehn Stücken gedrosselt aufgeräumt wird:
+#   jede Änderung legt eine neue Fassung der Zeile an, und ohne VACUUM
+#   wüchse die Tabelle um jede alte; wie «Umrisse laden»)
 # Ausgegeben werden nur Zahlen.
 set -euo pipefail
 datei=$1
@@ -78,6 +81,10 @@ for f in "$ordner"/teil_*; do
   sleep "$dauer"
   if [ $(( nummer % 10 )) -eq 0 ]; then
     echo "  Stück $nummer/$stuecke: $gesamt, Datenbank $mb MB"
+    if [ -n "${AUFRAEUMEN:-}" ]; then
+      psql "$DB" -X -q -c "set statement_timeout = '10min';" -c "set vacuum_cost_delay = '2ms';" \
+        -c "vacuum $AUFRAEUMEN;" 2>"$ordner/fehler" || { schwaerzen "$ordner/fehler"; echo "Aufräumen übersprungen."; }
+    fi
   fi
 done
 echo "Geschrieben: $gesamt"
