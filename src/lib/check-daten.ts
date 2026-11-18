@@ -8,6 +8,7 @@
  * (public.madd.bfs.admin.ch).
  */
 import { flaecheLv95 } from '@/lib/ortsabfrage';
+import { adressSuche } from '@/lib/adresssuche';
 
 const API = 'https://api3.geo.admin.ch/rest/services';
 
@@ -74,11 +75,12 @@ export function ortAusLink(suche: string): Ort | null {
 
 export async function vorschlaege(text: string, signal?: AbortSignal): Promise<Ort[]> {
   if (text.trim().length < 3) return [];
-  const r = await fetch(`${API}/ech/SearchServer?type=locations&origins=address,parcel&limit=6&sr=2056&lang=de&searchText=${encodeURIComponent(text)}`, { signal });
-  const j = await r.json();
+  // Mit dem Gebäuderegister als zweiter Quelle: am 18. November kannte die
+  // Adresssuche des Bundes nur Liechtenstein (lib/adresssuche.ts).
+  const holen = async (u: string) => { const r = await fetch(u, { signal }); if (!r.ok) throw new Error(String(r.status)); return r.json(); };
   // Mit sr=2056 steht der Ostwert in y, der Nordwert in x.
-  return ((j?.results ?? []) as { attrs?: Record<string, unknown> }[]).map(x => ({
-    label: vorschlagText(String(x.attrs?.label ?? ''), String(x.attrs?.origin ?? '')) ?? '', e: Number(x.attrs?.y), n: Number(x.attrs?.x),
+  return (await adressSuche(text, { limit: 6, origins: 'address,parcel', sr: '2056', holen })).map(a => ({
+    label: vorschlagText(String(a.label ?? ''), String(a.origin ?? '')) ?? '', e: Number(a.y), n: Number(a.x),
   })).filter(v => v.label && Number.isFinite(v.e) && Number.isFinite(v.n));
 }
 
