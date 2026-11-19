@@ -8,15 +8,19 @@ import { describe, expect, it } from 'vitest';
  * man umgehen. Diese Tests werden rot, wenn eine der Sicherungen aus der
  * Migration verschwindet.
  */
-const datei = readdirSync('supabase/migrations').find(d => d.endsWith('_kalkulation.sql'))!;
-const sql = readFileSync(`supabase/migrations/${datei}`, 'utf8');
-const ABLAUF = ['zustand', 'preis_chf', 'eingereicht_am', 'frist_am', 'gesendet_am', 'angebot_text', 'verlauf'];
+// Die Tabelle (16. November) und der Weg des Angebots durch vier Hände (19. November).
+const dateien = readdirSync('supabase/migrations').filter(d => d.endsWith('_kalkulation.sql') || d.endsWith('_angebot.sql')).sort();
+const sql = dateien.map(d => readFileSync(`supabase/migrations/${d}`, 'utf8')).join('\n');
+const neueste = readFileSync(`supabase/migrations/${dateien[dateien.length - 1]}`, 'utf8');
+// Was nur kalkulation_schritt schreibt: der Weg und alles, was David, Tim und Julian entscheiden.
+const ABLAUF = ['zustand', 'preis_chf', 'eingereicht_am', 'frist_am', 'gesendet_am', 'angebot_text', 'verlauf',
+  'firma', 'vorlage', 'schrift', 'angebot', 'preis_urteil', 'preis_grund'];
 
 describe('CALC YOU LATER: der Ablauf liegt in der Datenbank', () => {
   it('die Spalten des Ablaufs lassen sich von aussen nicht schreiben', () => {
     expect(sql).toMatch(/revoke all on public\.kalkulation from public, anon, authenticated;/);
     const rechte = [...sql.matchAll(/grant (insert|update) \(([^)]+)\)\s+on public\.kalkulation to authenticated;/g)];
-    expect(rechte.map(r => r[1]).sort()).toEqual(['insert', 'update']);
+    expect(rechte.map(r => r[1]).sort()).toEqual(['insert', 'insert', 'update', 'update']);
     for (const [, , spalten] of rechte) {
       const liste = spalten.split(',').map(s => s.trim());
       for (const s of ABLAUF) expect(liste).not.toContain(s);
@@ -43,6 +47,22 @@ describe('CALC YOU LATER: der Ablauf liegt in der Datenbank', () => {
     expect(sql).toMatch(/create policy kalkulation_loeschen[\s\S]*?using \(not public\.ist_fondsmanager\(\) and zustand = 'entwurf'\)/);
   });
 
+  it('David muss sein Urteil über die Empfehlung begründen: daraus lernt die Rechnung', () => {
+    expect(neueste).toMatch(/urteil not in \('zu_tief', 'passt', 'zu_hoch'\)/);
+    expect(neueste).toMatch(/if notiz is null or length\(notiz\) < 10 then\s+raise exception 'Bitte begründen/);
+  });
+
+  it('der Weg geht durch David, Tim, Julian, Tim und David', () => {
+    const weg = [...neueste.matchAll(/k\.zustand := '(\w+)';/g)].map(m => m[1]);
+    for (const z of ['pruefung', 'visum', 'angebot', 'gesendet']) expect(weg).toContain(z);
+    expect(neueste).toMatch(/'visieren' then 'kontrolle' else 'bestaetigung'/);
+    expect(neueste).toMatch(/p_schritt = 'bestaetigen' and k\.zustand = 'bestaetigung'/);
+    expect(neueste).toMatch(/p_schritt = 'senden' and k\.zustand = 'angebot'/);
+    // Wer eine Rolle mit Konto hat, tut sie allein; Rollen legt nur ein Admin fest.
+    expect(neueste).toMatch(/not public\.angebot_darf\(rolle\)/);
+    expect(neueste).toMatch(/create policy angebot_person_pflegen[\s\S]*?public\.has_role\(auth\.uid\(\), 'admin'\)/);
+  });
+
   it('die Uhr stellt die Datenbank: ein Tag ab dem Einreichen', () => {
     expect(sql).toMatch(/k\.eingereicht_am := now\(\);\s+k\.frist_am := now\(\) \+ interval '24 hours';/);
     expect(sql).toMatch(/k\.gesendet_am := now\(\);/);
@@ -50,6 +70,7 @@ describe('CALC YOU LATER: der Ablauf liegt in der Datenbank', () => {
 
   it('jede Anweisung trägt eine Frist', () => {
     expect(sql).toMatch(/create or replace function public\.kalkulation_schritt[\s\S]*?set statement_timeout to '5s'/);
+    expect(neueste).toMatch(/create or replace function public\.kalkulation_schritt[\s\S]*?set statement_timeout to '5s'/);
   });
 
   // Was der Text nicht zeigt, zeigt die Probe: die Migration in einer

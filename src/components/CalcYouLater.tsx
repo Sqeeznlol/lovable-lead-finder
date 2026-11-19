@@ -7,7 +7,8 @@ import { Ablauf } from '@/components/calc/Ablauf';
 import { useJetzt } from '@/components/calc/name';
 import { useUrlSetzen, useUrlWert } from '@/hooks/use-url-wert';
 import { BILD } from '@/lib/luftbild';
-import { betrag, kalkulationenLaden, kalkulationLaden, SCHRITT_TEXT, uhr, ZUSTAND_TEXT, type Kalkulation, type KalkulationKurz, type Zustand } from '@/lib/calc-ablauf';
+import { AblaufPersonen } from '@/components/calc/AblaufPersonen';
+import { betrag, kalkulationenLaden, kalkulationLaden, SCHRITT_TEXT, uhr, UNTERWEGS, ZUSTAND_TEXT, type Kalkulation, type KalkulationKurz, type Zustand } from '@/lib/calc-ablauf';
 
 /**
  * CALC YOU LATER: vom Lead zum Angebot in einem Tag.
@@ -15,16 +16,15 @@ import { betrag, kalkulationenLaden, kalkulationLaden, SCHRITT_TEXT, uhr, ZUSTAN
  * Die Idee, am 16. November an Julian weitergegeben: Lele gibt einen
  * Lead ein, und es kommt alles heraus (Landwert, Hauptnutzfläche,
  * Kubatur, Baukosten, Erlös, Gewinn, Chancen, Risiken). Dann ein Ablauf,
- * der nicht länger als einen Tag dauern darf: David bestätigt oder
- * ändert den Kaufpreis, es folgt die finale Freigabe, dann schreibt der
- * Caller oder Julian das Angebot und schickt es ab.
+ * der nicht länger als einen Tag dauern darf (seit 19. November): David
+ * prüft den Preis und wählt Firma, Vorlage und Schrift, Tim visiert,
+ * Julian kontrolliert, Tim bestätigt, David verschickt das Kaufangebot.
  *
  * Oben wird gerechnet, darunter steht, was unterwegs ist. Die offene
  * Kalkulation steht in der Adresse (?calc=...): so lässt sie sich
  * weitergeben, und «Zurück» schliesst sie.
  */
 type Wahl = 'offen' | 'entwurf' | 'gesendet' | 'abgelehnt';
-const UNTERWEGS: Zustand[] = ['pruefung', 'freigabe', 'angebot'];
 const IN_WAHL: Record<Wahl, Zustand[]> = { offen: UNTERWEGS, entwurf: ['entwurf'], gesendet: ['gesendet'], abgelehnt: ['abgelehnt'] };
 
 export function CalcYouLater() {
@@ -52,7 +52,6 @@ export function CalcYouLater() {
   const zahl = (z: Zustand) => alle.filter(k => k.zustand === z).length;
   const unterwegs = alle.filter(k => UNTERWEGS.includes(k.zustand));
   const ueberfaellig = unterwegs.filter(k => uhr(k, jetzt)?.ueberfaellig).length;
-  const gesendet30 = alle.filter(k => k.zustand === 'gesendet' && k.gesendet_am && jetzt - Date.parse(k.gesendet_am) < 30 * 864e5).length;
   const gezeigt = alle.filter(k => IN_WAHL[wahl].includes(k.zustand));
   const zeigen = (w: Wahl) => { setWahl(w); document.getElementById('calc-liste')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
 
@@ -64,10 +63,10 @@ export function CalcYouLater() {
     <Seite bild={BILD.calc} ueber="CALC YOU LATER" titel={titel}
       unter={!offenId ? <>Adresse eingeben. Heraus kommen Landwert, Nutzfläche, Kubatur, Baukosten, Erlös, Gewinn, Chancen und Risiken, und eine Kaufpreisempfehlung.</> : undefined}
       kennzahlen={[
-        { titel: 'Kaufpreis prüfen', wert: String(zahl('pruefung')), marke: ueberfaellig ? <Marke art="heiss">{ueberfaellig} überfällig</Marke> : undefined, onClick: () => zeigen('offen') },
-        { titel: 'Freigabe', wert: String(zahl('freigabe')), onClick: () => zeigen('offen') },
-        { titel: 'Angebot schreiben', wert: String(zahl('angebot')), onClick: () => zeigen('offen') },
-        { titel: 'Gesendet in 30 Tagen', wert: String(gesendet30), onClick: () => zeigen('gesendet') },
+        { titel: 'Preis prüfen (David)', wert: String(zahl('pruefung')), marke: ueberfaellig ? <Marke art="heiss">{ueberfaellig} überfällig</Marke> : undefined, onClick: () => zeigen('offen') },
+        { titel: 'Visum und Bestätigung (Tim)', wert: String(zahl('visum') + zahl('bestaetigung')), onClick: () => zeigen('offen') },
+        { titel: 'Kontrolle (Julian)', wert: String(zahl('kontrolle')), onClick: () => zeigen('offen') },
+        { titel: 'Versand (David)', wert: String(zahl('angebot')), onClick: () => zeigen('offen') },
       ]}>
       <div className="space-y-4 rounded border bg-card p-4 sm:p-6">
         {offenId ? (
@@ -101,6 +100,8 @@ export function CalcYouLater() {
             : <ul className={LISTE}>{gezeigt.map(k => <Zeile key={k.id} k={k} jetzt={jetzt} an={k.id === offenId} oeffnen={() => { setzen({ calc: k.id, neu: null, anfrage: null }); window.scrollTo({ top: 0 }); }} />)}</ul>}
         </Abschnitt>
       </div>
+
+      <div className="print:hidden"><AblaufPersonen /></div>
     </Seite>
   );
 }

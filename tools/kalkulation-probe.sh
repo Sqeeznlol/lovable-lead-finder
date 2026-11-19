@@ -29,10 +29,18 @@ $ALS "$BIN/pg_ctl" -D "$ORT/daten" -o "-p $PORT -k $ORT -c listen_addresses=''" 
 
 P=( "$BIN/psql" -h "$ORT" -p "$PORT" -U postgres -v ON_ERROR_STOP=1 -q )
 "${P[@]}" -f tools/kalkulation-probe/attrappe.sql >/dev/null || exit 1
-M=$(ls supabase/migrations/*_kalkulation.sql)
+# Die Tabelle (16. November) und der Weg des Angebots (19. November), in dieser Reihenfolge.
+for M in $(ls supabase/migrations/*_kalkulation.sql supabase/migrations/*_angebot.sql | sort); do
+  "${P[@]}" -f "$M" >/dev/null 2>&1 || { echo "Die Migration $M lässt sich nicht einspielen."; "${P[@]}" -f "$M"; exit 1; }
+done
+# Eine alte Freigabe, wie sie vor dem 19. November entstand: sie muss zu Tim (visum).
+"${P[@]}" -c "alter table public.kalkulation drop constraint kalkulation_zustand_check; insert into public.kalkulation (adresse, zustand) values ('TEST alte Freigabe', 'freigabe');" >/dev/null || exit 1
 # Zweimal: die Migration muss sich wiederholen lassen.
-"${P[@]}" -f "$M" >/dev/null 2>&1 || { echo "Die Migration lässt sich nicht einspielen."; "${P[@]}" -f "$M"; exit 1; }
-"${P[@]}" -f "$M" >/dev/null 2>&1 || { echo "Die Migration lässt sich nicht zweimal einspielen."; exit 1; }
+for M in $(ls supabase/migrations/*_kalkulation.sql supabase/migrations/*_angebot.sql | sort); do
+  "${P[@]}" -f "$M" >/dev/null 2>&1 || { echo "Die Migration $M lässt sich nicht zweimal einspielen."; "${P[@]}" -f "$M"; exit 1; }
+done
+[ "$("${P[@]}" -Atc "select zustand from public.kalkulation where adresse = 'TEST alte Freigabe'")" = visum ] || { echo "Eine alte Freigabe ist nicht bei Tim."; exit 1; }
+"${P[@]}" -c "delete from public.kalkulation" >/dev/null || exit 1
 AUS=$("${P[@]}" -f tools/kalkulation-probe/proben.sql 2>&1) || { echo "$AUS" | tail -5; exit 1; }
-echo "$AUS" | grep -c "alle Proben bestanden" | grep -qx 3 || { echo "Nicht alle drei Gruppen sind durchgelaufen."; echo "$AUS" | tail -5; exit 1; }
+echo "$AUS" | grep -c "alle Proben bestanden" | grep -qx 4 || { echo "Nicht alle vier Gruppen sind durchgelaufen."; echo "$AUS" | tail -5; exit 1; }
 echo "Reihenfolge, Uhr und Rechte: alle Proben bestanden."

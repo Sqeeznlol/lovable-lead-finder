@@ -201,6 +201,17 @@ senden. Alles Weitere in `docs/calc-you-later.md`.
     Publikation nur bis zu ihrem Ablauf (ein Jahr); danach führt der
     Knopf ins Register. `bauprojekt.test.ts` wacht darüber.
 
+  * Das Kaufangebot geht durch vier Hände (19. November, Julian):
+    David prüft den Preis und begründet sein Urteil (zu tief, passt, zu
+    hoch), wählt Firma, Vorlage und Schrift; Tim visiert; Julian
+    kontrolliert; Tim bestätigt; David verschickt. Hauptlayout ist die
+    Arbergstrasse (stimo). Die Datenbank erzwingt Weg und Rollen
+    (`20261119120000_angebot.sql`); wer was tut, steht nur in der
+    Datenbank (`angebot_person`), nie im Repository, ebenso Namen und
+    Adressen von Eigentümern. Aus den Urteilen lernt die Seite einen
+    Vorschlag neben der Empfehlung; Julians Formel bleibt. Vorlagen,
+    Schriften und Farben in `docs/calc-you-later.md`.
+
 ## 3D-Karte
 
 Am 17. November (Julian: «die 3D-Ansicht ist mega langsam und dann stockt

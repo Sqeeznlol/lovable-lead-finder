@@ -10,25 +10,34 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Bewertung, CalcEingabe } from '@/lib/calc';
 import type { Adresse } from '@/lib/calc-daten';
+import type { AblaufPerson, AngebotFelder, FirmaId, Parzelle, Person, Rueckmeldung, SchriftId, Urteil, VorlageId } from '@/lib/angebot';
 
 // Die erzeugten Typen kennen Tabelle und Funktion noch nicht.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = () => supabase as any;
 
 /**
- * Der Weg einer Kalkulation. Die Übergänge erzwingt die Datenbank
- * (kalkulation_schritt); hier stehen nur die Namen für die Seite.
+ * Der Weg einer Kalkulation (Julian, 19. November): der Agent reicht ein,
+ * David prüft den Preis und wählt Firma, Vorlage und Schrift, Tim visiert,
+ * Julian kontrolliert, Tim bestätigt, David verschickt. Die Übergänge
+ * erzwingt die Datenbank (kalkulation_schritt, Migration 20261119120000);
+ * hier stehen nur die Namen für die Seite.
  */
-export type Zustand = 'entwurf' | 'pruefung' | 'freigabe' | 'angebot' | 'gesendet' | 'abgelehnt';
-export type Schritt = 'einreichen' | 'pruefen' | 'freigeben' | 'zurueck' | 'ablehnen' | 'angebot' | 'senden' | 'oeffnen';
+export type Zustand = 'entwurf' | 'pruefung' | 'visum' | 'kontrolle' | 'bestaetigung' | 'angebot' | 'gesendet' | 'abgelehnt';
+export type Schritt = 'einreichen' | 'speichern' | 'pruefen' | 'visieren' | 'kontrollieren' | 'bestaetigen' | 'zurueck' | 'ablehnen' | 'senden' | 'oeffnen';
 
 export const ZUSTAND_TEXT: Record<Zustand, string> = {
-  entwurf: 'Entwurf', pruefung: 'Kaufpreis prüfen', freigabe: 'Freigabe', angebot: 'Angebot schreiben', gesendet: 'Gesendet', abgelehnt: 'Abgelehnt',
+  entwurf: 'Entwurf', pruefung: 'Preis prüfen', visum: 'Visum', kontrolle: 'Kontrolle', bestaetigung: 'Bestätigung',
+  angebot: 'Versand', gesendet: 'Gesendet', abgelehnt: 'Abgelehnt',
 };
-export const SCHRITT_TEXT: Record<Schritt, string> = {
-  einreichen: 'eingereicht', pruefen: 'Kaufpreis geprüft', freigeben: 'freigegeben', zurueck: 'zurück zur Prüfung',
-  ablehnen: 'abgelehnt', angebot: 'Angebot gespeichert', senden: 'Angebot gesendet', oeffnen: 'wieder geöffnet',
+/** Auch die Schritte des alten Wegs (bis 19. November), damit ältere Verläufe lesbar bleiben. */
+export const SCHRITT_TEXT: Record<string, string> = {
+  einreichen: 'eingereicht', speichern: 'gespeichert', pruefen: 'Preis geprüft', visieren: 'visiert', kontrollieren: 'kontrolliert',
+  bestaetigen: 'bestätigt', zurueck: 'zurück zur Prüfung', ablehnen: 'abgelehnt', senden: 'Angebot verschickt', oeffnen: 'wieder geöffnet',
+  freigeben: 'freigegeben', angebot: 'Angebot gespeichert',
 };
+/** Was unterwegs ist, in der Reihenfolge des Wegs. */
+export const UNTERWEGS: Zustand[] = ['pruefung', 'visum', 'kontrolle', 'bestaetigung', 'angebot'];
 /** Vom Einreichen bis zum Versand: ein Tag. Dieselbe Zahl steht in der Datenbank. */
 export const FRIST_STUNDEN = 24;
 
@@ -77,7 +86,7 @@ export function angebotEntwurf(k: { kontakt?: string | null; adresse: string; or
 
 // ------------------------------------------------------------- Ablage
 
-export interface VerlaufEintrag { schritt: Schritt; name: string; am: string; notiz?: string; chf?: number }
+export interface VerlaufEintrag { schritt: string; name: string; am: string; notiz?: string; chf?: number; urteil?: Urteil }
 
 /** Was gespeichert wird, damit ein Entwurf ohne neue Abfragen wieder aufgeht. */
 export interface Eingaben {
@@ -98,11 +107,32 @@ export interface Kalkulation {
   empfehlung_chf: number | null; zustand: Zustand; preis_chf: number | null;
   eingereicht_am: string | null; frist_am: string | null; gesendet_am: string | null;
   angebot_text: string | null; verlauf: VerlaufEintrag[];
+  /** Woher der Lead kam: im Aurora erfasst oder per Mail eingegangen. */
+  quelle: 'aurora' | 'mail';
+  parzellen: Parzelle[];
+  personen: Person[];
+  firma: FirmaId | null; vorlage: VorlageId | null; schrift: SchriftId | null;
+  /** Die Felder des Briefs; leer, bis David sie das erste Mal speichert. */
+  angebot: Partial<AngebotFelder>;
+  preis_urteil: Urteil | null; preis_grund: string | null;
 }
 
-export type KalkulationKurz = Pick<Kalkulation, 'id' | 'erstellt_am' | 'adresse' | 'plz' | 'gemeinde' | 'kontakt' | 'test' | 'empfehlung_chf' | 'zustand' | 'preis_chf' | 'eingereicht_am' | 'frist_am' | 'gesendet_am' | 'verlauf'>;
+export type KalkulationKurz = Pick<Kalkulation, 'id' | 'erstellt_am' | 'adresse' | 'plz' | 'gemeinde' | 'kanton' | 'kontakt' | 'test' | 'empfehlung_chf' | 'zustand' | 'preis_chf' | 'eingereicht_am' | 'frist_am' | 'gesendet_am' | 'verlauf' | 'vorlage' | 'preis_urteil' | 'preis_grund'>;
 
-const KURZ = 'id, erstellt_am, adresse, plz, gemeinde, kontakt, test, empfehlung_chf, zustand, preis_chf, eingereicht_am, frist_am, gesendet_am, verlauf';
+const KURZ = 'id, erstellt_am, adresse, plz, gemeinde, kanton, kontakt, test, empfehlung_chf, zustand, preis_chf, eingereicht_am, frist_am, gesendet_am, verlauf, vorlage, preis_urteil, preis_grund';
+
+/**
+ * Die Rückmeldungen, aus denen die Seite lernt: was nach Davids Prüfung
+ * geboten wird, verglichen mit der Empfehlung. Testdaten zählen nie.
+ */
+export function rueckmeldungen(liste: KalkulationKurz[]): Rueckmeldung[] {
+  return liste
+    .filter(k => !k.test && !['entwurf', 'pruefung', 'abgelehnt'].includes(k.zustand) && (k.empfehlung_chf ?? 0) > 0 && (k.preis_chf ?? 0) > 0)
+    .map(k => ({
+      empfehlung: k.empfehlung_chf!, preis: k.preis_chf!, urteil: k.preis_urteil, grund: k.preis_grund, kanton: k.kanton, vorlage: k.vorlage,
+      am: [...k.verlauf].reverse().find(v => v.schritt === 'pruefen')?.am ?? k.erstellt_am,
+    }));
+}
 
 /** Die jüngsten Kalkulationen. Die Tabelle ist klein: eine Zeile je Lead. */
 export async function kalkulationenLaden(): Promise<KalkulationKurz[]> {
@@ -117,7 +147,7 @@ export async function kalkulationLaden(id: string): Promise<Kalkulation | null> 
   return r.data ?? null;
 }
 
-export type Entwurf = Pick<Kalkulation, 'adresse' | 'plz' | 'gemeinde' | 'kanton' | 'egrid' | 'parzelle_id' | 'anfrage_id' | 'kontakt' | 'test' | 'eingaben' | 'ergebnis' | 'empfehlung_chf'>;
+export type Entwurf = Pick<Kalkulation, 'adresse' | 'plz' | 'gemeinde' | 'kanton' | 'egrid' | 'parzelle_id' | 'anfrage_id' | 'kontakt' | 'test' | 'eingaben' | 'ergebnis' | 'empfehlung_chf' | 'quelle' | 'parzellen' | 'personen'>;
 
 /** Einen Entwurf anlegen oder ändern. Was eingereicht ist, lässt die Datenbank nicht mehr ändern. */
 export async function entwurfSpeichern(e: Entwurf, id?: string | null): Promise<Kalkulation> {
@@ -134,9 +164,38 @@ export async function entwurfLoeschen(id: string): Promise<void> {
   if (r.error) throw r.error;
 }
 
-/** Ein Schritt im Ablauf. Reihenfolge und Uhr erzwingt die Datenbank (kalkulation_schritt). */
-export async function schritt(id: string, was: Schritt, name: string, mehr: { chf?: number | null; notiz?: string | null; text?: string | null } = {}): Promise<Kalkulation> {
-  const r = await db().rpc('kalkulation_schritt', { p_id: id, p_schritt: was, p_name: name, p_chf: mehr.chf ?? null, p_notiz: mehr.notiz ?? null, p_text: mehr.text ?? null });
+export interface SchrittDaten { urteil?: Urteil; firma?: FirmaId; vorlage?: VorlageId; schrift?: SchriftId; angebot?: AngebotFelder }
+
+/** Ein Schritt im Ablauf. Reihenfolge, Rollen und Uhr erzwingt die Datenbank (kalkulation_schritt). */
+export async function schritt(id: string, was: Schritt, name: string, mehr: { chf?: number | null; notiz?: string | null; text?: string | null; daten?: SchrittDaten | null } = {}): Promise<Kalkulation> {
+  const r = await db().rpc('kalkulation_schritt', { p_id: id, p_schritt: was, p_name: name, p_chf: mehr.chf ?? null, p_notiz: mehr.notiz ?? null, p_text: mehr.text ?? null, p_daten: mehr.daten ?? null });
   if (r.error) throw new Error(r.error.message || 'Der Schritt liess sich nicht ausführen.');
   return r.data;
+}
+
+// ------------------------------------------------------------- Wer was tut
+
+const PERSON = 'id, name, titel, email, telefon, firma, rollen, user_id, reihe';
+
+/** Wer prüft, visiert, kontrolliert, versendet und unterschreibt (angebot_person). Wenige Zeilen. */
+export async function ablaufPersonenLaden(): Promise<AblaufPerson[]> {
+  const r = await db().from('angebot_person').select(PERSON).order('reihe').order('name').limit(100);
+  if (r.error) throw r.error;
+  return r.data ?? [];
+}
+
+/** Anlegen oder ändern; das lässt die Datenbank nur einem Admin. */
+export async function ablaufPersonSpeichern(p: Omit<AblaufPerson, 'id'> & { id?: string | null }): Promise<AblaufPerson> {
+  const { id, ...rest } = p;
+  const r = id
+    ? await db().from('angebot_person').update(rest).eq('id', id).select(PERSON).maybeSingle()
+    : await db().from('angebot_person').insert(rest).select(PERSON).maybeSingle();
+  if (r.error) throw new Error(r.error.message || 'Speichern hat nicht geklappt.');
+  if (!r.data) throw new Error('Nur ein Admin legt fest, wer was tut.');
+  return r.data;
+}
+
+export async function ablaufPersonLoeschen(id: string): Promise<void> {
+  const r = await db().from('angebot_person').delete().eq('id', id);
+  if (r.error) throw r.error;
 }

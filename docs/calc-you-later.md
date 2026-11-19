@@ -6,10 +6,10 @@ Vom Lead zur Kaufpreisempfehlung, und in einem Tag zum Angebot. Reiter
 Die Idee, am 16. November an Julian weitergegeben: Lele gibt einen Lead
 ein, und es kommt alles heraus -- Landwert, mögliche Hauptnutzfläche,
 Kubatur, Baukosten, Verkaufserlös, Gewinn, Grösse der Fläche, Chancen,
-Risiken. Dann ein Ablauf, der nicht länger als einen Tag dauern darf:
-David bestätigt oder ändert die Kaufpreisempfehlung, es folgt die
-finale Freigabe, dann formuliert der Caller oder Julian das Angebot und
-schickt es ab. «Wichtig, dass es schnell Resultate gibt, die halten.»
+Risiken. Dann ein Ablauf, der nicht länger als einen Tag dauern darf.
+«Wichtig, dass es schnell Resultate gibt, die halten.» Seit dem
+19. November geht er durch vier Hände bis zum fertigen Kaufangebot
+(siehe «Der Ablauf: ein Tag, vier Hände»).
 
 ## Was gerechnet wird
 
@@ -257,33 +257,109 @@ Gemeinde, Baugesuche im Umkreis, ÖV, Hülle statt Ziffer, fehlender
 Umriss, Zone von Hand, Besitzstand, Denkmalschutz, Ortsbild, belasteter
 Standort, Mieter im Haus, unbekannte Miete.
 
-## Der Ablauf: ein Tag
+## Der Ablauf: ein Tag, vier Hände
 
-    Entwurf -> Kaufpreis prüfen -> Freigabe -> Angebot schreiben -> Gesendet
+Julian, 19. November: «Ein Agent muss ein Angebot machen ... David
+kontrolliert den vorgeschlagenen Preis, er kann entscheiden, welche
+Firma das Angebot macht und welche Schriftart ... dann Tim, er visiert
+den finalen Preis, dann kommt es zu mir, ich überprüfe es, und am
+Schluss wieder zu David, der das Angebot verschickt. Aber Tim muss auch
+nochmals bestätigen.»
+
+    Entwurf      der Agent rechnet, wählt Parzellen und Empfänger, reicht ein
+    Prüfung      David: Urteil über die Empfehlung mit Grund, Preis, Firma, Vorlage, Schrift
+    Visum        Tim visiert den Preis (ändert er ihn, mit Grund)
+    Kontrolle    Julian prüft Empfänger, Parzellen, Wortlaut, Preis
+    Bestätigung  Tim bestätigt noch einmal
+    Versand      David lädt das PDF, schickt es und trägt den Versand ein
+    Gesendet
 
 Mit dem Einreichen startet die Uhr: 24 Stunden bis zum Versand. Die
-Liste und das Cockpit zeigen, was wartet und was überfällig ist.
+Liste und das Cockpit zeigen, was wartet und was überfällig ist. Aus
+Visum, Kontrolle, Bestätigung und Versand geht es mit Grund zurück zu
+David; abgelehnt wird mit Grund, wieder geöffnet als Entwurf.
 
-Reihenfolge und Uhr erzwingt die Datenbank, nicht die Seite (Migration
-`20261116140000_kalkulation.sql`, Funktion `kalkulation_schritt`): die
-Spalten des Ablaufs lassen sich von aussen nicht schreiben, und
-eingereichte Kalkulationen nicht mehr ändern. Aus der Freigabe geht es
-mit Grund zurück zur Prüfung; abgelehnt wird mit Grund, wieder geöffnet
-als Entwurf.
+Reihenfolge, Rollen und Uhr erzwingt die Datenbank, nicht die Seite
+(Migrationen `20261116140000_kalkulation.sql` und
+`20261119120000_angebot.sql`, Funktion `kalkulation_schritt`): die
+Spalten des Ablaufs, Firma, Vorlage, Schrift, Urteil und Grund lassen
+sich von aussen nicht schreiben; Firma und Wortlaut ändern nur David
+beim Prüfen und Julian bei der Kontrolle. Ohne Empfänger lässt sich
+nichts einreichen. Was vorher in «Freigabe» lag, liegt jetzt bei Tim.
 
-Es gibt wenige Konten und mehrere Hände. Darum steht im Verlauf der
-Name, den jemand angibt, und dazu sein Konto. Sollen einzelne Schritte
-an bestimmte Konten gebunden sein, braucht es je Person ein Konto.
+**Empfänger.** Im Entwurf stehen die Parzellen (die Hauptparzelle und
+die Nachbarn, mit denen die Empfehlung rechnet; von Hand ergänzbar,
+mit GB-Blatt) und die Menschen: Eigentümer, Vertretung oder Makler,
+mit Anrede und Adresse, vorgeschlagen aus dem Grundbuch-Feld. Der Agent
+kreuzt an, wer den Brief bekommt. Daraus entstehen Adressfeld
+(«Anna & Peter Muster»; beim Makler «Z. Hd. Herrn ...») und Anrede
+(«Sehr geehrte Frau Muster, sehr geehrter Herr Muster»). Ob der Lead
+über Aurora oder per Mail kam, steht dabei.
 
-Benachrichtigt wird niemand: einen Dienst für Mail oder SMS hat Aurora
-nicht. Wer prüft oder freigibt, sieht es im Cockpit und im Reiter.
+**Rollen.** Wer prüft, visiert, kontrolliert, versendet und für welche
+Firma unterschreibt, steht in der Tabelle `angebot_person` (Reiter,
+ganz unten «Wer was tut»; ändern darf nur ein Admin). Namen, Telefon
+und E-Mail stehen nur dort, nie im Repository. Ist bei einer Rolle ein
+Konto hinterlegt, tut nur dieses Konto den Schritt; sonst zählt der
+Name im Verlauf, wie bisher.
+
+**Bescheid geben.** Aurora hat keinen Dienst für Mail oder SMS. Über
+jedem Schritt steht, wer am Zug ist, mit den Knöpfen «E-Mail» und
+«WhatsApp»: sie öffnen Mailprogramm oder WhatsApp mit Empfänger,
+Aufgabe, Adresse, Betrag und Link. Automatisch verschicken (und Leads
+aus einem Postfach lesen) braucht ein Konto bei einem Versanddienst und
+ein Postfach; beides kann nur Julian einrichten.
+
+**Lernen.** David muss sagen, ob die Empfehlung zu tief, richtig oder
+zu hoch ist, und warum (die Datenbank verlangt einen Satz und prüft,
+dass der Preis zum Urteil passt). Aus allen Kalkulationen nach seiner
+Prüfung rechnet die Seite, wie weit das, was am Ende geboten wird, von
+der Empfehlung liegt (Median, im selben Kanton, sobald es dort drei
+sind) und zeigt beim nächsten Prüfen «Aus N Rückmeldungen: im Mittel
+X % der Empfehlung, hier also CHF ...», mit den letzten Gründen.
+Julians Formel ändert sich dadurch nicht; der Vorschlag steht daneben.
+Testdaten zählen nie.
+
+## Das Kaufangebot
+
+Das PDF entsteht im Browser (`src/lib/angebot-pdf.ts`, jsPDF), jede
+Zeile als echter Text. Drei Kleider, die Farben an den Vorlagen
+gemessen:
+
+  * **stimo Unternehmungen** wie die Arbergstrasse (Hauptlayout):
+    Deckblatt im Verlauf #292f78 zu #18ad90 mit Strasse, Ort und
+    Luftbild, Brief, «Über uns» mit den vier Referenzen, Unterschrift
+    mit «Wir suchen Bauland».
+  * **Lebensraum Schweiz AG** wie Meilen und Niederglatt: dunkles
+    Deckblatt (#222a2b, Mint #9fd6b4), Brief mit nummerierten
+    Bedingungen, Preis im dunklen Feld, Anzahlung und Rest.
+  * **Studer Immobilien Schweiz AG** wie Volketswil: ein schlichter
+    Brief, Preis in Worten.
+
+Fünf Vorlagen, aus den Briefen auf ihr Gerüst zurückgeführt
+(`src/lib/angebot.ts`): Bauland (Arbergstrasse), Bestandsliegenschaft
+(Glattalstrasse, Oberhasli), mit Baubewilligung (Meilen), Bieterverfahren
+(Niederglatt), unverbindlich mit Reservation (Volketswil). Je Angebot
+ändern Datum, Empfänger, Anrede, Parzellen mit Fläche, Zone, Ortsteil,
+Anlass, Nutzung, Besitzantritt, Bindung, Anzahlung, Unterschriften
+und der Kontakt oben rechts; der Wortlaut lässt sich ganz ersetzen und
+mit «Vorlage» zurückholen.
+
+Schriften: Avenir, Arial und Calibri dürfen nicht mitgeliefert werden.
+Freie Schriften (SIL Open Font License, `public/schriften`, je Normal
+und Fett, auf Latein beschnitten): Nunito Sans statt Avenir, DM Sans
+(wie Glattalstrasse), Carlito statt Calibri, Source Serif; dazu
+Helvetica statt Arial. Logos, Fotos und Unterschriften als Bild fehlen
+mit Absicht: das Repository ist öffentlich. Der Name der Firma steht als
+Schrift.
 
 ## Prüfen
 
     npx vitest run src/lib/__tests__/calc.test.ts          # die Rechnung, von Hand nachgerechnet
     npx vitest run src/lib/__tests__/calc-daten.test.ts    # Antworten des Bundes, Portal-Links
-    tools/kalkulation-probe.sh                             # Migration in einer Wegwerf-Datenbank:
-                                                           # Reihenfolge, Uhr, Rechte
+    npx vitest run src/lib/__tests__/angebot.test.ts       # Anrede, Vorlagen, Lernen, das PDF mit pdftotext
+    tools/kalkulation-probe.sh                             # beide Migrationen in einer Wegwerf-Datenbank:
+                                                           # Reihenfolge, Rollen, Uhr, Rechte
 
 ## Noch nicht gebaut
 

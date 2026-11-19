@@ -8,7 +8,7 @@ import { useCanton } from '@/hooks/use-canton';
 import { Abschnitt, Karussell, KNOPF, KNOPF_HAUPT, KNOPF_LEISE, Leer, LISTE, Marke, Seite, Strichbalken } from '@/components/rahmen';
 import { LuftbildKarte } from '@/components/LuftbildKarte';
 import { KOPFBILD } from '@/lib/luftbild';
-import { kalkulationenLaden, uhr } from '@/lib/calc-ablauf';
+import { kalkulationenLaden, uhr, UNTERWEGS } from '@/lib/calc-ablauf';
 import { zoneKurzform } from '@/lib/potential';
 
 /**
@@ -120,11 +120,11 @@ export function Cockpit({ onGehe, onNeu }: { onGehe: (z: Ziel) => void; onNeu?: 
     staleTime: 60 * 1000,
   });
 
-  // CALC YOU LATER: was auf Prüfung, Freigabe oder Angebot wartet, muss in
+  // CALC YOU LATER: was zwischen Einreichen und Versand liegt, muss in
   // einem Tag durch -- darum steht es hier, wo jeder den Tag beginnt.
   // Dieselbe kleine Abfrage wie im Reiter; fehlt sie, bleibt die Zeile weg.
   const calc = useQuery({ queryKey: ['kalkulationen'], queryFn: kalkulationenLaden, staleTime: 60 * 1000, retry: 0 });
-  const wartend = (calc.data ?? []).filter(k => !k.test && ['pruefung', 'freigabe', 'angebot'].includes(k.zustand));
+  const wartend = (calc.data ?? []).filter(k => !k.test && UNTERWEGS.includes(k.zustand));
   const zuSpaet = wartend.filter(k => uhr(k)?.ueberfaellig).length;
 
   const maxPrio = Math.max(1, ...(data?.heisse ?? []).map(h => Number(h.prioritaet) || 0));

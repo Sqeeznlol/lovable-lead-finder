@@ -5,6 +5,8 @@ import { FELD, KNOPF, KNOPF_HAUPT, KNOPF_LEISE, LISTE } from '@/components/rahme
 import { Zahl } from '@/components/Machbarkeit';
 import { Ergebnis, Objektkopf } from '@/components/calc/Ergebnis';
 import { useName } from '@/components/calc/name';
+import { Empfaenger } from '@/components/calc/Empfaenger';
+import { empfaenger, personenAusEigentuemer, type Parzelle, type Person } from '@/lib/angebot';
 import { FENSTER } from '@/lib/fenster';
 import { adresseWaehlen, suchtext } from '@/lib/adresswahl';
 import type { Projekt } from '@/lib/bauprojekt';
@@ -82,6 +84,10 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
   const [nachbarnAuf, setNachbarnAuf] = useState((alt?.eingabe.nachbarn?.length ?? 0) > 0);
   const [kontakt, setKontakt] = useState(entwurf?.kontakt ?? '');
   const [test, setTest] = useState(entwurf?.test ?? false);
+  const [quelle, setQuelle] = useState<'aurora' | 'mail'>(entwurf?.quelle ?? 'aurora');
+  // Leer heisst: noch nichts von Hand, dann gelten Parzellen und Eigentümer der Rechnung.
+  const [parzellenHand, setParzellen] = useState<Parzelle[] | null>(entwurf?.parzellen?.length ? entwurf.parzellen : null);
+  const [personenHand, setPersonen] = useState<Person[] | null>(entwurf?.personen?.length ? entwurf.personen : null);
   const [name, setName] = useName();
   const [laeuft, setLaeuft] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
@@ -189,12 +195,20 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
   const gesuche = useGesucheParzelle(basis?.parzelleId ?? null, basis?.egrid ?? null);
   const gesuch = basis ? (gesuche.data ?? []).find(g => aufParzelle(g, basis.parzelleId, basis.egrid)) ?? null : null;
 
+  // Die Hauptparzelle und die Nachbarn, mit denen die Empfehlung rechnet.
+  const parzellen: Parzelle[] = parzellenHand ?? (basis ? [
+    { nummer: basis.parzelleNr ?? '', flaeche: basis.grundlage.flaeche ? Math.round(basis.grundlage.flaeche) : null, egrid: basis.egrid, adresse: basis.adresse.strasse },
+    ...(b?.zusammen?.lohnt && b.empfehlung === b.zusammen.empfehlung ? b.zusammen.teile.map(t => ({ nummer: t.nummer ?? '', flaeche: Math.round(t.flaeche), egrid: t.egrid })) : []),
+  ] : []);
+  const personen: Person[] = personenHand ?? personenAusEigentuemer(basis?.eigentuemer);
+
   const andere = () => { setGewaehlt(null); setText(''); setGesucht(''); setHand({}); setAnnahmen(CALC_ANNAHMEN); setErloesQuelle(ERLOES_ANNAHME); setNachbarn([]); setNachbarnAuf(false); setFehler(null); };
   const erloesSetzen = (erloes: number, quelle: ErloesQuelle) => { setAnnahmen(a => ({ ...a, erloes })); setErloesQuelle(quelle); };
 
   const speichern = async (einreichen: boolean) => {
     if (!basis || !eingabe || !b) return;
     if (einreichen && !name.trim()) { setFehler('Bitte deinen Namen angeben: er steht im Verlauf.'); return; }
+    if (einreichen && !empfaenger(personen).length) { setFehler('Bitte wählen, an wen das Angebot geht: bei einer Person «Bekommt das Angebot» ankreuzen.'); return; }
     setLaeuft(true); setFehler(null);
     try {
       let k = await entwurfSpeichern({
@@ -204,6 +218,7 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
         kontakt: kontakt.trim() || null, test: test || /\bTEST\b/.test(kontakt),
         eingaben: { eingabe, adresse: basis.adresse, parzelleNr: basis.parzelleNr, eigentuemer: basis.eigentuemer, luecken: basis.luecken, name: name.trim() || null },
         ergebnis: b, empfehlung_chf: b.empfehlung,
+        quelle, parzellen: parzellen.filter(p => p.nummer.trim() || p.flaeche), personen,
       }, entwurf?.id);
       if (einreichen) k = await schritt(k.id, 'einreichen', name.trim());
       onGespeichert(k);
@@ -498,6 +513,8 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
         </div>
       </section>
 
+      <Empfaenger quelle={quelle} setQuelle={setQuelle} parzellen={parzellen} setParzellen={setParzellen} personen={personen} setPersonen={setPersonen} />
+
       <section className="space-y-3 rounded-[3px] border bg-card p-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="block space-y-1.5">
@@ -518,7 +535,7 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
           <button type="button" className={KNOPF} disabled={laeuft} onClick={() => void speichern(false)}>Als Entwurf speichern</button>
           {entwurf && <button type="button" className={KNOPF} disabled={laeuft} onClick={() => void verwerfen()}>Entwurf löschen</button>}
         </div>
-        <p className="text-sm text-muted-foreground">Mit dem Einreichen läuft die Uhr: Prüfung, Freigabe und Angebot in 24 Stunden.</p>
+        <p className="text-sm text-muted-foreground">Mit dem Einreichen läuft die Uhr: David prüft den Preis, Tim visiert, Julian kontrolliert, Tim bestätigt, David verschickt, alles in 24 Stunden.</p>
       </section>
     </div>
   );
