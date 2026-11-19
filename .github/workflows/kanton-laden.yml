@@ -74,6 +74,8 @@ on:
           - zonen-punkte-schreiben # dasselbe, aber tatsächlich schreiben
           - zonennamen   # Schlüssel durch Zonennamen ersetzen (Probelauf)
           - zonennamen-schreiben   # dasselbe, aber tatsächlich schreiben
+          - ziffern      # Amtliche Ausnützungsziffer je Parzelle aus der Nutzungsplanung (Probelauf, für Zug)
+          - ziffern-schreiben      # dasselbe, aber tatsächlich schreiben
 
 # Nie zwei Läufe zugleich, die in die Datenbank schreiben (wie
 # «Umrisse laden» und «Nachbarschaft»).
@@ -101,6 +103,7 @@ jobs:
 
       - name: Amtliche Vermessung umwandeln
         if: ${{ inputs.schritt == 'parzellen' || inputs.schritt == 'alles'
+                || startsWith(inputs.schritt, 'ziffern')
                 || ((inputs.schritt == 'geometrie'
                      || inputs.schritt == 'geometrie-schreiben')
                     && inputs.quelllauf == '') }}
@@ -194,7 +197,8 @@ jobs:
                 || inputs.schritt == 'alles' || inputs.schritt == 'verschneiden'
                 || inputs.schritt == 'zonentypen'
                 || startsWith(inputs.schritt, 'zonennamen')
-                || startsWith(inputs.schritt, 'zonen-punkte') }}
+                || startsWith(inputs.schritt, 'zonen-punkte')
+                || startsWith(inputs.schritt, 'ziffern') }}
         env:
           KANTON: ${{ inputs.kanton }}
         run: |
@@ -217,7 +221,8 @@ jobs:
                 || inputs.schritt == 'alles' || inputs.schritt == 'verschneiden'
                 || inputs.schritt == 'zonentypen'
                 || startsWith(inputs.schritt, 'zonennamen')
-                || startsWith(inputs.schritt, 'zonen-punkte') }}
+                || startsWith(inputs.schritt, 'zonen-punkte')
+                || startsWith(inputs.schritt, 'ziffern') }}
         run: |
           set -euo pipefail
           # GDAL braucht das Datenmodell, um die Klassen zu benennen.
@@ -254,7 +259,8 @@ jobs:
       - name: Zonen umwandeln
         if: ${{ inputs.schritt == 'zonen' || inputs.schritt == 'alles'
                 || inputs.schritt == 'verschneiden'
-                || startsWith(inputs.schritt, 'zonen-punkte') }}
+                || startsWith(inputs.schritt, 'zonen-punkte')
+                || startsWith(inputs.schritt, 'ziffern') }}
         run: |
           set -euo pipefail
 
@@ -349,7 +355,8 @@ jobs:
           repository: ${{ github.repository }}
 
       - name: Verschneiden
-        if: ${{ inputs.schritt == 'alles' || inputs.schritt == 'verschneiden' }}
+        if: ${{ inputs.schritt == 'alles' || inputs.schritt == 'verschneiden'
+                || startsWith(inputs.schritt, 'ziffern') }}
         run: |
           set -euo pipefail
 
@@ -1341,5 +1348,66 @@ jobs:
                      notes = trim(coalesce(p.notes || '; ', '') || 'Zone am grössten Haus (Annahme, ohne Umriss)')
                 from eingang e
                where p.egrid = e.egrid and p.kanton = '$KANTON' and nullif(p.zone, '') is null
+              returning 1)
+            select count(*) from g;" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # =============================================================
+      # Ausnützungsziffer
+      # =============================================================
+      # Gemessen am 19. November: im Zonennamen ausserhalb Zürichs steht
+      # keine Ziffer («W2a Wohnzone 2a»), und ohne Ziffer rechnet die
+      # Potenzialrechnung nichts. Zug liefert sie am Zonentyp mit
+      # (119 Typen mit Ausnützungsziffer); Thurgau gar nicht, Luzern ohne
+      # Angabe, welche Ziffer es ist (tools/kanton_ziffern.py).
+      #
+      # Geschrieben wird die Spalte ausnuetzung, nur wo sie leer ist: mit
+      # ihr rechnet die Potenzialrechnung, und der Auslöser rechnet bei
+      # jeder Änderung das Potenzial der Zeile neu. Eine Ziffer, die schon
+      # steht, kam von Hand oder aus einer Liste und bleibt.
+      - name: Ausnützungsziffer übernehmen
+        if: ${{ startsWith(inputs.schritt, 'ziffern') }}
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+          KANTON: ${{ inputs.kanton }}
+          GRENZE_MB: ${{ inputs.grenze_mb }}
+        run: |
+          set -euo pipefail
+          [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
+          sudo apt-get install -y -qq postgresql-client
+
+          python3 tools/kanton_ziffern.py /tmp/verschnitten.csv /tmp/ziffern.csv \
+            $(find /tmp/npl -name '*.xtf' | sort) | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Parzellen mit Ausnützungsziffer: $(( $(wc -l < /tmp/ziffern.csv) - 1 ))" | tee -a "$GITHUB_STEP_SUMMARY"
+
+          tabelle="create temp table eingang (egrid text, ausnuetzung numeric);"
+          psql "$DB" -v ON_ERROR_STOP=1 -X -q \
+            -c "set statement_timeout = '2min';" \
+            -c "$tabelle" \
+            -c "\\copy eingang from '/tmp/ziffern.csv' with (format csv, header true)" \
+            -c "
+              select count(*) as mit_ziffer,
+                     count(p.id) as im_bestand,
+                     count(*) filter (where p.id is not null and p.ausnuetzung is null) as ziffer_dazu,
+                     count(*) filter (where p.ausnuetzung is not null and p.ausnuetzung <> e.ausnuetzung) as schon_andere,
+                     count(*) filter (where p.ausgeschlossen) as ausgeschlossen
+                from eingang e
+                left join public.properties p on p.egrid = e.egrid and p.kanton = '$KANTON';" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
+          if [ "${{ inputs.schritt }}" != "ziffern-schreiben" ]; then
+            echo ""
+            echo "**Probelauf** -- properties wurde nicht berührt."
+            exit 0
+          fi
+
+          echo "### Schreiben" | tee -a "$GITHUB_STEP_SUMMARY"
+          tools/in_portionen.sh /tmp/ziffern.csv "$tabelle" "
+            with g as (
+              update public.properties p
+                 set ausnuetzung = e.ausnuetzung,
+                     -- Keine Zahl ohne Herkunft: der Auslöser nennt sie nur «objekt».
+                     notes = trim(coalesce(p.notes || '; ', '') || 'Ausnützungsziffer amtlich (Nutzungsplanung)')
+                from eingang e
+               where p.egrid = e.egrid and p.kanton = '$KANTON' and p.ausnuetzung is null
               returning 1)
             select count(*) from g;" | tee -a "$GITHUB_STEP_SUMMARY"
