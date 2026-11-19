@@ -31,6 +31,7 @@ const KENNZAHLEN: { titel: string; zone: string; passt: (p: WunschParzelle) => b
 
 export function ParzellenNachWunsch() {
   const [ordnerId, setOrdnerId] = useUrlWert('ordner', '');
+  const [kanton, setKanton] = useUrlWert('kanton', '');
   const [gemeinde, setGemeinde] = useUrlWert('gemeinde', '');
   const [zone, setZone] = useUrlWert('zone', '');
   const [alle, setAlle] = useState(false);
@@ -61,17 +62,23 @@ export function ParzellenNachWunsch() {
   });
 
   const z = useMemo(() => parzellen.data ?? [], [parzellen.data]);
+  const kantone = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const p of z) m.set(p.kanton, (m.get(p.kanton) ?? 0) + 1);
+    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }, [z]);
+  const imKanton = useMemo(() => z.filter(p => !kanton || p.kanton === kanton), [z, kanton]);
   const gemeinden = useMemo(() => {
     const m = new Map<string, number>();
-    for (const p of z) m.set(p.gemeinde, (m.get(p.gemeinde) ?? 0) + 1);
-    return [...m.entries()].sort((a, b) => b[1] - a[1]);
-  }, [z]);
+    for (const p of imKanton) m.set(p.gemeinde, (m.get(p.gemeinde) ?? 0) + 1);
+    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0], 'de-CH'));
+  }, [imKanton]);
   const zonen = useMemo(() => {
     const m = new Map<string, number>();
-    for (const p of z) if (!gemeinde || p.gemeinde === gemeinde) m.set(p.zone, (m.get(p.zone) ?? 0) + 1);
+    for (const p of imKanton) if (!gemeinde || p.gemeinde === gemeinde) m.set(p.zone, (m.get(p.zone) ?? 0) + 1);
     return [...m.entries()].sort((a, b) => b[1] - a[1]);
-  }, [z, gemeinde]);
-  const inGemeinde = z.filter(p => !gemeinde || p.gemeinde === gemeinde);
+  }, [imKanton, gemeinde]);
+  const inGemeinde = imKanton.filter(p => !gemeinde || p.gemeinde === gemeinde);
   const treffer = inGemeinde.filter(p => !zone || (KENNZAHLEN.find(k => k.zone === zone)?.passt(p) ?? p.zone === zone));
   const wohnen = inGemeinde.filter(p => WOHNEN.has(p.zone)).length;
   const gezeigt = alle ? treffer : treffer.slice(0, 100);
@@ -79,7 +86,7 @@ export function ParzellenNachWunsch() {
   const herunterladen = () => {
     const url = URL.createObjectURL(new Blob(['﻿' + wunschCsv(treffer)], { type: 'text/csv;charset=utf-8' }));
     const a = document.createElement('a');
-    a.href = url; a.download = `parzellen-nach-wunsch-${(gemeinde || 'alle').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.csv`; a.click();
+    a.href = url; a.download = `parzellen-nach-wunsch-${(gemeinde || kanton || 'alle').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.csv`; a.click();
     URL.revokeObjectURL(url);
   };
 
@@ -90,11 +97,15 @@ export function ParzellenNachWunsch() {
       kennzahlen={parzellen.data ? KENNZAHLEN.map(k => ({ titel: k.titel, wert: ch(inGemeinde.filter(k.passt).length), onClick: () => setZone(zone === k.zone ? '' : k.zone) })) : undefined}>
       <div className="flex flex-wrap items-center gap-2">
         {(ordner.data?.length ?? 0) > 1 && (
-          <Auswahl label="Ordner" wert={o?.id ?? ''} setWert={w => { setOrdnerId(w); setGemeinde(''); setZone(''); }} className="min-w-[220px]"
+          <Auswahl label="Ordner" wert={o?.id ?? ''} setWert={w => { setOrdnerId(w); setKanton(''); setGemeinde(''); setZone(''); }} className="min-w-[220px]"
                    optionen={(ordner.data ?? []).map(x => ({ wert: x.id, titel: x.name }))} />
         )}
+        {kantone.length > 1 && (
+          <Auswahl label="Kanton" wert={kanton || 'alle'} setWert={w => { setKanton(w === 'alle' ? '' : w); setGemeinde(''); setZone(''); }} className="min-w-[160px]"
+                   optionen={[{ wert: 'alle', titel: `Alle Kantone · ${ch(z.length)}` }, ...kantone.map(([k, n]) => ({ wert: k, titel: `Kanton ${k} · ${ch(n)}` }))]} />
+        )}
         <Auswahl label="Gemeinde" wert={gemeinde || 'alle'} setWert={w => { setGemeinde(w === 'alle' ? '' : w); setZone(''); }} className="min-w-[200px]"
-                 optionen={[{ wert: 'alle', titel: `Alle Gemeinden · ${ch(z.length)}` }, ...gemeinden.map(([g, n]) => ({ wert: g, titel: `${g} · ${ch(n)}` }))]} />
+                 optionen={[{ wert: 'alle', titel: `Alle Gemeinden · ${ch(imKanton.length)}` }, ...gemeinden.map(([g, n]) => ({ wert: g, titel: `${g} · ${ch(n)}` }))]} />
         <Auswahl label="Zone" wert={zone || 'alle'} setWert={w => setZone(w === 'alle' ? '' : w)} className="min-w-[240px]"
                  optionen={[{ wert: 'alle', titel: 'Alle Bauzonen' }, { wert: 'wohnen', titel: `Wohnen, Misch- und Zentrumszonen · ${ch(wohnen)}` }, { wert: 'uebrige', titel: 'Übrige Bauzonen' },
                    ...zonen.map(([k, n]) => ({ wert: k, titel: `${k} · ${ch(n)}` }))]} />

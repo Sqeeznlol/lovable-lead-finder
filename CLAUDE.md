@@ -304,14 +304,21 @@ Vermessung.
 Reiter «Parzellen nach Wunsch» (19. November, Julian: «mache ein extra
 Ordner bei Aurora ... macht alle rein, die diese Kriterien haben»): feste
 Ordner mit Parzellen nach einem Kriterium, gerechnet auf dem Runner, in
-die Datenbank nur als Ergebnis (`wunsch_ordner`, `wunsch_parzelle`).
-Der erste: über 3'000 m², mindestens zur Hälfte in der Bauzone, in
-Sarnen, Stans, Stansstad, Hergiswil, Ennetbürgen und Buochs (454).
-Obwalden und Nidwalden geben die amtliche Fläche nicht frei; sie ist aus
-dem Umriss der Vermessung beim Bund gerechnet, ohne Baurechte, und je
-Gemeinde ergeben alle Parzellen die Gemeindefläche. Die Zone ist die
-harmonisierte des Bundes (Bauzonen Schweiz). `parzellen-nach-wunsch.test.ts`
-zählt nach.
+die Datenbank nur als Ergebnis (`wunsch_ordner`, `wunsch_parzelle`). Der
+erste: über 3'000 m², mindestens zur Hälfte in der Bauzone, in den
+Gemeinden, die Julian nennt (OW, NW, BE, SZ, UR, LU). Brunnen ist ein Dorf
+in Ingenbohl; gerechnet wird die Gemeinde.
+
+  * Die Fläche ist aus dem Umriss der Vermessung beim Bund gerechnet
+    (die Kantone geben die amtliche nicht frei), ohne Baurechte; die Zone
+    ist die harmonisierte des Bundes (Bauzonen Schweiz).
+  * Der Dienst des Bundes gibt höchstens 200 Treffer; beim Blättern kamen
+    Doppelte, andere fehlten (Nidau: 553 Treffer, 394 verschieden). Eine
+    volle Kachel wird geviertelt, nie geblättert.
+  * Zur Gemeinde gehört eine Parzelle über ihre Lage, nicht über die
+    Nummer des Grundbuchkreises (Bern und Luzern zählen anders).
+  * Nachweis je Gemeinde: alle Parzellen zusammen ergeben die
+    Gemeindefläche. `parzellen-nach-wunsch.test.ts` zählt nach.
 
 ## Gestaltung
 

@@ -8,18 +8,32 @@ import { geoAdminLink, WOHNEN, wunschCsv, ZONE_KURZ, type WunschParzelle } from 
  * Die Zahlen je Gemeinde sind am 19. November auf dem Runner gezählt; je
  * Gemeinde ergaben alle Parzellen der Vermessung die Gemeindefläche.
  */
-const SQL = readFileSync('supabase/migrations/20261119180000_parzellen_nach_wunsch.sql', 'utf8');
-const ZEILE = /^\s*\('(CH\d{12})','(OW|NW)',(\d+),'([^']+)','([^']+)',(\d+),'([^']+)',([\d.]+),([\d.]+),([\d.]+),([\d.]+),([\d.]+)\)/gm;
+// Die zweite Lieferung ersetzt den Inhalt des Ordners ganz; sie zählt.
+const SQL = readFileSync('supabase/migrations/20261119200000_parzellen_nach_wunsch_mehr.sql', 'utf8');
+const ZEILE = /^\s*\('(CH\d{12})','(OW|NW|BE|SZ|UR|LU)',(\d+),'([^']+)','([^']+)',(\d+),'([^']+)',([\d.]+),([\d.]+),([\d.]+),([\d.]+),([\d.]+)\)/gm;
 const zeilen = [...SQL.matchAll(ZEILE)].map(m => ({
   egrid: m[1], kanton: m[2], bfs: +m[3], gemeinde: m[4], nummer: m[5], flaeche: +m[6], zone: m[7], anteil: +m[8], e: +m[9], n: +m[10],
 }));
 
 describe('Parzellen nach Wunsch: der erste Ordner', () => {
-  it('alle 454 Parzellen, je Gemeinde so viele wie gezählt', () => {
-    const je = Object.fromEntries(['Sarnen', 'Stans', 'Stansstad', 'Hergiswil', 'Ennetbürgen', 'Buochs'].map(g => [g, zeilen.filter(z => z.gemeinde === g).length]));
-    expect(je).toEqual({ Sarnen: 152, Stans: 105, Stansstad: 58, Hergiswil: 57, Ennetbürgen: 38, Buochs: 44 });
-    expect(zeilen).toHaveLength(454);
-    expect(new Set(zeilen.map(z => z.egrid)).size).toBe(454);
+  it('alle 2895 Parzellen, je Gemeinde so viele wie gezählt', () => {
+    const GEZAEHLT = {
+      Sarnen: 152, Stans: 105, Stansstad: 58, Hergiswil: 57, Ennetbürgen: 38, Buochs: 44,
+      Nidau: 47, 'Muri bei Bern': 156,
+      'Ingenbohl (Brunnen)': 134, Einsiedeln: 146, Küssnacht: 188, Schwyz: 193, Arth: 102,
+      Altdorf: 125,
+      Ebikon: 146, Horw: 172, Kriens: 285, Meggen: 91, Luzern: 656,
+    };
+    const je = Object.fromEntries(Object.keys(GEZAEHLT).map(g => [g, zeilen.filter(z => z.gemeinde === g).length]));
+    expect(je).toEqual(GEZAEHLT);
+    expect(zeilen).toHaveLength(2895);
+    expect(new Set(zeilen.map(z => z.egrid)).size).toBe(2895);
+  });
+
+  it('die zweite Lieferung ersetzt den Ordner ganz, in einem Zug', () => {
+    expect(SQL).toMatch(/^begin;$/m);
+    expect(SQL).toMatch(/delete from public\.wunsch_parzelle where ordner_id = '6a1f0c3e/);
+    expect(SQL).toMatch(/^commit;$/m);
   });
 
   it('jede über 3000 m², mindestens zur Hälfte in der Bauzone, mit bekannter Zonenart und Punkt in der Gemeinde', () => {
@@ -28,12 +42,13 @@ describe('Parzellen nach Wunsch: der erste Ordner', () => {
       expect(z.flaeche, z.egrid).toBeGreaterThanOrEqual(3000);
       expect(z.anteil, z.egrid).toBeGreaterThanOrEqual(0.5);
       expect(ZONE_KURZ[z.zone], z.zone).toBeDefined();
-      // Grob die Innerschweiz in LV95: ein vertauschtes Paar fiele hier auf.
-      expect(z.e).toBeGreaterThan(2640000); expect(z.e).toBeLessThan(2690000);
-      expect(z.n).toBeGreaterThan(1180000); expect(z.n).toBeLessThan(1215000);
+      // Grob von Nidau bis Einsiedeln in LV95: ein vertauschtes Paar fiele hier auf.
+      expect(z.e).toBeGreaterThan(2580000); expect(z.e).toBeLessThan(2712000);
+      expect(z.n).toBeGreaterThan(1180000); expect(z.n).toBeLessThan(1227000);
     }
     expect(SQL).toMatch(/on conflict \(ordner_id, egrid\) do nothing/);
-    expect(SQL).toMatch(/revoke all on public\.wunsch_ordner, public\.wunsch_parzelle from anon/);
+    expect(readFileSync('supabase/migrations/20261119180000_parzellen_nach_wunsch.sql', 'utf8'))
+      .toMatch(/revoke all on public\.wunsch_ordner, public\.wunsch_parzelle from anon/);
   });
 
   it('CSV mit Strichpunkt und Link auf die Karte des Bundes', () => {
