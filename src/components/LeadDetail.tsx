@@ -220,6 +220,8 @@ export function LeadDetail({ lead, onClose, onErledigt, onNotiz, onNachfass }: {
               {zeile('Name', lead.name)}
               {zeile('Telefon', lead.telefon)}
               {zeile('E-Mail', lead.email)}
+              {/* Wo die Person wohnt (Check-Seiten seit 19. November); die Liegenschaft steht unten. */}
+              {zeile('Wohnadresse', typeof a.wohnadresse === 'string' ? a.wohnadresse : null)}
               {zeile('Eingegangen', new Date(lead.erstellt_am).toLocaleString('de-CH', { dateStyle: 'medium', timeStyle: 'short' }))}
             </section>
 
