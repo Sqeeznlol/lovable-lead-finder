@@ -112,6 +112,11 @@ Messlauf («Reiter prüfen», «Tempo») die Seite wieder zum Stehen.
     «aufraeumen» beendet hängende Rechnungen. «Reiter prüfen» nennt je
     Reiter die Abfragen, auf die die Datenbank erst nach drei Sekunden
     antwortet (nicht, wie lange der Browser des Prüfers damit braucht).
+  * Die Suche («Alle W2 in Dietikon») liest jede Parzelle des Orts
+    einzeln von der Platte: ohne Last 3.1 bis 3.7 Sekunden, während des
+    Ladens am 19. November 9.4 Sekunden und dann Abbruch durch die Frist.
+    Während eines Ladelaufs ist «Reiter prüfen» darum rot, ohne dass die
+    Seite kaputt ist.
 
 Die nächste Grösse («Small», 2 GB, doppelte Plattenleistung) kostet
 rund 5 Dollar im Monat mehr; das entscheidet Julian.
@@ -258,6 +263,30 @@ zählt je Angabe (`tools/parzellen_vergleich.py`).
     die bebauten Parzellen mit Adresse und Haus, die Zone am grössten
     Haus als Annahme, ohne Fläche und Umriss. Ob gekauft wird,
     entscheidet Julian.
+  * Die Ziffer steht ausserhalb Zürichs nicht im Zonennamen, und ohne
+    Ziffer rechnet kein Potenzial. Zug liefert die Ausnützungsziffer am
+    Zonentyp (Schritt `ziffern`, `tools/kanton_ziffern.py`: 13'080
+    Parzellen); Thurgau liefert keine Ziffer, Luzern eine ohne Angabe,
+    welche es ist. Die Baumassenziffer steht in Zug nur bei Arbeits- und
+    Mischzonen, die ohnehin ausgeschlossen sind.
+  * Mit Potenzialrechnung braucht ein Stück von 2000 Zeilen rund 13
+    Sekunden, dazu dieselbe Pause: 221'730 Zürcher Zonen dauerten 93
+    Minuten. Bei solchen Läufen auf das Ende warten, nicht auf eine
+    Schätzung.
+
+Gemessen am 19. November, 02:45 UTC (Auswerten «parzellen-vier»):
+
+    Kanton  amtlich  fehlen  Zone    Umriss  Adresse  Potenzial
+    ZH      391'436  0       99.2 %  99.1 %  57.5 %   42.6 %  (vorher Zone 43 %)
+    TG      137'274  0       100 %   99.9 %  53.3 %    1.7 %
+    LU       77'048  7       99.3 %  0       100 %     0      (nur bebaute)
+    ZG       24'646  0       99.9 %  100 %   66.0 %   40.0 %  (vorher 0)
+
+Die 7 in Luzern haben im Register keine gültige EGRID (sechsmal zwölf
+Ziffern ohne «CH», einmal «0»). Adressen fehlen dort, wo kein Haus
+steht: das Register kennt nur Gebäude. Potenzial im Thurgau braucht
+die Ziffern der Baureglemente (die Lieferung hat keine), in Luzern die
+Vermessung.
 
 ## Gestaltung
 
