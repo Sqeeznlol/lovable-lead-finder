@@ -27,10 +27,14 @@ on:
     - cron: '43 21 * * 0-4'
     - cron: '3 5 * * 1-5'
 
-# Bei drei Pushes kurz nacheinander interessiert nur der letzte.
+# Bei drei Pushes kurz nacheinander interessiert nur der letzte. Ein
+# geplanter Lauf aber wartet: am 19. November kam die Morgenkontrolle
+# (fünf Stunden zu spät) 20 Sekunden nach einem Push, brach dessen
+# Prüfung ab, sah ein einziges Mal nach, bevor Vercel fertig gebaut
+# hatte, und meldete «nicht live».
 concurrency:
   group: live
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name != 'schedule' }}
 
 jobs:
   pruefen:

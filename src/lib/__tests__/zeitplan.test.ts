@@ -155,8 +155,13 @@ describe('Geplante Läufe treffen ihre Tageszeit, wie spät GitHub auch startet'
 
   // Ein geplanter Lauf ausserhalb seiner Zeit tut nichts -- bräche er dabei
   // die laufende Prüfung eines ausgelieferten Standes ab, fehlte sie ganz.
+  // 19. November, 02:47 UTC: die Morgenkontrolle von «Was ist live» (Plan
+  // 21:43, fünf Stunden zu spät) kam 20 Sekunden nach einem Push, brach
+  // dessen Prüfung ab, sah einmal nach, fand den Bau noch nicht fertig
+  // und wurde rot. Eine Minute später stand der Stand auf der Seite.
   it('ein geplanter Lauf bricht keine laufende Prüfung ab', () => {
     expect(ohneKommentare(lesen('reiter.yml'))).toMatch(/group: reiter\n\s+cancel-in-progress: \$\{\{ github\.event_name != 'schedule' \}\}/);
+    expect(ohneKommentare(lesen('live.yml'))).toMatch(/group: live\n\s+cancel-in-progress: \$\{\{ github\.event_name != 'schedule' \}\}/);
   });
 
   // Die Gesuche sollen am Morgen da sein, nicht am Mittag -- und an keinem
