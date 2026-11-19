@@ -208,13 +208,19 @@ export function ueberbauung(b: Pick<Befund, 'flaeche' | 'haeuser'>): { flaeche: 
 export type Eigentum = 'allein' | 'gemeinsam' | 'erbengemeinschaft' | 'vertretung' | 'nein';
 export type Absicht = 'verkaufen' | 'bauen' | 'wert' | 'informieren' | 'ersetzen';
 export type Zeitraum = '12' | '36' | 'offen';
-export interface Antwort { eigentuemer: Eigentum | null; absicht: Absicht | null; zeitraum: Zeitraum | null }
+export type Kaufangebot = 'ja' | 'nein';
+/** kaufangebot: nur gefragt, wer verkaufen oder den Wert kennen will (Julian, 19. November: «mit Angebot»). */
+export interface Antwort { eigentuemer: Eigentum | null; absicht: Absicht | null; zeitraum: Zeitraum | null; kaufangebot?: Kaufangebot | null }
+
+/** Wer nach dem Kaufangebot gefragt wird: wer verkaufen oder den Wert kennen will. */
+export const fragtKaufangebot = (a: Pick<Antwort, 'absicht'>) => a.absicht === 'verkaufen' || a.absicht === 'wert';
 
 export const ANTWORT_TEXT = {
   eigentuemer: { allein: 'Ja, allein', gemeinsam: 'Ja, gemeinsam mit anderen', erbengemeinschaft: 'Ja, als Erbengemeinschaft',
     vertretung: 'Nein, ich vertrete den Eigentümer', nein: 'Nein' } as Record<Eigentum, string>,
   absicht: { verkaufen: 'Verkaufen', bauen: 'Bauen, aus- oder umbauen', wert: 'Den Wert kennen', informieren: 'Nur informieren' } as Partial<Record<Absicht, string>>,
   zeitraum: { 12: 'In den nächsten 12 Monaten', 36: 'In 1 bis 3 Jahren', offen: 'Noch offen' } as Record<Zeitraum, string>,
+  kaufangebot: { ja: 'Ja, gerne', nein: 'Nein, nur den Bericht' } as Record<Kaufangebot, string>,
 };
 
 /**
@@ -224,6 +230,8 @@ export const ANTWORT_TEXT = {
  */
 export function prioritaet(a: Antwort): 'heiss' | 'warm' | 'normal' {
   const eigen = a.eigentuemer != null && a.eigentuemer !== 'nein';
+  // Wer ein Kaufangebot will, ist so weit wie jemand, der in einem Jahr verkauft.
+  if (eigen && a.kaufangebot === 'ja') return 'heiss';
   // Heizungsersatz innert eines Jahres ist so dringend wie Verkaufen oder Bauen (Heizungs-Check).
   if (eigen && (a.absicht === 'verkaufen' || a.absicht === 'bauen' || a.absicht === 'ersetzen') && a.zeitraum === '12') return 'heiss';
   if (eigen && a.absicht != null && a.absicht !== 'informieren') return 'warm';
@@ -243,6 +251,7 @@ export function leadAngaben(o: { marke: string; domain: string; antwort: Antwort
   return {
     quelle: 'check', marke: o.marke, domain: o.domain,
     eigentuemer: o.antwort.eigentuemer, absicht: o.antwort.absicht, zeitraum: o.antwort.zeitraum, prioritaet: prioritaet(o.antwort),
+    kaufangebot: o.antwort.kaufangebot === 'ja' || null,
     parzelle: b.nummer, flaeche: b.flaeche, zone: b.zone, gemeinde: b.gemeinde, kanton: b.kanton,
     gebaeude: bestehend.length, wohnungen: bestehend.reduce((s, h) => s + (h.wohnungen ?? 0), 0) || null,
     baujahr: baujahre.length ? Math.min(...baujahre) : null,

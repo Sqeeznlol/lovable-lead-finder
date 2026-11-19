@@ -23,7 +23,11 @@ import { Ladebild, type LadebildDaten } from '@/components/check/Ladebild';
 import { FENSTER } from '@/lib/fenster';
 import {
   aeltestes, ANTWORT_TEXT, stockText, type Einheit, linkFuer, ortAusLink, bauzeit, befundAmOrt, heizungText, GEBAEUDEART, leadAngaben, mailOk, nameOk, schweizerNummer, STATUS, vorschlaege,
-  type Antwort, type Befund, type Ort, vorschlagTeile, wohnadresseOk } from '@/lib/check-daten';
+  type Antwort, type Befund, type Ort, vorschlagTeile, wohnadresseOk, fragtKaufangebot } from '@/lib/check-daten';
+import { BISHER_SATZ, bisherFuer, fundstelle, fundstelleZeilen, gesetzFuer, NUR_BISHER_SATZ, schnittDaten, type Begriff } from '@/lib/check-fundstelle';
+import { ANGEBOT, BEISPIEL, BEISPIEL_HINWEIS, beispielBericht, beispielFundstelle, beispielSchnitt } from '@/lib/check-beispiel';
+import { Schnitt } from '@/components/check/Schnitt';
+import { FundstelleTafel, GesetzText } from '@/components/check/FundstelleTafel';
 import { berichtSpeichern, luftbildMitUmriss, type BerichtAbschnitt } from '@/lib/check-bericht';
 import { tippsFuer, TIPP_TITEL } from '@/lib/check-tipps';
 import { fotoDatei, fotoNachId } from '@/lib/check-fotos';
@@ -312,9 +316,10 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
     <div className="wahl">
       {Object.entries(werte).map(([w, t]) => (
         <button key={w} type="button" aria-pressed={antwort[k] === w} onClick={() => {
-          setAntwort(a => ({ ...a, [k]: w as Antwort[K] }));
+          // Eine geänderte Absicht macht die Antwort zum Kaufangebot hinfällig.
+          setAntwort(a => ({ ...a, [k]: w as Antwort[K], ...(k === 'absicht' ? { kaufangebot: null } : {}) }));
           setTimeout(() => {
-            if (frage < 2) setFrage(frage + 1);
+            if (frage < fragen - 1) setFrage(frage + 1);
             else { setSchritt(2); setKschritt(0); zaehlen(marke.id, domain, 'kontakt'); }
           }, leise() ? 0 : 220);
         }}>{t}</button>
@@ -322,6 +327,8 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
     </div>
   );
 
+  // Wer verkaufen oder den Wert kennen will, wird nach dem Kaufangebot gefragt (Julian, 19. November: «mit Angebot»).
+  const fragen = modus !== 'heizung' && fragtKaufangebot(antwort) ? 4 : 3;
   const best = befund?.haeuser.filter(h => h.status === 1004 || h.status === 1003) ?? [];
   const grundfl = best.reduce((s, h) => s + (h.grundflaeche ?? 0), 0);
   const anteil = befund?.flaeche && grundfl ? Math.min(100, Math.round((grundfl / befund.flaeche) * 100)) : null;
@@ -393,6 +400,13 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
   const volumenHeute = best.length && best.every(h => h.volumen) ? best.reduce((s2, h) => s2 + (h.volumen ?? 0), 0) : null;
   useEffect(() => { if (azAusPlan != null) setAz(Math.min(2, Math.max(0.2, azAusPlan))); }, [azAusPlan]);
   const volumenMoeglich = bmzAusPlan != null && befund?.flaeche ? Math.round(bmzAusPlan * befund.flaeche) : null;
+  // Jede Zahl der Rechnung mit Fundstelle: Vorgabe, Gesetz mit Zitat, Rechnung (check-fundstelle.ts).
+  const ordnung = rechtslage && rechtslage !== 'fehlt' ? rechtslage.auszug?.ordnung ?? null : null;
+  const rechnungMitFundstelle = befund?.flaeche ? fundstelle({ kanton: befund.kanton, ziffern, flaeche: befund.flaeche, az, haeuser: best, volumenHeute, ordnung }) : null;
+  const schnitt = schnittDaten(ziffern, best.length ? Math.max(...best.map(h => h.geschosse ?? 0)) : 0);
+  const begriffZone: Begriff | null = ziffern ? (ziffern.az != null ? 'az' : ziffern.bmz != null ? 'bmz' : ziffern.uez != null ? 'uez' : ziffern.vollgeschosse != null ? 'vollgeschoss' : null) : null;
+  const gesetzZone = begriffZone ? gesetzFuer(befund?.kanton, begriffZone) : null;
+  const bisherZone = begriffZone ? bisherFuer(befund?.kanton, begriffZone) : null;
   // Tipps eines Kantons erst, wenn die Parzelle gefunden ist.
   const tipps = tippsFuer(marke.schwerpunkt, modus === 'heizung', befund?.kanton);
   const ratgeberPfad = (slug: string) => (markeFuerHost(window.location.hostname) ? `/ratgeber/${slug}` : `/check/${marke.id}/ratgeber/${slug}`);
@@ -440,7 +454,7 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
           { titel: 'Überbaut', wert: anteil != null ? `${anteil} %` : '–', zusatz: grundfl ? `${n(grundfl)} m² Grundfläche` : 'kein Gebäude erfasst' },
           { titel: 'Ältestes Gebäude', wert: aeltestesGebaeude ?? '–', zusatz: `${best.length} Gebäude laut Register` },
         ],
-        rechnung,
+        rechnung: rechnungMitFundstelle ? { titel: rechnung.titel, satz: rechnung.satz, zeilen: fundstelleZeilen(rechnungMitFundstelle) } : rechnung,
         abschnitte: [
           { titel: 'Gebäude auf der Parzelle', zeilen: haeuser, satz: haeuser.length ? undefined : 'Auf dieser Parzelle ist kein Gebäude im Register eingetragen.' },
           { titel: 'Ihre Heizung', zeilen: heizung },
@@ -473,7 +487,7 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
       <header className="kopf">
         <div className="huelle">
           <a className="wortmarke" href="#top" onClick={() => setRecht(null)}>{wortmarke}</a>
-          <nav aria-label="Seite"><a href="#ablauf" onClick={() => setRecht(null)}>So funktioniert's</a>{tipps.length > 0 && <a href="#tipps" onClick={() => setRecht(null)}>Tipps</a>}<a href="#fragen" onClick={() => setRecht(null)}>Häufige Fragen</a></nav>
+          <nav aria-label="Seite"><a href="#ablauf" onClick={() => setRecht(null)}>So funktioniert's</a><a href="#beispiel" onClick={() => setRecht(null)}>Beispiel</a><a href="#angebot" onClick={() => setRecht(null)}>Angebot</a>{tipps.length > 0 && <a href="#tipps" onClick={() => setRecht(null)}>Tipps</a>}<a href="#fragen" onClick={() => setRecht(null)}>Häufige Fragen</a></nav>
           <div className="rechts"><button type="button" className="knopf marke nur-gross" onClick={() => { setRecht(null); if (befund) oeffnen(); else zurSuche(); }}>Kostenlos prüfen</button></div>
         </div>
       </header>
@@ -577,6 +591,7 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
                 <div className="zweibalken"><div><i style={{ width: '45%' }} /></div><div><i style={{ width: '100%' }} /></div>
                   <p>Heute rund 334 m² Geschossfläche, möglich 744 m²</p></div>
               </div>
+              <a className="ganzes-beispiel" href="#beispiel">Ganzes Beispiel mit Rechnung und Fundstelle</a>
             </aside>
           </div>
         </section>
@@ -665,20 +680,22 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
                           </div>
                           <ul>{marke.vorteile.slice(0, 3).map(v => <li key={v}>{v}</li>)}</ul>
                           <button type="button" className="knopf marke gross-knopf" onClick={oeffnen}>Jetzt berechnen</button>
-                          <p className="wegweiser-satz">Drei kurze Fragen und Ihre Angaben, dann erhalten Sie den Bericht als PDF. Die Seite führt Sie Schritt für Schritt.</p>
+                          <p className="wegweiser-satz">Kurze Fragen und Ihre Angaben, dann erhalten Sie den Bericht als PDF, jede Zahl mit Fundstelle. Die Seite führt Sie Schritt für Schritt.</p>
                         </>
                       )}
 
                       {(schritt === 1 || schritt === 2) && (
                         <form onSubmit={absenden} noValidate>
-                          <div className="schritt-zeile">{schritt === 1 ? 'Schritt 1 von 3 · Drei kurze Fragen' : 'Schritt 2 von 3 · Ihre Angaben'}</div>
-                          <div className="fortschritt" aria-hidden="true">{Array.from({ length: 3 + KONTAKT.length }, (_, i) => <i key={i} className={(schritt === 2 ? 3 + kschritt : frage) >= i ? 'an' : ''} />)}</div>
+                          <div className="schritt-zeile">{schritt === 1 ? `Schritt 1 von 3 · ${fragen === 4 ? 'Vier' : 'Drei'} kurze Fragen` : 'Schritt 2 von 3 · Ihre Angaben'}</div>
+                          <div className="fortschritt" aria-hidden="true">{Array.from({ length: fragen + KONTAKT.length }, (_, i) => <i key={i} className={(schritt === 2 ? fragen + kschritt : frage) >= i ? 'an' : ''} />)}</div>
                           {schritt === 1 ? (
                             <>
-                              <div className="frage-nr">Frage {frage + 1} von 3</div>
+                              <div className="frage-nr">Frage {frage + 1} von {fragen}</div>
                               {frage === 0 && <><div className="frage">Sind Sie Eigentümer/in dieser Liegenschaft?</div>{wahl('eigentuemer', ANTWORT_TEXT.eigentuemer)}</>}
                               {frage === 1 && <><div className="frage">Was haben Sie vor?</div>{wahl('absicht', modus === 'heizung' ? ABSICHT_HEIZUNG : ANTWORT_TEXT.absicht as Record<string, string>)}</>}
                               {frage === 2 && <><div className="frage">Bis wann?</div>{wahl('zeitraum', ANTWORT_TEXT.zeitraum)}</>}
+                              {frage === 3 && <><div className="frage">Möchten Sie ein unverbindliches Kaufangebot für Ihr Grundstück?</div>
+                                <p className="klein frage-zusatz">Kostenlos, schriftlich, ohne Makler und ohne Verpflichtung.</p>{wahl('kaufangebot', ANTWORT_TEXT.kaufangebot)}</>}
                               <button type="button" className="zurueck" onClick={() => (frage > 0 ? setFrage(frage - 1) : setSchritt(0))}>Zurück</button>
                             </>
                           ) : (
@@ -708,7 +725,7 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
                                     <button type="submit" className="knopf marke senden gross-knopf" disabled={sendet}>{sendet ? 'Wird gesendet …' : 'Bericht erstellen'}</button>
                                     <p className="einwilligung">Mit dem Absenden sind Sie einverstanden, dass {BETREIBER} Ihre Angaben speichert und Sie zu dieser Liegenschaft kontaktiert, auch zu einem möglichen Verkauf oder einer Entwicklung. Widerruf jederzeit möglich.</p>
                                   </>}
-                              <button type="button" className="zurueck" onClick={() => { setFehler(null); if (kschritt > 0) setKschritt(kschritt - 1); else { setSchritt(1); setFrage(2); } }}>Zurück</button>
+                              <button type="button" className="zurueck" onClick={() => { setFehler(null); if (kschritt > 0) setKschritt(kschritt - 1); else { setSchritt(1); setFrage(fragen - 1); } }}>Zurück</button>
                               <div className="sicher">Verschlüsselt übertragen · keine Weitergabe an Dritte</div>
                             </>
                           )}
@@ -718,7 +735,7 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
                       {schritt === 3 && (
                         <>
                           <div className="schritt-zeile">Schritt 3 von 3 · Ihr Bericht</div>
-                          <div className="freigeschaltet"><span>Danke, {kontakt.name.trim().split(/\s+/)[0]}. Ihr Bericht ist bereit. Die ausführliche Analyse folgt innert zwei Arbeitstagen.</span></div>
+                          <div className="freigeschaltet"><span>Danke, {kontakt.name.trim().split(/\s+/)[0]}. Ihr Bericht ist bereit. Die ausführliche Analyse folgt innert zwei Arbeitstagen{antwort.kaufangebot === 'ja' ? ', und wir bereiten Ihr unverbindliches Kaufangebot vor' : ''}.</span></div>
                           <button type="button" className="knopf marke gross-knopf bericht-knopf" onClick={() => void pdfLaden()} disabled={pdfLaeuft}>
                             {pdfLaeuft ? 'Bericht wird erstellt …' : 'Bericht als PDF herunterladen'}
                           </button>
@@ -752,6 +769,8 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
                           <div className="fein">{volumenMoeglich != null
                             ? `Volumen: Baumassenziffer mal Grundstücksfläche (Zonenplan Kanton Zürich).${volumenHeute != null ? ' Heute: Gebäudevolumen laut Register.' : ' Das heutige Volumen führt das Register für dieses Gebäude nicht; wir messen es in der Analyse.'} Richtwert, keine Bewilligungszusage.`
                             : 'Geschossfläche, vereinfacht: Ausnützung mal Grundstücksfläche; heute Grundfläche mal Geschosse laut Register. Richtwert, keine Bewilligungszusage.'}</div>
+                          {rechnungMitFundstelle && <FundstelleTafel f={rechnungMitFundstelle} />}
+                          {schnitt && <Schnitt d={schnitt} titel="Ihre Parzelle im Schnitt" />}
                         </>
                       )}
                     </div>
@@ -829,6 +848,13 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
                               ))}
                             </dl>
                           )}
+                          {gesetzZone && (
+                            <details className="fundstelle kurz">
+                              <summary>Wie die Ziffer gemessen wird<span>{gesetzZone.artikel} {gesetzZone.erlass.match(/\(([^)]+)\)/)?.[1] ?? ''}</span></summary>
+                              <p><GesetzText g={gesetzZone} />{gesetzZone.fassung === 'bisher' && <small>{NUR_BISHER_SATZ}</small>}</p>
+                              {bisherZone && <p className="f-bisher"><small>{BISHER_SATZ}</small><GesetzText g={bisherZone} /></p>}
+                            </details>
+                          )}
                           {pdf && <a className="pdf" href={pdf} target={FENSTER.extern}>Amtlicher ÖREB-Auszug (PDF)</a>}
                         </div>
                         {nachbarSatz && (
@@ -898,6 +924,57 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
             <div className="schritte-aufruf">
               <button type="button" className="knopf marke" onClick={() => (befund ? oeffnen() : zurSuche())}>{befund ? 'Baureserve kostenlos berechnen' : 'Mit Schritt 1 beginnen'}</button>
               <span>Kostenlos, ohne Konto, in einer Minute.</span>
+            </div>
+          </div>
+        </section>
+
+        {/* Was man bekommt, bevor man etwas angibt (Julian, 19. November, nach dem Vergleich mit
+            baugesuch.prüfer.ch): ein Bericht mit erfundenen Daten, die Rechnung mit Fundstelle und
+            der Schnitt, so wie sie für das eigene Grundstück kommen. */}
+        <section className="abschnitt-gross beispiel-bericht" id="beispiel">
+          <div className="huelle">
+            <div className="ueber">Beispiel</div>
+            <h2 className="titel">So sieht Ihr Bericht aus</h2>
+            <p className="lead-satz">Jede Zahl mit Fundstelle: woher der Wert kommt, welcher Artikel sagt, wie er gemessen wird, und die Rechnung Schritt für Schritt.</p>
+            <div className="beispiel-tafel tafel">
+              <div className="b-kopf"><span className="b-marke">Beispiel, erfundene Daten</span><b>{BEISPIEL.adresse}</b><small>{BEISPIEL.ort}</small></div>
+              <div className="b-inhalt">
+                <Schnitt d={beispielSchnitt()} titel="Beispiel im Schnitt" />
+                <div>
+                  <div className="b-zahlen">
+                    <div><small>Möglich</small><b>{n(beispielFundstelle().moeglich)} m²</b></div>
+                    <div><small>Heute</small><b>{n(beispielFundstelle().heute ?? 0)} m²</b></div>
+                    <div className="plus"><small>Baureserve</small><b>+ {n(beispielFundstelle().reserve ?? 0)} m²</b></div>
+                  </div>
+                  <FundstelleTafel f={beispielFundstelle()} offen />
+                </div>
+              </div>
+              <p className="klein b-hinweis">{BEISPIEL_HINWEIS}</p>
+              <div className="b-knoepfe">
+                <button type="button" className="knopf marke" onClick={() => (befund ? oeffnen() : zurSuche())}>{befund ? 'Meinen Bericht erstellen' : 'Eigenes Grundstück prüfen'}</button>
+                <button type="button" className="knopf" disabled={pdfLaeuft} onClick={() => { setPdfLaeuft(true); void berichtSpeichern(beispielBericht({ name: marke.name.join(''), farbe: marke.farbe, domain, betreiber: BETREIBER, betreiberAdresse: BETREIBER_ADRESSE })).finally(() => setPdfLaeuft(false)); }}>Beispielbericht als PDF</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="abschnitt-gross angebot" id="angebot">
+          <div className="huelle">
+            <div className="ueber">Angebot</div>
+            <h2 className="titel">Was Sie bekommen</h2>
+            <p className="lead-satz">Alles kostenlos. Sie entscheiden bei jedem Schritt, ob Sie weitergehen.</p>
+            <div className="angebot-tafel tafel">
+              {ANGEBOT.map(a => (
+                <div key={a.stufe} className="a-stufe">
+                  <div className="a-oben"><span className="a-stufe-name">{a.stufe}</span><span className="a-preis">{a.preis}</span></div>
+                  <h3>{a.titel}</h3>
+                  <ul>{a.punkte.map(p => <li key={p}>{p}</li>)}</ul>
+                </div>
+              ))}
+            </div>
+            <div className="schritte-aufruf">
+              <button type="button" className="knopf marke" onClick={() => (befund ? oeffnen() : zurSuche())}>{befund ? 'Baureserve kostenlos berechnen' : 'Grundstück kostenlos prüfen'}</button>
+              <span>Das Kaufangebot gibt es auf Wunsch, nach Ihren Angaben.</span>
             </div>
           </div>
         </section>

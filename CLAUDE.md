@@ -104,6 +104,23 @@ Handy-Fassung. Gebaut wird mit `<Seite>` aus `src/components/rahmen.tsx`.
   * Eigene Fotos nur über `check-fotos.json` und
     `tools/fotos_vorbereiten.py` (docs/fotos.md): Alt-Text, Urheber,
     Rechte, Ort in Seite und Datei, Kameradaten und GPS entfernt.
+  * Jede Zahl mit Fundstelle (19. November, nach dem Vergleich mit
+    baugesuch.prüfer.ch): unter der Rechnung zum Aufklappen die Rechnung
+    Zahl für Zahl, woher der Wert kommt (Zonenplan, Bauordnung der
+    Gemeinde) und welcher Artikel des kantonalen Baurechts sagt, wie die
+    Ziffer gemessen wird, wörtlich zitiert (`check-fundstelle.ts`,
+    `check-gesetze.json` mit Adresse und Stand). Ein Artikel kommt nur
+    hinein, wenn er in der amtlichen Gesetzessammlung gelesen ist; fehlt
+    er, sagt die Seite das. Die Artikelnummer der Bauordnung jeder Gemeinde
+    kennen wir nicht und nennen sie nicht. Nicht neben jede Zahl (Julian,
+    15. November: Quellen nicht je Zeile).
+  * Vor dem ersten Klick sieht man, was man bekommt: ein Beispielbericht mit
+    erfundenen Daten (überall als erfunden bezeichnet), der bewegte Schnitt
+    (heute und möglich, «Schema, nicht massstäblich») und «Was Sie
+    bekommen» bis zum unverbindlichen Kaufangebot (Julian: «mit
+    Angebot»). Nach dem Kaufangebot fragt die Seite nur, wer verkaufen oder
+    den Wert kennen will; ein Ja macht den Lead heiss. Für das Kaufangebot
+    nennt die Seite keine Frist. `check-fundstelle.test.ts` wacht darüber.
   * Herkunft eines Leads (utm_*, gclid) wird beim Start gemerkt
     (`werbe-herkunft.ts`), weil die Check-Seite ihren Link beim Wählen
     einer Adresse umschreibt. Der Google-Tag lädt gleich nach

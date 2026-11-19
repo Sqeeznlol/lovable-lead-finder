@@ -70,7 +70,9 @@ export async function berichtPdf(d: BerichtDaten): Promise<JsPdf> {
 
   const platz = (h: number) => { if (y + h > UNTEN) { doc.addPage(); y = RAND; } };
   // Weiche Trennstriche aus den Daten (Eigentums\u00ADwohnung) zeichnet jsPDF als Bindestrich.
-  const rein = (t: string) => t.replace(/\u00AD/g, '');
+  // Helvetica im PDF kennt nur die Zeichen von Windows-1252: das Minus der Rechnung (U+2212)
+  // erschien als «"» (19. November, Beispielbericht). Darum der Gedankenstrich, den sie kennt.
+  const rein = (t: string) => t.replace(/\u00AD/g, '').replace(/\u2212/g, '\u2013').replace(/[\u2009\u202F]/g, ' ');
   const absatz = (text: string, groesse: number, stil: 'normal' | 'bold' = 'normal', farbe = tinte, abstand = 1.45, breite = BREITE, x = RAND) => {
     doc.setFont('helvetica', stil); doc.setFontSize(groesse); doc.setTextColor(...farbe);
     const zeilen = doc.splitTextToSize(rein(text), breite) as string[];

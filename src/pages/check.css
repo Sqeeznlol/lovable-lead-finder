@@ -437,3 +437,76 @@
 .pc .buehne picture.eigenes img{display: block; width: 100%; height: 100%; object-fit: cover;}
 .pc[data-buehne="luftbild"] .buehne picture.eigenes{position: absolute; inset: 0; z-index: 0;}
 .pc[data-buehne="luftbild"] .buehne:has(picture.eigenes){background: #11181B;}
+
+/* Fundstelle, Schnitt, Beispiel und Angebot (19. November, nach dem Vergleich mit baugesuch.prüfer.ch). */
+.pc .fundstelle{margin-top:14px; border-top:1px solid var(--linie);}
+.pc .fundstelle summary{list-style:none; cursor:pointer; min-height:48px; display:flex; align-items:center; justify-content:space-between; gap:12px; font-weight:600; font-size:16px; padding-right:28px; position:relative;}
+.pc .fundstelle summary::-webkit-details-marker{display:none;}
+.pc .fundstelle summary span{font-weight:500; color:var(--grau); font-size:14px; text-align:right;}
+.pc .fundstelle summary::after{content:""; position:absolute; right:6px; top:18px; width:9px; height:9px; border-right:2px solid var(--grau); border-bottom:2px solid var(--grau); transform:rotate(45deg); transition:transform .2s;}
+.pc .fundstelle[open] summary::after{transform:rotate(-135deg); top:22px;}
+.pc .fundstelle .f-rechnung{margin:4px 0 12px; padding:0 0 0 22px; display:grid; gap:6px; font-size:16px; font-variant-numeric:tabular-nums;}
+.pc .fundstelle dl{margin:0 0 8px; display:grid; gap:10px;}
+.pc .fundstelle dl > div{display:grid; grid-template-columns:84px 1fr; gap:10px;}
+.pc .fundstelle dt{font-size:13px; color:var(--hell); padding-top:2px;}
+.pc .fundstelle dd{margin:0; font-size:15px;}
+.pc .fundstelle q, .pc .fundstelle.kurz q{display:block; margin:6px 0; padding-left:12px; border-left:3px solid var(--marke); color:var(--tinte); font-style:italic; quotes:"«" "»";}
+.pc .fundstelle small{display:block; font-size:13px; color:var(--grau); margin-top:4px;}
+.pc .fundstelle a{color:var(--marke); text-underline-offset:3px;}
+.pc .fundstelle.kurz p{margin:0 0 10px; font-size:15px;}
+@media (max-width:440px){.pc .fundstelle dl > div{grid-template-columns:1fr; gap:2px;}}
+
+.pc .schnitt{margin:16px 0 0;}
+.pc .schnitt svg{display:block; width:100%; height:auto; background:var(--papier); border-radius:var(--r-klein);}
+.pc .schnitt .s-boden{stroke:var(--tinte); stroke-width:2;}
+.pc .schnitt .s-grenze line{stroke:var(--grau); stroke-width:1.5; stroke-dasharray:6 5;}
+.pc .schnitt .s-heute{fill:#C9C6BF;}
+.pc .schnitt .s-moeglich{fill:var(--marke); fill-opacity:.16; stroke:var(--marke); stroke-width:1.5; stroke-dasharray:5 4;}
+.pc .schnitt .s-masz line{stroke:var(--marke); stroke-width:1.5;}
+.pc .schnitt .s-klein{font-size:13px; fill:var(--grau); font-family:inherit;}
+.pc .schnitt .s-grenze, .pc .schnitt .s-heute, .pc .schnitt .s-moeglich, .pc .schnitt .s-masz{animation:s-auf .45s ease both;}
+.pc .schnitt .s-heute, .pc .schnitt .s-moeglich{transform-box:fill-box; transform-origin:bottom; animation-name:s-wachsen;}
+@keyframes s-auf{from{opacity:0}to{opacity:1}}
+@keyframes s-wachsen{from{opacity:0; transform:scaleY(0)}to{opacity:1; transform:scaleY(1)}}
+@media (prefers-reduced-motion: reduce){.pc .schnitt *{animation:none !important;}}
+.pc .schnitt figcaption{display:flex; flex-wrap:wrap; align-items:center; gap:6px 18px; margin-top:10px; font-size:15px;}
+.pc .schnitt .s-punkt{display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:8px; vertical-align:-1px; background:#C9C6BF;}
+.pc .schnitt .s-punkt.moeglich{background:var(--marke); opacity:.5;}
+.pc .schnitt .s-klein-text{font-size:13px; color:var(--hell);}
+.pc .schnitt .s-nochmals{margin-left:auto; min-height:44px; background:none; border:0; padding:0; color:var(--marke); font-weight:600; cursor:pointer; text-underline-offset:3px; text-decoration:underline;}
+
+.pc .ganzes-beispiel{display:flex; align-items:center; min-height:48px; padding:0 20px 14px; color:var(--marke); font-weight:600; font-size:15px; text-underline-offset:3px;}
+.pc .beispiel-bericht{background:var(--tafel); border-top:1px solid var(--linie);}
+.pc .beispiel-tafel{margin-top:32px; padding:22px; background:var(--papier);}
+.pc .b-kopf{display:grid; gap:2px; margin-bottom:16px;}
+.pc .b-kopf b{font-size:22px; font-weight:600; letter-spacing:-0.01em;}
+.pc .b-kopf small{color:var(--grau); font-size:14px;}
+.pc .b-marke{justify-self:start; font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--warm); margin-bottom:4px;}
+.pc .b-inhalt{display:grid; gap:20px;}
+@media (min-width:900px){.pc .b-inhalt{grid-template-columns:minmax(0,1fr) minmax(0,1fr); align-items:start;}}
+.pc .b-zahlen{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;}
+.pc .b-zahlen div{background:var(--tafel); border-radius:var(--r-klein); padding:12px;}
+.pc .b-zahlen small{display:block; font-size:13px; color:var(--grau);}
+.pc .b-zahlen b{font-size:20px; font-weight:600; white-space:nowrap;}
+.pc .b-zahlen .plus b{color:var(--marke);}
+@media (max-width:440px){.pc .b-zahlen b{font-size:16px;}}
+.pc .b-hinweis{margin:16px 0 0;}
+.pc .b-knoepfe{display:flex; flex-wrap:wrap; gap:10px; margin-top:16px;}
+.pc .b-knoepfe .knopf{min-height:52px;}
+@media (max-width:520px){.pc .b-knoepfe .knopf{width:100%;}}
+
+.pc .angebot-tafel{margin-top:32px; display:grid; grid-template-columns:1fr; overflow:hidden;}
+@media (min-width:900px){.pc .angebot-tafel{grid-template-columns:repeat(3, 1fr);}}
+.pc .a-stufe{padding:24px;}
+.pc .a-stufe + .a-stufe{border-top:1px solid var(--linie);}
+@media (min-width:900px){.pc .a-stufe + .a-stufe{border-top:0; border-left:1px solid var(--linie);}}
+.pc .a-oben{display:flex; justify-content:space-between; gap:8px; align-items:baseline;}
+.pc .a-stufe-name{font-size:13px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--marke);}
+.pc .a-preis{font-size:14px; color:var(--grau);}
+.pc .a-stufe h3{font-size:22px; font-weight:600; letter-spacing:-0.01em; margin:10px 0 12px;}
+.pc .a-stufe ul{list-style:none; padding:0; margin:0; display:grid; gap:10px; font-size:16px;}
+.pc .a-stufe li{padding-left:24px; position:relative;}
+.pc .a-stufe li::before{content:""; position:absolute; left:3px; top:7px; width:10px; height:5px; border-left:2px solid var(--marke); border-bottom:2px solid var(--marke); transform:rotate(-45deg);}
+.pc .frage-zusatz{margin:-4px 0 12px;}
+.pc .fundstelle .f-bisher{display:block; margin-top:12px; padding-top:10px; border-top:1px dashed var(--linie);}
+.pc .fundstelle .f-bisher q{border-left-color:var(--linie);}
