@@ -21,12 +21,13 @@ import { geoAdminLink, WOHNEN, wunschCsv, ZONE_KURZ, type WunschOrdner, type Wun
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
 const ch = (n: number) => n.toLocaleString('de-CH');
-// Vier Zahlen, die eine Auswahl auslösen: wo gewohnt werden darf zuerst, dort sucht Bauraum.
+// Vier Zahlen, die eine Auswahl auslösen. Seit «nur erschlossenes Bauland für Wohnen» (19. November)
+// liegen alle Parzellen in Wohn-, Misch- oder Zentrumszonen; was zählt, ist die Zone und ob schon gebaut ist.
 const KENNZAHLEN: { titel: string; zone: string; passt: (p: WunschParzelle) => boolean }[] = [
-  { titel: 'Wohnen, Misch, Zentrum', zone: 'wohnen', passt: p => WOHNEN.has(p.zone) },
-  { titel: 'Arbeitszonen', zone: 'Arbeitszonen', passt: p => p.zone === 'Arbeitszonen' },
-  { titel: 'Öffentliche Nutzungen', zone: 'Zonen für öffentliche Nutzungen', passt: p => p.zone === 'Zonen für öffentliche Nutzungen' },
-  { titel: 'Übrige Bauzonen', zone: 'uebrige', passt: p => !WOHNEN.has(p.zone) && p.zone !== 'Arbeitszonen' && p.zone !== 'Zonen für öffentliche Nutzungen' },
+  { titel: 'Wohnzonen', zone: 'Wohnzonen', passt: p => p.zone === 'Wohnzonen' },
+  { titel: 'Misch- und Zentrumszonen', zone: 'misch', passt: p => p.zone === 'Mischzonen' || p.zone === 'Zentrumszonen' },
+  { titel: 'Unbebaut', zone: 'unbebaut', passt: p => p.bebaut === false },
+  { titel: 'Bebaut', zone: 'bebaut', passt: p => p.bebaut === true },
 ];
 
 export function ParzellenNachWunsch() {
@@ -53,7 +54,7 @@ export function ParzellenNachWunsch() {
     enabled: !!o,
     queryFn: async (): Promise<WunschParzelle[]> => {
       const { data, error } = await db.from('wunsch_parzelle')
-        .select('egrid, kanton, bfs, gemeinde, nummer, flaeche, zone, bauzone_anteil, e, n, lat, lon')
+        .select('egrid, kanton, bfs, gemeinde, nummer, flaeche, zone, bauzone_anteil, e, n, lat, lon, bebaut, nachweis')
         .eq('ordner_id', o!.id).order('flaeche', { ascending: false }).limit(5000);
       if (error) throw error;
       return data ?? [];
@@ -79,7 +80,7 @@ export function ParzellenNachWunsch() {
     return [...m.entries()].sort((a, b) => b[1] - a[1]);
   }, [imKanton, gemeinde]);
   const inGemeinde = imKanton.filter(p => !gemeinde || p.gemeinde === gemeinde);
-  const treffer = inGemeinde.filter(p => !zone || (KENNZAHLEN.find(k => k.zone === zone)?.passt(p) ?? p.zone === zone));
+  const treffer = inGemeinde.filter(p => !zone || (KENNZAHLEN.find(k => k.zone === zone)?.passt(p) ?? (zone === 'wohnen' ? WOHNEN.has(p.zone) : p.zone === zone)));
   const wohnen = inGemeinde.filter(p => WOHNEN.has(p.zone)).length;
   const gezeigt = alle ? treffer : treffer.slice(0, 100);
 
@@ -107,8 +108,10 @@ export function ParzellenNachWunsch() {
         <Auswahl label="Gemeinde" wert={gemeinde || 'alle'} setWert={w => { setGemeinde(w === 'alle' ? '' : w); setZone(''); }} className="min-w-[200px]"
                  optionen={[{ wert: 'alle', titel: `Alle Gemeinden · ${ch(imKanton.length)}` }, ...gemeinden.map(([g, n]) => ({ wert: g, titel: `${g} · ${ch(n)}` }))]} />
         <Auswahl label="Zone" wert={zone || 'alle'} setWert={w => setZone(w === 'alle' ? '' : w)} className="min-w-[240px]"
-                 optionen={[{ wert: 'alle', titel: 'Alle Bauzonen' }, { wert: 'wohnen', titel: `Wohnen, Misch- und Zentrumszonen · ${ch(wohnen)}` }, { wert: 'uebrige', titel: 'Übrige Bauzonen' },
-                   ...zonen.map(([k, n]) => ({ wert: k, titel: `${k} · ${ch(n)}` }))]} />
+                 optionen={[{ wert: 'alle', titel: 'Alle Zonen' },
+                   ...KENNZAHLEN.map(k => ({ wert: k.zone, titel: `${k.titel} · ${ch(inGemeinde.filter(k.passt).length)}` })),
+                   ...zonen.filter(([k]) => !KENNZAHLEN.some(x => x.zone === k)).map(([k, n]) => ({ wert: k, titel: `${k} · ${ch(n)}` })),
+                   ...(wohnen < inGemeinde.length ? [{ wert: 'wohnen', titel: `Wohnen, Misch- und Zentrumszonen · ${ch(wohnen)}` }] : [])]} />
         <button type="button" className={KNOPF} disabled={!treffer.length} onClick={herunterladen}>Als CSV ({ch(treffer.length)})</button>
       </div>
 
@@ -126,8 +129,9 @@ export function ParzellenNachWunsch() {
                 <span className="min-w-0 flex-1">
                   <span className="block font-medium">Parzelle {p.nummer} · {p.gemeinde}</span>
                   <span className="block text-sm text-muted-foreground">
-                    {ch(p.flaeche)}{'\u00a0'}m² · {ZONE_KURZ[p.zone] ?? p.zone}{p.bauzone_anteil < 0.95 ? ` (${Math.round(p.bauzone_anteil * 100)}\u00a0% in der Bauzone)` : ''}
+                    {ch(p.flaeche)}{'\u00a0'}m² · {ZONE_KURZ[p.zone] ?? p.zone}{p.bauzone_anteil < 0.95 ? ` (${Math.round(p.bauzone_anteil * 100)}\u00a0% in der Bauzone)` : ''}{p.bebaut != null ? ` · ${p.bebaut ? 'bebaut' : 'unbebaut'}` : ''}
                   </span>
+                  {p.nachweis && <span className="block text-xs text-muted-foreground">{p.nachweis}</span>}
                   <span className="block truncate text-xs text-muted-foreground">{p.egrid}</span>
                 </span>
                 <a className="inline-flex h-11 shrink-0 items-center text-sm underline underline-offset-2" target={FENSTER.karte} href={geoAdminLink(p)}>Karte</a>

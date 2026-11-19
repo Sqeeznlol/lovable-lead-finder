@@ -319,6 +319,17 @@ in Ingenbohl; gerechnet wird die Gemeinde.
     Nummer des Grundbuchkreises (Bern und Luzern zählen anders).
   * Nachweis je Gemeinde: alle Parzellen zusammen ergeben die
     Gemeindefläche. `parzellen-nach-wunsch.test.ts` zählt nach.
+  * «Nur erschlossenes Bauland für Wohnen» (Julian, 19. November): Wohn-,
+    Misch- und Zentrumszonen; erschlossen laut Kanton (Stand der
+    Erschliessung auf geodienste.ch, frei als Karte in OW und UR, teils
+    NW), sonst belegt durch ein bestehendes Wohnhaus im Register. Bern,
+    Schwyz und Luzern (bis 2029) veröffentlichen den Stand nicht; ihre
+    unbebauten Parzellen stehen im Ordner «Unbebaut, Erschliessung
+    erfragen». Nie als erschlossen ausgeben, was keine Quelle belegt.
+  * Zwei Werte der Adresse im selben Tipp (Gemeinde wählen, Zone
+    zurücksetzen) überschrieben sich, und der Filter tat nichts
+    (19. November). `use-url-wert.ts` baut seither auf dem zuletzt
+    geschriebenen Stand auf; `use-url-wert.test.tsx` spielt es nach.
 
 ## Gestaltung
 

@@ -8,31 +8,45 @@ import { geoAdminLink, WOHNEN, wunschCsv, ZONE_KURZ, type WunschParzelle } from 
  * Die Zahlen je Gemeinde sind am 19. November auf dem Runner gezählt; je
  * Gemeinde ergaben alle Parzellen der Vermessung die Gemeindefläche.
  */
-// Die zweite Lieferung ersetzt den Inhalt des Ordners ganz; sie zählt.
-const SQL = readFileSync('supabase/migrations/20261119200000_parzellen_nach_wunsch_mehr.sql', 'utf8');
-const ZEILE = /^\s*\('(CH\d{12})','(OW|NW|BE|SZ|UR|LU)',(\d+),'([^']+)','([^']+)',(\d+),'([^']+)',([\d.]+),([\d.]+),([\d.]+),([\d.]+),([\d.]+)\)/gm;
+// Die dritte Lieferung ersetzt den Inhalt beider Ordner ganz; sie zählt (Julian: «nur erschlossenes Bauland für Wohnen»).
+const SQL = readFileSync('supabase/migrations/20261119220000_parzellen_nach_wunsch_erschlossen.sql', 'utf8');
+const ERSCHLOSSEN = '6a1f0c3e-5b7d-4e1a-9c2f-3d8b0e4a7f19', OFFEN = '9c4e2b71-3a5f-4d08-b6e2-7f1a0c5d8e42';
+const ZEILE = /^\s*\('([0-9a-f-]{36})','(CH\d{12})','(OW|NW|BE|SZ|UR|LU)',(\d+),'([^']+)','([^']+)',(\d+),'([^']+)',([\d.]+),([\d.]+),([\d.]+),[\d.]+,[\d.]+,(true|false),'([^']+)'\)/gm;
 const zeilen = [...SQL.matchAll(ZEILE)].map(m => ({
-  egrid: m[1], kanton: m[2], bfs: +m[3], gemeinde: m[4], nummer: m[5], flaeche: +m[6], zone: m[7], anteil: +m[8], e: +m[9], n: +m[10],
+  ordner: m[1], egrid: m[2], kanton: m[3], bfs: +m[4], gemeinde: m[5], nummer: m[6], flaeche: +m[7], zone: m[8], anteil: +m[9], e: +m[10], n: +m[11],
+  bebaut: m[12] === 'true', nachweis: m[13],
 }));
 
 describe('Parzellen nach Wunsch: der erste Ordner', () => {
-  it('alle 2895 Parzellen, je Gemeinde so viele wie gezählt', () => {
-    const GEZAEHLT = {
-      Sarnen: 152, Stans: 105, Stansstad: 58, Hergiswil: 57, Ennetbürgen: 38, Buochs: 44,
-      Nidau: 47, 'Muri bei Bern': 156,
-      'Ingenbohl (Brunnen)': 134, Einsiedeln: 146, Küssnacht: 188, Schwyz: 193, Arth: 102,
-      Altdorf: 125,
-      Ebikon: 146, Horw: 172, Kriens: 285, Meggen: 91, Luzern: 656,
+  it('je Gemeinde so viele wie am 19. November gezählt, keine doppelt', () => {
+    // [erschlossen, unbebaut ohne Nachweis]
+    const GEZAEHLT: Record<string, [number, number]> = {
+      Sarnen: [40, 1], Stans: [24, 6], Stansstad: [24, 1], Hergiswil: [23, 4], Ennetbürgen: [12, 5], Buochs: [12, 0],
+      Nidau: [16, 6], 'Muri bei Bern': [47, 16],
+      'Ingenbohl (Brunnen)': [44, 11], Einsiedeln: [41, 14], Küssnacht: [54, 13], Schwyz: [63, 19], Arth: [39, 10],
+      Altdorf: [42, 0],
+      Ebikon: [65, 8], Horw: [86, 29], Kriens: [93, 32], Meggen: [50, 12], Luzern: [284, 62],
     };
-    const je = Object.fromEntries(Object.keys(GEZAEHLT).map(g => [g, zeilen.filter(z => z.gemeinde === g).length]));
+    const je = Object.fromEntries(Object.keys(GEZAEHLT).map(g => [g, [ERSCHLOSSEN, OFFEN].map(o => zeilen.filter(z => z.gemeinde === g && z.ordner === o).length)]));
     expect(je).toEqual(GEZAEHLT);
-    expect(zeilen).toHaveLength(2895);
-    expect(new Set(zeilen.map(z => z.egrid)).size).toBe(2895);
+    expect(zeilen).toHaveLength(1059 + 249);
+    expect(new Set(zeilen.map(z => z.egrid)).size).toBe(zeilen.length);
   });
 
-  it('die zweite Lieferung ersetzt den Ordner ganz, in einem Zug', () => {
+  it('nur für Wohnen, und jede erschlossene mit Nachweis; die unbebauten ohne Nachweis im eigenen Ordner', () => {
+    for (const z of zeilen) {
+      expect(WOHNEN.has(z.zone), z.egrid).toBe(true);
+      if (z.ordner === ERSCHLOSSEN) expect(z.nachweis, z.egrid).toMatch(/^(erschlossen laut Kanton|Wohnhaus im Gebäuderegister)/);
+      else expect([z.bebaut, z.nachweis]).toEqual([false, 'unbebaut, Erschliessung bei der Gemeinde erfragen']);
+    }
+    // Ein Wohnhaus belegt die Erschliessung nur dort, wo der Kanton keinen Stand liefert; amtlich gibt es ihn in OW und UR.
+    expect(zeilen.filter(z => ['OW', 'UR'].includes(z.kanton) && z.ordner === ERSCHLOSSEN && z.nachweis.startsWith('erschlossen laut Kanton')).length).toBe(39 + 41);
+    expect(SQL).not.toMatch(/'nicht erschlossen'/);
+  });
+
+  it('die dritte Lieferung ersetzt beide Ordner ganz, in einem Zug', () => {
     expect(SQL).toMatch(/^begin;$/m);
-    expect(SQL).toMatch(/delete from public\.wunsch_parzelle where ordner_id = '6a1f0c3e/);
+    expect(SQL).toMatch(/delete from public\.wunsch_parzelle\s+where ordner_id in \('6a1f0c3e/);
     expect(SQL).toMatch(/^commit;$/m);
   });
 

@@ -9,6 +9,8 @@ export interface WunschOrdner { id: string; name: string; kriterium: string; que
 export interface WunschParzelle {
   egrid: string; kanton: string; bfs: number; gemeinde: string; nummer: string; flaeche: number;
   zone: string; bauzone_anteil: number; e: number; n: number; lat: number; lon: number;
+  /** Seit der dritten Lieferung: ob ein Gebäude steht, und womit die Erschliessung belegt ist. */
+  bebaut?: boolean | null; nachweis?: string | null;
 }
 
 /** Wo gewohnt werden darf: dort sucht Bauraum zuerst. */
@@ -39,8 +41,8 @@ const feld = (v: string | number) => {
 
 /** Für Excel mit Strichpunkt, wie die Lead-Listen. */
 export function wunschCsv(z: WunschParzelle[]): string {
-  const kopf = ['Kanton', 'Gemeinde', 'Parzelle', 'EGRID', 'Fläche m²', 'Zone', 'Anteil Bauzone', 'Ost', 'Nord', 'Karte'];
+  const kopf = ['Kanton', 'Gemeinde', 'Parzelle', 'EGRID', 'Fläche m²', 'Zone', 'Anteil Bauzone', 'Bebaut', 'Erschliessung', 'Ost', 'Nord', 'Karte'];
   return [kopf, ...z.map(p => [p.kanton, p.gemeinde, p.nummer, p.egrid, p.flaeche, ZONE_KURZ[p.zone] ?? p.zone,
-    `${Math.round(p.bauzone_anteil * 100)} %`, Math.round(p.e), Math.round(p.n), geoAdminLink(p)])]
+    `${Math.round(p.bauzone_anteil * 100)} %`, p.bebaut == null ? '' : p.bebaut ? 'ja' : 'nein', p.nachweis ?? '', Math.round(p.e), Math.round(p.n), geoAdminLink(p)])]
     .map(r => r.map(feld).join(';')).join('\r\n');
 }

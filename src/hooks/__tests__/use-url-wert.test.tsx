@@ -36,4 +36,22 @@ describe('Zustand in der Adresse', () => {
     act(() => api.viele({ neu: null, vorhaben: 'v3' }));
     expect(api.ort).toBe('/zentrale?reiter=aktiv&vorhaben=v3');
   });
+
+  // 19. November, Julian: «wenn ich Parzellen nach Wunsch filtere, passiert nichts». Ein Tipp setzte
+  // die Gemeinde und gleich danach die Zone zurück; der zweite Schritt schrieb die alte Adresse zurück.
+  it('zwei Werte im selben Tipp bleiben beide stehen', () => {
+    let f: { g: (v: string) => void; z: (v: string) => void; ort: string } = { g: () => {}, z: () => {}, ort: '' };
+    function Filter() {
+      const [, g] = useUrlWert('gemeinde', '');
+      const [, z] = useUrlWert('zone', '');
+      const l = useLocation();
+      f = { g, z, ort: l.pathname + l.search };
+      return null;
+    }
+    render(<MemoryRouter initialEntries={['/wunsch?kanton=LU&zone=wohnen']}><Filter /></MemoryRouter>);
+    act(() => { f.g('Kriens'); f.z(''); });
+    expect(f.ort).toBe('/wunsch?kanton=LU&gemeinde=Kriens');
+    act(() => { f.z('unbebaut'); });
+    expect(f.ort).toBe('/wunsch?kanton=LU&gemeinde=Kriens&zone=unbebaut');
+  });
 });
