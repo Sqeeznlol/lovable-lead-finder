@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { TIPPS } from '../check-tipps';
 import { readFileSync } from 'node:fs';
 import { BETREIBER_ADRESSE, MARKEN, markeFuerHost } from '@/lib/check-marken';
 import { FRAGEN, SCHRITTE } from '@/lib/check-inhalt';
@@ -30,6 +31,7 @@ describe('Wortlaut der Check-Seiten', () => {
     ...SCHRITTE.flat(), ...FRAGEN.flat(),
     HEIZUNG_TEXT.titel, HEIZUNG_TEXT.satz, HEIZUNG_TEXT.aufruf, ...HEIZUNG_TEXT.vorteile,
     ...ARTIKEL.flatMap(a => [a.titel, a.lead, a.kasten.titel, a.kasten.satz, a.kasten.knopf, ...a.abschnitte.flatMap(x => [x.titel, ...x.absaetze])]),
+    ...TIPPS.flatMap(t => [t.titel, t.text]),
   ];
   it('kein Grundstück und keine Parzelle, die etwas trägt, kann, erlaubt oder hergibt', () => {
     // Nur wo Grundstück oder Parzelle selbst handeln (Nominativ): «was die Zone auf Ihrem Land erlaubt» ist richtig.

@@ -29,6 +29,9 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - name: Typen
         run: npx tsc --noEmit -p tsconfig.app.json
+      # check-bericht.test.ts liest das erzeugte PDF wie ein Mensch, mit pdftotext.
+      - name: PDF-Leser
+        run: command -v pdftotext || sudo apt-get install -y -qq poppler-utils
       - name: Tests
         run: npx vitest run
       - name: Bau

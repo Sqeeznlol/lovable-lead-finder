@@ -23,7 +23,10 @@ import { Ladebild, type LadebildDaten } from '@/components/check/Ladebild';
 import { FENSTER } from '@/lib/fenster';
 import {
   aeltestes, ANTWORT_TEXT, stockText, type Einheit, linkFuer, ortAusLink, bauzeit, befundAmOrt, heizungText, GEBAEUDEART, leadAngaben, mailOk, nameOk, schweizerNummer, STATUS, vorschlaege,
-  type Antwort, type Befund, type Ort, vorschlagTeile } from '@/lib/check-daten';
+  type Antwort, type Befund, type Ort, vorschlagTeile, wohnadresseOk } from '@/lib/check-daten';
+import { berichtSpeichern, luftbildMitUmriss, type BerichtAbschnitt } from '@/lib/check-bericht';
+import { tippsFuer, TIPP_TITEL } from '@/lib/check-tipps';
+import { fotoDatei, fotoNachId } from '@/lib/check-fotos';
 
 /**
  * Die Check-Seiten für Eigentümer: ParzellenChecker, HausChecker, Was
@@ -49,7 +52,23 @@ const heuteSchon = (): number[] => {
 };
 
 
-type Feld = 'name' | 'email' | 'telefon';
+type Feld = 'name' | 'adresse' | 'telefon' | 'email';
+
+/**
+ * Die Angaben einzeln, eine je Bild, und immer in dasselbe Feld: so bleibt
+ * auf dem iPhone die Tastatur offen, und niemand muss suchen, wo es
+ * weitergeht. Julian, 19. November: «Name und Adresse muss man eingeben
+ * und die Nummer und vielleicht noch eine E-Mail-Adresse und erst dann am
+ * Schluss bekommt man ein PDF.» Die E-Mail ist darum freiwillig; die
+ * Datenbank verlangt E-Mail oder Telefon (anfrage, check), das Telefon
+ * ist hier Pflicht.
+ */
+const KONTAKT: { k: Feld; frage: string; titel: string; typ: string; auto: string; modus?: 'email' | 'tel' | 'text'; platzhalter?: string; zusatz?: string }[] = [
+  { k: 'name', frage: 'Wie heissen Sie?', titel: 'Vor- und Nachname', typ: 'text', auto: 'name', modus: 'text', platzhalter: 'Anna Muster' },
+  { k: 'adresse', frage: 'Wo wohnen Sie?', titel: 'Strasse, Nummer, PLZ und Ort', typ: 'text', auto: 'street-address', modus: 'text', platzhalter: 'Seestrasse 12, 8810 Horgen' },
+  { k: 'telefon', frage: 'Unter welcher Nummer erreichen wir Sie?', titel: 'Telefon', typ: 'tel', auto: 'tel', modus: 'tel', platzhalter: '079 412 58 36' },
+  { k: 'email', frage: 'Ihre E-Mail-Adresse', titel: 'E-Mail (freiwillig)', typ: 'email', auto: 'email', modus: 'email', zusatz: 'Freiwillig. Damit können wir Ihnen die ausführliche Analyse auch schriftlich senden.' },
+];
 
 export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?: 'heizung' | 'gemeinde' | 'gemeinden' }) {
   const { marke: markeId, ort: ortSlug } = useParams();
@@ -84,10 +103,14 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
   // 0 gesperrt, 1 Fragen, 2 Kontakt, 3 freigeschaltet
   const [schritt, setSchritt] = useState<0 | 1 | 2 | 3>(0);
   const [antwort, setAntwort] = useState<Antwort>({ eigentuemer: null, absicht: null, zeitraum: null });
-  const [kontakt, setKontakt] = useState<Record<Feld | 'website', string>>({ name: '', email: '', telefon: '', website: '' });
+  const [kontakt, setKontakt] = useState<Record<Feld | 'website', string>>({ name: '', adresse: '', email: '', telefon: '', website: '' });
   const [beruehrt, setBeruehrt] = useState<Set<Feld>>(new Set());
   // Fragen einzeln, eine nach der anderen: ein Tipp genügt (Julian: "kinderleicht").
   const [frage, setFrage] = useState(0);
+  // Welche der vier Angaben gerade gefragt ist (KONTAKT).
+  const [kschritt, setKschritt] = useState(0);
+  const kontaktFeld = useRef<HTMLInputElement>(null);
+  const [pdfLaeuft, setPdfLaeuft] = useState(false);
   const [sendet, setSendet] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
   const [luftbild, setLuftbild] = useState(true);
@@ -221,9 +244,6 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
       await navigator.clipboard.writeText(url); setGeteilt(true); window.setTimeout(() => setGeteilt(false), 2500);
     } catch { /* abgebrochen */ }
   };
-  // Der Bericht ist die Seite selbst, für den Druck aufgeräumt (check.css, @media print).
-  const bericht = () => { zaehlen(marke.id, domain, 'bericht'); window.print(); };
-
   const oeffnen = () => {
     if (!befund) { zurSuche(); return; }
     if (schritt === 0) { setSchritt(1); setFrage(0); geoeffnet.current = Date.now(); zaehlen(marke.id, domain, 'rechner'); }
@@ -232,31 +252,33 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
 
   const meldung: Record<Feld, string> = {
     name: nameOk(kontakt.name) ? '' : 'Bitte Vor- und Nachnamen angeben.',
-    email: mailOk(kontakt.email) ? '' : 'Bitte eine gültige E-Mail-Adresse.',
+    adresse: wohnadresseOk(kontakt.adresse) ? '' : 'Bitte Strasse, Hausnummer und Ort angeben.',
     telefon: schweizerNummer(kontakt.telefon) ? '' : 'Bitte eine Schweizer Nummer, z. B. 079 412 58 36.',
+    email: !kontakt.email.trim() || mailOk(kontakt.email) ? '' : 'Diese E-Mail-Adresse stimmt nicht. Korrigieren Sie sie oder lassen Sie das Feld leer.',
   };
   const bereit = Object.values(meldung).every(t => !t);
-  const feld = (k: Feld, titel: string, typ: string, auto: string, extra?: { inputMode?: 'email' | 'tel'; placeholder?: string }) => {
-    const zeigen = beruehrt.has(k) ? meldung[k] : '';
-    return (
-      <label className="feld">
-        <span>{titel}</span>
-        <input type={typ} autoComplete={auto} value={kontakt[k]} aria-invalid={!!zeigen} {...extra}
-               onChange={e => setKontakt(x => ({ ...x, [k]: e.target.value }))}
-               onBlur={() => {
-                 if (kontakt[k].trim()) setBeruehrt(b => new Set(b).add(k));
-                 // Die Nummer beim Verlassen einheitlich schreiben: +41 79 412 58 36
-                 if (k === 'telefon') { const t = schweizerNummer(kontakt.telefon); if (t) setKontakt(x => ({ ...x, telefon: t })); }
-               }} />
-        <em className="hinweis-feld">{zeigen}</em>
-      </label>
-    );
+  const angabe = KONTAKT[kschritt];
+
+  // Weiter zur nächsten Angabe. Der Fokus bleibt im selben Feld, noch im
+  // Tippen gesetzt: nur so lässt Safari auf dem iPhone die Tastatur offen.
+  const weiter = () => {
+    const k = angabe.k;
+    setBeruehrt(b => new Set(b).add(k));
+    // Die Nummer einheitlich schreiben: +41 79 412 58 36
+    if (k === 'telefon') { const t = schweizerNummer(kontakt.telefon); if (t) setKontakt(x => ({ ...x, telefon: t })); }
+    kontaktFeld.current?.focus({ preventScroll: true });
+    if (meldung[k]) return;
+    setKschritt(s => Math.min(KONTAKT.length - 1, s + 1));
+  };
+  const absenden = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (kschritt < KONTAKT.length - 1) weiter(); else void senden();
   };
 
-  const senden = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setBeruehrt(new Set<Feld>(['name', 'email', 'telefon']));
-    if (!bereit || !befund || sendet) return;
+  const senden = async () => {
+    setBeruehrt(new Set<Feld>(['name', 'adresse', 'telefon', 'email']));
+    if (!bereit) { const erste = KONTAKT.findIndex(f => meldung[f.k]); if (erste >= 0) setKschritt(erste); return; }
+    if (!befund || sendet) return;
     // Spamschutz: verstecktes Feld, nicht schneller als ein Mensch, höchstens drei Anfragen je Tag und Gerät.
     if (kontakt.website) return;
     // Zu schnell für einen Menschen: nicht still verwerfen, denn mit Autofill
@@ -270,11 +292,12 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
     if (wohnung) angaben.wohnung = { egid: wohnung.egid, stock: stockText(wohnung.stock), zimmer: wohnung.zimmer, flaeche: wohnung.flaeche, nr: wohnung.nr };
     if (document.referrer) angaben.referrer = document.referrer.slice(0, 200);
     if (ort) angaben.lv95 = [Math.round(ort.e), Math.round(ort.n)];
+    // Wo die Person wohnt; die Spalte adresse bleibt die Liegenschaft.
+    angaben.wohnadresse = kontakt.adresse.trim().replace(/\s+/g, ' ').slice(0, 200);
     // Ohne Rückgabe der Zeile: der öffentliche Schlüssel darf einfügen, nicht lesen.
-     
     const { error } = await (await datenbank()).from('anfrage').insert({
       art: 'potenzial', name: kontakt.name.trim().replace(/\s+/g, ' ').slice(0, 120),
-      email: kontakt.email.trim(), telefon: schweizerNummer(kontakt.telefon),
+      email: kontakt.email.trim() || null, telefon: schweizerNummer(kontakt.telefon),
       adresse: befund.adresse.slice(0, 200), egrid: befund.egrid, angaben, einwilligung: true,
     });
     setSendet(false);
@@ -282,7 +305,6 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
     try { localStorage.setItem(ZAEHLER, JSON.stringify([...heuteSchon(), Date.now()])); } catch { /* privates Fenster */ }
     setSchritt(3);
     zaehlen(marke.id, domain, 'lead');
-    setTimeout(() => rechnerRef.current?.scrollIntoView({ behavior: leise() ? 'auto' : 'smooth', block: 'start' }), 30);
   };
 
   // Ein Tipp wählt und führt weiter; die kurze Pause zeigt, was gewählt ist.
@@ -293,7 +315,7 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
           setAntwort(a => ({ ...a, [k]: w as Antwort[K] }));
           setTimeout(() => {
             if (frage < 2) setFrage(frage + 1);
-            else { setSchritt(2); zaehlen(marke.id, domain, 'kontakt'); }
+            else { setSchritt(2); setKschritt(0); zaehlen(marke.id, domain, 'kontakt'); }
           }, leise() ? 0 : 220);
         }}>{t}</button>
       ))}
@@ -371,12 +393,79 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
   const volumenHeute = best.length && best.every(h => h.volumen) ? best.reduce((s2, h) => s2 + (h.volumen ?? 0), 0) : null;
   useEffect(() => { if (azAusPlan != null) setAz(Math.min(2, Math.max(0.2, azAusPlan))); }, [azAusPlan]);
   const volumenMoeglich = bmzAusPlan != null && befund?.flaeche ? Math.round(bmzAusPlan * befund.flaeche) : null;
+  // Tipps eines Kantons erst, wenn die Parzelle gefunden ist.
+  const tipps = tippsFuer(marke.schwerpunkt, modus === 'heizung', befund?.kanton);
+  const ratgeberPfad = (slug: string) => (markeFuerHost(window.location.hostname) ? `/ratgeber/${slug}` : `/check/${marke.id}/ratgeber/${slug}`);
+  const quellenText = `Amtliche Vermessung, Bauzonen Schweiz (ARE), Gebäude- und Wohnungsregister (BFS), ÖREB-Kataster des Kantons, Kulturgüterinventar, Solarkataster und Wärmenetze (BFE), ÖV-Güteklassen (ARE), Radonkarte (BAG)${nachbarSatz ? ', Baugesuche aus den Amtsblättern und vom Kanton Zürich' : ''}${gemeindePreise ? `, Immobilienpreise: ${preise?.quellen[gemeindePreise.k] ?? ''}` : ''}`;
+
+  // Der Wegweiser: jeder Tipp führt weiter, und die Seite rollt selbst zum
+  // nächsten Schritt, sobald er nicht mehr oben im Bild steht (Julian,
+  // 19. November: «dass man da nicht selber scrollen muss»).
+  useEffect(() => {
+    if (schritt === 0) return;
+    const el = rechnerRef.current;
+    if (!el) return;
+    const t = window.setTimeout(() => {
+      const r = el.getBoundingClientRect();
+      if (r.top < 72 || r.top > window.innerHeight * 0.4) el.scrollIntoView({ behavior: leise() ? 'auto' : 'smooth', block: 'start' });
+    }, 40);
+    return () => window.clearTimeout(t);
+  }, [schritt, frage, kschritt]);
+
+  // Der Bericht enthält, was die Seite gezeigt hat, und die Rechnung nach dem Freischalten.
+  const pdfLaden = async () => {
+    if (!befund || pdfLaeuft) return;
+    setPdfLaeuft(true);
+    zaehlen(marke.id, domain, 'bericht');
+    try {
+      const bild = befund.teile.length ? await luftbildMitUmriss(befund.teile, marke.farbe).catch(() => null) : null;
+      const plus = (a: number, b: number) => (a - b > 0 ? `+ ${n(a - b)}` : 'keine');
+      const rechnung: BerichtAbschnitt = volumenMoeglich != null
+        ? { titel: 'Bauvolumen laut Zonenplan', satz: `Ihre Zone (${ziffern?.kuerzel ?? ziffern?.zone ?? ''}) begrenzt das Volumen über dem Boden mit der Baumassenziffer ${bmzAusPlan!.toLocaleString('de-CH')}.`,
+            zeilen: [{ titel: 'Möglich', wert: `${n(volumenMoeglich)} m³` }, { titel: 'Heute', wert: volumenHeute != null ? `${n(volumenHeute)} m³` : 'in Analyse' },
+              { titel: 'Baureserve', wert: volumenHeute != null ? (plus(volumenMoeglich, volumenHeute) === 'keine' ? 'keine' : `${plus(volumenMoeglich, volumenHeute)} m³`) : 'in Analyse' }] }
+        : { titel: 'Ausnützung durchgerechnet', satz: azAusPlan != null ? `Der Zonenplan des Kantons nennt für Ihre Zone die Ausnützungsziffer ${azAusPlan.toLocaleString('de-CH')}. Gerechnet mit ${az.toFixed(2)}.` : `Gerechnet mit der Ausnützungsziffer ${az.toFixed(2)}. Den gültigen Wert Ihrer Gemeinde prüfen wir in der Analyse.`,
+            zeilen: [{ titel: 'Möglich', wert: `${n(moeglich)} m²` }, { titel: 'Heute ca.', wert: `${n(heuteFl)} m²` },
+              { titel: 'Baureserve', wert: plus(moeglich, heuteFl) === 'keine' ? 'keine' : `${plus(moeglich, heuteFl)} m²` }] };
+      const haeuser = befund.haeuser.slice(0, 8).map(h => ({ titel: h.adresse ?? 'Gebäude',
+        wert: [h.status ? STATUS[h.status] : null, h.klasse ? GEBAEUDEART[h.klasse] : null, bauzeit(h) ? `${h.baujahr || !h.periode ? 'Baujahr' : 'Bauperiode'} ${bauzeit(h)}` : null,
+          h.geschosse ? `${h.geschosse} Geschosse` : null, h.wohnungen ? `${h.wohnungen} Wohnungen` : null, heizungText(h) ? `Heizung ${heizungText(h)}` : null].filter(Boolean).join(' · ') }));
+      await berichtSpeichern({
+        marke: marke.name.join(''), farbe: marke.farbe, domain, datum: new Date(),
+        adresse: befund.adresse, ort: [befund.gemeinde, befund.nummer ? `Parzelle ${befund.nummer}` : null, befund.kanton ? `Kanton ${befund.kanton}` : null].filter(Boolean).join(' · '),
+        egrid: befund.egrid, bild,
+        kennzahlen: [
+          { titel: 'Grundstücksfläche', wert: `${n(befund.flaeche)} m²`, zusatz: 'amtliche Vermessung' },
+          { titel: 'Bauzone', wert: zonenKuerzel(zoneText) ?? kurzZone(befund.zone), zusatz: zoneText ?? befund.zone ?? 'keine Bauzone erfasst' },
+          { titel: 'Überbaut', wert: anteil != null ? `${anteil} %` : '–', zusatz: grundfl ? `${n(grundfl)} m² Grundfläche` : 'kein Gebäude erfasst' },
+          { titel: 'Ältestes Gebäude', wert: aeltestesGebaeude ?? '–', zusatz: `${best.length} Gebäude laut Register` },
+        ],
+        rechnung,
+        abschnitte: [
+          { titel: 'Gebäude auf der Parzelle', zeilen: haeuser, satz: haeuser.length ? undefined : 'Auf dieser Parzelle ist kein Gebäude im Register eingetragen.' },
+          { titel: 'Ihre Heizung', zeilen: heizung },
+          { titel: 'Was für Ihre Parzelle gilt', zeilen },
+          { titel: 'In Ihrer Nachbarschaft', satz: nachbarSatz ?? undefined, zeilen: nachbar },
+          { titel: gemeindePreise ? `Preise in ${gemeindePreise.name}` : 'Preise', zeilen: preis },
+          { titel: 'Energie und Lage', zeilen: lage },
+        ],
+        tipps: tipps.map(t => ({ titel: t.titel, text: t.text, quellen: [...t.quellen, ...(t.ratgeber ? [{ name: 'Ratgeber', url: `${window.location.origin}${ratgeberPfad(t.ratgeber)}` }] : [])] })),
+        fuer: kontakt.name.trim().replace(/\s+/g, ' '),
+        betreiber: BETREIBER, betreiberAdresse: BETREIBER_ADRESSE,
+        quellen: `${quellenText}, abgefragt am ${new Date().toLocaleDateString('de-CH')}`,
+      });
+    } catch { setFehler('Der Bericht liess sich gerade nicht erstellen. Bitte tippen Sie nochmals.'); }
+    finally { setPdfLaeuft(false); }
+  };
   // Aufrufleiste auf dem Handy: nur, wenn gerade kein anderer Aufruf im Bild ist.
   const andererAufruf = useImBild('.pc .suche, .pc .aufruf, .pc .rechner, .pc .formular.offen, .pc .danke.sichtbar, .pc .schritte-aufruf', [befund, schritt, recht]);
   const leiste = recht || schritt !== 0 || andererAufruf ? null
     : befund ? { text: 'Baureserve kostenlos berechnen', tun: oeffnen }
     : { text: 'Grundstück kostenlos prüfen', tun: zurSuche };
 
+  const eigenesFoto = fotoNachId(marke.design.foto);
+  // Die Luftbild-Bühne ist ganz breit, die geteilte gut die Hälfte (check.css): danach wählt der Browser die Datei.
+  const fotoBreite = marke.design.buehne === 'luftbild' ? '100vw' : '(max-width: 999px) 100vw, 46vw';
   const wortmarke = <><span className="zeichen" aria-hidden="true"><i /></span><span>{marke.name[0]}<b>{marke.name[1]}</b></span></>;
 
   return (
@@ -384,7 +473,7 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
       <header className="kopf">
         <div className="huelle">
           <a className="wortmarke" href="#top" onClick={() => setRecht(null)}>{wortmarke}</a>
-          <nav aria-label="Seite"><a href="#ablauf" onClick={() => setRecht(null)}>So funktioniert's</a><a href="#fragen" onClick={() => setRecht(null)}>Häufige Fragen</a></nav>
+          <nav aria-label="Seite"><a href="#ablauf" onClick={() => setRecht(null)}>So funktioniert's</a>{tipps.length > 0 && <a href="#tipps" onClick={() => setRecht(null)}>Tipps</a>}<a href="#fragen" onClick={() => setRecht(null)}>Häufige Fragen</a></nav>
           <div className="rechts"><button type="button" className="knopf marke nur-gross" onClick={() => { setRecht(null); if (befund) oeffnen(); else zurSuche(); }}>Kostenlos prüfen</button></div>
         </div>
       </header>
@@ -401,7 +490,7 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
               </>
             : <>
                 <p>Verantwortlich für die Bearbeitung Ihrer Daten ist {BETREIBER}, {BETREIBER_ADRESSE.join(', ')}.</p>
-                <p>Wir speichern die Angaben, die Sie im Formular machen (Vorname, Name, E-Mail, Telefon, Adresse der Liegenschaft und Ihre Antworten), um Ihnen die Berechnung und Analyse zu erstellen und Sie zu Ihrer Liegenschaft zu kontaktieren. An Dritte geben wir sie nicht weiter.</p>
+                <p>Wir speichern die Angaben, die Sie im Formular machen (Vorname, Name, Ihre Adresse, Telefon, E-Mail, falls Sie sie angeben, Adresse der Liegenschaft und Ihre Antworten), um Ihnen die Berechnung, den Bericht und die Analyse zu erstellen und Sie zu Ihrer Liegenschaft zu kontaktieren. An Dritte geben wir sie nicht weiter. Den Bericht als PDF erstellt Ihr Browser selbst; er wird nicht bei uns gespeichert.</p>
                 {/* Wer was sieht, ist gemessen, nicht angenommen (18. November): im Browser
                     aufgerufen werden nur diese Seite, geo.admin.ch, Google Fonts und die
                     Datenbank; die Datenbank steht bei Amazon in Frankfurt (eu-central-1);
@@ -427,7 +516,15 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
       ) : (
       <main id="top">
         <section className="buehne">
-          {buehnenBild(marke) && <div className="foto" aria-hidden="true" />}
+          {eigenesFoto ? (
+            // Ein eigenes Foto steht als Bild mit Text auf der Seite, nicht als Hintergrund: so sehen es Google und Vorleseprogramme.
+            <picture className="foto eigenes">
+              <source type="image/avif" srcSet={`${fotoDatei(eigenesFoto, 800, 'avif')} 800w, ${fotoDatei(eigenesFoto, 1600, 'avif')} 1600w`} sizes={fotoBreite} />
+              <img src={fotoDatei(eigenesFoto, 1600, 'webp')} srcSet={`${fotoDatei(eigenesFoto, 800, 'webp')} 800w, ${fotoDatei(eigenesFoto, 1600, 'webp')} 1600w`}
+                   sizes={fotoBreite} alt={eigenesFoto.alt} title={eigenesFoto.titel} width={eigenesFoto.breite} height={eigenesFoto.hoehe}
+                   fetchPriority="high" decoding="async" />
+            </picture>
+          ) : buehnenBild(marke) && <div className="foto" aria-hidden="true" />}
           <svg className="kataster" viewBox={`0 0 ${KATASTER.breite} ${KATASTER.hoehe}`} preserveAspectRatio="xMidYMid slice" aria-hidden="true">
             <path className="linien" d={KATASTER.linien} /><path className="hervor" d={KATASTER.hervor} />
           </svg>
@@ -517,10 +614,10 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
                     : <div className="ueber">Ihre Parzelle</div>}
                   <h2>{befund?.adresse ?? ort.label}</h2>
                 </div>
+                {/* Den Bericht als PDF gibt es erst nach den Angaben, am Ende des Wegweisers. */}
                 {befund && bildFertig && (
                   <div className="ergebnis-aktionen">
                     <button type="button" className="knopf leise" onClick={() => void teilen()}>{geteilt ? 'Link kopiert' : 'Teilen'}</button>
-                    <button type="button" className="knopf leise" onClick={bericht}>Bericht als PDF</button>
                   </div>
                 )}
               </div>
@@ -537,18 +634,133 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
                   </div>
                 </div>
 
+                {/* Reihenfolge, wie ein Eigentümer liest (Julian, 19. November: «Call to Action
+                    ist weit unten»): die vier Zahlen, gleich darunter der nächste Schritt, dann
+                    alle Einzelheiten. Auf dem Handy steht die Karte zwischen Aufruf und
+                    Einzelheiten (check.css, .seitenteil). */}
                 <div className="seitenteil">
-                  <div className="tafel">
+                  <div className="tafel kurz">
                     {laden === 'laeuft' && <div className="laedt">Amtliche Daten werden abgefragt …</div>}
                     {laden === 'fehler' && <div className="laedt">Die amtlichen Dienste antworten gerade nicht. Bitte in einer Minute nochmals versuchen.</div>}
                     {befund && (
-                      <>
                         <div className="kacheln">
                           <div><small>Grundstücksfläche</small><b>{n(befund.flaeche)} <span>m²</span></b><em>laut amtlicher Vermessung</em></div>
                           <div><small>Bauzone</small><b>{zonenKuerzel(zoneText) ?? kurzZone(befund.zone)}</b><em>{zoneText ?? befund.zone ?? 'keine Bauzone erfasst'}</em></div>
                           <div><small>Überbaut</small><b>{anteil != null ? <>{anteil} <span>%</span></> : '–'}</b><em>{grundfl ? `${n(grundfl)} m² Gebäudegrundfläche` : 'kein Gebäude erfasst'}</em></div>
                           <div><small>Ältestes Gebäude</small><b>{aeltestesGebaeude ?? '–'}</b><em>{best.length} Gebäude laut Register</em></div>
                         </div>
+                    )}
+                  </div>
+
+                  {befund?.flaeche != null && (
+                    <div ref={rechnerRef} className={`tafel wegweiser ${schritt === 1 || schritt === 2 ? 'formular offen' : schritt === 3 ? 'rechner' : 'rechner schloss'}`}>
+                      {schritt === 0 && (
+                        <>
+                          <div className="schritt-zeile">Ihr nächster Schritt</div>
+                          <div className="zeile-oben"><h3>Baureserve berechnen und Bericht erhalten</h3><span className="wert">kostenlos</span></div>
+                          <div className="ergebnisse">
+                            <div><small>Möglich</small><b>•••</b></div>
+                            <div><small>Heute ca.</small><b>{n(heuteFl)} m²</b></div>
+                            <div className="plus"><small>Baureserve</small><b>•••</b></div>
+                          </div>
+                          <ul>{marke.vorteile.slice(0, 3).map(v => <li key={v}>{v}</li>)}</ul>
+                          <button type="button" className="knopf marke gross-knopf" onClick={oeffnen}>Jetzt berechnen</button>
+                          <p className="wegweiser-satz">Drei kurze Fragen und Ihre Angaben, dann erhalten Sie den Bericht als PDF. Die Seite führt Sie Schritt für Schritt.</p>
+                        </>
+                      )}
+
+                      {(schritt === 1 || schritt === 2) && (
+                        <form onSubmit={absenden} noValidate>
+                          <div className="schritt-zeile">{schritt === 1 ? 'Schritt 1 von 3 · Drei kurze Fragen' : 'Schritt 2 von 3 · Ihre Angaben'}</div>
+                          <div className="fortschritt" aria-hidden="true">{Array.from({ length: 3 + KONTAKT.length }, (_, i) => <i key={i} className={(schritt === 2 ? 3 + kschritt : frage) >= i ? 'an' : ''} />)}</div>
+                          {schritt === 1 ? (
+                            <>
+                              <div className="frage-nr">Frage {frage + 1} von 3</div>
+                              {frage === 0 && <><div className="frage">Sind Sie Eigentümer/in dieser Liegenschaft?</div>{wahl('eigentuemer', ANTWORT_TEXT.eigentuemer)}</>}
+                              {frage === 1 && <><div className="frage">Was haben Sie vor?</div>{wahl('absicht', modus === 'heizung' ? ABSICHT_HEIZUNG : ANTWORT_TEXT.absicht as Record<string, string>)}</>}
+                              {frage === 2 && <><div className="frage">Bis wann?</div>{wahl('zeitraum', ANTWORT_TEXT.zeitraum)}</>}
+                              <button type="button" className="zurueck" onClick={() => (frage > 0 ? setFrage(frage - 1) : setSchritt(0))}>Zurück</button>
+                            </>
+                          ) : (
+                            <>
+                              <div className="frage-nr">Angabe {kschritt + 1} von {KONTAKT.length}</div>
+                              {/* Immer dasselbe Feld, nur Frage und Art wechseln: so bleibt der Fokus und auf dem iPhone die Tastatur. */}
+                              <label className="feld feld-gross" htmlFor="pc-kontakt">
+                                <span className="frage">{angabe.frage}</span>
+                                {angabe.zusatz && <small className="feld-zusatz">{angabe.zusatz}</small>}
+                                <input id="pc-kontakt" ref={kontaktFeld} name={angabe.k} type={angabe.typ} autoComplete={angabe.auto} inputMode={angabe.modus}
+                                       placeholder={angabe.platzhalter} aria-label={angabe.titel} value={kontakt[angabe.k]}
+                                       aria-invalid={!!(beruehrt.has(angabe.k) && meldung[angabe.k])}
+                                       onChange={e => setKontakt(x => ({ ...x, [angabe.k]: e.target.value }))} />
+                                <em className="hinweis-feld" role="alert">{beruehrt.has(angabe.k) ? meldung[angabe.k] : ''}</em>
+                              </label>
+                              {angabe.k === 'adresse' && befund && !kontakt.adresse.trim() && (
+                                <button type="button" className="knopf leise hier-wohnen" onClick={() => { setKontakt(x => ({ ...x, adresse: befund.adresse })); kontaktFeld.current?.focus({ preventScroll: true }); }}>
+                                  Ich wohne hier: {befund.adresse}
+                                </button>
+                              )}
+                              <input className="falle" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true"
+                                     value={kontakt.website} onChange={e => setKontakt(k => ({ ...k, website: e.target.value }))} />
+                              {fehler && <p className="fehler">{fehler}</p>}
+                              {kschritt < KONTAKT.length - 1
+                                ? <button type="submit" className="knopf marke senden gross-knopf">Weiter</button>
+                                : <>
+                                    <button type="submit" className="knopf marke senden gross-knopf" disabled={sendet}>{sendet ? 'Wird gesendet …' : 'Bericht erstellen'}</button>
+                                    <p className="einwilligung">Mit dem Absenden sind Sie einverstanden, dass {BETREIBER} Ihre Angaben speichert und Sie zu dieser Liegenschaft kontaktiert, auch zu einem möglichen Verkauf oder einer Entwicklung. Widerruf jederzeit möglich.</p>
+                                  </>}
+                              <button type="button" className="zurueck" onClick={() => { setFehler(null); if (kschritt > 0) setKschritt(kschritt - 1); else { setSchritt(1); setFrage(2); } }}>Zurück</button>
+                              <div className="sicher">Verschlüsselt übertragen · keine Weitergabe an Dritte</div>
+                            </>
+                          )}
+                        </form>
+                      )}
+
+                      {schritt === 3 && (
+                        <>
+                          <div className="schritt-zeile">Schritt 3 von 3 · Ihr Bericht</div>
+                          <div className="freigeschaltet"><span>Danke, {kontakt.name.trim().split(/\s+/)[0]}. Ihr Bericht ist bereit. Die ausführliche Analyse folgt innert zwei Arbeitstagen.</span></div>
+                          <button type="button" className="knopf marke gross-knopf bericht-knopf" onClick={() => void pdfLaden()} disabled={pdfLaeuft}>
+                            {pdfLaeuft ? 'Bericht wird erstellt …' : 'Bericht als PDF herunterladen'}
+                          </button>
+                          <p className="wegweiser-satz">Die Datei öffnet sich auf Ihrem Gerät. Sie können sie sichern, drucken oder weiterleiten.</p>
+                          {fehler && <p className="fehler">{fehler}</p>}
+                          {volumenMoeglich != null ? (
+                            <>
+                              <div className="zeile-oben"><h3>Bauvolumen laut Zonenplan</h3><span className="wert">BMZ {bmzAusPlan!.toLocaleString('de-CH')}</span></div>
+                              <p className="klein" style={{ margin: '6px 0 0' }}>Ihre Zone ({ziffern?.kuerzel ?? ziffern?.zone}) begrenzt das Volumen über dem Boden mit der Baumassenziffer {bmzAusPlan!.toLocaleString('de-CH')}.</p>
+                              <div className="ergebnisse">
+                                <div><small>Möglich</small><b>{n(volumenMoeglich)} m³</b></div>
+                                <div><small>Heute</small><b>{volumenHeute != null ? `${n(volumenHeute)} m³` : '–'}</b></div>
+                                <div className="plus"><small>Baureserve</small><b>{volumenHeute != null ? (volumenMoeglich - volumenHeute > 0 ? `+ ${n(volumenMoeglich - volumenHeute)} m³` : 'keine') : 'in Analyse'}</b></div>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="zeile-oben"><h3>Ausnützung durchrechnen</h3><span className="wert">AZ {az.toFixed(2)}{azAusPlan != null && az === Math.min(2, Math.max(0.2, azAusPlan)) ? ' laut Zonenplan' : ''}</span></div>
+                              <p className="klein" style={{ margin: '6px 0 0' }}>{azAusPlan != null
+                                ? `Der Zonenplan des Kantons nennt für Ihre Zone (${ziffern?.kuerzel ?? ziffern?.zone}) die Ausnützungsziffer ${azAusPlan.toLocaleString('de-CH')}. Verschieben Sie den Regler, um andere Werte durchzurechnen.`
+                                : 'Stellen Sie die Ausnützungsziffer Ihrer Zone ein. Den gültigen Wert Ihrer Gemeinde prüfen wir in der Analyse.'}</p>
+                              <input type="range" min={0.2} max={2} step={0.05} value={az} aria-label="Ausnützungsziffer" onChange={e => setAz(Number(e.target.value))} />
+                              <div className="skala"><span>0.2</span><span>1.0</span><span>2.0</span></div>
+                              <div className="ergebnisse">
+                                <div><small>Möglich</small><b>{n(moeglich)} m²</b></div>
+                                <div><small>Heute ca.</small><b>{n(heuteFl)} m²</b></div>
+                                <div className="plus"><small>Baureserve</small><b>{moeglich - heuteFl > 0 ? `+ ${n(moeglich - heuteFl)} m²` : 'keine'}</b></div>
+                              </div>
+                            </>
+                          )}
+                          <div className="fein">{volumenMoeglich != null
+                            ? `Volumen: Baumassenziffer mal Grundstücksfläche (Zonenplan Kanton Zürich).${volumenHeute != null ? ' Heute: Gebäudevolumen laut Register.' : ' Das heutige Volumen führt das Register für dieses Gebäude nicht; wir messen es in der Analyse.'} Richtwert, keine Bewilligungszusage.`
+                            : 'Geschossfläche, vereinfacht: Ausnützung mal Grundstücksfläche; heute Grundfläche mal Geschosse laut Register. Richtwert, keine Bewilligungszusage.'}</div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {befund && (
+                  <div className="tafel einzelheiten">
+                    <div className="ueber">Alle Angaben zu Ihrer Parzelle</div>
+                    <>
                         <div className="block">
                           <h3>Gebäude auf der Parzelle</h3>
                           {befund.haeuser.length ? (
@@ -662,91 +874,11 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
                             </dl>
                           </div>
                         )}
-                        <div className="block klein">Quellen: Amtliche Vermessung, Bauzonen Schweiz (ARE), Gebäude- und Wohnungsregister (BFS), ÖREB-Kataster des Kantons, Kulturgüterinventar, Solarkataster und Wärmenetze (BFE), ÖV-Güteklassen (ARE), Radonkarte (BAG){nachbarSatz ? ', Baugesuche aus den Amtsblättern und vom Kanton Zürich' : ''}{gemeindePreise ? `, Immobilienpreise: ${preise?.quellen[gemeindePreise.k] ?? ''}` : ''}, abgefragt am {new Date().toLocaleDateString('de-CH')}. Vorprüfung, keine Bewilligungszusage.</div>
-                      </>
-                    )}
+                        <div className="block klein">Quellen: {quellenText}, abgefragt am {new Date().toLocaleDateString('de-CH')}. Vorprüfung, keine Bewilligungszusage.</div>
+                    </>
                   </div>
-
-                  {befund?.flaeche != null && (
-                    <div ref={rechnerRef} className={`tafel ${schritt === 1 || schritt === 2 ? 'formular offen' : schritt === 3 ? 'rechner' : 'rechner schloss'}`}>
-                      {schritt === 0 && (
-                        <>
-                          <div className="zeile-oben"><h3>Ausnützung &amp; Reserve berechnen</h3><span className="wert">kostenlos</span></div>
-                          <div className="ergebnisse">
-                            <div><small>Möglich</small><b>•••</b></div>
-                            <div><small>Heute ca.</small><b>{n(heuteFl)} m²</b></div>
-                            <div className="plus"><small>Reserve</small><b>•••</b></div>
-                          </div>
-                          <ul>{marke.vorteile.slice(0, 3).map(v => <li key={v}>{v}</li>)}</ul>
-                          <button type="button" className="knopf marke" onClick={oeffnen}>Berechnung freischalten</button>
-                        </>
-                      )}
-
-                      {(schritt === 1 || schritt === 2) && (
-                        <form onSubmit={senden} noValidate>
-                          <div className="fortschritt" aria-hidden="true">{[0, 1, 2, 3].map(i => <i key={i} className={(schritt === 2 ? 3 : frage) >= i ? 'an' : ''} />)}</div>
-                          {schritt === 1 ? (
-                            <>
-                              <div className="frage-nr">Frage {frage + 1} von 3</div>
-                              {frage === 0 && <><div className="frage">Sind Sie Eigentümer/in dieser Liegenschaft?</div>{wahl('eigentuemer', ANTWORT_TEXT.eigentuemer)}</>}
-                              {frage === 1 && <><div className="frage">Was haben Sie vor?</div>{wahl('absicht', modus === 'heizung' ? ABSICHT_HEIZUNG : ANTWORT_TEXT.absicht as Record<string, string>)}</>}
-                              {frage === 2 && <><div className="frage">Bis wann?</div>{wahl('zeitraum', ANTWORT_TEXT.zeitraum)}</>}
-                              <button type="button" className="zurueck" onClick={() => (frage > 0 ? setFrage(frage - 1) : setSchritt(0))}>Zurück</button>
-                            </>
-                          ) : (
-                            <>
-                              <div className="frage">Fast geschafft: Wem dürfen wir die Analyse schicken?</div>
-                              <p className="klein" style={{ margin: 0 }}>Die Berechnung erscheint sofort hier. Die ausführliche Analyse senden wir Ihnen persönlich.</p>
-                              {feld('name', 'Vor- und Nachname', 'text', 'name')}
-                              {feld('telefon', 'Telefon', 'tel', 'tel', { inputMode: 'tel', placeholder: '079 412 58 36' })}
-                              {feld('email', 'E-Mail', 'email', 'email', { inputMode: 'email' })}
-                              <input className="falle" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true"
-                                     value={kontakt.website} onChange={e => setKontakt(k => ({ ...k, website: e.target.value }))} />
-                              {fehler && <p className="fehler">{fehler}</p>}
-                              <button type="submit" className="knopf marke senden" disabled={sendet}>{sendet ? 'Wird gesendet …' : 'Berechnung jetzt anzeigen'}</button>
-                              <p className="einwilligung">Mit dem Absenden sind Sie einverstanden, dass {BETREIBER} Ihre Angaben speichert und Sie zu dieser Liegenschaft kontaktiert, auch zu einem möglichen Verkauf oder einer Entwicklung. Widerruf jederzeit möglich.</p>
-                              <button type="button" className="zurueck" onClick={() => { setSchritt(1); setFrage(2); }}>Zurück</button>
-                              <div className="sicher">Verschlüsselt übertragen · keine Weitergabe an Dritte</div>
-                            </>
-                          )}
-                        </form>
-                      )}
-
-                      {schritt === 3 && (
-                        <>
-                          <div className="freigeschaltet"><span>Freigeschaltet. Danke, {kontakt.name.trim().split(/\s+/)[0]}: Ihre ausführliche Analyse folgt innert zwei Arbeitstagen.</span></div>
-                          {volumenMoeglich != null ? (
-                            <>
-                              <div className="zeile-oben"><h3>Bauvolumen laut Zonenplan</h3><span className="wert">BMZ {bmzAusPlan!.toLocaleString('de-CH')}</span></div>
-                              <p className="klein" style={{ margin: '6px 0 0' }}>Ihre Zone ({ziffern?.kuerzel ?? ziffern?.zone}) begrenzt das Volumen über dem Boden mit der Baumassenziffer {bmzAusPlan!.toLocaleString('de-CH')}.</p>
-                              <div className="ergebnisse">
-                                <div><small>Möglich</small><b>{n(volumenMoeglich)} m³</b></div>
-                                <div><small>Heute</small><b>{volumenHeute != null ? `${n(volumenHeute)} m³` : '–'}</b></div>
-                                <div className="plus"><small>Reserve</small><b>{volumenHeute != null ? (volumenMoeglich - volumenHeute > 0 ? `+ ${n(volumenMoeglich - volumenHeute)} m³` : 'keine') : 'in Analyse'}</b></div>
-                              </div>
-                            </>
-                          ) : (
-                            <>
-                              <div className="zeile-oben"><h3>Ausnützung durchrechnen</h3><span className="wert">AZ {az.toFixed(2)}{azAusPlan != null && az === Math.min(2, Math.max(0.2, azAusPlan)) ? ' laut Zonenplan' : ''}</span></div>
-                              <p className="klein" style={{ margin: '6px 0 0' }}>{azAusPlan != null
-                                ? `Der Zonenplan des Kantons nennt für Ihre Zone (${ziffern?.kuerzel ?? ziffern?.zone}) die Ausnützungsziffer ${azAusPlan.toLocaleString('de-CH')}. Verschieben Sie den Regler, um andere Werte durchzurechnen.`
-                                : 'Stellen Sie die Ausnützungsziffer Ihrer Zone ein. Den gültigen Wert Ihrer Gemeinde prüfen wir in der Analyse.'}</p>
-                              <input type="range" min={0.2} max={2} step={0.05} value={az} aria-label="Ausnützungsziffer" onChange={e => setAz(Number(e.target.value))} />
-                              <div className="skala"><span>0.2</span><span>1.0</span><span>2.0</span></div>
-                              <div className="ergebnisse">
-                                <div><small>Möglich</small><b>{n(moeglich)} m²</b></div>
-                                <div><small>Heute ca.</small><b>{n(heuteFl)} m²</b></div>
-                                <div className="plus"><small>Reserve</small><b>{moeglich - heuteFl > 0 ? `+ ${n(moeglich - heuteFl)} m²` : 'keine'}</b></div>
-                              </div>
-                            </>
-                          )}
-                          <div className="fein">{volumenMoeglich != null
-                            ? `Volumen: Baumassenziffer mal Grundstücksfläche (Zonenplan Kanton Zürich).${volumenHeute != null ? ' Heute: Gebäudevolumen laut Register.' : ' Das heutige Volumen führt das Register für dieses Gebäude nicht; wir messen es in der Analyse.'} Richtwert, keine Bewilligungszusage.`
-                            : 'Geschossfläche, vereinfacht: Ausnützung mal Grundstücksfläche; heute Grundfläche mal Geschosse laut Register. Richtwert, keine Bewilligungszusage.'}</div>
-                        </>
-                      )}
-                    </div>
                   )}
+
                 </div>
               </div>
               )}
@@ -769,6 +901,27 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
             </div>
           </div>
         </section>
+
+        {tipps.length > 0 && (
+          <section className="abschnitt-gross tipps" id="tipps">
+            <div className="huelle">
+              <div className="ueber">Tipps und Tricks</div>
+              <h2 className="titel">{TIPP_TITEL}</h2>
+              <div className="tipps-liste">
+                {tipps.map(t => (
+                  <details key={t.titel}>
+                    <summary>{t.titel}</summary>
+                    <p>{t.text}</p>
+                    <ul className="tipp-quellen">
+                      {t.quellen.map(q => <li key={q.url}><a className="tipp-quelle" href={q.url} target={FENSTER.extern}>Nachlesen: {q.name}</a></li>)}
+                      {t.ratgeber && <li><a className="tipp-quelle" href={ratgeberPfad(t.ratgeber)}>Mehr dazu im Ratgeber</a></li>}
+                    </ul>
+                  </details>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
 
         <section className="abschnitt-gross fragen" id="fragen">
           <div className="huelle">

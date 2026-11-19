@@ -281,3 +281,13 @@ export function schweizerNummer(roh: string | null | undefined): string | null {
 const WEGWERF = ['mailinator.com', 'yopmail.com', 'trashmail.com', 'guerrillamail.com', '10minutemail.com', 'tempmail.com', 'wegwerfemail.de'];
 export const mailOk = (m: string) => /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(m.trim()) && !WEGWERF.includes(m.trim().split('@')[1].toLowerCase());
 export const nameOk = (t: string) => /^\p{L}[\p{L}' .-]{1,59}$/u.test(t.trim());
+/**
+ * Wohnadresse der Person, nicht der Liegenschaft: Eigentümer wohnen oft
+ * anderswo (Erbe, Ferienhaus, vermietet). Verlangt wird nur, was einen
+ * Brief ankommen lässt: Buchstaben für die Strasse oder den Ort und
+ * Ziffern für Hausnummer oder Postleitzahl.
+ */
+export const wohnadresseOk = (t: string) => {
+  const s = t.trim();
+  return s.length >= 6 && s.length <= 200 && /\p{L}{2,}/u.test(s) && /\d/.test(s);
+};

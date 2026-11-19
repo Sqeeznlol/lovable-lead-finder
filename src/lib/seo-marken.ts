@@ -11,6 +11,8 @@
 // nackte Adresse dorthin weiter (am 15. November gemessen, 308).
 import { BETREIBER, GEKAUFT, MARKEN, type Marke } from './check-marken';
 import { DATENQUELLEN, FRAGEN, SCHRITTE } from './check-inhalt';
+import { TIPP_TITEL, tippsFuer } from './check-tipps';
+import { bildObjekt, fotoDatei, fotoNachId, fotoTeilen, TEILEN_BREITE, TEILEN_HOEHE } from './check-fotos';
 import { buehnenBild, schriftAdresse } from './check-gestaltung';
 import { ARTIKEL, type Artikel } from './ratgeber';
 import { HEIZUNG_TEXT } from './heizung-text';
@@ -55,11 +57,16 @@ export function strukturiert(m: Marke, url: string, a?: Artikel, ausfuehrlich = 
   const herausgeber = { '@type': 'Organization', name: BETREIBER };
   if (a) return { '@context': 'https://schema.org', '@type': 'Article', headline: a.titel, description: a.lead, inLanguage: 'de-CH',
     url, mainEntityOfPage: url, author: herausgeber, publisher: herausgeber, ...(isoDatum(a.stand) ? { datePublished: isoDatum(a.stand), dateModified: isoDatum(a.stand) } : {}) };
+  // Ein eigenes Foto der Bühne mit Urheber, Rechten und Ort (check-fotos.ts).
+  const foto = fotoNachId(m.design.foto);
+  const bild = foto ? bildObjekt(foto, hauptadresse(m), `${hauptadresse(m)}/#impressum`) : null;
   const seite = { '@type': 'WebPage', '@id': url, url, name: titel(m), description: beschreibung(m), inLanguage: 'de-CH',
-    isPartOf: { '@type': 'WebSite', name: m.name.join(''), url: `${hauptadresse(m)}/`, publisher: herausgeber } };
+    isPartOf: { '@type': 'WebSite', name: m.name.join(''), url: `${hauptadresse(m)}/`, publisher: herausgeber },
+    ...(bild ? { primaryImageOfPage: { '@id': bild['@id'] } } : {}) };
+  const graph: object[] = [seite, ...(bild ? [bild] : [])];
   return { '@context': 'https://schema.org', '@graph': ausfuehrlich
-    ? [seite, { '@type': 'FAQPage', '@id': `${url}#fragen`, mainEntity: FRAGEN.map(([f, x]) => ({ '@type': 'Question', name: f, acceptedAnswer: { '@type': 'Answer', text: x } })) }]
-    : [seite] };
+    ? [...graph, { '@type': 'FAQPage', '@id': `${url}#fragen`, mainEntity: FRAGEN.map(([f, x]) => ({ '@type': 'Question', name: f, acceptedAnswer: { '@type': 'Answer', text: x } })) }]
+    : graph };
 }
 
 /**
@@ -71,6 +78,7 @@ export function markenSeite(indexHtml: string, m: Marke, a?: Artikel, pfad?: str
   // Ratgeber und Heizungs-Check sind auf allen Domains gleich: eine Hauptfassung für Google.
   const url = a ? `${RATGEBER_HEIMAT}/ratgeber/${a.slug}` : pfad ? `${opt.basis ?? RATGEBER_HEIMAT}${pfad}` : `${hauptadresse(m)}/`;
   const t = esc(titel(m, a)), d = esc(beschreibung(m, a));
+  const foto = a ? null : fotoNachId(m.design.foto);
   const kopf = [
     `<title>${t}</title>`,
     `<meta name="description" content="${d}" />`,
@@ -83,10 +91,22 @@ export function markenSeite(indexHtml: string, m: Marke, a?: Artikel, pfad?: str
     `<meta property="og:locale" content="de_CH" />`,
     `<meta name="twitter:title" content="${t}" />`,
     `<meta name="twitter:description" content="${d}" />`,
+    // Vorschaubild beim Teilen: nur ein eigenes Foto, 1200 x 630 als JPEG (das lesen alle Dienste);
+    // twitter:card summary_large_image steht schon in index.html.
+    ...(foto ? [
+      `<meta property="og:image" content="${hauptadresse(m)}${fotoTeilen(foto)}" />`,
+      `<meta property="og:image:width" content="${TEILEN_BREITE}" />`,
+      `<meta property="og:image:height" content="${TEILEN_HOEHE}" />`,
+      `<meta property="og:image:alt" content="${esc(foto.alt)}" />`,
+    ] : []),
     ldSkript(strukturiert(m, url, a, opt.ausfuehrlich)),
     // Tempo (Lighthouse Handy, 15. November): Schrift der Marke ohne Warten auf JavaScript und
     // ohne das Zeichnen aufzuhalten; das Bühnenbild als grösstes Element mit Vorrang.
     `<link rel="stylesheet" href="${esc(schriftAdresse(m))}" media="print" onload="this.media='all'" />`,
+    ...(!a && foto ? [
+      `<link rel="preload" as="image" href="${fotoDatei(foto, 800, 'webp')}" type="image/webp" media="(max-width: 999px)" fetchpriority="high" />`,
+      `<link rel="preload" as="image" href="${fotoDatei(foto, 1600, 'webp')}" type="image/webp" media="(min-width: 1000px)" fetchpriority="high" />`,
+    ] : []),
     ...(!a && buehnenBild(m) ? [
       `<link rel="preload" as="image" href="${buehnenBild(m, 800)}" type="image/webp" media="(max-width: 999px)" fetchpriority="high" />`,
       `<link rel="preload" as="image" href="${buehnenBild(m)}" type="image/webp" media="(min-width: 1000px)" fetchpriority="high" />`,
@@ -96,7 +116,7 @@ export function markenSeite(indexHtml: string, m: Marke, a?: Artikel, pfad?: str
   const stil = 'style="font-family:system-ui,sans-serif;max-width:40rem;margin:3rem auto;padding:0 1rem;line-height:1.5;color:#222"';
   const grund = a
     ? `<main ${stil}><p>${esc(a.rubrik)}</p><h1>${esc(a.titel)}</h1><p>${esc(a.lead)}</p>${a.abschnitte.map(x => `<h2>${esc(x.titel)}</h2>${x.absaetze.map(p => `<p>${esc(p)}</p>`).join('')}`).join('')}</main>`
-    : `<main ${stil}><p>${esc(m.etikett)}</p><h1>${esc(m.titel)}</h1><p>${esc(m.satz)}</p><ul>${m.vorteile.map(v => `<li>${esc(v)}</li>`).join('')}</ul>${opt.links ? `<ul>${opt.links.map(l => `<li><a href="${esc(l.href)}">${esc(l.text)}</a></li>`).join('')}</ul>` : ''}<p>${esc(m.aufruf)}</p>${opt.ausfuehrlich ? ausfuehrlicherText() : ''}<h2>Ratgeber</h2><ul>${ARTIKEL.map(x => `<li><a href="/ratgeber/${x.slug}">${esc(x.titel)}</a></li>`).join('')}</ul></main>`;
+    : `<main ${stil}><p>${esc(m.etikett)}</p><h1>${esc(m.titel)}</h1><p>${esc(m.satz)}</p><ul>${m.vorteile.map(v => `<li>${esc(v)}</li>`).join('')}</ul>${opt.links ? `<ul>${opt.links.map(l => `<li><a href="${esc(l.href)}">${esc(l.text)}</a></li>`).join('')}</ul>` : ''}<p>${esc(m.aufruf)}</p>${opt.ausfuehrlich ? ausfuehrlicherText(m) : ''}<h2>Ratgeber</h2><ul>${ARTIKEL.map(x => `<li><a href="/ratgeber/${x.slug}">${esc(x.titel)}</a></li>`).join('')}</ul></main>`;
   return indexHtml
     // Alles, was index.html über die interne App sagt, fällt weg.
     .replace(/<title>[\s\S]*?<\/title>/, '')
@@ -110,9 +130,11 @@ export function markenSeite(indexHtml: string, m: Marke, a?: Artikel, pfad?: str
 }
 
 /** Ablauf, Datenquellen und Fragen der Startseite, wie sie React später zeigt. */
-function ausfuehrlicherText(): string {
+function ausfuehrlicherText(m: Marke): string {
   return `<h2>So funktioniert's</h2><ol>${SCHRITTE.map(([t, p]) => `<li><strong>${esc(t)}</strong>: ${esc(p)}</li>`).join('')}</ol>`
     + `<h2>Daten aus</h2><ul>${DATENQUELLEN.map(q => `<li>${esc(q)}</li>`).join('')}</ul>`
+    // Die Tipps, die überall gelten; die kantonalen zeigt die Seite erst zur Parzelle.
+    + `<h2>${esc(TIPP_TITEL)}</h2>${tippsFuer(m.schwerpunkt).map(t => `<h3>${esc(t.titel)}</h3><p>${esc(t.text)}</p>${t.quellen.map(q => `<p><a href="${esc(q.url)}">${esc(q.name)}</a></p>`).join('')}`).join('')}`
     + `<h2>Was Eigentümer uns fragen</h2>${FRAGEN.map(([f, x]) => `<h3>${esc(f)}</h3><p>${esc(x)}</p>`).join('')}`;
 }
 

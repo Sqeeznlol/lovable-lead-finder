@@ -38,6 +38,8 @@ export function buehnenBildQuelle(m: Marke): string | null {
  * 15. November: 7.4 s bis es stand). Handy 800 px, Computer 1600 px.
  */
 export function buehnenBild(m: Marke, breite: 800 | 1600 = 1600): string | null {
+  // Ein eigenes Foto ersetzt das Luftbild (check-fotos.ts); es steht als <img> auf der Seite.
+  if (m.design.foto) return null;
   return buehnenBildQuelle(m) ? `/buehne/${m.id}-${breite}.webp` : null;
 }
 

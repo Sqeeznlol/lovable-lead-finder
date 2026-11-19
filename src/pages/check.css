@@ -362,3 +362,78 @@
 .pc .nachbar-satz{margin:0 0 12px; font-weight:500; line-height:1.45;}
 /* Auf dem Handy das kleine Luftbild (80 statt 250 KB, tools/buehnenbilder.py). */
 @media (max-width: 999px){.pc[data-buehne="luftbild"] .buehne, .pc[data-buehne="geteilt"] .foto{background-image: var(--luftbild-klein, var(--luftbild));}}
+
+/* =====================================================================
+   Wegweiser (19. November). Julian: «ältere Leute verwenden diese
+   Webseite», «dass man da nicht selber scrollen muss». Grössere Schrift
+   und Knöpfe für alle Marken, nicht nur für «Haus zu gross»; der nächste
+   Schritt steht gleich unter den vier Zahlen, und jeder Tipp führt weiter
+   (Check.tsx rollt selbst zum Schritt).
+   ===================================================================== */
+.pc{font-size: 17px;}
+.pc .knopf{min-height: 50px; font-size: 17px;}
+.pc .wahl button{min-height: 56px; font-size: 18px; padding: 14px 18px;}
+.pc .feld span{font-size: 16px;}
+.pc .feld input{height: 56px; font-size: 18px;}
+.pc .formular .frage{font-size: 22px; line-height: 1.3;}
+.pc .frage-nr{font-size: 15px;}
+[data-gross]{font-size: 19px;}
+
+.pc .wegweiser{scroll-margin-top: 88px; border: 2px solid var(--marke) !important;}
+.pc .schritt-zeile{font-size: 14px; font-weight: 700; letter-spacing: .02em; color: var(--marke); text-transform: uppercase; margin-bottom: 10px;}
+.pc .gross-knopf{width: 100%; min-height: 58px; font-size: 19px; margin-top: 16px;}
+.pc .wegweiser-satz{margin: 12px 0 0; color: var(--grau); font-size: 16px; line-height: 1.5;}
+.pc .rechner.schloss .ergebnisse .plus small{white-space: nowrap;}
+
+.pc .feld-gross{margin-top: 6px;}
+.pc .feld-gross .frage{display: block; color: var(--tinte); font-size: 22px; font-weight: 600; margin: 0 0 8px;}
+.pc .feld-gross input{height: 60px; font-size: 20px;}
+.pc .feld-zusatz{display: block; color: var(--grau); font-size: 16px; margin: 0 0 10px; line-height: 1.45;}
+.pc .feld-gross .hinweis-feld{display: block; min-height: 22px; margin-top: 6px; font-size: 16px; font-style: normal; color: #B4321E;}
+.pc .hier-wohnen{width: 100%; min-height: 56px; margin-top: 10px; justify-content: flex-start; text-align: left; white-space: normal; line-height: 1.35; padding: 12px 16px;}
+.pc .formular .zurueck{min-height: 48px; font-size: 16px;}
+.pc .bericht-knopf{margin-top: 18px;}
+
+.pc .seitenteil > .tafel.kurz:empty{display: none;}
+.pc .einzelheiten{padding-top: 18px;}
+.pc .einzelheiten > .ueber{padding: 0 22px; margin-bottom: 4px;}
+
+/* Handy: zuerst die Zahlen und der Aufruf, dann die Karte, dann alles Weitere. */
+@media (max-width: 999px){
+  .pc .raster{display: flex; flex-direction: column; gap: 16px;}
+  .pc .seitenteil{display: contents;}
+  .pc .seitenteil > *{margin-top: 0 !important;}
+  .pc .seitenteil > .kurz{order: 1;}
+  .pc .seitenteil > .wegweiser{order: 2;}
+  .pc .raster > .karte-tafel{order: 3; height: 300px;}
+  .pc .seitenteil > .einzelheiten{order: 4;}
+}
+
+/* Tipps und Tricks: wie die Fragen, grosse Tippflächen. */
+.pc .tipps{background: var(--papier);}
+.pc .tipps-liste{margin-top: 32px; border-top: 1px solid var(--linie); max-width: 860px;}
+.pc .tipps details{border-bottom: 1px solid var(--linie);}
+.pc .tipps summary{list-style: none; cursor: pointer; padding: 20px 40px 20px 0; min-height: 56px; font-size: 19px; font-weight: 600; position: relative; line-height: 1.35;}
+.pc .tipps summary::-webkit-details-marker{display: none;}
+.pc .tipps summary::after{content: ""; position: absolute; right: 6px; top: 26px; width: 10px; height: 10px; border-right: 2px solid var(--grau); border-bottom: 2px solid var(--grau); transform: rotate(45deg); transition: transform .2s;}
+.pc .tipps details[open] summary::after{transform: rotate(-135deg); top: 30px;}
+.pc .tipps details p{margin: 0 0 10px; max-width: 70ch; line-height: 1.6;}
+.pc .tipp-quelle{display: inline-flex; align-items: center; min-height: 44px; margin-bottom: 14px; color: var(--marke); font-weight: 600; text-underline-offset: 3px;}
+@media print{.pc .tipps details{break-inside: avoid;} .pc .tipps details > *{display: block !important;}}
+.pc .wegweiser .wegweiser-satz + .zeile-oben, .pc .wegweiser .fehler + .zeile-oben{margin-top: 26px; padding-top: 22px; border-top: 1px solid var(--linie);}
+.pc .tipp-quellen{list-style: none; margin: 0 0 8px; padding: 0;}
+.pc .tipp-quellen .tipp-quelle{margin-bottom: 0;}
+/* Handy: Kopf und Kacheln knapper, damit der nächste Schritt gleich ins Bild kommt. */
+@media (max-width: 999px){
+  .pc .ergebnis{padding-top: 20px;}
+  .pc .ergebnis-kopf{margin-bottom: 14px; align-items: center;}
+  .pc .ergebnis-aktionen .knopf{min-height: 44px; padding: 0 16px;}
+  .pc .kacheln > div{padding: 14px 16px;}
+  .pc .kacheln b{font-size: 26px;}
+  .pc .kacheln em{font-size: 13px;}
+}
+/* Eigenes Foto statt Luftbild (check-fotos.ts): dieselbe Fläche, als Bild mit Alt-Text. */
+.pc .buehne picture.eigenes{display: block; overflow: hidden;}
+.pc .buehne picture.eigenes img{display: block; width: 100%; height: 100%; object-fit: cover;}
+.pc[data-buehne="luftbild"] .buehne picture.eigenes{position: absolute; inset: 0; z-index: 0;}
+.pc[data-buehne="luftbild"] .buehne:has(picture.eigenes){background: #11181B;}

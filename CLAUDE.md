@@ -87,6 +87,23 @@ Handy-Fassung. Gebaut wird mit `<Seite>` aus `src/components/rahmen.tsx`.
     Editor; der Werbeplan (`werbeplan.py`) nennt dieselben Zahlen. Neue
     Anzeigentexte versprechen nur, was die Seite hält (nie «ohne
     Anmeldung»: Ausnützung und Reserve gibt es gegen Kontaktangaben).
+  * Ältere Eigentümer lesen mit (19. November: «ältere Leute verwenden
+    diese Webseite», «Call to Action ist weit unten», «dass man da nicht
+    selber scrollen muss»). Nach der Adresse stehen die vier Zahlen und
+    gleich darunter der nächste Schritt, erst danach die Einzelheiten; auf
+    dem Handy liegt die Karte dazwischen. Jeder Tipp führt weiter, und die
+    Seite rollt selbst zum Schritt (Wegweiser). Schrift ab 17px,
+    Hauptknöpfe 58px.
+  * Angaben einzeln, immer im selben Feld: Name, Wohnadresse, Telefon,
+    E-Mail freiwillig. Erst danach der Bericht als echtes PDF
+    (`check-bericht.ts`, mit Luftbild und Umriss), nie vorher und nicht
+    mehr als Druck der Seite. `check-wegweiser.test.ts` wacht darüber.
+  * Tipps und Tricks (`check-tipps.ts`) nur mit Quelle, auf der
+    amtlichen Seite nachgelesen. Was kantonal verschieden ist, trägt den
+    Kanton und erscheint erst zur Parzelle dort.
+  * Eigene Fotos nur über `check-fotos.json` und
+    `tools/fotos_vorbereiten.py` (docs/fotos.md): Alt-Text, Urheber,
+    Rechte, Ort in Seite und Datei, Kameradaten und GPS entfernt.
   * Herkunft eines Leads (utm_*, gclid) wird beim Start gemerkt
     (`werbe-herkunft.ts`), weil die Check-Seite ihren Link beim Wählen
     einer Adresse umschreibt. Der Google-Tag lädt gleich nach

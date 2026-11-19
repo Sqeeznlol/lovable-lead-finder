@@ -64,6 +64,11 @@ export interface Gestaltung {
   papier?: string;
   /** LV95 (Ost, Nord) des Luftbilds für "luftbild" und "geteilt". */
   ort?: [number, number];
+  /**
+   * Eigenes Foto statt Luftbild, als id aus check-fotos.json; gilt für die
+   * Bühnen "luftbild" und "geteilt". Siehe docs/fotos.md.
+   */
+  foto?: string;
 }
 
 export interface Marke {
