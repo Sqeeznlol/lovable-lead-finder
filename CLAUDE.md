@@ -122,6 +122,14 @@ Handy-Fassung. Gebaut wird mit `<Seite>` aus `src/components/rahmen.tsx`.
     Angebot»). Nach dem Kaufangebot fragt die Seite nur, wer verkaufen oder
     den Wert kennen will; ein Ja macht den Lead heiss. Für das Kaufangebot
     nennt die Seite keine Frist. `check-fundstelle.test.ts` wacht darüber.
+  * «Wo der Check hingehört» (19. November, nach dem Vergleich mit
+    eigenheimkompass.ch): Online-Bewertung, unser Check, Makler, ehrlich
+    auch mit dem, was der Check nicht kann (kein Blick vor Ort). Über die
+    anderen keine Beträge oder Prozente, die wir nicht belegen können.
+    Dazu die Fragen «Warum ist der Check kostenlos?» und «Ersetzt der Check
+    eine Bauanfrage?». Kosten je Bauteil zeigt die Seite nicht: frei
+    belegbar ist nur, was einzelne Teile halten (paritätische
+    Lebensdauertabelle, ganz nur gedruckt), nicht, was sie kosten.
   * Herkunft eines Leads (utm_*, gclid) wird beim Start gemerkt
     (`werbe-herkunft.ts`), weil die Check-Seite ihren Link beim Wählen
     einer Adresse umschreibt. Der Google-Tag lädt gleich nach

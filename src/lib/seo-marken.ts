@@ -10,7 +10,7 @@
 // Die Hauptadresse ist die www-Fassung: jede gekaufte Domain leitet die
 // nackte Adresse dorthin weiter (am 15. November gemessen, 308).
 import { BETREIBER, GEKAUFT, MARKEN, type Marke } from './check-marken';
-import { DATENQUELLEN, FRAGEN, SCHRITTE } from './check-inhalt';
+import { DATENQUELLEN, FRAGEN, SCHRITTE, VERGLEICH } from './check-inhalt';
 import { TIPP_TITEL, tippsFuer } from './check-tipps';
 import { bildObjekt, fotoDatei, fotoNachId, fotoTeilen, TEILEN_BREITE, TEILEN_HOEHE } from './check-fotos';
 import { buehnenBild, schriftAdresse } from './check-gestaltung';
@@ -135,6 +135,7 @@ function ausfuehrlicherText(m: Marke): string {
     + `<h2>Daten aus</h2><ul>${DATENQUELLEN.map(q => `<li>${esc(q)}</li>`).join('')}</ul>`
     // Die Tipps, die überall gelten; die kantonalen zeigt die Seite erst zur Parzelle.
     + `<h2>${esc(TIPP_TITEL)}</h2>${tippsFuer(m.schwerpunkt).map(t => `<h3>${esc(t.titel)}</h3><p>${esc(t.text)}</p>${t.quellen.map(q => `<p><a href="${esc(q.url)}">${esc(q.name)}</a></p>`).join('')}`).join('')}`
+    + `<h2>Wo der Check hingehört</h2><table><thead><tr><th></th>${VERGLEICH.spalten.map(s => `<th>${esc(s)}</th>`).join('')}</tr></thead><tbody>${VERGLEICH.zeilen.map(([w, ...x]) => `<tr><th>${esc(w)}</th>${x.map(v => `<td>${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table>`
     + `<h2>Was Eigentümer uns fragen</h2>${FRAGEN.map(([f, x]) => `<h3>${esc(f)}</h3><p>${esc(x)}</p>`).join('')}`;
 }
 

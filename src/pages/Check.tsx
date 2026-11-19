@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { CookieHinweis } from '@/components/CookieHinweis';
 import { setzeZustimmung } from '@/lib/zustimmung';
 import { sitzungsHerkunft } from '@/lib/werbe-herkunft';
-import { DATENQUELLEN, FRAGEN, SCHRITTE } from '@/lib/check-inhalt';
+import { DATENQUELLEN, FRAGEN, SCHRITTE, VERGLEICH } from '@/lib/check-inhalt';
 import { preisZeilen, type Preise } from '@/lib/preise';
 import { umkreisLaden, umkreisSatz, umkreisZeilen, type Umkreis } from '@/lib/umkreis';
 import { useParams } from 'react-router-dom';
@@ -977,6 +977,34 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
             </div>
           </div>
         </section>
+
+        {/* Wo der Check hingehört (19. November, nach dem Vergleich mit eigenheimkompass.ch):
+            neben Online-Bewertung und Makler, ehrlich auch mit dem, was er nicht kann. Auf dem
+            Handy wird jede Zeile zu einem Block mit drei Zeilen (check.css), nichts ragt hinaus. */}
+        {modus !== 'heizung' && (
+          <section className="abschnitt-gross vergleich" id="vergleich">
+            <div className="huelle">
+              <div className="ueber">Vergleich</div>
+              <h2 className="titel">Wo der Check hingehört</h2>
+              <p className="lead-satz">Zwischen der schnellen Online-Bewertung und dem Makler vor Ort: was die amtlichen Daten über Ihr Grundstück sagen, bevor Sie jemanden ins Haus lassen.</p>
+              <table className="vergleich-tabelle tafel">
+                <thead><tr><th scope="col"><span className="unsichtbar">Was</span></th>{VERGLEICH.spalten.map((s, i) => <th key={s} scope="col" className={i === 1 ? 'wir' : undefined}>{s}</th>)}</tr></thead>
+                <tbody>
+                  {VERGLEICH.zeilen.map(([was, ...werte]) => (
+                    <tr key={was}>
+                      <th scope="row">{was}</th>
+                      {werte.map((w, i) => <td key={i} className={i === 1 ? 'wir' : undefined} data-spalte={VERGLEICH.spalten[i]}>{w}</td>)}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="schritte-aufruf">
+                <button type="button" className="knopf marke" onClick={() => (befund ? oeffnen() : zurSuche())}>{befund ? 'Baureserve kostenlos berechnen' : 'Grundstück kostenlos prüfen'}</button>
+                <span>Unser Tipp: Mit dem Check wissen Sie, ob sich ein Gespräch vor Ort lohnt.</span>
+              </div>
+            </div>
+          </section>
+        )}
 
         {tipps.length > 0 && (
           <section className="abschnitt-gross tipps" id="tipps">

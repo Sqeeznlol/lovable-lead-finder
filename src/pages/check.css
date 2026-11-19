@@ -510,3 +510,25 @@
 .pc .frage-zusatz{margin:-4px 0 12px;}
 .pc .fundstelle .f-bisher{display:block; margin-top:12px; padding-top:10px; border-top:1px dashed var(--linie);}
 .pc .fundstelle .f-bisher q{border-left-color:var(--linie);}
+
+/* Vergleich mit Online-Bewertung und Makler: am Computer eine Tabelle, die eigene Spalte in der
+   Markenfarbe; auf dem Handy je Zeile ein Block, damit nichts über den Rand ragt. */
+.pc .vergleich{background: var(--tafel); border-top: 1px solid var(--linie);}
+.pc .vergleich-tabelle{margin-top: 32px; width: 100%; border-collapse: separate; border-spacing: 0; overflow: hidden; font-size: 15px;}
+.pc .vergleich-tabelle th, .pc .vergleich-tabelle td{padding: 14px 18px; text-align: left; vertical-align: top; border-top: 1px solid var(--linie);}
+.pc .vergleich-tabelle thead th{border-top: 0; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--grau); font-weight: 700;}
+.pc .vergleich-tabelle tbody th{font-weight: 600; width: 24%;}
+.pc .vergleich-tabelle td{color: var(--grau);}
+.pc .vergleich-tabelle .wir{background: var(--marke-hell); color: var(--tinte); font-weight: 600;}
+.pc .vergleich-tabelle thead .wir{color: var(--marke);}
+.pc .unsichtbar{position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;}
+@media (max-width: 760px){
+  .pc .vergleich-tabelle, .pc .vergleich-tabelle tbody, .pc .vergleich-tabelle tr, .pc .vergleich-tabelle th, .pc .vergleich-tabelle td{display: block; width: auto;}
+  .pc .vergleich-tabelle thead{display: none;}
+  .pc .vergleich-tabelle tr{padding: 16px 18px; border-top: 1px solid var(--linie);}
+  .pc .vergleich-tabelle tr:first-child{border-top: 0;}
+  .pc .vergleich-tabelle tbody th, .pc .vergleich-tabelle td{padding: 0; border: 0; width: auto;}
+  .pc .vergleich-tabelle tbody th{margin-bottom: 8px;}
+  .pc .vergleich-tabelle td{display: grid; grid-template-columns: 9.5em 1fr; gap: 10px; padding: 6px 8px; border-radius: 6px;}
+  .pc .vergleich-tabelle td::before{content: attr(data-spalte); color: var(--grau); font-weight: 500;}
+}

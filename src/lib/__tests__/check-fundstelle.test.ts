@@ -137,3 +137,25 @@ describe('Beispielbericht und Angebot', () => {
     }
   });
 });
+
+describe('Vergleich und ehrliche Fragen (19. November, nach eigenheimkompass.ch)', () => {
+  it('der Vergleich nennt auch, was der Check nicht kann, und keine unbelegten Zahlen über andere', async () => {
+    const { VERGLEICH, FRAGEN } = await import('@/lib/check-inhalt');
+    expect(VERGLEICH.spalten[1]).toBe('Unser Check');
+    expect(VERGLEICH.zeilen.find(z => z[0] === 'Blick vor Ort')?.[2]).toMatch(/^nein/);
+    for (const z of VERGLEICH.zeilen) {
+      expect(z).toHaveLength(4);
+      // Über Online-Bewertung und Makler keine Beträge oder Prozente: belegen könnten wir sie nicht.
+      expect(`${z[1]} ${z[3]}`).not.toMatch(/\d/);
+    }
+    const f = FRAGEN.map(([q]) => q);
+    expect(f).toContain('Warum ist der Check kostenlos?');
+    expect(f).toContain('Ersetzt der Check eine Bauanfrage oder einen Architekten?');
+  });
+
+  it('die Seite zeigt den Vergleich, ausser im Heizungs-Check, und das feste HTML enthält ihn', () => {
+    const seite = readFileSync('src/pages/Check.tsx', 'utf8');
+    expect(seite).toMatch(/modus !== 'heizung' && \(\s*<section className="abschnitt-gross vergleich" id="vergleich">/);
+    expect(readFileSync('src/lib/seo-marken.ts', 'utf8')).toMatch(/Wo der Check hingehört/);
+  });
+});
