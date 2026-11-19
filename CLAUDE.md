@@ -299,6 +299,20 @@ steht: das Register kennt nur Gebäude. Potenzial im Thurgau braucht
 die Ziffern der Baureglemente (die Lieferung hat keine), in Luzern die
 Vermessung.
 
+## Parzellen nach Wunsch
+
+Reiter «Parzellen nach Wunsch» (19. November, Julian: «mache ein extra
+Ordner bei Aurora ... macht alle rein, die diese Kriterien haben»): feste
+Ordner mit Parzellen nach einem Kriterium, gerechnet auf dem Runner, in
+die Datenbank nur als Ergebnis (`wunsch_ordner`, `wunsch_parzelle`).
+Der erste: über 3'000 m², mindestens zur Hälfte in der Bauzone, in
+Sarnen, Stans, Stansstad, Hergiswil, Ennetbürgen und Buochs (454).
+Obwalden und Nidwalden geben die amtliche Fläche nicht frei; sie ist aus
+dem Umriss der Vermessung beim Bund gerechnet, ohne Baurechte, und je
+Gemeinde ergeben alle Parzellen die Gemeindefläche. Die Zone ist die
+harmonisierte des Bundes (Bauzonen Schweiz). `parzellen-nach-wunsch.test.ts`
+zählt nach.
+
 ## Gestaltung
 
 Wie die Seite aussieht, steht in `DESIGN.md` -- vor jeder Arbeit an der

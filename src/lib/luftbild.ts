@@ -45,7 +45,8 @@ export const BILD = {
   kalender: luftbildLv95(2683300, 1252500, 800, 1280),
   gebaeudesuche: luftbildLv95(2684900, 1243200, 800, 1280), // Zürichsee, rechtes Ufer     // Zürich-Oerlikon, Messe und Halle 550
   suche: luftbildLv95(2671734, 1250505, 800, 1280),       // Dietikon, das Beispiel der Suche (Mitte laut Suchdienst des Bundes)
-  calc: luftbildLv95(2696794, 1245099, 800, 1280),        // Uster, Bahnhofstrasse (Punkt laut Suchdienst des Bundes)
+  calc: luftbildLv95(2696794, 1245099, 800, 1280),
+  wunsch: luftbildLv95(2670185, 1200990, 800, 1280),      // Stans, Dorfplatz (Mitte laut Suchdienst des Bundes)        // Uster, Bahnhofstrasse (Punkt laut Suchdienst des Bundes)
   // Wohntraums: jede Seite ihr eigener Ort, wie in Bauraum.
   fondsBaugesuche: luftbildLv95(2681400, 1249700, 800, 1280),   // Zürich-West, Baustellen
   fondsGespraeche: luftbildLv95(2683900, 1246200, 800, 1280),   // Zürich, Seefeld

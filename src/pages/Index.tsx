@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useState } from 'react';
 import { nachladen } from '@/lib/neue-fassung';
-import { Building2, X, Shield, Share, Plus, Map, Target, BarChart3, Gauge, HardHat, MoreHorizontal, Briefcase, LogOut, Orbit, CalendarDays, Inbox, Combine, Flame, Search, Calculator } from 'lucide-react';
+import { Building2, X, Shield, Share, Plus, Map, Target, BarChart3, Gauge, HardHat, MoreHorizontal, Briefcase, LogOut, Orbit, CalendarDays, Inbox, Combine, Flame, Search, Calculator, FolderOpen } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { KontoMenu } from '@/components/KontoMenu';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
@@ -23,6 +23,7 @@ const Kalender = nachladen(() => import('@/components/Kalender'), 'Kalender');
 const Nachbarschaft = nachladen(() => import('@/components/Nachbarschaft'), 'Nachbarschaft');
 const Suche = nachladen(() => import('@/components/Suche'), 'Suche');
 const CalcYouLater = nachladen(() => import('@/components/CalcYouLater'), 'CalcYouLater');
+const ParzellenNachWunsch = nachladen(() => import('@/components/ParzellenNachWunsch'), 'ParzellenNachWunsch');
 // Die Karte zieht Leaflet nach -- das gehoert nicht ins erste
 // Buendel, sondern wird geholt, wenn jemand den Reiter oeffnet.
 const Karte = nachladen(() => import('@/components/Karte'), 'Karte');
@@ -42,7 +43,7 @@ import { usePlatform } from '@/hooks/use-platform';
 
 // Jeder Bereich ist eine Adresse: /zentrale, /baugesuche ... ("/" ist
 // das Cockpit). So führt "Zurück" im Browser in den vorigen Bereich.
-const TABS = ['cockpit', 'suche', 'leads', 'calc', 'zentrale', 'baugesuche', 'leadlisten', 'karte', 'nachbarschaft', 'arrondierung', 'gelegenheiten', 'auswertung', 'kalender', 'karte3d', 'admin'] as const;
+const TABS = ['cockpit', 'suche', 'leads', 'calc', 'zentrale', 'baugesuche', 'leadlisten', 'wunsch', 'karte', 'nachbarschaft', 'arrondierung', 'gelegenheiten', 'auswertung', 'kalender', 'karte3d', 'admin'] as const;
 type Tab = typeof TABS[number];
 const istTab = (x: string | undefined): x is Tab => !!x && (TABS as readonly string[]).includes(x);
 
@@ -73,6 +74,8 @@ const gruppen: { titel: string; eintraege: Eintrag[] }[] = [
     { id: 'baugesuche', label: 'Baugesuche', icon: HardHat },
     // Wohngebäude mit Öl oder Gas, bis 1980 gebaut, Deutschschweiz (Gebäuderegister).
     { id: 'leadlisten', label: 'Lead-Listen', icon: Flame },
+    // Feste Ordner mit Parzellen nach einem Kriterium, zuerst über 3000 m² in OW und NW (19. November).
+    { id: 'wunsch', label: 'Parzellen nach Wunsch', icon: FolderOpen },
     { id: 'auswertung', label: 'Auswertung', icon: BarChart3 },
     { id: 'nachbarschaft', label: 'Nachbarschaft', icon: Share },
     // Nachbarparzellen der Kundenliegenschaften (Helvetica) nach Potenzial.
@@ -267,6 +270,7 @@ export default function Index() {
             {active === 'zentrale' && <Zentrale />}
             {active === 'baugesuche' && <Baugesuche />}
             {active === 'leadlisten' && <LeadListen />}
+            {active === 'wunsch' && <ParzellenNachWunsch />}
             {active === 'karte' && <Karte onSchliessen={() => gehe('cockpit')} />}
             {active === 'nachbarschaft' && <Nachbarschaft />}
             {active === 'arrondierung' && <Arrondierung />}
