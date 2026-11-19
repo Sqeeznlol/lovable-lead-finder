@@ -141,6 +141,7 @@ export function Leads() {
                       <div className="flex flex-wrap items-center gap-2">
                         <button type="button" className="text-left font-medium underline-offset-4 hover:underline" onClick={() => setOffenId(l.id)}>{l.name}</button>
                         {a.prioritaet === 'heiss' && <Marke art="heiss">heiss</Marke>}
+                        {a.kaufangebot === true && <Marke art="violett">Kaufangebot</Marke>}
                         {a.prioritaet === 'warm' && <Marke art="violett">warm</Marke>}
                         <Marke>{String(a.domain ?? a.marke ?? 'Anfrage')}</Marke>
                         {a.thema === 'heizung' && <Marke>Heizungs-Check</Marke>}

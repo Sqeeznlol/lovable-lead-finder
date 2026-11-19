@@ -231,6 +231,8 @@ export function LeadDetail({ lead, onClose, onErledigt, onNotiz, onNachfass }: {
               {zeile('Einstieg', a.thema === 'heizung' ? 'Heizungs-Check' : null)}
               {zeile('Absicht', ANTWORT_TEXT.absicht[String(a.absicht)])}
               {zeile('Zeitraum', ANTWORT_TEXT.zeitraum[String(a.zeitraum)])}
+              {/* Seit 19. November fragen die Check-Seiten, wer verkaufen oder den Wert kennen will, nach einem Kaufangebot. */}
+              {zeile('Kaufangebot', a.kaufangebot === true ? 'gewünscht: in CALC YOU LATER rechnen und anbieten' : null)}
               {zeile('Priorität', a.prioritaet)}
             </section>
 
