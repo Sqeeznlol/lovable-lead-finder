@@ -62,7 +62,6 @@ export function beispielBericht(marke: { name: string; farbe: string; domain: st
     tipps: [],
     fuer: 'Beispiel',
     betreiber: marke.betreiber, betreiberAdresse: marke.betreiberAdresse,
-    quellen: 'Beispiel mit erfundenen Daten. Ein echter Bericht nennt hier die amtlichen Quellen und den Tag der Abfrage.',
   };
 }
 

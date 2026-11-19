@@ -16,7 +16,8 @@ import type { jsPDF as JsPdf } from 'jspdf';
 
 export interface BerichtZeile { titel: string; wert: string; zusatz?: string }
 export interface BerichtAbschnitt { titel: string; satz?: string; zeilen: BerichtZeile[] }
-export interface BerichtTipp { titel: string; text: string; quellen: { name: string; url: string }[] }
+// Ohne Quellen: Julian, 19. November: «Quelle rausnehmen im Bericht». Auf der Seite stehen sie weiter.
+export interface BerichtTipp { titel: string; text: string }
 
 export interface BerichtDaten {
   marke: string;
@@ -38,7 +39,6 @@ export interface BerichtDaten {
   fuer: string;
   betreiber: string;
   betreiberAdresse: string[];
-  quellen: string;
 }
 
 const RAND = 18;
@@ -150,14 +150,6 @@ export async function berichtPdf(d: BerichtDaten): Promise<JsPdf> {
       platz(14);
       absatz(t.titel, 11, 'bold');
       absatz(t.text, 10.5);
-      // Die Quellen als Link mit Namen: eine lange Adresse liefe über den Rand.
-      for (const q of t.quellen) {
-        let host = q.url;
-        try { host = new URL(q.url).hostname.replace(/^www\./, ''); } catch { /* bleibt die Adresse */ }
-        const zeile = (doc.splitTextToSize(rein(`Quelle: ${q.name} (${host})`), BREITE) as string[])[0];
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...marke);
-        platz(4.5); doc.textWithLink(zeile, RAND, y + 3.3, { url: q.url }); y += 4.5;
-      }
       y += 2.5;
     }
   }
@@ -166,9 +158,6 @@ export async function berichtPdf(d: BerichtDaten): Promise<JsPdf> {
   absatz(`Fachleute von ${d.betreiber} prüfen die Bau- und Zonenordnung Ihrer Gemeinde und melden sich innert zwei Arbeitstagen bei Ihnen. Die Prüfung ist kostenlos und unverbindlich.`, 10.5);
   y += 2;
   absatz([d.betreiber, ...d.betreiberAdresse].join(', '), 10.5, 'normal', grau);
-
-  ueberschrift('Quellen');
-  absatz(d.quellen, 9, 'normal', grau);
 
   // Fuss auf jeder Seite: was der Bericht ist und was nicht.
   const seiten = doc.getNumberOfPages();

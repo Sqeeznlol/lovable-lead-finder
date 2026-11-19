@@ -17,9 +17,8 @@ const DATEN: BerichtDaten = {
   ],
   rechnung: { titel: 'Ausnützung durchrechnen', satz: 'Ausnützungsziffer 0.60 laut Zonenplan.', zeilen: [{ titel: 'Möglich', wert: '744 m²' }, { titel: 'Baureserve', wert: '+ 410 m²' }] },
   abschnitte: [{ titel: 'Was für Ihre Parzelle gilt', zeilen: [{ titel: 'Denkmalschutz', wert: 'nicht inventarisiert', zusatz: 'Kanton Zürich' }] }],
-  tipps: [{ titel: 'Ölheizung früh ersetzen', text: 'Planen Sie den Ersatz, bevor die alte Heizung ausfällt.', quellen: [{ name: 'EnergieSchweiz', url: 'https://www.energieschweiz.ch/modernisieren/informationen-heizungsersatz/' }] }],
+  tipps: [{ titel: 'Ölheizung früh ersetzen', text: 'Planen Sie den Ersatz, bevor die alte Heizung ausfällt.' }],
   fuer: 'Anna Muster', betreiber: 'Bauraum', betreiberAdresse: ['Sihleggstrasse 23', '8832 Wollerau'],
-  quellen: 'Amtliche Vermessung, Gebäude- und Wohnungsregister (BFS)',
 };
 
 describe('Bericht als PDF', () => {
@@ -30,9 +29,11 @@ describe('Bericht als PDF', () => {
     writeFileSync(datei, Buffer.from(doc.output('arraybuffer')));
     const text = execFileSync('pdftotext', ['-layout', datei, '-'], { encoding: 'utf8' });
     for (const s of ['Seestrasse 12, 8810 Horgen', 'Grundstücksfläche', '1’240 m²', 'Ausnützung durchrechnen', '+ 410 m²',
-      'Ölheizung früh ersetzen', 'Quelle: EnergieSchweiz (energieschweiz.ch)', 'Erstellt für Anna Muster', 'keine Bewilligungszusage', 'Seite 1 von']) {
+      'Ölheizung früh ersetzen', 'Erstellt für Anna Muster', 'keine Bewilligungszusage', 'Seite 1 von']) {
       expect(text).toContain(s);
     }
+    // Julian, 19. November: «Quelle rausnehmen im Bericht».
+    expect(text).not.toMatch(/Quelle/);
   });
 
   it('Dateiname ohne Umlaute und Sonderzeichen', () => {

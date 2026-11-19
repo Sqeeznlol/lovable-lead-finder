@@ -63,15 +63,15 @@ type Feld = 'name' | 'adresse' | 'telefon' | 'email';
  * auf dem iPhone die Tastatur offen, und niemand muss suchen, wo es
  * weitergeht. Julian, 19. November: «Name und Adresse muss man eingeben
  * und die Nummer und vielleicht noch eine E-Mail-Adresse und erst dann am
- * Schluss bekommt man ein PDF.» Die E-Mail ist darum freiwillig; die
- * Datenbank verlangt E-Mail oder Telefon (anfrage, check), das Telefon
- * ist hier Pflicht.
+ * Schluss bekommt man ein PDF.» Seit dem Abend desselben Tages ist auch
+ * die E-Mail Pflicht (Julian: «Email ist Pflicht, keine freiwillige
+ * Option»): dorthin geht die ausführliche Analyse.
  */
 const KONTAKT: { k: Feld; frage: string; titel: string; typ: string; auto: string; modus?: 'email' | 'tel' | 'text'; platzhalter?: string; zusatz?: string }[] = [
   { k: 'name', frage: 'Wie heissen Sie?', titel: 'Vor- und Nachname', typ: 'text', auto: 'name', modus: 'text', platzhalter: 'Anna Muster' },
   { k: 'adresse', frage: 'Wo wohnen Sie?', titel: 'Strasse, Nummer, PLZ und Ort', typ: 'text', auto: 'street-address', modus: 'text', platzhalter: 'Seestrasse 12, 8810 Horgen' },
   { k: 'telefon', frage: 'Unter welcher Nummer erreichen wir Sie?', titel: 'Telefon', typ: 'tel', auto: 'tel', modus: 'tel', platzhalter: '079 412 58 36' },
-  { k: 'email', frage: 'Ihre E-Mail-Adresse', titel: 'E-Mail (freiwillig)', typ: 'email', auto: 'email', modus: 'email', zusatz: 'Freiwillig. Damit können wir Ihnen die ausführliche Analyse auch schriftlich senden.' },
+  { k: 'email', frage: 'Ihre E-Mail-Adresse', titel: 'E-Mail', typ: 'email', auto: 'email', modus: 'email', platzhalter: 'anna.muster@beispiel.ch', zusatz: 'Dorthin senden wir Ihnen die ausführliche Analyse.' },
 ];
 
 export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?: 'heizung' | 'gemeinde' | 'gemeinden' }) {
@@ -258,7 +258,7 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
     name: nameOk(kontakt.name) ? '' : 'Bitte Vor- und Nachnamen angeben.',
     adresse: wohnadresseOk(kontakt.adresse) ? '' : 'Bitte Strasse, Hausnummer und Ort angeben.',
     telefon: schweizerNummer(kontakt.telefon) ? '' : 'Bitte eine Schweizer Nummer, z. B. 079 412 58 36.',
-    email: !kontakt.email.trim() || mailOk(kontakt.email) ? '' : 'Diese E-Mail-Adresse stimmt nicht. Korrigieren Sie sie oder lassen Sie das Feld leer.',
+    email: mailOk(kontakt.email) ? '' : kontakt.email.trim() ? 'Diese E-Mail-Adresse stimmt nicht. Bitte korrigieren Sie sie.' : 'Bitte Ihre E-Mail-Adresse angeben.',
   };
   const bereit = Object.values(meldung).every(t => !t);
   const angabe = KONTAKT[kschritt];
@@ -301,7 +301,7 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
     // Ohne Rückgabe der Zeile: der öffentliche Schlüssel darf einfügen, nicht lesen.
     const { error } = await (await datenbank()).from('anfrage').insert({
       art: 'potenzial', name: kontakt.name.trim().replace(/\s+/g, ' ').slice(0, 120),
-      email: kontakt.email.trim() || null, telefon: schweizerNummer(kontakt.telefon),
+      email: kontakt.email.trim(), telefon: schweizerNummer(kontakt.telefon),
       adresse: befund.adresse.slice(0, 200), egrid: befund.egrid, angaben, einwilligung: true,
     });
     setSendet(false);
@@ -463,10 +463,9 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
           { titel: gemeindePreise ? `Preise in ${gemeindePreise.name}` : 'Preise', zeilen: preis },
           { titel: 'Energie und Lage', zeilen: lage },
         ],
-        tipps: tipps.map(t => ({ titel: t.titel, text: t.text, quellen: [...t.quellen, ...(t.ratgeber ? [{ name: 'Ratgeber', url: `${window.location.origin}${ratgeberPfad(t.ratgeber)}` }] : [])] })),
+        tipps: tipps.map(t => ({ titel: t.titel, text: t.text })),
         fuer: kontakt.name.trim().replace(/\s+/g, ' '),
         betreiber: BETREIBER, betreiberAdresse: BETREIBER_ADRESSE,
-        quellen: `${quellenText}, abgefragt am ${new Date().toLocaleDateString('de-CH')}`,
       });
     } catch { setFehler('Der Bericht liess sich gerade nicht erstellen. Bitte tippen Sie nochmals.'); }
     finally { setPdfLaeuft(false); }
@@ -504,7 +503,7 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
               </>
             : <>
                 <p>Verantwortlich für die Bearbeitung Ihrer Daten ist {BETREIBER}, {BETREIBER_ADRESSE.join(', ')}.</p>
-                <p>Wir speichern die Angaben, die Sie im Formular machen (Vorname, Name, Ihre Adresse, Telefon, E-Mail, falls Sie sie angeben, Adresse der Liegenschaft und Ihre Antworten), um Ihnen die Berechnung, den Bericht und die Analyse zu erstellen und Sie zu Ihrer Liegenschaft zu kontaktieren. An Dritte geben wir sie nicht weiter. Den Bericht als PDF erstellt Ihr Browser selbst; er wird nicht bei uns gespeichert.</p>
+                <p>Wir speichern die Angaben, die Sie im Formular machen (Vorname, Name, Ihre Adresse, Telefon, E-Mail, Adresse der Liegenschaft und Ihre Antworten), um Ihnen die Berechnung, den Bericht und die Analyse zu erstellen und Sie zu Ihrer Liegenschaft zu kontaktieren. An Dritte geben wir sie nicht weiter. Den Bericht als PDF erstellt Ihr Browser selbst; er wird nicht bei uns gespeichert.</p>
                 {/* Wer was sieht, ist gemessen, nicht angenommen (18. November): im Browser
                     aufgerufen werden nur diese Seite, geo.admin.ch, Google Fonts und die
                     Datenbank; die Datenbank steht bei Amazon in Frankfurt (eu-central-1);

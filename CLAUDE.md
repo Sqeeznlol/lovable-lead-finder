@@ -95,7 +95,8 @@ Handy-Fassung. Gebaut wird mit `<Seite>` aus `src/components/rahmen.tsx`.
     Seite rollt selbst zum Schritt (Wegweiser). Schrift ab 17px,
     Hauptknöpfe 58px.
   * Angaben einzeln, immer im selben Feld: Name, Wohnadresse, Telefon,
-    E-Mail freiwillig. Erst danach der Bericht als echtes PDF
+    E-Mail, alle vier Pflicht (19. November: «Email ist Pflicht, keine
+    freiwillige Option»). Erst danach der Bericht als echtes PDF
     (`check-bericht.ts`, mit Luftbild und Umriss), nie vorher und nicht
     mehr als Druck der Seite. `check-wegweiser.test.ts` wacht darüber.
   * Tipps und Tricks (`check-tipps.ts`) nur mit Quelle, auf der

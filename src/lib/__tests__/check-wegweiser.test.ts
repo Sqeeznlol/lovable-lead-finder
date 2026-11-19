@@ -1,6 +1,6 @@
 /**
  * Der Wegweiser der Check-Seiten (Julian, 19. November): der nächste
- * Schritt gleich unter den Zahlen, eine Angabe je Bild, E-Mail freiwillig,
+ * Schritt gleich unter den Zahlen, eine Angabe je Bild, E-Mail Pflicht,
  * das PDF erst am Schluss, Tipps mit Herkunft.
  */
 import { readFileSync } from 'node:fs';
@@ -39,11 +39,12 @@ describe('Tipps und Tricks', () => {
 });
 
 describe('Angaben und Bericht', () => {
-  it('Name, Adresse, Telefon, dann die E-Mail freiwillig', () => {
+  it('Name, Adresse, Telefon, dann die E-Mail, und alle vier Pflicht (19. November: «Email ist Pflicht»)', () => {
     const reihe = [...seite.matchAll(/\{ k: '(\w+)', frage:/g)].map(m => m[1]);
     expect(reihe).toEqual(['name', 'adresse', 'telefon', 'email']);
-    expect(seite).toContain("email: kontakt.email.trim() || null");
-    expect(seite).toMatch(/email: !kontakt\.email\.trim\(\) \|\| mailOk/);
+    expect(seite).toContain('email: kontakt.email.trim(), telefon:');
+    expect(seite).toMatch(/email: mailOk\(kontakt\.email\) \? '' :/);
+    expect(seite.match(/\{ k: 'email'[^\n]*/)?.[0]).not.toMatch(/freiwillig/i);
     expect(seite).toContain('angaben.wohnadresse =');
   });
   it('die Wohnadresse braucht Strasse oder Ort und eine Zahl', () => {
