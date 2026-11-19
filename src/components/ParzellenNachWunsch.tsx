@@ -35,6 +35,8 @@ export function ParzellenNachWunsch() {
   const [kanton, setKanton] = useUrlWert('kanton', '');
   const [gemeinde, setGemeinde] = useUrlWert('gemeinde', '');
   const [zone, setZone] = useUrlWert('zone', '');
+  // Eigener Filter neben der Zone (Julian, 19. November: «Unbebaut/bebaut filter»).
+  const [bebaut, setBebaut] = useUrlWert('bebaut', '');
   const [alle, setAlle] = useState(false);
 
   const ordner = useQuery({
@@ -80,7 +82,7 @@ export function ParzellenNachWunsch() {
     return [...m.entries()].sort((a, b) => b[1] - a[1]);
   }, [imKanton, gemeinde]);
   const inGemeinde = imKanton.filter(p => !gemeinde || p.gemeinde === gemeinde);
-  const treffer = inGemeinde.filter(p => !zone || (KENNZAHLEN.find(k => k.zone === zone)?.passt(p) ?? (zone === 'wohnen' ? WOHNEN.has(p.zone) : p.zone === zone)));
+  const treffer = inGemeinde.filter(p => !bebaut || p.bebaut === (bebaut === 'ja')).filter(p => !zone || (KENNZAHLEN.find(k => k.zone === zone)?.passt(p) ?? (zone === 'wohnen' ? WOHNEN.has(p.zone) : p.zone === zone)));
   const wohnen = inGemeinde.filter(p => WOHNEN.has(p.zone)).length;
   const gezeigt = alle ? treffer : treffer.slice(0, 100);
 
@@ -98,7 +100,7 @@ export function ParzellenNachWunsch() {
       kennzahlen={parzellen.data ? KENNZAHLEN.map(k => ({ titel: k.titel, wert: ch(inGemeinde.filter(k.passt).length), onClick: () => setZone(zone === k.zone ? '' : k.zone) })) : undefined}>
       <div className="flex flex-wrap items-center gap-2">
         {(ordner.data?.length ?? 0) > 1 && (
-          <Auswahl label="Ordner" wert={o?.id ?? ''} setWert={w => { setOrdnerId(w); setKanton(''); setGemeinde(''); setZone(''); }} className="min-w-[220px]"
+          <Auswahl label="Ordner" wert={o?.id ?? ''} setWert={w => { setOrdnerId(w); setKanton(''); setGemeinde(''); setZone(''); setBebaut(''); }} className="min-w-[220px]"
                    optionen={(ordner.data ?? []).map(x => ({ wert: x.id, titel: x.name }))} />
         )}
         {kantone.length > 1 && (
@@ -112,6 +114,10 @@ export function ParzellenNachWunsch() {
                    ...KENNZAHLEN.map(k => ({ wert: k.zone, titel: `${k.titel} · ${ch(inGemeinde.filter(k.passt).length)}` })),
                    ...zonen.filter(([k]) => !KENNZAHLEN.some(x => x.zone === k)).map(([k, n]) => ({ wert: k, titel: `${k} · ${ch(n)}` })),
                    ...(wohnen < inGemeinde.length ? [{ wert: 'wohnen', titel: `Wohnen, Misch- und Zentrumszonen · ${ch(wohnen)}` }] : [])]} />
+        <Auswahl label="Bebauung" wert={bebaut || 'alle'} setWert={w => setBebaut(w === 'alle' ? '' : w)} className="min-w-[180px]"
+                 optionen={[{ wert: 'alle', titel: 'Bebaut und unbebaut' },
+                   { wert: 'nein', titel: `Unbebaut · ${ch(inGemeinde.filter(p => p.bebaut === false).length)}` },
+                   { wert: 'ja', titel: `Bebaut · ${ch(inGemeinde.filter(p => p.bebaut === true).length)}` }]} />
         <button type="button" className={KNOPF} disabled={!treffer.length} onClick={herunterladen}>Als CSV ({ch(treffer.length)})</button>
       </div>
 
