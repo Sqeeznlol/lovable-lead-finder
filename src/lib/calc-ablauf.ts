@@ -134,6 +134,66 @@ export function rueckmeldungen(liste: KalkulationKurz[]): Rueckmeldung[] {
     }));
 }
 
+// ------------------------------------------------------------- Bemerkungen zum Preis
+
+/**
+ * Ein Wort zum Preis, wie im Gespräch (Julian, 20. November: «ist richtig
+ * so, nicht richtig so ... 4,1 Millionen weil das und das, dass auch
+ * Aurora lernt, warum»). Jeder kann es zu jeder Kalkulation schreiben, auch
+ * zu einem Entwurf. Empfehlung, Kanton und Testmarke hält die Datenbank
+ * beim Schreiben fest (Migration 20261120120000).
+ */
+export interface Bemerkung {
+  id: string; kalkulation_id: string; erstellt_am: string; user_id: string | null; name: string;
+  urteil: Urteil | null; preis_chf: number | null; text: string;
+  empfehlung_chf: number | null; kanton: string | null; test: boolean;
+}
+
+const BEMERKUNG = 'id, kalkulation_id, erstellt_am, user_id, name, urteil, preis_chf, text, empfehlung_chf, kanton, test';
+
+export async function bemerkungenLaden(kalkulationId?: string): Promise<Bemerkung[]> {
+  let q = db().from('kalkulation_bemerkung').select(BEMERKUNG);
+  q = kalkulationId ? q.eq('kalkulation_id', kalkulationId).order('erstellt_am').limit(500) : q.order('erstellt_am', { ascending: false }).limit(1000);
+  const r = await q;
+  if (r.error) throw r.error;
+  return r.data ?? [];
+}
+
+export async function bemerkungSchreiben(b: { kalkulation_id: string; name: string; urteil: Urteil | null; preis_chf: number | null; text: string }): Promise<Bemerkung> {
+  const r = await db().from('kalkulation_bemerkung').insert(b).select(BEMERKUNG).maybeSingle();
+  if (r.error) throw r.error;
+  return r.data;
+}
+
+export async function bemerkungLoeschen(id: string): Promise<void> {
+  const r = await db().from('kalkulation_bemerkung').delete().eq('id', id);
+  if (r.error) throw r.error;
+}
+
+/**
+ * Was die Bemerkungen dem Lernen geben: je Kalkulation das jüngste Urteil
+ * mit Preis. Wo der Ablauf schon einen gebotenen Preis kennt, zählt der
+ * (er ist durch vier Hände gegangen); so zählt keine Kalkulation doppelt.
+ */
+export function rueckmeldungenAusBemerkungen(liste: Bemerkung[], schonGezaehlt: Set<string>): Rueckmeldung[] {
+  const juengste = new Map<string, Bemerkung>();
+  for (const b of liste) {
+    if (b.test || !b.urteil || !(b.preis_chf! > 0) || !(b.empfehlung_chf! > 0) || schonGezaehlt.has(b.kalkulation_id)) continue;
+    const da = juengste.get(b.kalkulation_id);
+    if (!da || da.erstellt_am < b.erstellt_am) juengste.set(b.kalkulation_id, b);
+  }
+  return [...juengste.values()].map(b => ({
+    empfehlung: b.empfehlung_chf!, preis: b.preis_chf!, urteil: b.urteil, grund: b.text, kanton: b.kanton, vorlage: null, am: b.erstellt_am,
+  }));
+}
+
+/** Alle Rückmeldungen: aus dem Ablauf und aus den Bemerkungen, ohne die Kalkulation, um die es gerade geht. */
+export function alleRueckmeldungen(kalkulationen: KalkulationKurz[], bemerkungen: Bemerkung[], ohne?: string): Rueckmeldung[] {
+  const k = kalkulationen.filter(x => x.id !== ohne);
+  const ablauf = k.filter(x => rueckmeldungen([x]).length > 0);
+  return [...rueckmeldungen(ablauf), ...rueckmeldungenAusBemerkungen(bemerkungen.filter(b => b.kalkulation_id !== ohne), new Set(ablauf.map(x => x.id)))];
+}
+
 /** Die jüngsten Kalkulationen. Die Tabelle ist klein: eine Zeile je Lead. */
 export async function kalkulationenLaden(): Promise<KalkulationKurz[]> {
   const r = await db().from('kalkulation').select(KURZ).order('erstellt_am', { ascending: false }).limit(200);

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Check, Download, FileText, Loader2, Mail, MessageCircle, Printer, RotateCcw } from 'lucide-react';
 import { FELD, KNOPF, KNOPF_HAUPT, Marke, Strichbalken } from '@/components/rahmen';
+import { Bemerkungen } from '@/components/calc/Bemerkungen';
 import { Ergebnis, Objektkopf } from '@/components/calc/Ergebnis';
 import { useJetzt, useName } from '@/components/calc/name';
 import {
@@ -10,7 +11,7 @@ import {
   type SchriftId, type Unterschrift, type Urteil, type VorlageId,
 } from '@/lib/angebot';
 import {
-  ablaufPersonenLaden, betrag, kalkulationenLaden, rueckmeldungen, schritt, SCHRITT_TEXT, uhr, ZUSTAND_TEXT,
+  ablaufPersonenLaden, alleRueckmeldungen, bemerkungenLaden, betrag, kalkulationenLaden, schritt, SCHRITT_TEXT, uhr, ZUSTAND_TEXT,
   type Kalkulation, type Schritt, type SchrittDaten,
 } from '@/lib/calc-ablauf';
 import { drucken } from '@/lib/drucken';
@@ -128,7 +129,9 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
 
   const ort = [k.plz, k.gemeinde].filter(Boolean).join(' ');
   const u = uhr(k, jetzt);
-  const g = useMemo(() => lernen(rueckmeldungen((alle.data ?? []).filter(x => x.id !== k.id)), k.kanton), [alle.data, k.id, k.kanton]);
+  // Gelernt wird auch aus den Bemerkungen zum Preis (20. November), nicht nur aus Davids Prüfung.
+  const bem = useQuery({ queryKey: ['bemerkungen-alle'], queryFn: () => bemerkungenLaden(), staleTime: 60 * 1000, retry: 0 });
+  const g = useMemo(() => lernen(alleRueckmeldungen(alle.data ?? [], bem.data ?? [], k.id), k.kanton), [alle.data, bem.data, k.id, k.kanton]);
   const lernPreis = vorschlag(k.empfehlung_chf, g);
   const preisJetzt = betragLesen(preis) ?? k.preis_chf ?? k.empfehlung_chf ?? 0;
   const ktx = kontextAus(k, firma, felder, preisJetzt);
@@ -423,6 +426,7 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
         </div>
         <Ergebnis b={k.ergebnis} annahmen={k.eingaben.eingabe.annahmen} />
       </section>
+      <Bemerkungen kalkulationId={k.id} empfehlung={k.empfehlung_chf} kanton={k.kanton} />
     </div>
   );
 }

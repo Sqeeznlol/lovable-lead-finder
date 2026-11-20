@@ -212,6 +212,15 @@ senden. Alles Weitere in `docs/calc-you-later.md`.
     Vorschlag neben der Empfehlung; Julians Formel bleibt. Vorlagen,
     Schriften und Farben in `docs/calc-you-later.md`.
 
+  * Unter jeder Kalkulation, schon im Entwurf, steht «Stimmt der Preis?»
+    wie ein Chatfenster (20. November, Julian zur Schöneggstrasse 18: CALC
+    1.41 Mio., Angebot 4.1 Mio., «weil das und das, dass auch Aurora den
+    Algo lernt»): richtig so, zu tief oder zu hoch, der richtige Preis und
+    warum. Die Empfehlung, gegen die geurteilt wird, hält die Datenbank fest
+    (`20261120120000_kalkulation_bemerkung.sql`); der Vorschlag aus den
+    Urteilen steht neben der Empfehlung, Julians Formel bleibt.
+    `calc-bemerkung.test.ts` und `tools/kalkulation-probe.sh` wachen darüber.
+
   * Mieterspiegel aus dem Gebäuderegister (20. November, Tim: «Anzahl
     Wohnungen, deren Grösse und die inserierten Preise»): CALC liest jede
     bestehende Wohnung mit Nummer, Stockwerk (WSTWK laut Merkmalskatalog:

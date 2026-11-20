@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ExternalLink, Loader2, Plus, Search, X } from 'lucide-react';
 import { FELD, KNOPF, KNOPF_HAUPT, KNOPF_LEISE, LISTE } from '@/components/rahmen';
 import { Zahl } from '@/components/Machbarkeit';
+import { Bemerkungen } from '@/components/calc/Bemerkungen';
 import { Ergebnis, Objektkopf } from '@/components/calc/Ergebnis';
 import { useName } from '@/components/calc/name';
 import { Empfaenger } from '@/components/calc/Empfaenger';
@@ -581,6 +582,9 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
         </div>
         <p className="text-sm text-muted-foreground">Mit dem Einreichen läuft die Uhr: David prüft den Preis, Tim visiert, Julian kontrolliert, Tim bestätigt, David verschickt, alles in 24 Stunden.</p>
       </section>
+
+      {/* Schon zum Entwurf lässt sich sagen, ob der Preis stimmt; die Datenbank misst gegen die gespeicherte Empfehlung. */}
+      {entwurf && <Bemerkungen kalkulationId={entwurf.id} empfehlung={entwurf.empfehlung_chf} kanton={entwurf.kanton} />}
     </div>
   );
 }

@@ -157,6 +157,33 @@ begin
   raise notice 'Rollen: alle Proben bestanden';
 end $$;
 
+-- 13 Bemerkungen zum Preis (20. November): jeder darf, gemessen wird gegen die Empfehlung der Datenbank
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
+do $$
+declare kid uuid; b public.kalkulation_bemerkung; ok boolean; n int;
+begin
+  insert into public.kalkulation (adresse, kanton, test, eingaben, ergebnis, empfehlung_chf) values ('TEST Bemerkung 1', 'ZH', true, '{}', '{}', 1410000) returning id into kid;
+  insert into public.kalkulation_bemerkung (kalkulation_id, name, urteil, preis_chf, text) values (kid, 'TEST', 'zu_tief', 4100000, 'Fläche mehr wert als die Miete') returning * into b;
+  assert b.empfehlung_chf = 1410000 and b.kanton = 'ZH' and b.test and b.user_id = '00000000-0000-0000-0000-000000000001', '13a vorbelegt aus der Kalkulation';
+  insert into public.kalkulation_bemerkung (kalkulation_id, name, urteil, preis_chf, text) values (kid, 'TEST', 'passt', 99, 'stimmt') returning * into b;
+  assert b.preis_chf = 1410000, '13b richtig so heisst: Preis = Empfehlung';
+  begin insert into public.kalkulation_bemerkung (kalkulation_id, name, urteil, preis_chf, text) values (kid, 'TEST', 'zu_tief', 1000000, 'x'); ok := false; exception when others then ok := sqlerrm like 'Zu tief heisst%'; end;
+  assert ok, '13c zu tief mit tieferem Preis';
+  begin insert into public.kalkulation_bemerkung (kalkulation_id, name, text, empfehlung_chf) values (kid, 'TEST', 'x', 1); ok := false; exception when insufficient_privilege then ok := true; end;
+  assert ok, '13d Empfehlung von aussen';
+  begin update public.kalkulation_bemerkung set text = 'anders' where kalkulation_id = kid; ok := false; exception when insufficient_privilege then ok := true; end;
+  assert ok, '13e ändern';
+  -- Ein anderes Konto liest mit, nimmt aber nicht zurück, was es nicht geschrieben hat.
+  perform set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000003', true);
+  select count(*) into n from public.kalkulation_bemerkung where kalkulation_id = kid; assert n = 2, '13f andere lesen mit';
+  delete from public.kalkulation_bemerkung where kalkulation_id = kid;
+  select count(*) into n from public.kalkulation_bemerkung where kalkulation_id = kid; assert n = 2, '13g fremde zurücknehmen';
+  perform set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001', true);
+  delete from public.kalkulation_bemerkung where kalkulation_id = kid and urteil = 'passt';
+  select count(*) into n from public.kalkulation_bemerkung where kalkulation_id = kid; assert n = 1, '13h eigene zurücknehmen';
+  raise notice 'Bemerkungen: alle Proben bestanden';
+end $$;
+
 -- 11 eine Fondsleitung sieht und schreibt nichts
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000002';
 do $$
@@ -179,5 +206,7 @@ begin
   assert ok, '12a anon liest';
   begin perform public.kalkulation_schritt(gen_random_uuid(), 'einreichen', 'x'); ok := false; exception when insufficient_privilege then ok := true; end;
   assert ok, '12b anon im Ablauf';
+  begin perform 1 from public.kalkulation_bemerkung; ok := false; exception when insufficient_privilege then ok := true; end;
+  assert ok, '12c anon liest Bemerkungen';
   raise notice 'Ohne Anmeldung: alle Proben bestanden';
 end $$;
