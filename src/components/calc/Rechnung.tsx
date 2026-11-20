@@ -17,7 +17,7 @@ import { ERLOES_AMTLICH } from '@/lib/erloes-daten';
 import { ERLOES_ANGABEN } from '@/lib/erloes-angaben';
 import { angabePruefen, erloesHerleiten, quartierLaden, reihenLaden } from '@/lib/preis-herleitung';
 import { entwurfLoeschen, entwurfSpeichern, schritt, type Kalkulation } from '@/lib/calc-ablauf';
-import { adressen, leadLaden, nachbarnLaden, objektLaden, portalLinks, umfeldLaden, type Adresse } from '@/lib/calc-daten';
+import { adressen, gebaeudeFrisch, leadLaden, nachbarnLaden, objektLaden, portalLinks, umfeldLaden, type Adresse } from '@/lib/calc-daten';
 import { chf } from '@/lib/machbarkeit';
 import { grundlageLaden } from '@/lib/machbarkeit-daten';
 import { wohnungText, type Wert } from '@/lib/preise';
@@ -154,10 +154,18 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
     queryFn: () => umfeldLaden(objekt.data!), enabled: !!objekt.data, staleTime: 10 * 60 * 1000, retry: 0,
   });
 
+  // Ein Entwurf von vor dem Mieterspiegel kennt die Wohnungen nicht: sie kommen beim Öffnen frisch aus dem Register.
+  const altOhneWohnungen = !!alt && !!entwurf?.egrid && (alt.eingabe.grundlage.gebaeude ?? []).length > 0
+    && !(alt.eingabe.grundlage.gebaeude ?? []).some(g => g.wohnungsliste?.length);
+  const frisch = useQuery({
+    queryKey: ['calc-gebaeude-frisch', entwurf?.egrid], queryFn: () => gebaeudeFrisch(entwurf!.egrid!),
+    enabled: altOhneWohnungen, staleTime: 30 * 60 * 1000, retry: 1,
+  });
   const basis: Basis | null = useMemo(() => {
     if (alt) {
+      const gebaeude = frisch.data?.some(g => g.wohnungsliste?.length) ? frisch.data : alt.eingabe.grundlage.gebaeude;
       return { adresse: alt.adresse, parzelleNr: alt.parzelleNr, eigentuemer: alt.eigentuemer, luecken: alt.luecken, egrid: entwurf!.egrid,
-        parzelleId: entwurf!.parzelle_id, gemeinde: entwurf!.gemeinde, kanton: alt.eingabe.kanton, grundlage: alt.eingabe.grundlage, umfeld: alt.eingabe.umfeld,
+        parzelleId: entwurf!.parzelle_id, gemeinde: entwurf!.gemeinde, kanton: alt.eingabe.kanton, grundlage: { ...alt.eingabe.grundlage, gebaeude }, umfeld: alt.eingabe.umfeld,
         projekt: alt.eingabe.projekt ?? null };
     }
     const o = objekt.data;
@@ -171,7 +179,7 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
         denkmal: o.denkmal, isos: o.isos, ...(umfeld.data ?? {}) },
       projekt: o.projekt,
     };
-  }, [alt, entwurf, objekt.data, umfeld.data]);
+  }, [alt, entwurf, objekt.data, umfeld.data, frisch.data]);
 
   // Ein anderer Grenzabstand: die bebaubare Fläche rechnet die Datenbank am Umriss neu.
   const huelle = useQuery({

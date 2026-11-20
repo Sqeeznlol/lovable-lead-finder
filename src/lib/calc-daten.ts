@@ -211,6 +211,15 @@ export function wohnungenAusRegister(a: Record<string, unknown>): Wohnung[] {
 
 interface Register { gebaeude: Gebaeude[]; projekt: Projekt | null; kanton: string | null; bfs: string | null; gemeinde: string | null; plz: string | null }
 
+/**
+ * Die Gebäude einer Parzelle frisch aus dem Register: für Entwürfe, die vor
+ * dem Mieterspiegel gespeichert wurden (20. November, Schöneggstrasse 18 in
+ * Zürich: 458 m² aus dem Fussabdruck, laut Register 13 Studios mit 242 m²).
+ */
+export async function gebaeudeFrisch(egrid: string): Promise<Gebaeude[]> {
+  return (await registerBund(egrid)).gebaeude;
+}
+
 async function registerBund(egrid: string): Promise<Register> {
   const q = new URLSearchParams({ layer: 'ch.bfs.gebaeude_wohnungs_register', searchField: 'egrid', searchText: egrid, contains: 'false', returnGeometry: 'false' });
   const j = await holen(`${API}/all/MapServer/find?${q}`) as { results?: { attributes?: Record<string, unknown>; featureId?: string }[] };
