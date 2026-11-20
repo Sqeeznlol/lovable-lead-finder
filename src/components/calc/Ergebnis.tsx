@@ -108,7 +108,9 @@ export function Ergebnis({ b, annahmen, onErloes }: { b: Bewertung; annahmen: Ca
           Kaufpreisempfehlung <span className="font-semibold">{betrag(b.empfehlung)}</span>.{' '}
           <span className="text-muted-foreground">
             {b.massgebend === 'bestand'
-              ? <>Massgebend ist der Bestand: mit den heutigen Mieten ist das Haus {chf(b.wert!)} wert.</>
+              ? b.bestand?.wertArt === 'flaeche'
+                ? <>Massgebend ist der Bestand nach seiner Fläche: {m2(b.bestand.flaeche!)} zu CHF {de(b.bestand.jeM2!)} sind {chf(b.wert!)}, mehr als die Mieten hergeben.</>
+                : <>Massgebend ist der Bestand: mit den heutigen Mieten ist das Haus {chf(b.wert!)} wert.</>
               : b.massgebend === 'miete'
               ? <>Massgebend ist ein Neubau zum Vermieten: {chf(b.wert!)} bleiben für das Land.</>
               : <>Massgebend ist ein Neubau zum Verkaufen: {chf(b.wert!)} bleiben für das Land.</>}
@@ -196,16 +198,19 @@ export function Ergebnis({ b, annahmen, onErloes }: { b: Bewertung; annahmen: Ca
         </div>
         <div className="rounded-[3px] border bg-card p-4">
           <p className="flex items-center justify-between gap-2 font-medium">Bestand {b.massgebend === 'bestand' && <Marke art="lila">massgebend</Marke>}</p>
-          <p className="text-sm text-muted-foreground">Was das Haus mit seinen Mieten wert ist.</p>
+          <p className="text-sm text-muted-foreground">Was das Haus mit seinen Mieten oder nach seiner Fläche wert ist; das Höhere zählt.</p>
           {h ? (
             <>
               <dl className="mt-3 space-y-1.5 text-sm">
                 {h.wohnungen != null && <Zeile titel="Wohnungen" wert={de(h.wohnungen)} />}
-                {h.flaeche != null && <Zeile titel={h.flaecheArt === 'hand' ? 'Vermietbare Fläche laut Eingabe' : h.flaecheArt === 'register' ? 'Wohnfläche laut Gebäuderegister' : 'Vermietbare Fläche aus dem Fussabdruck'} wert={m2(h.flaeche)} />}
+                {h.flaeche != null && <Zeile titel={h.flaecheArt === 'hand' ? 'Vermietbare Fläche laut Eingabe' : h.flaecheArt === 'register' ? 'Wohnfläche laut Gebäuderegister'
+                  : h.flaecheArt === 'gemischt' ? 'Vermietbare Fläche aus dem Fussabdruck (Haus mit Gewerbe)' : 'Vermietbare Fläche aus dem Fussabdruck'} wert={m2(h.flaeche)} />}
+                {h.flaecheArt === 'gemischt' && h.flaecheWohnungen != null && <Zeile titel="davon Wohnungen laut Gebäuderegister" wert={m2(h.flaecheWohnungen)} />}
                 {h.mieteHeute != null && <Zeile titel="Miete je m² und Monat" wert={`CHF ${de(h.mieteHeute, 2)}`} />}
                 <Zeile titel="Mietertrag im Jahr" wert={chf(h.ertragHeute)} />
                 <Zeile titel="Rendite des Käufers" wert={`${de(annahmen.rendite * 100, 1)} %`} />
-                <Zeile titel="Ertragswert" wert={chf(h.wert)} fett />
+                <Zeile titel="Ertragswert" wert={chf(h.wertMiete ?? h.wert)} fett={h.wertArt !== 'flaeche'} />
+                {h.wertFlaeche != null && h.jeM2 != null && <Zeile titel={`Flächenwert, CHF ${de(h.jeM2)} je m²`} wert={chf(h.wertFlaeche)} fett={h.wertArt === 'flaeche'} />}
                 {h.marktmiete != null && h.wertMarkt != null && (
                   <>
                     <Zeile titel={`Marktmiete aus ${h.vergleiche} ${h.vergleiche === 1 ? 'Inserat' : 'Inseraten'}`} wert={`CHF ${de(h.marktmiete, 2)}`} />
@@ -213,7 +218,8 @@ export function Ergebnis({ b, annahmen, onErloes }: { b: Bewertung; annahmen: Ca
                   </>
                 )}
               </dl>
-              <p className="mt-2 text-xs text-muted-foreground">Miete: {h.mieteQuelle}.</p>
+              <p className="mt-2 text-xs text-muted-foreground">Miete: {h.mieteQuelle}.
+                {h.jeM2 != null && <> Flächenwert: {de(Math.round((h.jeM2 / annahmen.erloes) * 1000) / 10, 1)} % des Verkaufspreises je m² (Tim, 20. November: «manchmal ist der Bestand mehr wert als die zu günstig kapitalisierte Miete»).</>}</p>
             </>
           ) : (
             <p className="mt-3 text-sm text-muted-foreground">Kein Mehrfamilienhaus im Register. Wer unten Mieten oder die vermietbare Fläche einträgt, bekommt die zweite Bewertung.</p>

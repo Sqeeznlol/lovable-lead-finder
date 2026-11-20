@@ -67,6 +67,12 @@ export interface Gebaeude {
   grundflaeche: number | null; geschosse: number | null; baujahr: number | null; wohnungen: number | null;
   /** Die Wohnungen einzeln, wo das Register sie führt: der Flächenspiegel (20. November, Tim). */
   wohnungsliste?: Wohnung[];
+  /**
+   * Gebäudekategorie laut Register (GKAT): 1040 heisst teilweise Wohnnutzung.
+   * Dort führt das Register nur die Wohnungen, nicht Läden und Büros
+   * (Schöneggstrasse 18: 13 Studios mit 242 m² in sieben Geschossen).
+   */
+  kategorie?: number | null;
 }
 
 export interface Annahmen {

@@ -170,7 +170,7 @@ const zahl = (v: unknown): number | null => { const x = Number(v); return v != n
 export function gebaeudeAusRegister(a: Record<string, unknown>): Gebaeude | null {
   // 1004: bestehend. Projektierte, abgebrochene und nicht realisierte zählen nicht zum Bestand.
   if (a.gstat != null && Number(a.gstat) !== 1004) return null;
-  const g: Gebaeude = { grundflaeche: zahl(a.garea), geschosse: zahl(a.gastw), baujahr: zahl(a.gbauj), wohnungen: zahl(a.ganzwhg) };
+  const g: Gebaeude = { grundflaeche: zahl(a.garea), geschosse: zahl(a.gastw), baujahr: zahl(a.gbauj), wohnungen: zahl(a.ganzwhg), kategorie: zahl(a.gkat) };
   const liste = wohnungenAusRegister(a);
   if (liste.length) g.wohnungsliste = liste;
   return g;

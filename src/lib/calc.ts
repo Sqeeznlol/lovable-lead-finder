@@ -49,6 +49,11 @@ export interface CalcAnnahmen extends Annahmen {
   /** Zuschlag auf die Baukosten eines kleinen Projekts (0 bis 1), und bis zu welchen Baukosten ein Projekt klein ist (CHF). */
   klein: number;
   kleinGrenze: number;
+  /**
+   * Was ein m² vermietbare Fläche im Bestand wert ist, als Anteil am
+   * Verkaufspreis je m² (Erlös). Leer oder 0: nur der Ertragswert zählt.
+   */
+  bestandAnteil?: number;
 }
 /**
  * Julian, 16. November: «Wir brauchen eine Gewinnmarge von 20 %», und
@@ -63,6 +68,11 @@ export const CALC_ANNAHMEN: CalcAnnahmen = {
   arealMin: 3000, arealBonus: 0.1,
   // Julian, 18. November (YOMORI): unter 10 Mio. Baukosten 30 % teurer.
   klein: 0.3, kleinGrenze: 10_000_000,
+  // Tim, 20. November (Schöneggstrasse 18): «10k/m² HNF ... manchmal ist der
+  // Bestand mehr wert als die zu günstig kapitalisierte Miete». 10'000 sind
+  // 57.8 % der 17'300, die Stockwerkeigentum dort kostet; anderswo gilt
+  // derselbe Anteil am örtlichen Preis, nicht dieselbe Zahl.
+  bestandAnteil: 0.578,
 };
 
 /**
@@ -334,8 +344,14 @@ export interface Bestand {
   baujahr: number | null;
   /** Vermietbare Fläche, m². */
   flaeche: number | null;
-  /** hand: eingegeben. register: Summe der Wohnungen im Gebäuderegister. fussabdruck: geschätzt. */
-  flaecheArt: 'hand' | 'register' | 'fussabdruck' | null;
+  /**
+   * hand: eingegeben. register: Summe der Wohnungen im Gebäuderegister.
+   * fussabdruck: geschätzt. gemischt: Haus mit Gewerbe, aus dem Fussabdruck,
+   * weil das Register nur die Wohnungen führt.
+   */
+  flaecheArt: 'hand' | 'register' | 'fussabdruck' | 'gemischt' | null;
+  /** Die Wohnungen laut Register, m²; bei «gemischt» der Teil der Fläche, der Wohnung ist. */
+  flaecheWohnungen: number | null;
   /** Der Mieterspiegel: jede Wohnung mit Fläche und Miete, und woher die Miete stammt. */
   spiegel: SpiegelZeile[];
   /** CHF je m² und Monat. */
@@ -344,7 +360,16 @@ export interface Bestand {
   mieteArt: 'ertrag' | 'spiegel' | 'hand' | 'statistik';
   mieteQuelle: string;
   ertragHeute: number;
+  /** Das Höhere aus Ertragswert und Flächenwert. */
   wert: number;
+  /** Ertrag ÷ Rendite. */
+  wertMiete: number;
+  /** Fläche × Wert je m² (Tim, 20. November); null ohne Fläche oder Anteil. */
+  wertFlaeche: number | null;
+  /** CHF je m² vermietbare Fläche, für den Flächenwert. */
+  jeM2: number | null;
+  /** Welcher der beiden zählt. */
+  wertArt: 'miete' | 'flaeche';
   /** Median der Inserate, CHF je m² und Monat; null ohne Inserate. */
   marktmiete: number | null;
   vergleiche: number;
@@ -514,7 +539,11 @@ export function bewerten(e: CalcEingabe): Bewertung {
   // Die Wohnungen laut Register: ihre Fläche ist die vermietbare, genauer als jeder Fussabdruck.
   const liste = g.gebaeude.flatMap(x => x.wohnungsliste ?? []);
   const flaecheRegister = liste.length && liste.every(w => pos(w.flaeche)) ? liste.reduce((s, w) => s + w.flaeche!, 0) : null;
-  const flaecheB = flaecheHand ?? flaecheRegister ?? (studie.gfBestand != null ? studie.gfBestand * a.hnfFaktor : null);
+  const schaetzung = studie.gfBestand != null ? studie.gfBestand * a.hnfFaktor : null;
+  // Ein Haus mit Gewerbe: das Register kennt nur die Wohnungen, Läden und Büros fehlen.
+  const gemischt = !flaecheHand && flaecheRegister != null && schaetzung != null && schaetzung > flaecheRegister
+    && g.gebaeude.some(x => x.kategorie === 1040);
+  const flaecheB = flaecheHand ?? (gemischt ? schaetzung : flaecheRegister) ?? schaetzung;
   const statistik = mieteStatistik(e.kanton, haupt?.baujahr);
   const mieteHand = pos(e.hand.mieteHeute);
   const satzJeM2 = mieteHand ?? statistik?.wert ?? null;
@@ -525,7 +554,9 @@ export function bewerten(e: CalcEingabe): Bewertung {
   });
   const ausSpiegel = spiegel.some(z => z.quelle === 'eingabe') && spiegel.every(z => z.miete != null) && !flaecheHand
     ? spiegel.reduce((s, z) => s + z.miete!, 0) * 12 : null;
-  const ertragHeute = ertragHand ?? ausSpiegel ?? (flaecheB && satzJeM2 ? flaecheB * satzJeM2 * 12 : null);
+  // Bei Gewerbe im Haus kommt zum Mieterspiegel der Rest der Fläche, zur Miete je m².
+  const rest = gemischt && satzJeM2 ? (flaecheB! - flaecheRegister!) * satzJeM2 * 12 : 0;
+  const ertragHeute = ertragHand ?? (ausSpiegel != null ? ausSpiegel + rest : null) ?? (flaecheB && satzJeM2 ? flaecheB * satzJeM2 * 12 : null);
   // Ein Mehrfamilienhaus laut Register, oder jemand hat Mieten eingetragen.
   const vermietet = (wohnungen ?? 0) >= 3 || !!ertragHand || !!mieteHand || !!flaecheHand || vergleiche.length > 0 || ausSpiegel != null;
   let bestand: Bestand | null = null;
@@ -534,16 +565,23 @@ export function bewerten(e: CalcEingabe): Bewertung {
     const ertragMarkt = marktmiete && flaecheB ? flaecheB * marktmiete * 12 : null;
     const eingabeZahl = spiegel.filter(z => z.quelle === 'eingabe').length;
     const art: Bestand['mieteArt'] = ertragHand ? 'ertrag' : ausSpiegel ? 'spiegel' : mieteHand ? 'hand' : 'statistik';
+    const wertMiete = ertragHeute / a.rendite;
+    // Entwürfe von vor dem 20. November kennen den Anteil nicht: dann gilt Tims Vorgabe. 0 schaltet den Flächenwert ab.
+    const anteil = a.bestandAnteil === undefined ? CALC_ANNAHMEN.bestandAnteil : a.bestandAnteil;
+    const jeM2 = pos(anteil) && pos(a.erloes) ? Math.round((a.erloes * anteil!) / 100) * 100 : null;
+    const wertFlaeche = jeM2 && flaecheB ? flaecheB * jeM2 : null;
     bestand = {
       wohnungen, baujahr: haupt?.baujahr ?? null, flaeche: flaecheB,
-      flaecheArt: flaecheHand ? 'hand' : flaecheRegister ? 'register' : flaecheB ? 'fussabdruck' : null,
+      flaecheArt: flaecheHand ? 'hand' : gemischt ? 'gemischt' : flaecheRegister ? 'register' : flaecheB ? 'fussabdruck' : null,
+      flaecheWohnungen: flaecheRegister,
       spiegel,
       mieteHeute: art === 'ertrag' || art === 'spiegel' ? (flaecheB ? ertragHeute / 12 / flaecheB : null) : satzJeM2,
       mieteArt: art,
       mieteQuelle: art === 'ertrag' ? 'Mietertrag laut Eingabe'
-        : art === 'spiegel' ? `${eingabeZahl} von ${spiegel.length} Wohnungen laut Eingabe${eingabeZahl < spiegel.length ? `, die übrigen mit ${mieteHand ? 'der eingegebenen Miete je m²' : statistik!.text}` : ''}`
+        : art === 'spiegel' ? `${eingabeZahl} von ${spiegel.length} Wohnungen laut Eingabe${eingabeZahl < spiegel.length ? `, die übrigen mit ${mieteHand ? 'der eingegebenen Miete je m²' : statistik!.text}` : ''}${gemischt ? `; Gewerbe (${de(Math.round(flaecheB! - flaecheRegister!))} m²) mit ${mieteHand ? 'der eingegebenen Miete je m²' : statistik!.text}` : ''}`
         : art === 'hand' ? 'Miete laut Eingabe' : statistik!.text,
-      ertragHeute, wert: ertragHeute / a.rendite, marktmiete, vergleiche: vergleiche.length,
+      ertragHeute, wert: Math.max(wertMiete, wertFlaeche ?? 0), wertMiete, wertFlaeche, jeM2,
+      wertArt: wertFlaeche != null && wertFlaeche > wertMiete ? 'flaeche' : 'miete', marktmiete, vergleiche: vergleiche.length,
       ertragMarkt, wertMarkt: ertragMarkt ? ertragMarkt / a.rendite : null,
     };
   }
@@ -685,8 +723,9 @@ export function bewerten(e: CalcEingabe): Bewertung {
     if ((bestand.wohnungen ?? 0) >= 3) risiken.push(`${bestand.wohnungen} Wohnungen im Haus: Kündigungen und Erstreckungen brauchen Zeit.`);
   }
   if (wN != null && wB != null) {
-    if (wN > wB) chancen.push(`Als Bauland ist die Liegenschaft ${chf(wN - wB)} mehr wert als mit den heutigen Mieten.`);
-    else risiken.push(`Mit den heutigen Mieten ist das Haus ${chf(wB - wN)} mehr wert als das Land: ein Abbruch lohnt sich nicht.`);
+    const wie = bestand?.wertArt === 'flaeche' ? 'nach seiner Fläche' : 'mit den heutigen Mieten';
+    if (wN > wB) chancen.push(`Als Bauland ist die Liegenschaft ${chf(wN - wB)} mehr wert als ${wie}.`);
+    else risiken.push(`${wie[0].toUpperCase()}${wie.slice(1)} ist das Haus ${chf(wB - wN)} mehr wert als das Land: ein Abbruch lohnt sich nicht.`);
   }
   if (neubau && erloesQuelle.art === 'annahme' && !u.land) {
     risiken.push(`Der Erlös von CHF ${de(a.erloes)} je m² ist eine Annahme, nicht für diesen Ort gemessen: zwei, drei Kaufinserate eintragen.`);

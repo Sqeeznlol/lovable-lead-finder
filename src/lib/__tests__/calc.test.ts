@@ -120,7 +120,11 @@ describe('CALC YOU LATER: Bestand', () => {
   });
 
   it('der Mietertrag laut Mieterspiegel geht jeder Annahme vor', () => {
-    const o = bewerten({ ...e, hand: { mietertragJahr: 20_000 } });
+    // Für so wenig Miete wäre die Fläche mehr wert (Tim, 20. November); hier zählt nur die Miete.
+    const mitFlaeche = bewerten({ ...e, hand: { mietertragJahr: 20_000 } });
+    expect(mitFlaeche.bestand!.wertArt).toBe('flaeche');
+    expect(mitFlaeche.bestand!.wertMiete).toBe(500_000);
+    const o = bewerten({ ...e, annahmen: { ...e.annahmen, bestandAnteil: 0 }, hand: { mietertragJahr: 20_000 } });
     expect(o.bestand!.mieteArt).toBe('ertrag');
     expect(o.bestand!.wert).toBe(500_000);
     expect(o.massgebend).toBe('neubau');
@@ -603,5 +607,48 @@ describe('CALC YOU LATER: Mieterspiegel aus dem Register (Tim, 20. November)', (
     const o = bewerten({ ...e, hand: { mietertragJahr: 150_000, wohnungMiete: { [haus.wohnungsliste![0].id]: 2000 } } });
     expect(o.bestand!.mieteArt).toBe('ertrag');
     expect(o.bestand!.ertragHeute).toBe(150_000);
+  });
+});
+
+/**
+ * Schöneggstrasse 18 (Tim, 20. November: «eher 4.58 Mio ... 10k/m² HNF ...
+ * manchmal ist der Bestand mehr wert als die zu günstig kapitalisierte
+ * Miete»). Die Zahlen des Hauses stehen so im Gebäuderegister: 85 m²
+ * Grundfläche, 7 Geschosse, Kategorie 1040 (teilweise Wohnnutzung),
+ * 13 Studios mit zusammen 242 m². Erlös 17'300 je m² wie in der Stadt.
+ */
+describe('CALC YOU LATER: Bestand nach Fläche (Tim)', () => {
+  const studios = [18, 18, 20, 18, 18, 20, 18, 18, 20, 18, 18, 20, 18].map((f, i) => ({ id: `148727-${i}`, nr: String(i), geschoss: null, zimmer: 1, flaeche: f }));
+  const haus = { grundflaeche: 85, geschosse: 7, baujahr: 1877, wohnungen: 13, kategorie: 1040, wohnungsliste: studios };
+  const e: CalcEingabe = {
+    ...leer, kanton: 'ZH', annahmen: { ...leer.annahmen, erloes: 17_300 },
+    grundlage: { ...leer.grundlage, flaeche: 101, gebaeude: [haus] },
+  };
+
+  it('Haus mit Gewerbe: die ganze Fläche zählt, nicht nur die Wohnungen', () => {
+    const b = bewerten(e);
+    expect(b.bestand!.flaecheArt).toBe('gemischt');
+    expect(b.bestand!.flaeche).toBeCloseTo(85 * 7 * 0.77, 6);
+    expect(b.bestand!.flaecheWohnungen).toBe(242);
+  });
+
+  it('10’000 je m², weil die Fläche mehr wert ist als die kapitalisierte Miete: rund 4.1 Mio. Angebot', () => {
+    const b = bewerten(e);
+    expect(b.bestand!.jeM2).toBe(10_000);
+    expect(b.bestand!.wertArt).toBe('flaeche');
+    expect(b.bestand!.wertFlaeche).toBeCloseTo(458.15 * 10_000, 0);
+    expect(b.bestand!.wertFlaeche!).toBeGreaterThan(b.bestand!.wertMiete);
+    expect(b.massgebend).toBe('bestand');
+    // 4.58 Mio. weniger 10 % Abschlag: das Angebot von 4.1 Mio.
+    expect(b.empfehlung).toBe(4_120_000);
+  });
+
+  it('ein reines Wohnhaus bleibt bei den Wohnungen; 0 % schaltet den Flächenwert ab', () => {
+    const rein = bewerten({ ...e, grundlage: { ...e.grundlage, gebaeude: [{ ...haus, kategorie: 1025 }] } });
+    expect(rein.bestand!.flaecheArt).toBe('register');
+    expect(rein.bestand!.flaeche).toBe(242);
+    const aus = bewerten({ ...e, annahmen: { ...e.annahmen, bestandAnteil: 0 } });
+    expect(aus.bestand!.wertFlaeche).toBeNull();
+    expect(aus.bestand!.wert).toBe(aus.bestand!.wertMiete);
   });
 });

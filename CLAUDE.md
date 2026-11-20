@@ -212,6 +212,16 @@ senden. Alles Weitere in `docs/calc-you-later.md`.
     Vorschlag neben der Empfehlung; Julians Formel bleibt. Vorlagen,
     Schriften und Farben in `docs/calc-you-later.md`.
 
+  * Der Bestand zählt mit dem Höheren aus Ertragswert und Flächenwert
+    (20. November, Tim zur Schöneggstrasse 18: «10k/m² HNF ... manchmal
+    ist der Bestand mehr wert als die zu günstig kapitalisierte Miete»).
+    Der Wert je m² ist ein Anteil am örtlichen Verkaufspreis (57.8 %, dort
+    10'000 von 17'300), nicht überall 10'000; unter «Annahmen» änderbar, 0
+    schaltet ihn ab. Ein Haus mit Gewerbe (Register-Kategorie 1040) rechnet
+    mit der ganzen Fläche aus dem Fussabdruck: das Register führt nur die
+    Wohnungen (dort 242 von 458 m²). Ergebnis 4.12 Mio., Angebot 4.1 Mio.;
+    `calc.test.ts` rechnet den Fall nach.
+
   * Unter jeder Kalkulation, schon im Entwurf, steht «Stimmt der Preis?»
     wie ein Chatfenster (20. November, Julian zur Schöneggstrasse 18: CALC
     1.41 Mio., Angebot 4.1 Mio., «weil das und das, dass auch Aurora den

@@ -156,15 +156,16 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
   });
 
   // Ein Entwurf von vor dem Mieterspiegel kennt die Wohnungen nicht: sie kommen beim Öffnen frisch aus dem Register.
+  // Seit dem 20. November liest CALC auch die Gebäudekategorie (Wohnungen allein unterschätzen ein Haus mit Gewerbe).
   const altOhneWohnungen = !!alt && !!entwurf?.egrid && (alt.eingabe.grundlage.gebaeude ?? []).length > 0
-    && !(alt.eingabe.grundlage.gebaeude ?? []).some(g => g.wohnungsliste?.length);
+    && (!(alt.eingabe.grundlage.gebaeude ?? []).some(g => g.wohnungsliste?.length) || (alt.eingabe.grundlage.gebaeude ?? []).some(g => g.kategorie === undefined));
   const frisch = useQuery({
     queryKey: ['calc-gebaeude-frisch', entwurf?.egrid], queryFn: () => gebaeudeFrisch(entwurf!.egrid!),
     enabled: altOhneWohnungen, staleTime: 30 * 60 * 1000, retry: 1,
   });
   const basis: Basis | null = useMemo(() => {
     if (alt) {
-      const gebaeude = frisch.data?.some(g => g.wohnungsliste?.length) ? frisch.data : alt.eingabe.grundlage.gebaeude;
+      const gebaeude = frisch.data?.length ? frisch.data : alt.eingabe.grundlage.gebaeude;
       return { adresse: alt.adresse, parzelleNr: alt.parzelleNr, eigentuemer: alt.eigentuemer, luecken: alt.luecken, egrid: entwurf!.egrid,
         parzelleId: entwurf!.parzelle_id, gemeinde: entwurf!.gemeinde, kanton: alt.eingabe.kanton, grundlage: { ...alt.eingabe.grundlage, gebaeude }, umfeld: alt.eingabe.umfeld,
         projekt: alt.eingabe.projekt ?? null };
@@ -419,6 +420,7 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
           <Zahl titel="Wohnungsgrösse" wert={annahmen.wohnungM2} einheit="m²" min={30} max={250} schritt={5} setWert={n => setze({ wohnungM2: n })} />
           <Zahl titel="Abbruch je m² Bestand" wert={annahmen.abbruch} einheit="CHF" min={0} max={2000} schritt={10} setWert={n => setze({ abbruch: n })} />
           <Zahl titel="Rendite des Käufers" wert={Math.round(annahmen.rendite * 1000) / 10} einheit="%" min={1} max={12} schritt={0.1} setWert={n => setze({ rendite: n / 100 })} />
+          <Zahl titel="Bestand je m², Anteil am Erlös" wert={Math.round((annahmen.bestandAnteil ?? CALC_ANNAHMEN.bestandAnteil!) * 1000) / 10} einheit="%" min={0} max={100} schritt={0.1} setWert={n => setze({ bestandAnteil: n / 100 })} />
         </div>
         {/* Woraus die Baukosten bestehen: die Stufe nach Verkaufspreis und die Zuschläge. */}
         {b.neubau && (

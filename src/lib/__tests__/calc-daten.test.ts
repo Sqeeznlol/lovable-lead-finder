@@ -31,7 +31,7 @@ describe('CALC YOU LATER: Adresse des Bundes', () => {
 
 describe('CALC YOU LATER: Gebäude aus dem Register', () => {
   it('übernimmt Fläche, Geschosse, Baujahr und Wohnungen', () => {
-    expect(gebaeudeAusRegister({ gstat: 1004, garea: 393, gastw: 7, gbauj: 1961, gvol: 7610 })).toEqual({ grundflaeche: 393, geschosse: 7, baujahr: 1961, wohnungen: null });
+    expect(gebaeudeAusRegister({ gstat: 1004, garea: 393, gastw: 7, gbauj: 1961, gvol: 7610 })).toEqual({ grundflaeche: 393, geschosse: 7, baujahr: 1961, wohnungen: null, kategorie: null });
     expect(gebaeudeAusRegister({ gstat: 1004, garea: 200, gastw: 3, gbauj: 1965, ganzwhg: 6 })!.wohnungen).toBe(6);
   });
 

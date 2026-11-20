@@ -19,7 +19,7 @@ Drei Bewertungen, die höchste bestimmt den Preis (`src/lib/calc.ts`):
 |---|---|---|
 | **Neubau zum Verkaufen** | Erlös − Baukosten − Abbruch − Gewinn = Landwert | Flächen aus der Machbarkeit (`machbarkeit.ts`): Ziffer und Hülle, die engere gilt |
 | **Neubau zum Vermieten** | Nutzfläche × Miete × 12 ÷ Rendite − Baukosten − Abbruch − Gewinn = Landwert | Miete aus Inseraten, sonst BFS für Baujahre ab 2021 |
-| **Bestand** | vermietbare Fläche × Miete × 12 ÷ Rendite = Ertragswert | Fussabdruck × Geschosse × 77 %; Miete laut Eingabe, sonst BFS nach Baujahr |
+| **Bestand** | das Höhere aus Ertragswert (vermietbare Fläche × Miete × 12 ÷ Rendite) und Flächenwert (vermietbare Fläche × 57.8 % des Verkaufspreises je m²; Tim, 20. November) | Wohnungen laut Register, bei Gewerbe im Haus (Kategorie 1040) Fussabdruck × Geschosse × 77 %; Miete laut Eingabe, sonst BFS nach Baujahr |
 
 Die Empfehlung ist dieser Wert minus Abschlag (Vorgabe 10 %), auf
 10'000 abgerundet. Der Bestand wird bewertet, wenn das Register drei
