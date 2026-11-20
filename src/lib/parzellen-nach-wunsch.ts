@@ -46,3 +46,35 @@ export function wunschCsv(z: WunschParzelle[]): string {
     `${Math.round(p.bauzone_anteil * 100)} %`, p.bebaut == null ? '' : p.bebaut ? 'ja' : 'nein', p.nachweis ?? '', Math.round(p.e), Math.round(p.n), geoAdminLink(p)])]
     .map(r => r.map(feld).join(';')).join('\r\n');
 }
+
+// ------------------------------------------------------------- Favoriten
+
+/**
+ * Eine Parzelle, die jemand ausfindig machen will (Julian, 20. November:
+ * «Button ... ausfindig machen, dann ist es wo, wo man die Daten ausfüllen
+ * kann, aber weg von der Filterseite»). Die Angaben der Parzelle sind
+ * mitgeschrieben: ein Ordner wird mit jeder Lieferung ersetzt, der Favorit
+ * bleibt (Migration 20261120150000).
+ */
+export type FavoritStand = 'suchen' | 'gefunden' | 'kontaktiert' | 'interesse' | 'kein_interesse';
+export const STAND: [FavoritStand, string][] = [
+  ['suchen', 'Eigentümer suchen'], ['gefunden', 'Eigentümer gefunden'], ['kontaktiert', 'Kontaktiert'],
+  ['interesse', 'Interesse'], ['kein_interesse', 'Kein Interesse'],
+];
+export interface WunschFavorit {
+  egrid: string; erstellt_am: string; geaendert_am: string; von: string | null;
+  kanton: string; gemeinde: string; nummer: string; flaeche: number; zone: string; e: number; n: number; lat: number; lon: number;
+  stand: FavoritStand; eigentuemer: string | null; adresse: string | null; telefon: string | null; email: string | null; notiz: string | null;
+}
+export type FavoritAngaben = Pick<WunschFavorit, 'stand' | 'eigentuemer' | 'adresse' | 'telefon' | 'email' | 'notiz'>;
+
+/** Was beim «Ausfindig machen» aus dem Ordner mitgeht. */
+export function favoritAus(p: WunschParzelle, von: string): Omit<WunschFavorit, 'erstellt_am' | 'geaendert_am' | 'stand' | 'eigentuemer' | 'adresse' | 'telefon' | 'email' | 'notiz'> {
+  return { egrid: p.egrid, von: von.trim() || null, kanton: p.kanton, gemeinde: p.gemeinde, nummer: p.nummer, flaeche: p.flaeche, zone: p.zone, e: p.e, n: p.n, lat: p.lat, lon: p.lon };
+}
+
+/** Die Filterliste zeigt, was noch niemand ausfindig macht. */
+export function ohneFavoriten<T extends { egrid: string }>(liste: T[], favoriten: { egrid: string }[]): T[] {
+  const weg = new Set(favoriten.map(f => f.egrid));
+  return liste.filter(p => !weg.has(p.egrid));
+}

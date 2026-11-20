@@ -1,13 +1,15 @@
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Auswahl } from '@/components/Auswahl';
-import { KNOPF, Leer, LISTE, Seite } from '@/components/rahmen';
+import { KNOPF, Leer, LISTE, Reiter, Seite } from '@/components/rahmen';
+import { WunschFavoriten } from '@/components/WunschFavoriten';
+import { useName } from '@/components/calc/name';
 import { BILD, luftbildWgs } from '@/lib/luftbild';
 import { FENSTER } from '@/lib/fenster';
 import { useUrlWert } from '@/hooks/use-url-wert';
-import { geoAdminLink, WOHNEN, wunschCsv, ZONE_KURZ, type WunschOrdner, type WunschParzelle } from '@/lib/parzellen-nach-wunsch';
+import { favoritAus, geoAdminLink, ohneFavoriten, STAND, WOHNEN, wunschCsv, ZONE_KURZ, type FavoritAngaben, type WunschFavorit, type WunschOrdner, type WunschParzelle } from '@/lib/parzellen-nach-wunsch';
 
 /**
  * Parzellen nach Wunsch (Julian, 19. November: «mache ein extra Ordner bei
@@ -38,6 +40,39 @@ export function ParzellenNachWunsch() {
   // Eigener Filter neben der Zone (Julian, 19. November: «Unbebaut/bebaut filter»).
   const [bebaut, setBebaut] = useUrlWert('bebaut', '');
   const [alle, setAlle] = useState(false);
+  // Favoriten (Julian, 20. November): «ausfindig machen ... wo man die Daten ausfüllen kann, aber weg von der Filterseite».
+  const [sicht, setSicht] = useUrlWert('sicht', '');
+  const [name] = useName();
+  const qc = useQueryClient();
+  const [legtAn, setLegtAn] = useState<string | null>(null);
+  const [fehler, setFehler] = useState<string | null>(null);
+  const favoriten = useQuery({
+    queryKey: ['wunsch-favoriten'],
+    queryFn: async (): Promise<WunschFavorit[]> => {
+      const { data, error } = await db.from('wunsch_favorit').select('*').order('geaendert_am', { ascending: false }).limit(2000);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const favListe = favoriten.data ?? [];
+  const ausfindig = async (p: WunschParzelle) => {
+    setLegtAn(p.egrid); setFehler(null);
+    const { error } = await db.from('wunsch_favorit').insert(favoritAus(p, name));
+    // Schon da (jemand anders war schneller): dann einfach neu lesen.
+    if (error && error.code !== '23505') setFehler('Nicht in die Favoriten gelegt. Ist die Migration eingespielt?');
+    await qc.invalidateQueries({ queryKey: ['wunsch-favoriten'] });
+    setLegtAn(null);
+  };
+  const speichern = async (egrid: string, a: FavoritAngaben) => {
+    const { error } = await db.from('wunsch_favorit').update({ ...a, geaendert_am: new Date().toISOString() }).eq('egrid', egrid);
+    if (error) throw new Error('Nicht gespeichert. Bitte noch einmal.');
+    await qc.invalidateQueries({ queryKey: ['wunsch-favoriten'] });
+  };
+  const entfernen = async (egrid: string) => {
+    const { error } = await db.from('wunsch_favorit').delete().eq('egrid', egrid);
+    if (error) setFehler('Nicht zurückgelegt. Bitte noch einmal.');
+    await qc.invalidateQueries({ queryKey: ['wunsch-favoriten'] });
+  };
 
   const ordner = useQuery({
     queryKey: ['wunsch-ordner'],
@@ -64,7 +99,8 @@ export function ParzellenNachWunsch() {
     staleTime: 60 * 60 * 1000,
   });
 
-  const z = useMemo(() => parzellen.data ?? [], [parzellen.data]);
+  // Was jemand ausfindig macht, steht nicht mehr in der Filterliste, sondern bei den Favoriten.
+  const z = useMemo(() => ohneFavoriten(parzellen.data ?? [], favoriten.data ?? []), [parzellen.data, favoriten.data]);
   const kantone = useMemo(() => {
     const m = new Map<string, number>();
     for (const p of z) m.set(p.kanton, (m.get(p.kanton) ?? 0) + 1);
@@ -93,11 +129,29 @@ export function ParzellenNachWunsch() {
     URL.revokeObjectURL(url);
   };
 
+  const reiter = (
+    <Reiter wahl={sicht === 'favoriten' ? 'favoriten' : 'liste'} setWahl={w => setSicht(w === 'favoriten' ? 'favoriten' : '')}
+            optionen={[{ wert: 'liste', titel: 'Parzellen', zahl: z.length }, { wert: 'favoriten', titel: 'Favoriten', zahl: favListe.length }]} />
+  );
+
+  if (sicht === 'favoriten') return (
+    <Seite bild={BILD.wunsch} ueber="Parzellen nach Wunsch · Favoriten"
+      titel={favoriten.data ? `${ch(favListe.length)} ${favListe.length === 1 ? 'Parzelle' : 'Parzellen'} ausfindig machen` : ' '}
+      unter={<>Eigentümer, Kontakt und Stand je Parzelle. Was hier liegt, steht nicht mehr in der Liste.</>}
+      kennzahlen={favoriten.data ? STAND.map(([w, t]) => ({ titel: t, wert: ch(favListe.filter(f => f.stand === w).length) })) : undefined}>
+      {reiter}
+      {favoriten.error && <p className="text-sm text-destructive">Favoriten nicht lesbar. Ist die Migration eingespielt?</p>}
+      {fehler && <p className="text-sm text-destructive">{fehler}</p>}
+      <WunschFavoriten liste={favListe} laedt={favoriten.isLoading} speichern={speichern} entfernen={entfernen} />
+    </Seite>
+  );
+
   return (
     <Seite bild={BILD.wunsch} ueber={o ? `Parzellen nach Wunsch · ${o.name}` : 'Parzellen nach Wunsch'}
       titel={parzellen.data ? `${ch(treffer.length)} Parzellen ${(o?.kriterium ?? '').replace(' m²', '\u00a0m²')}`.trim() : ' '}
       unter={o && <>{o.quelle} Stand {o.stand}.</>}
       kennzahlen={parzellen.data ? KENNZAHLEN.map(k => ({ titel: k.titel, wert: ch(inGemeinde.filter(k.passt).length), onClick: () => setZone(zone === k.zone ? '' : k.zone) })) : undefined}>
+      {reiter}
       <div className="flex flex-wrap items-center gap-2">
         {(ordner.data?.length ?? 0) > 1 && (
           <Auswahl label="Ordner" wert={o?.id ?? ''} setWert={w => { setOrdnerId(w); setKanton(''); setGemeinde(''); setZone(''); setBebaut(''); }} className="min-w-[220px]"
@@ -121,6 +175,7 @@ export function ParzellenNachWunsch() {
         <button type="button" className={KNOPF} disabled={!treffer.length} onClick={herunterladen}>Als CSV ({ch(treffer.length)})</button>
       </div>
 
+      {fehler && <p className="text-sm text-destructive">{fehler}</p>}
       {(ordner.isLoading || parzellen.isLoading) && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> wird geladen …</p>}
       {(ordner.error || parzellen.error) && <p className="text-sm text-destructive">Parzellen nach Wunsch nicht lesbar. Ist die Migration eingespielt?</p>}
       {ordner.data && !ordner.data.length && <Leer titel="Noch kein Ordner angelegt." />}
@@ -140,7 +195,12 @@ export function ParzellenNachWunsch() {
                   {p.nachweis && <span className="block text-xs text-muted-foreground">{p.nachweis}</span>}
                   <span className="block truncate text-xs text-muted-foreground">{p.egrid}</span>
                 </span>
-                <a className="inline-flex h-11 shrink-0 items-center text-sm underline underline-offset-2" target={FENSTER.karte} href={geoAdminLink(p)}>Karte</a>
+                <span className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-3">
+                  <button type="button" className={KNOPF} disabled={legtAn === p.egrid} onClick={() => void ausfindig(p)}>
+                    {legtAn === p.egrid ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Ausfindig machen
+                  </button>
+                  <a className="inline-flex h-11 items-center text-sm underline underline-offset-2" target={FENSTER.karte} href={geoAdminLink(p)}>Karte</a>
+                </span>
               </li>
             ))}
           </ul>

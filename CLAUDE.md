@@ -360,6 +360,12 @@ in Ingenbohl; gerechnet wird die Gemeinde.
     zurücksetzen) überschrieben sich, und der Filter tat nichts
     (19. November). `use-url-wert.ts` baut seither auf dem zuletzt
     geschriebenen Stand auf; `use-url-wert.test.tsx` spielt es nach.
+  * Favoriten (20. November, Julian: «Button ... ausfindig machen, dann ist
+    es wo, wo man die Daten ausfüllen kann, aber weg von der Filterseite»):
+    «Ausfindig machen» legt eine Parzelle in `wunsch_favorit`, mit ihren
+    Angaben, damit sie eine neue Lieferung des Ordners übersteht. Dort stehen
+    Stand, Eigentümer und Kontakt (nur in der Datenbank); in der Filterliste
+    erscheint sie nicht mehr.
 
 ## Gestaltung
 

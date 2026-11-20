@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { geoAdminLink, WOHNEN, wunschCsv, ZONE_KURZ, type WunschParzelle } from '@/lib/parzellen-nach-wunsch';
+import { favoritAus, geoAdminLink, ohneFavoriten, STAND, WOHNEN, wunschCsv, ZONE_KURZ, type WunschParzelle } from '@/lib/parzellen-nach-wunsch';
 
 /**
  * Parzellen nach Wunsch (19. November). Wird rot, wenn eine Parzelle das
@@ -79,5 +79,30 @@ describe('Parzellen nach Wunsch: der erste Ordner', () => {
     expect(index).toMatch(/\{ id: 'wunsch', label: 'Parzellen nach Wunsch'/);
     expect(index).toMatch(/nachladen\(\(\) => import\('@\/components\/ParzellenNachWunsch'\)/);
     expect(readFileSync('tools/reiter-pruefen.cjs', 'utf8')).toMatch(/'wunsch'/);
+  });
+});
+
+describe('Parzellen nach Wunsch: Favoriten (20. November)', () => {
+  const p: WunschParzelle = { egrid: 'CH000000000001', kanton: 'OW', bfs: 1407, gemeinde: 'TEST', nummer: '7', flaeche: 3200, zone: 'Wohnzonen', bauzone_anteil: 1, e: 2661000, n: 1194000, lat: 46.9, lon: 8.2 };
+
+  it('was ausfindig gemacht wird, steht nicht mehr in der Filterliste', () => {
+    const andere = { ...p, egrid: 'CH000000000002' };
+    expect(ohneFavoriten([p, andere], [{ egrid: p.egrid }])).toEqual([andere]);
+  });
+
+  it('der Favorit nimmt die Angaben der Parzelle mit, nicht nur die EGRID', () => {
+    const f = favoritAus(p, '  TEST  ');
+    expect(f).toMatchObject({ egrid: p.egrid, gemeinde: 'TEST', nummer: '7', flaeche: 3200, von: 'TEST', lat: 46.9 });
+    expect(STAND.map(([w]) => w)).toEqual(['suchen', 'gefunden', 'kontaktiert', 'interesse', 'kein_interesse']);
+  });
+
+  it('nur für Angemeldete, nie ohne Anmeldung oder für Fondsleitungen; Knopf und Ansicht stehen im Reiter', () => {
+    const sql = readFileSync('supabase/migrations/20261120150000_wunsch_favorit.sql', 'utf8');
+    expect(sql).toMatch(/revoke all on public\.wunsch_favorit from public, anon, authenticated/);
+    expect(sql.match(/not public\.ist_fondsmanager\(\)/g)?.length).toBeGreaterThanOrEqual(4);
+    const seite = readFileSync('src/components/ParzellenNachWunsch.tsx', 'utf8');
+    expect(seite).toMatch(/Ausfindig machen/);
+    expect(seite).toMatch(/ohneFavoriten\(/);
+    expect(seite).toMatch(/<WunschFavoriten /);
   });
 });
