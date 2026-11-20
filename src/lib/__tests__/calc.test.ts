@@ -120,11 +120,9 @@ describe('CALC YOU LATER: Bestand', () => {
   });
 
   it('der Mietertrag laut Mieterspiegel geht jeder Annahme vor', () => {
-    // Für so wenig Miete wäre die Fläche mehr wert (Tim, 20. November); hier zählt nur die Miete.
-    const mitFlaeche = bewerten({ ...e, hand: { mietertragJahr: 20_000 } });
-    expect(mitFlaeche.bestand!.wertArt).toBe('flaeche');
-    expect(mitFlaeche.bestand!.wertMiete).toBe(500_000);
-    const o = bewerten({ ...e, annahmen: { ...e.annahmen, bestandAnteil: 0 }, hand: { mietertragJahr: 20_000 } });
+    // Den Flächenwert (Tim, 20. November) gibt es nur in der Stadt Zürich; hier zählt die Miete.
+    const o = bewerten({ ...e, hand: { mietertragJahr: 20_000 } });
+    expect(o.bestand!.wertFlaeche).toBeNull();
     expect(o.bestand!.mieteArt).toBe('ertrag');
     expect(o.bestand!.wert).toBe(500_000);
     expect(o.massgebend).toBe('neubau');
@@ -621,9 +619,16 @@ describe('CALC YOU LATER: Bestand nach Fläche (Tim)', () => {
   const studios = [18, 18, 20, 18, 18, 20, 18, 18, 20, 18, 18, 20, 18].map((f, i) => ({ id: `148727-${i}`, nr: String(i), geschoss: null, zimmer: 1, flaeche: f }));
   const haus = { grundflaeche: 85, geschosse: 7, baujahr: 1877, wohnungen: 13, kategorie: 1040, wohnungsliste: studios };
   const e: CalcEingabe = {
-    ...leer, kanton: 'ZH', annahmen: { ...leer.annahmen, erloes: 17_300 },
+    ...leer, kanton: 'ZH', annahmen: { ...leer.annahmen, erloes: 17_300 }, umfeld: { ...leer.umfeld, gemeinde: 'Zürich' },
     grundlage: { ...leer.grundlage, flaeche: 101, gebaeude: [haus] },
   };
+
+  it('nur in der Stadt Zürich (Julian, 20. November): in Schlieren zählt allein die Miete', () => {
+    const b = bewerten({ ...e, umfeld: { ...e.umfeld, gemeinde: 'Schlieren' } });
+    expect(b.bestand!.wertFlaeche).toBeNull();
+    expect(b.bestand!.wert).toBe(b.bestand!.wertMiete);
+    expect(b.bestand!.flaecheArt).toBe('gemischt');
+  });
 
   it('Haus mit Gewerbe: die ganze Fläche zählt, nicht nur die Wohnungen', () => {
     const b = bewerten(e);

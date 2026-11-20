@@ -70,8 +70,8 @@ export const CALC_ANNAHMEN: CalcAnnahmen = {
   klein: 0.3, kleinGrenze: 10_000_000,
   // Tim, 20. November (Schöneggstrasse 18): «10k/m² HNF ... manchmal ist der
   // Bestand mehr wert als die zu günstig kapitalisierte Miete». 10'000 sind
-  // 57.8 % der 17'300, die Stockwerkeigentum dort kostet; anderswo gilt
-  // derselbe Anteil am örtlichen Preis, nicht dieselbe Zahl.
+  // 57.8 % der 17'300, die Stockwerkeigentum dort kostet. Gilt vorerst nur
+  // in der Stadt Zürich (inStadtZuerich).
   bestandAnteil: 0.578,
 };
 
@@ -419,6 +419,10 @@ export interface Bewertung {
   risiken: string[];
 }
 
+/** Die Stadt Zürich, nicht der Kanton: die Gemeinde heisst in den amtlichen Preisen wie im Register «Zürich». */
+export const inStadtZuerich = (e: Pick<CalcEingabe, 'kanton' | 'umfeld'>): boolean =>
+  e.kanton === 'ZH' && (e.umfeld?.gemeinde ?? '').trim().toLowerCase() === 'zürich';
+
 const pos = (v: number | null | undefined): number | null => (v != null && Number.isFinite(v) && v > 0 ? v : null);
 const de = (n: number, stellen = 0) => n.toLocaleString('de-CH', { maximumFractionDigits: stellen });
 const prozent = (anteil: number) => Math.round(anteil * 100);
@@ -567,7 +571,8 @@ export function bewerten(e: CalcEingabe): Bewertung {
     const art: Bestand['mieteArt'] = ertragHand ? 'ertrag' : ausSpiegel ? 'spiegel' : mieteHand ? 'hand' : 'statistik';
     const wertMiete = ertragHeute / a.rendite;
     // Entwürfe von vor dem 20. November kennen den Anteil nicht: dann gilt Tims Vorgabe. 0 schaltet den Flächenwert ab.
-    const anteil = a.bestandAnteil === undefined ? CALC_ANNAHMEN.bestandAnteil : a.bestandAnteil;
+    // Vorerst nur in der Stadt Zürich (Julian, 20. November: «mach das mal nur in der Stadt ZH»): dort ist er geeicht.
+    const anteil = !inStadtZuerich(e) ? 0 : a.bestandAnteil === undefined ? CALC_ANNAHMEN.bestandAnteil : a.bestandAnteil;
     const jeM2 = pos(anteil) && pos(a.erloes) ? Math.round((a.erloes * anteil!) / 100) * 100 : null;
     const wertFlaeche = jeM2 && flaecheB ? flaecheB * jeM2 : null;
     bestand = {

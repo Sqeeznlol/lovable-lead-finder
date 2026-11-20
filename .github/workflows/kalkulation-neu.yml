@@ -1,0 +1,60 @@
+# =====================================================================
+# Kalkulationen neu rechnen
+# =====================================================================
+# Ein Entwurf von CALC YOU LATER speichert sein Ergebnis beim Speichern.
+# Ändert sich die Rechnung (20. November: Tims Flächenwert in der Stadt
+# Zürich, Häuser mit Gewerbe), steht in der Liste die alte Empfehlung.
+# Dieser Ablauf rechnet alle Entwürfe mit der heutigen Rechnung neu
+# (tools/kalkulation_neu.ts). Eingereichte Kalkulationen bleiben, wie sie
+# geprüft werden: geschrieben wird nur, wo zustand = 'entwurf'.
+#
+# «zeigen» rechnet und listet alt und neu, ohne zu schreiben.
+# Ausgegeben werden Adresse und Zahlen, nie Eigentümer oder Personen.
+# =====================================================================
+name: Kalkulationen neu rechnen
+
+on:
+  workflow_dispatch:
+    inputs:
+      schritt:
+        description: 'Was getan werden soll'
+        required: true
+        default: 'zeigen'
+        type: choice
+        options:
+          - zeigen     # alt und neu auflisten
+          - schreiben  # die neuen Ergebnisse in die Entwürfe schreiben
+
+jobs:
+  neu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Werkzeuge
+        run: sudo apt-get install -y -qq postgresql-client && npm ci --no-audit --no-fund
+
+      - name: Neu rechnen
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+          SCHRITT: ${{ inputs.schritt }}
+        run: |
+          set -euo pipefail
+          [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
+          # Klein: eine Zeile je Lead. Trotzdem mit Frist (CLAUDE.md: Die Datenbank bedient die Seite).
+          psql "$DB" -X -q -At -v ON_ERROR_STOP=1 -c "set statement_timeout = '30s';" \
+            -c "select coalesce(json_agg(json_build_object('id', id, 'egrid', egrid, 'adresse', adresse, 'empfehlung_chf', empfehlung_chf, 'eingaben', eingaben)), '[]') from public.kalkulation where zustand = 'entwurf'" > ein.json
+          npx vite-node tools/kalkulation_neu.ts -- ein.json aus.json | tee -a "$GITHUB_STEP_SUMMARY"
+          [ "$SCHRITT" = schreiben ] || { echo "Nur gezeigt, nichts geschrieben."; exit 0; }
+          # Nur Entwürfe, auch wenn einer seit dem Lesen eingereicht wurde.
+          # Über psql gelesen, nicht als Argument: ein Entwurf ist bis 100 KB, die Befehlszeile hat Grenzen.
+          psql "$DB" -X -q -v ON_ERROR_STOP=1 <<'SQL'
+          \set daten `cat aus.json`
+          set statement_timeout = '30s';
+          with neu as (select * from json_to_recordset(:'daten'::json) as x(id uuid, eingaben jsonb, ergebnis jsonb, empfehlung_chf numeric))
+          update public.kalkulation k set eingaben = neu.eingaben, ergebnis = neu.ergebnis, empfehlung_chf = neu.empfehlung_chf, geaendert_am = now()
+            from neu where k.id = neu.id and k.zustand = 'entwurf';
+          SQL
+          echo "Geschrieben: $(psql "$DB" -X -At -c "select count(*) from public.kalkulation where zustand = 'entwurf' and geaendert_am > now() - interval '5 minutes'") Entwürfe." | tee -a "$GITHUB_STEP_SUMMARY"
