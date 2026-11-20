@@ -211,6 +211,10 @@ senden. Alles Weitere in `docs/calc-you-later.md`.
     Adressen von Eigentümern. Aus den Urteilen lernt die Seite einen
     Vorschlag neben der Empfehlung; Julians Formel bleibt. Vorlagen,
     Schriften und Farben in `docs/calc-you-later.md`.
+    Lebensraum ist keine wählbare Vorlage mehr (20. November, Julian:
+    «Lebensraum wegnehmen als Vorlage»; `FIRMEN_WAHL`). Das Luftbild des
+    Deckblatts zeigt das Haus: Ausschnitt nach Grösse des Grundstücks, 80 bis
+    160 m (`deckblattBreite`).
 
   * Der Bestand zählt mit dem Höheren aus Ertragswert und Flächenwert
     (20. November, Tim zur Schöneggstrasse 18: «10k/m² HNF ... manchmal

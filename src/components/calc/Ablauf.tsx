@@ -6,7 +6,7 @@ import { Bemerkungen } from '@/components/calc/Bemerkungen';
 import { Ergebnis, Objektkopf } from '@/components/calc/Ergebnis';
 import { useJetzt, useName } from '@/components/calc/name';
 import {
-  adressbloecke, AM_ZUG, anrede, brief, empfaenger, felderVorgabe, FIRMEN, katNummern, lernen, LERNEN_AB, luecken, nachricht, punkteAlsText,
+  adressbloecke, AM_ZUG, anrede, brief, deckblattBreite, empfaenger, felderVorgabe, FIRMEN, FIRMEN_WAHL, katNummern, lernen, LERNEN_AB, luecken, nachricht, punkteAlsText,
   SCHRIFTEN, URTEIL_TEXT, VORLAGEN, vorlageVorschlag, vorschlag, type AblaufPerson, type AngebotFelder, type FirmaId, type Kontext,
   type SchriftId, type Unterschrift, type Urteil, type VorlageId,
 } from '@/lib/angebot';
@@ -73,7 +73,8 @@ async function luftbild(k: Kalkulation): Promise<string | null> {
   const halt = new AbortController();
   const t = setTimeout(() => halt.abort(), 8000);
   try {
-    const r = await fetch(luftbildLv95(a.e, a.n, 160, 1280), { signal: halt.signal });
+    // Das Haus soll das Bild füllen, nicht das Quartier (Julian, 20. November: «da sollte das Haus sein»).
+    const r = await fetch(luftbildLv95(a.e, a.n, deckblattBreite(k), 1280), { signal: halt.signal });
     if (!r.ok) return null;
     const blob = await r.blob();
     return await new Promise(ok => { const f = new FileReader(); f.onload = () => ok(String(f.result)); f.onerror = () => ok(null); f.readAsDataURL(blob); });
@@ -474,7 +475,7 @@ function AngebotBearbeiten({ k, firma, setFirma, vorlage, setVorlage, schrift, s
       <div className="space-y-1.5">
         <p className={ETIKETT}>Firma</p>
         <div className="flex flex-wrap gap-2">
-          {(Object.keys(FIRMEN) as FirmaId[]).map(f => <button key={f} type="button" aria-pressed={firma === f} className={WAHL(firma === f)} onClick={() => setFirma(f)}>{FIRMEN[f].name}</button>)}
+          {[...FIRMEN_WAHL, ...(FIRMEN_WAHL.includes(k.firma ?? 'stimo') ? [] : [k.firma!])].map(f => <button key={f} type="button" aria-pressed={firma === f} className={WAHL(firma === f)} onClick={() => setFirma(f)}>{FIRMEN[f].name}</button>)}
         </div>
       </div>
 

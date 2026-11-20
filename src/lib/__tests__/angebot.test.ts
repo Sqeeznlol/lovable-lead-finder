@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  adressbloecke, anrede, brief, chfText, felderVorgabe, FIRMEN, inWorten, lernen, leerePerson, luecken, nachricht,
+  adressbloecke, anrede, brief, chfText, deckblattBreite, felderVorgabe, FIRMEN, FIRMEN_WAHL, inWorten, lernen, leerePerson, luecken, nachricht,
   parzellenText, personenAusEigentuemer, punkteAlsText, vorschlag, VORLAGEN, type Kontext, type Person, type Rueckmeldung, type VorlageId,
 } from '@/lib/angebot';
 import { angebotDateiname, angebotPdf } from '@/lib/angebot-pdf';
@@ -191,5 +191,18 @@ describe.skipIf(!pdftotext)('Angebot: das PDF', () => {
   it('der Dateiname wie in den Vorlagen', () => {
     expect(angebotDateiname('Glattalstrasse 138–142', '2026-09-23')).toBe('Kaufangebot_Glattalstrasse138142_2026-09-23.pdf');
     expect(angebotDateiname('Zürichstrasse 5', '2026-01-02')).toBe('Kaufangebot_Zurichstrasse5_2026-01-02.pdf');
+  });
+});
+
+describe('Angebot, 20. November', () => {
+  it('Lebensraum ist keine Vorlage mehr, frühere Angebote bleiben lesbar', () => {
+    expect(FIRMEN_WAHL).toEqual(['stimo', 'studer']);
+    expect(FIRMEN.lebensraum.name).toBe('Lebensraum Schweiz AG');
+  });
+  it('das Deckblatt zeigt das Haus: Ausschnitt nach der Grösse des Grundstücks', () => {
+    const k = (flaeche: number) => ({ parzellen: [], eingaben: { eingabe: { grundlage: { flaeche } } } });
+    expect(deckblattBreite(k(101))).toBe(80);
+    expect(deckblattBreite(k(900))).toBe(120);
+    expect(deckblattBreite(k(20_000))).toBe(160);
   });
 });

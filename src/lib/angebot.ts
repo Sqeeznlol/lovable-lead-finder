@@ -21,6 +21,13 @@
  */
 
 export type FirmaId = 'stimo' | 'lebensraum' | 'studer';
+/**
+ * Welche Firmen David wählen kann. Lebensraum ist seit dem 20. November
+ * keine Vorlage mehr (Julian: «Lebensraum wegnehmen als Vorlage»); die
+ * Firma bleibt in FIRMEN, damit frühere Angebote sich weiter zeigen lassen.
+ */
+export const FIRMEN_WAHL: FirmaId[] = ['stimo', 'studer'];
+
 export type VorlageId = 'bauland' | 'bestand' | 'bedingt' | 'bieterverfahren' | 'unverbindlich';
 export type SchriftId = 'nunito' | 'dmsans' | 'carlito' | 'serif' | 'helvetica';
 export type Urteil = 'zu_tief' | 'passt' | 'zu_hoch';
@@ -674,3 +681,16 @@ export function nachricht(o: { zustand: string; adresse: string; ort: string; pr
     whatsapp: nummer ? `https://wa.me/${nummer}?text=${encodeURIComponent(text)}` : `https://wa.me/?text=${encodeURIComponent(text)}`,
   };
 }
+
+/**
+ * Wie breit der Ausschnitt des Deckblatts ist, in Metern: viermal die Seite
+ * des Grundstücks, mindestens 80 m, höchstens 160 m wie bisher. Verglichen
+ * an der Schöneggstrasse 18: bei 160 m ist das Haus eines unter vielen, bei
+ * 45 m liefert der Bund ein dunkles, unscharfes Bild; bei 80 m füllt das
+ * Haus die Mitte und ist scharf.
+ */
+export function deckblattBreite(k: { parzellen?: Parzelle[] | null; eingaben: { eingabe: { grundlage: { flaeche: number } } } }): number {
+  const flaeche = (k.parzellen ?? []).reduce((s, p) => s + (p.flaeche ?? 0), 0) || k.eingaben.eingabe.grundlage.flaeche || 0;
+  return Math.round(Math.min(160, Math.max(80, Math.sqrt(flaeche) * 4)));
+}
+
