@@ -469,8 +469,44 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Offen titel="Mietertrag im Jahr, netto" wert={hand.mietertragJahr} einheit="CHF" setWert={n => vonHand({ mietertragJahr: n })} />
           <Offen titel="Miete heute je m² und Monat" wert={hand.mieteHeute} einheit="CHF" platz={b.bestand?.mieteArt === 'statistik' && b.bestand.mieteHeute ? de(b.bestand.mieteHeute, 2) : undefined} setWert={n => vonHand({ mieteHeute: n })} />
-          <Offen titel="Vermietbare Fläche" wert={hand.wohnflaeche} einheit="m²" platz={b.bestand?.flaecheArt === 'fussabdruck' && b.bestand.flaeche ? de(Math.round(b.bestand.flaeche)) : undefined} setWert={n => vonHand({ wohnflaeche: n })} />
+          <Offen titel="Vermietbare Fläche" wert={hand.wohnflaeche} einheit="m²" platz={(b.bestand?.flaecheArt === 'fussabdruck' || b.bestand?.flaecheArt === 'register') && b.bestand.flaeche ? de(Math.round(b.bestand.flaeche)) : undefined} setWert={n => vonHand({ wohnflaeche: n })} />
         </div>
+
+        {/* Der Mieterspiegel aus dem Gebäuderegister (Tim, 20. November: «Anzahl Wohnungen,
+            deren Grösse und die inserierten Preise»): jede Wohnung mit Geschoss, Zimmern und
+            Fläche; die Miete je Wohnung trägt ein Mensch ein, aus dem Mieterspiegel des
+            Eigentümers oder einem Inserat dieser Adresse. Leer heisst: gerechnet. */}
+        {b.bestand && b.bestand.spiegel.length > 0 && (
+          <div className="space-y-2 rounded-[3px] border bg-card p-4">
+            <p className="font-medium">Mieterspiegel: {b.bestand.spiegel.length} {b.bestand.spiegel.length === 1 ? 'Wohnung' : 'Wohnungen'} laut Gebäuderegister</p>
+            <p className="text-sm text-muted-foreground">
+              Wohnung, Geschoss, Zimmer und Fläche stehen im Gebäuderegister. Trag die Netto-Miete ein, wo sie bekannt ist; ohne Eingabe rechnet die Zeile mit {b.bestand.mieteArt === 'hand' ? 'der eingegebenen Miete je m²' : 'der Miete je m² des Kantons'}.
+            </p>
+            <ul className={LISTE}>
+              {b.bestand.spiegel.map(z => (
+                <li key={z.id} className="grid grid-cols-1 items-end gap-2 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,220px)]">
+                  <span className="min-w-0">
+                    <span className="block font-medium">Wohnung {z.nr ?? '–'}{z.geschoss ? ` · ${z.geschoss}` : ''}</span>
+                    <span className="block text-sm text-muted-foreground">
+                      {z.zimmer != null ? `${de(z.zimmer, z.zimmer % 1 ? 1 : 0)} Zimmer` : 'Zimmer offen'} · {z.flaeche != null ? `${de(z.flaeche)} m²` : 'Fläche offen'}
+                      {z.quelle === 'gerechnet' && z.miete != null ? ` · gerechnet CHF ${de(Math.round(z.miete))}` : ''}
+                    </span>
+                  </span>
+                  <Offen titel="Netto-Miete im Monat" wert={hand.wohnungMiete?.[z.id] ?? null} einheit="CHF" platz={z.miete != null ? de(Math.round(z.miete)) : undefined}
+                         setWert={n => {
+                           const neu = { ...(hand.wohnungMiete ?? {}) };
+                           if (n == null) delete neu[z.id]; else neu[z.id] = n;
+                           vonHand({ wohnungMiete: neu });
+                         }} />
+                </li>
+              ))}
+            </ul>
+            <p className="text-sm">
+              Zusammen {de(Math.round(b.bestand.spiegel.reduce((s, z) => s + (z.flaeche ?? 0), 0)))} m² · Mietertrag im Jahr {chf(b.bestand.ertragHeute)} · Ertragswert {chf(b.bestand.wert)}
+            </p>
+            <p className="text-xs text-muted-foreground">Ob von dieser Adresse Wohnungen inseriert sind, zeigen die Portale unten: Comparis und Homegate lassen sich nicht automatisch auslesen.</p>
+          </div>
+        )}
 
         <div className="space-y-2 rounded-[3px] border bg-card p-4">
           <p className="font-medium">Was die Nachbarschaft zahlt</p>

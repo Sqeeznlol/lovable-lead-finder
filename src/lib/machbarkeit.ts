@@ -61,7 +61,13 @@ export interface ZonenRegeln {
   quelle: 'kanton' | 'bestand' | 'hand';
 }
 
-export interface Gebaeude { grundflaeche: number | null; geschosse: number | null; baujahr: number | null; wohnungen: number | null }
+/** Eine bestehende Wohnung laut Gebäuderegister (Merkmale EWID, WHGNR, WSTWK, WAZIM, WAREA). */
+export interface Wohnung { id: string; nr: string | null; geschoss: string | null; zimmer: number | null; flaeche: number | null }
+export interface Gebaeude {
+  grundflaeche: number | null; geschosse: number | null; baujahr: number | null; wohnungen: number | null;
+  /** Die Wohnungen einzeln, wo das Register sie führt: der Flächenspiegel (20. November, Tim). */
+  wohnungsliste?: Wohnung[];
+}
 
 export interface Annahmen {
   /** Abstand zur Grenze rundum, Meter. Steht nur in der Bauordnung der Gemeinde. */

@@ -212,6 +212,15 @@ senden. Alles Weitere in `docs/calc-you-later.md`.
     Vorschlag neben der Empfehlung; Julians Formel bleibt. Vorlagen,
     Schriften und Farben in `docs/calc-you-later.md`.
 
+  * Mieterspiegel aus dem Gebäuderegister (20. November, Tim: «Anzahl
+    Wohnungen, deren Grösse und die inserierten Preise»): CALC liest jede
+    bestehende Wohnung mit Nummer, Stockwerk (WSTWK laut Merkmalskatalog:
+    3100 Parterre, 3101 der 1. Stock), Zimmern und Fläche; deren Summe ist
+    die vermietbare Fläche. Die Miete je Wohnung trägt ein Mensch ein
+    (Mieterspiegel des Eigentümers oder Inserat dieser Adresse), sonst
+    rechnet die Zeile mit der Miete des Kantons. Inserate von Comparis und
+    Homegate liest Aurora weiterhin nicht automatisch.
+
 ## 3D-Karte
 
 Am 17. November (Julian: «die 3D-Ansicht ist mega langsam und dann stockt

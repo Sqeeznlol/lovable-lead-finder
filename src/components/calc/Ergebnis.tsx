@@ -201,7 +201,7 @@ export function Ergebnis({ b, annahmen, onErloes }: { b: Bewertung; annahmen: Ca
             <>
               <dl className="mt-3 space-y-1.5 text-sm">
                 {h.wohnungen != null && <Zeile titel="Wohnungen" wert={de(h.wohnungen)} />}
-                {h.flaeche != null && <Zeile titel={h.flaecheArt === 'hand' ? 'Vermietbare Fläche laut Eingabe' : 'Vermietbare Fläche aus dem Fussabdruck'} wert={m2(h.flaeche)} />}
+                {h.flaeche != null && <Zeile titel={h.flaecheArt === 'hand' ? 'Vermietbare Fläche laut Eingabe' : h.flaecheArt === 'register' ? 'Wohnfläche laut Gebäuderegister' : 'Vermietbare Fläche aus dem Fussabdruck'} wert={m2(h.flaeche)} />}
                 {h.mieteHeute != null && <Zeile titel="Miete je m² und Monat" wert={`CHF ${de(h.mieteHeute, 2)}`} />}
                 <Zeile titel="Mietertrag im Jahr" wert={chf(h.ertragHeute)} />
                 <Zeile titel="Rendite des Käufers" wert={`${de(annahmen.rendite * 100, 1)} %`} />

@@ -221,6 +221,12 @@ export interface VonHand {
   mietertragJahr?: number | null;
   /** Was Inserate in der Nachbarschaft verlangen (Homegate, Comparis), von Hand übertragen. */
   vergleiche?: Vergleich[];
+  /**
+   * Netto-Miete im Monat je Wohnung (Schlüssel: Wohnung.id), aus dem
+   * Mieterspiegel des Eigentümers oder aus einem Inserat dieser Adresse.
+   * Tim, 20. November: «Anzahl Wohnungen, deren Grösse und die inserierten Preise».
+   */
+  wohnungMiete?: Record<string, number>;
   /** Was Kaufinserate in der Nachbarschaft verlangen, von Hand übertragen. */
   kaeufe?: Kauf[];
   /**
@@ -328,11 +334,14 @@ export interface Bestand {
   baujahr: number | null;
   /** Vermietbare Fläche, m². */
   flaeche: number | null;
-  flaecheArt: 'hand' | 'fussabdruck' | null;
+  /** hand: eingegeben. register: Summe der Wohnungen im Gebäuderegister. fussabdruck: geschätzt. */
+  flaecheArt: 'hand' | 'register' | 'fussabdruck' | null;
+  /** Der Mieterspiegel: jede Wohnung mit Fläche und Miete, und woher die Miete stammt. */
+  spiegel: SpiegelZeile[];
   /** CHF je m² und Monat. */
   mieteHeute: number | null;
-  /** ertrag: aus dem Mieterspiegel. hand: eingegeben. statistik: Durchschnitt des Kantons. */
-  mieteArt: 'ertrag' | 'hand' | 'statistik';
+  /** ertrag: Jahresertrag eingegeben. spiegel: Mieten je Wohnung eingegeben. hand: Miete je m² eingegeben. statistik: Durchschnitt des Kantons. */
+  mieteArt: 'ertrag' | 'spiegel' | 'hand' | 'statistik';
   mieteQuelle: string;
   ertragHeute: number;
   wert: number;
@@ -341,6 +350,14 @@ export interface Bestand {
   vergleiche: number;
   ertragMarkt: number | null;
   wertMarkt: number | null;
+}
+
+export interface SpiegelZeile {
+  id: string; nr: string | null; geschoss: string | null; zimmer: number | null; flaeche: number | null;
+  /** Netto-Miete im Monat, CHF; null ohne Fläche und ohne Eingabe. */
+  miete: number | null;
+  /** eingabe: Mieterspiegel oder Inserat. sonst: Fläche mal Miete je m². */
+  quelle: 'eingabe' | 'gerechnet';
 }
 
 export interface Bewertung {
@@ -494,21 +511,38 @@ export function bewerten(e: CalcEingabe): Bewertung {
   const vergleiche = (e.hand.vergleiche ?? []).filter(v => pos(v.flaeche) && pos(v.miete));
   const ertragHand = pos(e.hand.mietertragJahr);
   const flaecheHand = pos(e.hand.wohnflaeche);
-  const flaecheB = flaecheHand ?? (studie.gfBestand != null ? studie.gfBestand * a.hnfFaktor : null);
+  // Die Wohnungen laut Register: ihre Fläche ist die vermietbare, genauer als jeder Fussabdruck.
+  const liste = g.gebaeude.flatMap(x => x.wohnungsliste ?? []);
+  const flaecheRegister = liste.length && liste.every(w => pos(w.flaeche)) ? liste.reduce((s, w) => s + w.flaeche!, 0) : null;
+  const flaecheB = flaecheHand ?? flaecheRegister ?? (studie.gfBestand != null ? studie.gfBestand * a.hnfFaktor : null);
   const statistik = mieteStatistik(e.kanton, haupt?.baujahr);
   const mieteHand = pos(e.hand.mieteHeute);
-  const ertragHeute = ertragHand ?? (flaecheB && (mieteHand ?? statistik) ? flaecheB * (mieteHand ?? statistik!.wert) * 12 : null);
+  const satzJeM2 = mieteHand ?? statistik?.wert ?? null;
+  const eingegeben = e.hand.wohnungMiete ?? {};
+  const spiegel: SpiegelZeile[] = liste.map(w => {
+    const m = pos(eingegeben[w.id]);
+    return { ...w, miete: m ?? (pos(w.flaeche) && satzJeM2 ? w.flaeche! * satzJeM2 : null), quelle: m ? 'eingabe' : 'gerechnet' };
+  });
+  const ausSpiegel = spiegel.some(z => z.quelle === 'eingabe') && spiegel.every(z => z.miete != null) && !flaecheHand
+    ? spiegel.reduce((s, z) => s + z.miete!, 0) * 12 : null;
+  const ertragHeute = ertragHand ?? ausSpiegel ?? (flaecheB && satzJeM2 ? flaecheB * satzJeM2 * 12 : null);
   // Ein Mehrfamilienhaus laut Register, oder jemand hat Mieten eingetragen.
-  const vermietet = (wohnungen ?? 0) >= 3 || !!ertragHand || !!mieteHand || !!flaecheHand || vergleiche.length > 0;
+  const vermietet = (wohnungen ?? 0) >= 3 || !!ertragHand || !!mieteHand || !!flaecheHand || vergleiche.length > 0 || ausSpiegel != null;
   let bestand: Bestand | null = null;
   if (vermietet && ertragHeute && pos(a.rendite)) {
     const marktmiete = median(vergleiche.map(v => v.miete / v.flaeche));
     const ertragMarkt = marktmiete && flaecheB ? flaecheB * marktmiete * 12 : null;
+    const eingabeZahl = spiegel.filter(z => z.quelle === 'eingabe').length;
+    const art: Bestand['mieteArt'] = ertragHand ? 'ertrag' : ausSpiegel ? 'spiegel' : mieteHand ? 'hand' : 'statistik';
     bestand = {
-      wohnungen, baujahr: haupt?.baujahr ?? null, flaeche: flaecheB, flaecheArt: flaecheHand ? 'hand' : flaecheB ? 'fussabdruck' : null,
-      mieteHeute: ertragHand ? (flaecheB ? ertragHand / 12 / flaecheB : null) : mieteHand ?? statistik!.wert,
-      mieteArt: ertragHand ? 'ertrag' : mieteHand ? 'hand' : 'statistik',
-      mieteQuelle: ertragHand ? 'Mietertrag laut Eingabe' : mieteHand ? 'Miete laut Eingabe' : statistik!.text,
+      wohnungen, baujahr: haupt?.baujahr ?? null, flaeche: flaecheB,
+      flaecheArt: flaecheHand ? 'hand' : flaecheRegister ? 'register' : flaecheB ? 'fussabdruck' : null,
+      spiegel,
+      mieteHeute: art === 'ertrag' || art === 'spiegel' ? (flaecheB ? ertragHeute / 12 / flaecheB : null) : satzJeM2,
+      mieteArt: art,
+      mieteQuelle: art === 'ertrag' ? 'Mietertrag laut Eingabe'
+        : art === 'spiegel' ? `${eingabeZahl} von ${spiegel.length} Wohnungen laut Eingabe${eingabeZahl < spiegel.length ? `, die übrigen mit ${mieteHand ? 'der eingegebenen Miete je m²' : statistik!.text}` : ''}`
+        : art === 'hand' ? 'Miete laut Eingabe' : statistik!.text,
       ertragHeute, wert: ertragHeute / a.rendite, marktmiete, vergleiche: vergleiche.length,
       ertragMarkt, wertMarkt: ertragMarkt ? ertragMarkt / a.rendite : null,
     };

@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
-import { adresseLesen, adressen, comparisOrt, gebaeudeAusRegister, neigungAus, parzelleLesen, portalLinks } from '@/lib/calc-daten';
+import { REGISTER_MFH_2019 } from './register-beispiel';
+import { adresseLesen, adressen, comparisOrt, gebaeudeAusRegister, neigungAus, parzelleLesen, portalLinks, stockwerk, wohnungenAusRegister } from '@/lib/calc-daten';
 
 /**
  * Was CALC YOU LATER vom Bund liest. Die Beispiele sind echte Antworten
@@ -144,3 +145,28 @@ describe('CALC YOU LATER: Adressen auch ohne die Adresssuche des Bundes', () => 
   });
 });
 
+
+/**
+ * Der Mieterspiegel aus dem Gebäuderegister (Tim, 20. November). Die Werte
+ * sind die Antwort des Bundes für ein Mehrfamilienhaus von 2019 in Uitikon
+ * (abgefragt am 20. November), ohne Angaben zu Personen.
+ */
+
+describe('CALC YOU LATER: Wohnungen aus dem Gebäuderegister', () => {
+  it('liest jede Wohnung mit Nummer, Geschoss, Zimmern und Fläche', () => {
+    const w = wohnungenAusRegister(REGISTER_MFH_2019);
+    expect(w).toHaveLength(5);
+    expect(w[4]).toEqual({ id: '210218325-5', nr: '101', geschoss: '1. Stock', zimmer: 3, flaeche: 96 });
+    expect(w.reduce((s, x) => s + x.flaeche!, 0)).toBe(526);
+    expect(gebaeudeAusRegister(REGISTER_MFH_2019)!.wohnungsliste).toHaveLength(5);
+  });
+
+  it('Stockwerke nach dem Merkmalskatalog des BFS: 3100 ist das Parterre, nicht der 1. Stock', () => {
+    expect([stockwerk(3100), stockwerk(3101), stockwerk(3103), stockwerk(3401), stockwerk(9999)]).toEqual(['Parterre', '1. Stock', '3. Stock', '1. Untergeschoss', null]);
+  });
+
+  it('nur bestehende Wohnungen: projektierte und aufgehobene zählen nicht', () => {
+    const w = wohnungenAusRegister({ ...REGISTER_MFH_2019, wstat: [3004, 3001, 3007, 3004, 3004] });
+    expect(w.map(x => x.nr)).toEqual(['202', '201', '101']);
+  });
+});

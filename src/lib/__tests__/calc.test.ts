@@ -3,6 +3,8 @@ import { vi } from 'vitest';
 vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
 import { baukostenNachErloes, bewerten, CALC_ANNAHMEN, hangZuschlag, kleinZuschlag, hnfPraxis, median, mieteStatistik, nachbarArt, zoneMitHand, zuerichKm, zuerichZuschlag, type CalcEingabe } from '@/lib/calc';
 import { angebotEntwurf, betrag, uhr } from '@/lib/calc-ablauf';
+import { gebaeudeAusRegister } from '@/lib/calc-daten';
+import { REGISTER_MFH_2019 } from './register-beispiel';
 import type { ZonenRegeln } from '@/lib/machbarkeit';
 
 /**
@@ -565,5 +567,41 @@ describe('CALC YOU LATER: kleine Projekte und Zahlen eines Projekts (YOMORI)', (
     // (2 400 000 + 5 500 000 + 55 000) ÷ (724 × 0.8) = 13 734.5
     const n = bewerten({ ...yomori, annahmen: { ...yomori.annahmen, erloes: 13_735 }, hand: { projektHnf: 724, projektBaukosten: 5_500_000 } }).neubau!;
     expect(n.landwert).toBeCloseTo(2_400_000, -3);
+  });
+});
+
+describe('CALC YOU LATER: Mieterspiegel aus dem Register (Tim, 20. November)', () => {
+  const haus = gebaeudeAusRegister(REGISTER_MFH_2019)!;
+  const e: CalcEingabe = { ...leer, grundlage: { ...leer.grundlage, gebaeude: [haus] } };
+
+  it('rechnet mit der Wohnfläche des Registers statt mit dem Fussabdruck', () => {
+    const b = bewerten(e);
+    expect(b.bestand!.flaecheArt).toBe('register');
+    expect(b.bestand!.flaeche).toBe(526);
+    expect(b.bestand!.spiegel).toHaveLength(5);
+    // Kanton Zürich, Baujahr 2019: CHF 23.00 je m² und Monat (BFS 2024). 526 × 23 × 12 = 145'176; ÷ 4 % = 3'629'400.
+    expect(b.bestand!.mieteHeute).toBe(23);
+    expect(b.bestand!.ertragHeute).toBeCloseTo(145_176, 6);
+    expect(b.bestand!.wert).toBeCloseTo(3_629_400, 4);
+  });
+
+  it('eingetragene Mieten je Wohnung gehen der Statistik vor, die übrigen bleiben gerechnet', () => {
+    const id = (nr: string) => haus.wohnungsliste!.find(w => w.nr === nr)!.id;
+    const eine = bewerten({ ...e, hand: { wohnungMiete: { [id('101')]: 2300 } } });
+    // 2'300 + (526 − 96) × 23 = 12'190 im Monat; × 12 = 146'280.
+    expect(eine.bestand!.mieteArt).toBe('spiegel');
+    expect(eine.bestand!.ertragHeute).toBeCloseTo(146_280, 6);
+    expect(eine.bestand!.mieteQuelle).toMatch(/^1 von 5 Wohnungen laut Eingabe, die übrigen mit/);
+    const alle = bewerten({ ...e, hand: { wohnungMiete: { [id('101')]: 2300, [id('201')]: 2900, [id('202')]: 2400, [id('301')]: 3000, [id('302')]: 2450 } } });
+    // 13'050 im Monat; × 12 = 156'600; ÷ 4 % = 3'915'000.
+    expect(alle.bestand!.ertragHeute).toBe(156_600);
+    expect(alle.bestand!.wert).toBeCloseTo(3_915_000, 4);
+    expect(alle.bestand!.mieteQuelle).toBe('5 von 5 Wohnungen laut Eingabe');
+  });
+
+  it('ein eingegebener Jahresertrag geht auch dem Spiegel vor', () => {
+    const o = bewerten({ ...e, hand: { mietertragJahr: 150_000, wohnungMiete: { [haus.wohnungsliste![0].id]: 2000 } } });
+    expect(o.bestand!.mieteArt).toBe('ertrag');
+    expect(o.bestand!.ertragHeute).toBe(150_000);
   });
 });

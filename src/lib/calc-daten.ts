@@ -27,7 +27,7 @@ import { grundlageLaden, ZONEN_FRIST_MS, zoneAusBestand, zoneZh, type Grundlage 
 import { gemeindePreise, type GemeindePreise } from '@/lib/preise';
 import { zusatzAbfragen } from '@/lib/parzelle-zusatz';
 import { istVorhanden } from '@/lib/potential';
-import type { Gebaeude, ZonenRegeln } from '@/lib/machbarkeit';
+import type { Gebaeude, Wohnung, ZonenRegeln } from '@/lib/machbarkeit';
 import { CALC_ANNAHMEN, nachbarArt, zuerichKm, type NachbarTeil } from '@/lib/calc';
 import { bundParzelle, mitte } from '@/lib/bund-parzelle';
 import { hausnummerLesen, nummerFehlt, suchtext } from '@/lib/adresswahl';
@@ -170,7 +170,43 @@ const zahl = (v: unknown): number | null => { const x = Number(v); return v != n
 export function gebaeudeAusRegister(a: Record<string, unknown>): Gebaeude | null {
   // 1004: bestehend. Projektierte, abgebrochene und nicht realisierte zählen nicht zum Bestand.
   if (a.gstat != null && Number(a.gstat) !== 1004) return null;
-  return { grundflaeche: zahl(a.garea), geschosse: zahl(a.gastw), baujahr: zahl(a.gbauj), wohnungen: zahl(a.ganzwhg) };
+  const g: Gebaeude = { grundflaeche: zahl(a.garea), geschosse: zahl(a.gastw), baujahr: zahl(a.gbauj), wohnungen: zahl(a.ganzwhg) };
+  const liste = wohnungenAusRegister(a);
+  if (liste.length) g.wohnungsliste = liste;
+  return g;
+}
+
+/**
+ * Stockwerk laut Merkmalskatalog des BFS (WSTWK, nachgelesen am 20. November
+ * auf housing-stat.ch): 3100 Parterre inkl. Hochparterre, 3101 bis 3199 der
+ * 1. bis 99. Stock, 3401 bis 3419 das 1. bis 19. Untergeschoss.
+ */
+export function stockwerk(code: unknown): string | null {
+  const c = Number(code);
+  if (c === 3100) return 'Parterre';
+  if (c >= 3101 && c <= 3199) return `${c - 3100}. Stock`;
+  if (c >= 3401 && c <= 3419) return `${c - 3400}. Untergeschoss`;
+  return null;
+}
+
+/**
+ * Die bestehenden Wohnungen eines Gebäudes. Der Bund liefert sie als
+ * gleich lange Listen je Merkmal (ewid, whgnr, wstwk, wazim, warea, wstat);
+ * 3004 heisst bestehend. Tim, 20. November: «Ich brauche die Anzahl
+ * Wohnungen, deren Grösse».
+ */
+export function wohnungenAusRegister(a: Record<string, unknown>): Wohnung[] {
+  const liste = (k: string): unknown[] => (Array.isArray(a[k]) ? a[k] as unknown[] : []);
+  const ewid = liste('ewid'), status = liste('wstat');
+  return ewid.map((id, i) => ({ i, id }))
+    .filter(({ i }) => status[i] == null || Number(status[i]) === 3004)
+    .map(({ i, id }) => ({
+      id: `${a.egid ?? ''}-${id}`,
+      nr: liste('whgnr')[i] != null ? String(liste('whgnr')[i]) : null,
+      geschoss: stockwerk(liste('wstwk')[i]),
+      zimmer: zahl(liste('wazim')[i]),
+      flaeche: zahl(liste('warea')[i]),
+    }));
 }
 
 interface Register { gebaeude: Gebaeude[]; projekt: Projekt | null; kanton: string | null; bfs: string | null; gemeinde: string | null; plz: string | null }
