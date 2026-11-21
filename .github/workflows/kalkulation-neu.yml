@@ -45,7 +45,7 @@ jobs:
           [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
           # Klein: eine Zeile je Lead. Trotzdem mit Frist (CLAUDE.md: Die Datenbank bedient die Seite).
           psql "$DB" -X -q -At -v ON_ERROR_STOP=1 -c "set statement_timeout = '30s';" \
-            -c "select coalesce(json_agg(json_build_object('id', id, 'egrid', egrid, 'adresse', adresse, 'empfehlung_chf', empfehlung_chf, 'eingaben', eingaben)), '[]') from public.kalkulation where zustand = 'entwurf'" > ein.json
+            -c "select coalesce(json_agg(json_build_object('id', id, 'egrid', egrid, 'adresse', adresse, 'gemeinde', gemeinde, 'empfehlung_chf', empfehlung_chf, 'eingaben', eingaben)), '[]') from public.kalkulation where zustand = 'entwurf'" > ein.json
           npx vite-node tools/kalkulation_neu.ts -- ein.json aus.json | tee -a "$GITHUB_STEP_SUMMARY"
           [ "$SCHRITT" = schreiben ] || { echo "Nur gezeigt, nichts geschrieben."; exit 0; }
           # Nur Entwürfe, auch wenn einer seit dem Lesen eingereicht wurde.

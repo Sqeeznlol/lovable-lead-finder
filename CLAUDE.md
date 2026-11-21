@@ -219,18 +219,23 @@ senden. Alles Weitere in `docs/calc-you-later.md`.
   * Der Bestand zählt mit dem Höheren aus Ertragswert und Flächenwert
     (20. November, Tim zur Schöneggstrasse 18: «10k/m² HNF ... manchmal
     ist der Bestand mehr wert als die zu günstig kapitalisierte Miete»).
-    Der Wert je m² ist ein Anteil am Verkaufspreis (57.8 %, dort 10'000 von
-    17'300); unter «Annahmen» änderbar, 0 schaltet ihn ab. Vorerst nur in der
+    Der Wert je m² ist ein Anteil am Verkaufspreis des Quartiers (56.9 %:
+    Mittel aus Tims 10'000 von 19'000 im Kreis 4 und 12'000 von 19'650 in
+    Wollishofen); unter «Annahmen» änderbar, 0 schaltet ihn ab. Vorerst nur in der
     Stadt Zürich (Julian, 20. November: «mach das mal nur in der Stadt ZH»). Ein Haus mit Gewerbe (Register-Kategorie 1040) rechnet
     mit der ganzen Fläche aus dem Fussabdruck: das Register führt nur die
-    Wohnungen (dort 242 von 458 m²). Ergebnis 4.12 Mio., Angebot 4.1 Mio.;
+    Wohnungen (dort 242 von 458 m²). Ergebnis 4.45 Mio., Angebot 4.1 Mio.;
     `calc.test.ts` rechnet den Fall nach.
     Häuser ab Baujahr 1970 rechnen den Flächenwert überall, mit 71.9 % des
     Erlöses (21. November, aus Tims Prüfung der Rietwisstrasse 7, Uitikon,
     Baujahr 2019: «nach 1970 gebaut ... lange Lebensdauer ... im Bestand
     wesentlich mehr wert ... 12000/m²»; `flaechenAnteil`). Was Menschen in
     CALC zum Preis schreiben, liest der Ablauf «CALC lesen», verschlüsselt,
-    weil die Protokolle öffentlich sind.
+    weil die Protokolle öffentlich sind. «Kalkulationen neu rechnen» leitet
+    auch den Verkaufspreis neu her, in der Stadt Zürich je Quartier
+    (21. November, Julian: «Quartierpreise in Zürich nehmen»); im Browser
+    der Prüfung war der Dienst der Stadt gesperrt, darum standen Entwürfe
+    mit dem Preis der ganzen Stadt da.
     Ändert sich die Rechnung, rechnet der Ablauf «Kalkulationen neu rechnen»
     alle Entwürfe neu («zeigen», dann «schreiben»); Eingereichtes bleibt.
 

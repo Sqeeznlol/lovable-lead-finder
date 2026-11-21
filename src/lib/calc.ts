@@ -74,7 +74,10 @@ export const CALC_ANNAHMEN: CalcAnnahmen = {
   // Bestand mehr wert als die zu günstig kapitalisierte Miete». 10'000 sind
   // 57.8 % der 17'300, die Stockwerkeigentum dort kostet. Gilt vorerst nur
   // in der Stadt Zürich (inStadtZuerich).
-  bestandAnteil: 0.578,
+  // Seit dem 21. November mit den Preisen je Quartier: Tims zwei Urteile in
+  // der Stadt geben 10'000 von 19'000 (Schöneggstrasse 18, Kreis 4) und
+  // 12'000 von 19'650 (Mutschellenstrasse 49, Wollishofen), im Mittel 56.9 %.
+  bestandAnteil: 0.569,
   // Tim, 20. November, Rietwisstrasse 7 in Uitikon (Baujahr 2019): «alle
   // Gebäude, welche nach 1970 gebaut wurden, haben noch eine lange
   // Lebensdauer ... im Bestand wesentlich mehr wert als bei einem Neubau ...

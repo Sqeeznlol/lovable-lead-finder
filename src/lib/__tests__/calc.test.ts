@@ -613,13 +613,15 @@ describe('CALC YOU LATER: Mieterspiegel aus dem Register (Tim, 20. November)', (
  * manchmal ist der Bestand mehr wert als die zu günstig kapitalisierte
  * Miete»). Die Zahlen des Hauses stehen so im Gebäuderegister: 85 m²
  * Grundfläche, 7 Geschosse, Kategorie 1040 (teilweise Wohnnutzung),
- * 13 Studios mit zusammen 242 m². Erlös 17'300 je m² wie in der Stadt.
+ * 13 Studios mit zusammen 242 m². Erlös 19'000 je m², Stockwerkeigentum im
+ * Kreis 4 (Quartier Langstrasse hat zu wenige Verkäufe; seit dem 21. November
+ * je Quartier statt der ganzen Stadt).
  */
 describe('CALC YOU LATER: Bestand nach Fläche (Tim)', () => {
   const studios = [18, 18, 20, 18, 18, 20, 18, 18, 20, 18, 18, 20, 18].map((f, i) => ({ id: `148727-${i}`, nr: String(i), geschoss: null, zimmer: 1, flaeche: f }));
   const haus = { grundflaeche: 85, geschosse: 7, baujahr: 1877, wohnungen: 13, kategorie: 1040, wohnungsliste: studios };
   const e: CalcEingabe = {
-    ...leer, kanton: 'ZH', annahmen: { ...leer.annahmen, erloes: 17_300 }, umfeld: { ...leer.umfeld, gemeinde: 'Zürich' },
+    ...leer, kanton: 'ZH', annahmen: { ...leer.annahmen, erloes: 19_000 }, umfeld: { ...leer.umfeld, gemeinde: 'Zürich' },
     grundlage: { ...leer.grundlage, flaeche: 101, gebaeude: [haus] },
   };
 
@@ -637,15 +639,15 @@ describe('CALC YOU LATER: Bestand nach Fläche (Tim)', () => {
     expect(b.bestand!.flaecheWohnungen).toBe(242);
   });
 
-  it('10’000 je m², weil die Fläche mehr wert ist als die kapitalisierte Miete: rund 4.1 Mio. Angebot', () => {
+  it('nahe an Tims 10’000 je m², weil die Fläche mehr wert ist als die kapitalisierte Miete', () => {
     const b = bewerten(e);
-    expect(b.bestand!.jeM2).toBe(10_000);
+    // 56.9 % von 19'000: der Mittelwert aus Tims zwei Urteilen in der Stadt (10'000 hier, 12'000 in Wollishofen).
+    expect(b.bestand!.jeM2).toBe(10_800);
     expect(b.bestand!.wertArt).toBe('flaeche');
-    expect(b.bestand!.wertFlaeche).toBeCloseTo(458.15 * 10_000, 0);
+    expect(b.bestand!.wertFlaeche).toBeCloseTo(458.15 * 10_800, 0);
     expect(b.bestand!.wertFlaeche!).toBeGreaterThan(b.bestand!.wertMiete);
     expect(b.massgebend).toBe('bestand');
-    // 4.58 Mio. weniger 10 % Abschlag: das Angebot von 4.1 Mio.
-    expect(b.empfehlung).toBe(4_120_000);
+    expect(b.empfehlung).toBe(4_450_000);
   });
 
   it('ein reines Wohnhaus bleibt bei den Wohnungen; 0 % schaltet den Flächenwert ab', () => {
@@ -689,6 +691,6 @@ describe('CALC YOU LATER: Bestand ab 1970 (Tim)', () => {
   it('das Feld der Annahmen folgt dem Alter', () => {
     expect(flaechenAnteil(e, 2019)).toEqual({ anteil: 0.719, feld: 'bestandAnteilJung' });
     expect(flaechenAnteil(e, 1911)).toBeNull();
-    expect(flaechenAnteil({ ...e, umfeld: { gemeinde: 'Zürich' } }, 1908)).toEqual({ anteil: 0.578, feld: 'bestandAnteil' });
+    expect(flaechenAnteil({ ...e, umfeld: { gemeinde: 'Zürich' } }, 1908)).toEqual({ anteil: 0.569, feld: 'bestandAnteil' });
   });
 });
