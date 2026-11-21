@@ -1,0 +1,55 @@
+# =====================================================================
+# Test-Lead
+# =====================================================================
+# Schickt einen gekennzeichneten TEST-Lead über eine Check-Seite und prüft,
+# ob er in der Tabelle anfrage ankommt und gezählt wird (Julian,
+# 21. November). Ausgegeben werden nur Zählungen und Ja/Nein, nie Namen
+# oder Nummern: die Protokolle sind öffentlich.
+# =====================================================================
+name: Test-Lead
+
+on:
+  workflow_dispatch:
+    inputs:
+      seite:
+        description: 'Check-Seite'
+        required: true
+        default: 'https://www.zonen-check.ch/'
+
+jobs:
+  lead:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Browser einrichten
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y -qq postgresql-client
+          chrome=$(command -v google-chrome || command -v chromium-browser || command -v chromium || true)
+          [ -n "$chrome" ] || { echo "Kein Chrome auf dem Runner."; exit 1; }
+          echo "CHROMIUM=$chrome" >> "$GITHUB_ENV"
+          mkdir -p /tmp/pruefung && cd /tmp/pruefung && npm init -y >/dev/null && npm install --silent playwright-core@1.57.0
+      - name: Lead absenden
+        env:
+          NODE_PATH: /tmp/pruefung/node_modules
+          SEITE: ${{ inputs.seite }}
+        run: node tools/test-lead.cjs | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Angekommen?
+        if: always()
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
+          psql "$DB" -X -q -v ON_ERROR_STOP=1 >> "$GITHUB_STEP_SUMMARY" <<'SQL'
+          set statement_timeout = '20s';
+          \echo '### In der Datenbank (letzte 15 Minuten)'
+          select count(*) as test_leads,
+                 count(*) filter (where angaben->>'utm_source' = 'test') as mit_quelle_test,
+                 count(*) filter (where angaben ? 'marke') as von_check_seite,
+                 count(*) filter (where egrid is not null) as mit_egrid,
+                 count(*) filter (where einwilligung) as mit_einwilligung
+          from public.anfrage where name like 'TEST Lead GitHub%' and erstellt_am > now() - interval '15 minutes';
+          select count(distinct sitzung) as lead_gezaehlt from public.check_ereignis where ereignis = 'lead' and zeit > now() - interval '15 minutes';
+          SQL
+          cat "$GITHUB_STEP_SUMMARY" | tail -12
