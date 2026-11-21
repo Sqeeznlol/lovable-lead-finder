@@ -44,6 +44,12 @@ aber keiner sehen das Passwort»): die Datenbank prüft es
 (`anfrage_loeschen`, nach fünf Fehlversuchen eine Stunde gesperrt); im
 Repository steht nur sein bcrypt-Prüfwert, nie das Passwort.
 `anfrage-loeschen.test.ts` wird rot, wenn es irgendwo im Klartext steht.
+Google Ads (21. November, Julian: «Tracker ... der permanent analysiert,
+jeden Tag»): unter «Leads» die Tafel «Google Ads» je Kampagne (Besuche,
+Ergebnis, Kontakt, Leads aus `werbung_tage`, Kosten aus `werbung_kosten`,
+Rat nach den Regeln des Werbeplans, `src/lib/werbung.ts`). Der Ablauf
+«Werbung täglich» prüft jeden Tag, ob die sieben Seiten antworten und den
+Messpunkt (AW-…) ausliefern, und wird sonst rot.
 
 ## Was live ist
 

@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Abschnitt, KNOPF, Leer, LISTE, Marke, Reiter, Seite } from '@/components/rahmen';
 import { BILD } from '@/lib/luftbild';
 import { LeadDetail, type Lead } from '@/components/LeadDetail';
+import { WerbungTafel } from '@/components/WerbungTafel';
 import { naechsterSchritt } from '@/lib/nachfass';
 import { useUrlWert } from '@/hooks/use-url-wert';
 import { ANTWORT_TEXT, bodenText, bodenWert, gesamt, istTest, nachWert, wohnungText, prozent, quellen, SCHRITT_TEXT, SCHRITTE, trichterJeSeite, type TrichterZeile } from '@/lib/lead-auswertung';
@@ -163,6 +164,8 @@ export function Leads() {
             </ul>
           )}
       </Abschnitt>
+
+      <WerbungTafel tage={Number(tage)} />
 
       <Abschnitt titel="Je Webseite" hinweis="Sitzungen, die den Schritt erreicht haben. Abschluss = Leads je Besucher. Ein Klick auf eine Webseite zeigt ihre Leads.">
         {trichter.data === null ? <Leer titel="Die Zählung ist noch nicht eingerichtet.">In GitHub den Ablauf «Migrationen» mit «einspielen» starten (Repository der Webseite).</Leer>

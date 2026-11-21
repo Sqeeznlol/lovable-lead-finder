@@ -1,0 +1,64 @@
+# =====================================================================
+# Werbung täglich
+# =====================================================================
+# Julian, 21. November: «mache noch einen Tracker dafür, der permanent
+# analysiert, jeden Tag». Jeden Tag:
+#   1. Die sieben Seiten der Kampagnen antworten, und jede liefert den
+#      Messpunkt von Google Ads (AW-…) aus. Fehlt er, zählt Google keine
+#      Leads und «Conversions maximieren» lernt nichts.
+#   2. Je Kampagne die letzten sieben Tage: Besuche aus Anzeigen, Ergebnis,
+#      Kontakt, Leads (werbung_tage), mit dem Rat des Werbeplans.
+# Wird rot, wenn eine Seite nicht antwortet oder der Messpunkt fehlt; dann
+# schickt GitHub eine Mail. Ausgegeben werden nur Zählungen, keine Namen,
+# keine Kosten (die Protokolle sind öffentlich; Kosten stehen in Aurora).
+# Wann genau er läuft, ist gleich: GitHub startet Stunden zu spät (CLAUDE.md).
+# =====================================================================
+name: Werbung täglich
+
+on:
+  schedule:
+    - cron: '41 5 * * *'
+  workflow_dispatch:
+
+jobs:
+  werbung:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Werkzeuge
+        run: sudo apt-get install -y -qq postgresql-client
+      - name: Seiten und Messpunkt
+        run: |
+          set -uo pipefail
+          fehler=0
+          echo "### Seiten der Kampagnen" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Seite | Antwort | Messpunkt |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          for d in zonen-check.ch ausnuetzung-check.ch erbliegenschaft.ch parzellenchecker.ch was-kann-ich-bauen.ch aufstockungscheck.ch hauschecker.ch; do
+            code=$(curl -s -o seite.html -w '%{http_code}' -m 30 "https://www.$d/")
+            js=$(grep -o 'src="/assets/index-[^"]*\.js"' seite.html | head -1 | cut -d'"' -f2)
+            aw="fehlt"
+            if [ -n "$js" ] && curl -s -m 30 "https://www.$d$js" | grep -q 'AW-[0-9]\{6,14\}'; then aw="da"; fi
+            echo "| $d | $code | $aw |" >> "$GITHUB_STEP_SUMMARY"
+            echo "$d $code Messpunkt $aw"
+            [ "$code" = 200 ] || fehler=1
+            [ "$aw" = da ] || fehler=1
+          done
+          [ "$fehler" = 0 ] || { echo "Eine Seite antwortet nicht oder der Messpunkt fehlt." | tee -a "$GITHUB_STEP_SUMMARY"; exit 1; }
+      - name: Je Kampagne, letzte 7 Tage
+        if: always()
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
+          psql "$DB" -X -q -v ON_ERROR_STOP=1 <<'SQL' | tee -a "$GITHUB_STEP_SUMMARY"
+          set statement_timeout = '30s';
+          \echo '### Je Kampagne, letzte 7 Tage (ohne Testdaten)'
+          select kampagne, sum(besuche) as besuche, sum(ergebnisse) as ergebnis, sum(kontakte) as kontakt, sum(leads) as leads,
+                 case when sum(besuche) >= 10 and sum(ergebnisse) = 0 then 'Seite prüfen: Besucher, aber kein Ergebnis'
+                      when sum(leads) = 0 and sum(coalesce(klicks, besuche)) >= 150 then 'Stoppen oder Zielseite ändern'
+                      when sum(besuche) = 0 then 'Noch keine Klicks'
+                      else 'Kosten je Lead in Aurora ansehen' end as rat
+          from public.werbung_tage(((now() at time zone 'Europe/Zurich')::date - 7))
+          group by kampagne order by kampagne;
+          SQL
