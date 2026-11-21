@@ -31,11 +31,16 @@ const { chromium, devices } = require('playwright-core');
     await seite.locator('.wahl button').first().click();
     await seite.waitForTimeout(700);
   }
-  for (const wert of ['TEST Lead GitHub', 'Teststrasse 1, 8000 Zürich', '079 000 00 00', 'test@example.ch']) {
+  console.log(`Kontaktfeld erreicht: ${(await seite.locator('#pc-kontakt').count()) ? 'ja' : 'nein'}`);
+  // Die Seite nimmt nur echte Schweizer Nummern an (keine Reihen gleicher Ziffern):
+  // 044 000 12 34 hat die Form einer Zürcher Nummer im unvergebenen Bereich 000.
+  for (const wert of ['TEST Lead GitHub', 'Teststrasse 1, 8000 Zürich', '044 000 12 34', 'test@example.ch']) {
     await seite.locator('#pc-kontakt').fill(wert);
     await seite.waitForTimeout(400);
     await seite.locator('button.senden').click();
     await seite.waitForTimeout(1500);
+    const hinweis = (await seite.locator('.hinweis-feld').allInnerTexts()).join(' ').trim();
+    if (hinweis) console.log(`Hinweis beim Feld: ${hinweis}`);
   }
   await seite.waitForTimeout(6000);
   const dank = await seite.locator('.freigeschaltet').innerText().catch(() => '');

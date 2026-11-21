@@ -33,7 +33,9 @@ jobs:
         env:
           NODE_PATH: /tmp/pruefung/node_modules
           SEITE: ${{ inputs.seite }}
-        run: node tools/test-lead.cjs | tee -a "$GITHUB_STEP_SUMMARY"
+        run: |
+          set -o pipefail
+          node tools/test-lead.cjs | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Angekommen?
         if: always()
         env:
