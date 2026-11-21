@@ -20,12 +20,13 @@ with contextlib.redirect_stdout(io.StringIO()):
 
 K = {k['kurz']: k for k in P.KAMPAGNEN}
 
-# Budget: CHF 1'000 im Monat (Julian, 18. November). Google gibt im Monat
+# Budget: CHF 600 im Monat (Julian, 21. November: «Budget ist 500-700 Franken
+# pro Monat», gerechnet mit der Mitte; vorher CHF 1'000). Google gibt im Monat
 # höchstens das Tagesbudget mal 30.4 aus, an einzelnen Tagen bis doppelt so
 # viel. Verteilt wie im Kampagnenplan nach Suchen und Absicht; Ausbau und
 # Steuer starten in Woche 3, bis dahin bleibt ihr Anteil ungenutzt.
-MONATSBUDGET = 1000
-BUDGET = {'Zone': 7, 'Ausnützung': 5, 'Erbe': 6, 'Parzelle': 4, 'Bauen': 4, 'Ausbau': 3, 'Steuer': 3}
+MONATSBUDGET = 600
+BUDGET = {'Zone': 4.5, 'Ausnützung': 3, 'Erbe': 4, 'Parzelle': 2.5, 'Bauen': 2.5, 'Ausbau': 1.5, 'Steuer': 1.5}
 SPAETER = {'Ausbau', 'Steuer'}
 assert sum(BUDGET.values()) * 30.4 <= MONATSBUDGET, sum(BUDGET.values()) * 30.4
 

@@ -26,15 +26,16 @@ K = G.K
 THEMA = {'Zone': 'Zonenplan, Bauzone', 'Ausnützung': 'Ausnützungsziffer', 'Erbe': 'Erbe, Erbengemeinschaft', 'Parzelle': 'Parzelle, Kataster',
          'Bauen': 'Baubewilligung, Baugesuch', 'Ausbau': 'Aufstocken, Anbau', 'Steuer': 'Grundstückgewinnsteuer'}
 START = {'Ausbau': 'Woche 3', 'Steuer': 'Woche 3, mit dem Ratgeber'}
-fr = lambda x: f"{x:.0f}" if x else '–'
+# Tagesbudgets in Franken und Rappen, seit dem kleineren Budget (4.50 statt 7).
+fr = lambda x: (f"{x:.2f}" if x % 1 else f"{x:.0f}") if x else '–'
 
-# Budget: CHF 1'000 im Monat (google_ads.py). Woche 1 und 2 laufen fünf
+# Budget: CHF 600 im Monat (google_ads.py). Woche 1 und 2 laufen fünf
 # Kampagnen, ab Woche 3 alle sieben, mit denselben Tagesbudgets.
 TAG_1 = sum(v for x, v in G.BUDGET.items() if x not in G.SPAETER)
 TAG_3 = sum(G.BUDGET.values())
 SECHS = TAG_1 * 14 + TAG_3 * 28
 MONAT = TAG_3 * 30.4
-assert (TAG_1, TAG_3) == (26, 32) and MONAT <= G.MONATSBUDGET, (TAG_1, TAG_3, MONAT)
+assert (TAG_1, TAG_3) == (16.5, 19.5) and MONAT <= G.MONATSBUDGET, (TAG_1, TAG_3, MONAT)
 
 
 def seite(inhalt):
@@ -56,7 +57,7 @@ titel = seite(f"""
   <li>Diese Begriffe bewirbt kaum jemand: ein Klick kostet meist unter CHF 3. Teure Begriffe wie «Immobilienbewertung» (CHF {P.gebot('immobilienbewertung')[0]:.0f} bis {P.gebot('immobilienbewertung')[1]:.0f} pro Klick) lassen wir weg.</li>
   <li>Kampagnen, Keywords, Anzeigen, Ausschlüsse, Standorte und Sitelinks liegen in einer Datei für den Google Ads Editor. Sie kommen pausiert an: es kostet nichts, bevor wir sie einschalten.</li>
   <li>Gemessen wird jeder Lead: mit Zustimmung im Cookie-Hinweis meldet die Seite Google die Anfrage, und in unserer Datenbank steht zu jedem Lead Kampagne und Suchbegriff.</li>
-  <li>Budget: CHF {tsd(G.MONATSBUDGET)} im Monat, als Tagesbudget je Kampagne, zusammen CHF {TAG_3:.0f} am Tag. Google gibt im Monat höchstens CHF {tsd(round(MONAT))} aus.</li>
+  <li>Budget: CHF {tsd(G.MONATSBUDGET)} im Monat, als Tagesbudget je Kampagne, zusammen CHF {fr(TAG_3)} am Tag. Google gibt im Monat höchstens CHF {tsd(round(MONAT))} aus.</li>
   <li>Die ersten sechs Wochen sind ein Test. Jeden Montag zählen die Kosten pro guten Lead: was sich rechnet, bekommt mehr, der Rest wird gestoppt.</li>
 </ul>
 """)
@@ -87,7 +88,7 @@ werwas = seite(f"""
 
 zeilen = [[f'<b>{K[x]["domain"]}</b>', THEMA[x], START.get(x, 'Woche 1'), fr(G.BUDGET[x]), tsd(round(G.BUDGET[x] * 30.4)),
            f'{G.MAX_CPC.get(x, 2.5):.2f}', rund(P.summe(K[x]['woerter']), 100)] for x in G.REIHE]
-zeilen.append(['<b>Total</b>', '', '', f'<b>{TAG_3:.0f}</b>', f'<b>{tsd(round(MONAT))}</b>', '', f'<b>{rund(P.GOOGLE_SUMME, 100)}</b>'])
+zeilen.append(['<b>Total</b>', '', '', f'<b>{fr(TAG_3)}</b>', f'<b>{tsd(round(MONAT))}</b>', '', f'<b>{rund(P.GOOGLE_SUMME, 100)}</b>'])
 phasen = [
     ['<b>1</b>', ', '.join(G.ORTE), 'ab Woche 1', f'Der Check zeigt hier die Ziffer aus dem Zonenplan, also wie viel gebaut werden darf. Rund {rund(SUMME1)} ältere Häuser.'],
     ['<b>2</b>', ', '.join(G.ORTE_2), 'ab Woche 3', f'Viele Häuser, allein Bern hat rund {rund(haeuser("BE"))}. Der Check zeigt dort Zone und Parzelle, die Ziffer noch nicht.'],

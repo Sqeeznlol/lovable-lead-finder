@@ -79,8 +79,9 @@ Handy-Fassung. Gebaut wird mit `<Seite>` aus `src/components/rahmen.tsx`.
     «Reserve», wo das Wort allein steht. Der Test `check.test.ts`
     (Wortlaut der Check-Seiten) wird rot, wenn so ein Satz zurückkommt.
   * Werbung nur bei Google Ads, Julian und Bauraum zusammen, Budget
-    CHF 1'000 im Monat (18. November: «wir machen nur Google ADS»,
-    «budget 1000 CHF im Monat»). Kein Meta-Pixel mehr
+    CHF 600 im Monat (18. November: «wir machen nur Google ADS»; 21. November:
+    «Budget ist 500-700 Franken pro Monat», gerechnet mit der Mitte). Konto
+    «Bauraum» im Google-Konto von Bauraum, nie in einem privaten. Kein Meta-Pixel mehr
     (`zustimmung.test.ts` wird rot, wenn es zurückkommt). Kampagnen,
     Keywords, Anzeigen und Standorte erzeugt
     `docs/kampagnenplan/google_ads.py` als Importdatei für den Google Ads
