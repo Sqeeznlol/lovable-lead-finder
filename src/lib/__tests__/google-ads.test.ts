@@ -21,8 +21,10 @@ async function frisch(idWert: string, labelWert: string, wahl: 'alle' | 'noetig'
 describe('Google Ads: Lead melden', () => {
   afterEach(() => { vi.unstubAllEnvs(); localStorage.clear(); });
 
-  it('ohne Konto lädt nichts', async () => {
-    const g = await frisch('', '', 'alle');
+  // Seit dem 21. November steht das Konto fest (KONTO); leer heisst jetzt «das Konto».
+  // Ohne gültiges Konto, etwa nach einem Tippfehler bei Vercel, lädt weiterhin nichts.
+  it('ohne gültiges Konto lädt nichts', async () => {
+    const g = await frisch('kein-konto', 'x', 'alle');
     g.googleLead();
     expect(skripte()).toEqual([]);
   });
@@ -67,5 +69,14 @@ describe('Google Ads: Lead melden', () => {
       ['event', 'conversion', { send_to: 'AW-1234567890/AbC-dEf_123' }],
       ['event', 'conversion', { send_to: 'AW-1234567890/AbC-dEf_123' }],
     ]);
+  });
+});
+
+describe('Konto «Bauraum» (21. November)', () => {
+  it('ID und Label der Conversion «Lead» stehen fest und haben die Form, die Google verlangt', async () => {
+    const { KONTO } = await import('@/lib/google-ads');
+    expect(KONTO).toEqual({ id: 'AW-18588031014', label: 'Y3eECO-s4rwdEKawu59F' });
+    expect(KONTO.id).toMatch(/^AW-\d{6,14}$/);
+    expect(KONTO.label).toMatch(/^[A-Za-z0-9_-]{6,40}$/);
   });
 });

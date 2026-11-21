@@ -19,9 +19,10 @@ import { KLICK, sitzungsHerkunft } from '@/lib/werbe-herkunft';
  * Gemeldet wird allein der Lead, ohne Namen, Adresse oder Nummer. Für
  * persönliche Werbung (Remarketing) gibt es keine Zustimmung.
  */
-// Aus der Conversion «Lead» im Konto (Zeile send_to: 'AW-…/…'). Öffentlich wie
-// in jeder Seite mit Messpunkt, darum direkt hier; Vercel kann sie überschreiben.
-export const KONTO = { id: '', label: '' };
+// Aus der Conversion «Lead» im Konto «Bauraum» (21. November, Ereignis-Snippet,
+// send_to: 'AW-18588031014/Y3eECO-s4rwdEKawu59F'). Öffentlich wie in jeder Seite
+// mit Messpunkt, darum direkt hier; Vercel kann sie überschreiben.
+export const KONTO = { id: 'AW-18588031014', label: 'Y3eECO-s4rwdEKawu59F' };
 const id = String(import.meta.env.VITE_GOOGLE_ADS_ID || KONTO.id).trim();
 const label = String(import.meta.env.VITE_GOOGLE_ADS_LABEL || KONTO.label).trim();
 // Ein Tippfehler bei Vercel soll keine fremde Adresse laden.
