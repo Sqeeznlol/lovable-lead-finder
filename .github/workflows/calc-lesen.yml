@@ -1,0 +1,64 @@
+# =====================================================================
+# CALC lesen
+# =====================================================================
+# Liest, was Menschen in CALC YOU LATER zum Preis geschrieben haben: das
+# Gespräch «Stimmt der Preis?» (kalkulation_bemerkung) und Urteil, Grund
+# und Bemerkungen im Ablauf (kalkulation). Daraus lernt die Rechnung
+# (Julian, 21. November: «schau, was Tim in Aurora zur Überprüfung
+# geschrieben hat, und lerne das an»).
+#
+# Darin stehen Namen und womöglich Eigentümer. Die Protokolle dieses
+# Repositorys sind öffentlich: darum geht nichts davon ins Protokoll. Das
+# Ergebnis wird mit dem öffentlichen Schlüssel aus der Eingabe
+# verschlüsselt und als Anhang des Laufs abgelegt, einen Tag lang; lesen
+# kann es nur, wer den passenden privaten Schlüssel hat.
+# =====================================================================
+name: CALC lesen
+
+on:
+  workflow_dispatch:
+    inputs:
+      schluessel:
+        description: 'Öffentlicher RSA-Schlüssel (PEM, base64)'
+        required: true
+
+jobs:
+  lesen:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Werkzeuge
+        run: sudo apt-get install -y -qq postgresql-client
+      - name: Lesen und verschlüsseln
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+          SCHLUESSEL: ${{ inputs.schluessel }}
+        run: |
+          set -euo pipefail
+          [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
+          umask 077
+          echo "$SCHLUESSEL" | base64 -d > oeffentlich.pem
+          openssl pkey -pubin -in oeffentlich.pem -noout
+          psql "$DB" -X -q -At -v ON_ERROR_STOP=1 -c "set statement_timeout = '30s';" -c "
+            select json_build_object(
+              'bemerkungen', coalesce((select json_agg(json_build_object(
+                  'adresse', k.adresse, 'gemeinde', k.gemeinde, 'zustand', k.zustand, 'name', b.name, 'am', b.erstellt_am,
+                  'urteil', b.urteil, 'preis', b.preis_chf, 'empfehlung', b.empfehlung_chf, 'text', b.text) order by b.erstellt_am)
+                from public.kalkulation_bemerkung b join public.kalkulation k on k.id = b.kalkulation_id), '[]'),
+              'kalkulationen', coalesce((select json_agg(json_build_object(
+                  'adresse', adresse, 'gemeinde', gemeinde, 'zustand', zustand, 'test', test, 'empfehlung', empfehlung_chf,
+                  'preis', preis_chf, 'urteil', preis_urteil, 'grund', preis_grund, 'verlauf', verlauf,
+                  'massgebend', ergebnis->'massgebend', 'bestand', ergebnis->'bestand'->'wertArt',
+                  'hand', eingaben->'eingabe'->'hand', 'annahmen', eingaben->'eingabe'->'annahmen') order by erstellt_am)
+                from public.kalkulation), '[]'))" > klar.json
+          echo "Gelesen: $(wc -c < klar.json) Bytes."
+          openssl rand -out aes.key 32
+          openssl enc -aes-256-cbc -pbkdf2 -salt -in klar.json -out daten.enc -pass file:aes.key
+          openssl pkeyutl -encrypt -pubin -inkey oeffentlich.pem -pkeyopt rsa_padding_mode:oaep -in aes.key -out aes.enc
+          rm -f klar.json aes.key
+      - uses: actions/upload-artifact@v4
+        with:
+          name: calc-lesen
+          path: |
+            daten.enc
+            aes.enc
+          retention-days: 1
