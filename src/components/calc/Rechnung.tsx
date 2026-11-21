@@ -13,7 +13,7 @@ import { adresseWaehlen, suchtext } from '@/lib/adresswahl';
 import type { Projekt } from '@/lib/bauprojekt';
 import { ProjektHinweis } from '@/components/ProjektHinweis';
 import { aufParzelle, useGesucheParzelle } from '@/components/BaugesucheParzelle';
-import { bewerten, CALC_ANNAHMEN, inStadtZuerich, ERLOES_ANNAHME, median, nachbarArt, type CalcAnnahmen, type CalcEingabe, type ErloesQuelle, type Kauf, type NachbarTeil, type Umfeld, type Vergleich, type VonHand } from '@/lib/calc';
+import { bewerten, CALC_ANNAHMEN, flaechenAnteil, ERLOES_ANNAHME, median, nachbarArt, type CalcAnnahmen, type CalcEingabe, type ErloesQuelle, type Kauf, type NachbarTeil, type Umfeld, type Vergleich, type VonHand } from '@/lib/calc';
 import { ERLOES_AMTLICH } from '@/lib/erloes-daten';
 import { ERLOES_ANGABEN } from '@/lib/erloes-angaben';
 import { angabePruefen, erloesHerleiten, quartierLaden, reihenLaden } from '@/lib/preis-herleitung';
@@ -201,6 +201,9 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
     enabled: nachbarnAuf && !!basis?.egrid, staleTime: 30 * 60 * 1000, retry: 1,
   });
   const b = useMemo(() => (eingabe ? bewerten(eingabe) : null), [eingabe]);
+  // Das Feld für den Flächenwert steht nur, wo er gilt: Stadt Zürich, oder ein Haus ab 1970 (Tim).
+  const hauptBaujahr = [...(eingabe?.grundlage.gebaeude ?? [])].sort((x, y) => (y.grundflaeche ?? 0) - (x.grundflaeche ?? 0))[0]?.baujahr;
+  const flaechenWert = eingabe ? flaechenAnteil(eingabe, hauptBaujahr) : null;
   // Das letzte Baugesuch auf der Parzelle, für den Knopf aufs Projekt.
   const gesuche = useGesucheParzelle(basis?.parzelleId ?? null, basis?.egrid ?? null);
   const gesuch = basis ? (gesuche.data ?? []).find(g => aufParzelle(g, basis.parzelleId, basis.egrid)) ?? null : null;
@@ -420,7 +423,7 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
           <Zahl titel="Wohnungsgrösse" wert={annahmen.wohnungM2} einheit="m²" min={30} max={250} schritt={5} setWert={n => setze({ wohnungM2: n })} />
           <Zahl titel="Abbruch je m² Bestand" wert={annahmen.abbruch} einheit="CHF" min={0} max={2000} schritt={10} setWert={n => setze({ abbruch: n })} />
           <Zahl titel="Rendite des Käufers" wert={Math.round(annahmen.rendite * 1000) / 10} einheit="%" min={1} max={12} schritt={0.1} setWert={n => setze({ rendite: n / 100 })} />
-          {inStadtZuerich({ kanton: basis.kanton, umfeld: basis.umfeld }) && <Zahl titel="Bestand je m², Anteil am Erlös" wert={Math.round((annahmen.bestandAnteil ?? CALC_ANNAHMEN.bestandAnteil!) * 1000) / 10} einheit="%" min={0} max={100} schritt={0.1} setWert={n => setze({ bestandAnteil: n / 100 })} />}
+          {flaechenWert && <Zahl titel={flaechenWert.feld === 'bestandAnteilJung' ? 'Bestand je m² (ab 1970), Anteil am Erlös' : 'Bestand je m², Anteil am Erlös'} wert={Math.round(flaechenWert.anteil * 1000) / 10} einheit="%" min={0} max={100} schritt={0.1} setWert={n => setze({ [flaechenWert.feld]: n / 100 })} />}
         </div>
         {/* Woraus die Baukosten bestehen: die Stufe nach Verkaufspreis und die Zuschläge. */}
         {b.neubau && (

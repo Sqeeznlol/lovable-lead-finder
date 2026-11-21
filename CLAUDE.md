@@ -225,6 +225,12 @@ senden. Alles Weitere in `docs/calc-you-later.md`.
     mit der ganzen Fläche aus dem Fussabdruck: das Register führt nur die
     Wohnungen (dort 242 von 458 m²). Ergebnis 4.12 Mio., Angebot 4.1 Mio.;
     `calc.test.ts` rechnet den Fall nach.
+    Häuser ab Baujahr 1970 rechnen den Flächenwert überall, mit 71.9 % des
+    Erlöses (21. November, aus Tims Prüfung der Rietwisstrasse 7, Uitikon,
+    Baujahr 2019: «nach 1970 gebaut ... lange Lebensdauer ... im Bestand
+    wesentlich mehr wert ... 12000/m²»; `flaechenAnteil`). Was Menschen in
+    CALC zum Preis schreiben, liest der Ablauf «CALC lesen», verschlüsselt,
+    weil die Protokolle öffentlich sind.
     Ändert sich die Rechnung, rechnet der Ablauf «Kalkulationen neu rechnen»
     alle Entwürfe neu («zeigen», dann «schreiben»); Eingereichtes bleibt.
 

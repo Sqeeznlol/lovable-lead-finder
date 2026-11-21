@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { vi } from 'vitest';
 vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
-import { baukostenNachErloes, bewerten, CALC_ANNAHMEN, hangZuschlag, kleinZuschlag, hnfPraxis, median, mieteStatistik, nachbarArt, zoneMitHand, zuerichKm, zuerichZuschlag, type CalcEingabe } from '@/lib/calc';
+import { baukostenNachErloes, bewerten, CALC_ANNAHMEN, flaechenAnteil, hangZuschlag, kleinZuschlag, hnfPraxis, median, mieteStatistik, nachbarArt, zoneMitHand, zuerichKm, zuerichZuschlag, type CalcEingabe } from '@/lib/calc';
 import { angebotEntwurf, betrag, uhr } from '@/lib/calc-ablauf';
 import { gebaeudeAusRegister } from '@/lib/calc-daten';
 import { REGISTER_MFH_2019 } from './register-beispiel';
@@ -655,5 +655,40 @@ describe('CALC YOU LATER: Bestand nach Fläche (Tim)', () => {
     const aus = bewerten({ ...e, annahmen: { ...e.annahmen, bestandAnteil: 0 } });
     expect(aus.bestand!.wertFlaeche).toBeNull();
     expect(aus.bestand!.wert).toBe(aus.bestand!.wertMiete);
+  });
+});
+
+/**
+ * Tims Prüfung vom 20. November, Rietwisstrasse 7 in Uitikon (Baujahr 2019,
+ * 526 m² Wohnungen laut Register, Erlös 16'700): «alle Gebäude, welche nach
+ * 1970 gebaut wurden, haben noch eine lange Lebensdauer ... da muss man den
+ * Bestand rechnen ... über m² HNF ... 12000/m²». Ab 1970 gilt der
+ * Flächenwert überall, nicht nur in der Stadt Zürich.
+ */
+describe('CALC YOU LATER: Bestand ab 1970 (Tim)', () => {
+  const wohnungen = [100, 110, 106, 100, 110].map((f, i) => ({ id: `x-${i}`, nr: String(i), geschoss: null, zimmer: 4.5, flaeche: f }));
+  const haus = { grundflaeche: 302, geschosse: 3, baujahr: 2019, wohnungen: 5, kategorie: 1025, wohnungsliste: wohnungen };
+  const e: CalcEingabe = {
+    ...leer, kanton: 'ZH', annahmen: { ...leer.annahmen, erloes: 16_700 }, umfeld: { ...leer.umfeld, gemeinde: 'Uitikon' },
+    grundlage: { ...leer.grundlage, flaeche: 1332, gebaeude: [haus] },
+  };
+
+  it('ein Haus von 2019 in Uitikon: 12’000 je m², wie Tim', () => {
+    const b = bewerten(e);
+    expect(b.bestand!.flaeche).toBe(526);
+    expect(b.bestand!.jeM2).toBe(12_000);
+    expect(b.bestand!.wertFlaeche).toBe(526 * 12_000);
+    expect(b.bestand!.wertArt).toBe('flaeche');
+  });
+
+  it('ein Haus von 1911 ausserhalb der Stadt bleibt bei der Miete', () => {
+    const alt = bewerten({ ...e, grundlage: { ...e.grundlage, gebaeude: [{ ...haus, baujahr: 1911 }] } });
+    expect(alt.bestand!.wertFlaeche).toBeNull();
+  });
+
+  it('das Feld der Annahmen folgt dem Alter', () => {
+    expect(flaechenAnteil(e, 2019)).toEqual({ anteil: 0.719, feld: 'bestandAnteilJung' });
+    expect(flaechenAnteil(e, 1911)).toBeNull();
+    expect(flaechenAnteil({ ...e, umfeld: { gemeinde: 'Zürich' } }, 1908)).toEqual({ anteil: 0.578, feld: 'bestandAnteil' });
   });
 });

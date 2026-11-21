@@ -54,6 +54,8 @@ export interface CalcAnnahmen extends Annahmen {
    * Verkaufspreis je m² (Erlös). Leer oder 0: nur der Ertragswert zählt.
    */
   bestandAnteil?: number;
+  /** Dasselbe für Häuser ab Baujahr 1970 (Tim, 20. November), überall, nicht nur in der Stadt Zürich. */
+  bestandAnteilJung?: number;
 }
 /**
  * Julian, 16. November: «Wir brauchen eine Gewinnmarge von 20 %», und
@@ -73,7 +75,29 @@ export const CALC_ANNAHMEN: CalcAnnahmen = {
   // 57.8 % der 17'300, die Stockwerkeigentum dort kostet. Gilt vorerst nur
   // in der Stadt Zürich (inStadtZuerich).
   bestandAnteil: 0.578,
+  // Tim, 20. November, Rietwisstrasse 7 in Uitikon (Baujahr 2019): «alle
+  // Gebäude, welche nach 1970 gebaut wurden, haben noch eine lange
+  // Lebensdauer ... im Bestand wesentlich mehr wert als bei einem Neubau ...
+  // über Rendite oder über m² HNF ... 12000/m²». 12'000 von 16'700 Erlös
+  // sind 71.9 %.
+  bestandAnteilJung: 0.719,
 };
+
+/** Ab diesem Baujahr hat ein Haus noch eine lange Lebensdauer (Tim, 20. November). */
+export const JUNG_AB = 1970;
+
+/**
+ * Welcher Anteil am Erlös für den Flächenwert gilt, und unter welchem Feld
+ * der Annahmen er steht. Ältere Häuser nur in der Stadt Zürich (Julian,
+ * 20. November); Häuser ab 1970 überall (Tim, am selben Tag). Ohne beides:
+ * kein Flächenwert.
+ */
+export function flaechenAnteil(e: Pick<CalcEingabe, 'kanton' | 'umfeld' | 'annahmen'>, baujahr: number | null | undefined): { anteil: number; feld: 'bestandAnteil' | 'bestandAnteilJung' } | null {
+  const a = e.annahmen;
+  if (baujahr != null && baujahr >= JUNG_AB) return { anteil: a.bestandAnteilJung ?? CALC_ANNAHMEN.bestandAnteilJung!, feld: 'bestandAnteilJung' };
+  if (inStadtZuerich(e)) return { anteil: a.bestandAnteil ?? CALC_ANNAHMEN.bestandAnteil!, feld: 'bestandAnteil' };
+  return null;
+}
 
 /**
  * Die Hauptnutzfläche nach Julians Praxisformel, mit der Objekte
@@ -571,8 +595,8 @@ export function bewerten(e: CalcEingabe): Bewertung {
     const art: Bestand['mieteArt'] = ertragHand ? 'ertrag' : ausSpiegel ? 'spiegel' : mieteHand ? 'hand' : 'statistik';
     const wertMiete = ertragHeute / a.rendite;
     // Entwürfe von vor dem 20. November kennen den Anteil nicht: dann gilt Tims Vorgabe. 0 schaltet den Flächenwert ab.
-    // Vorerst nur in der Stadt Zürich (Julian, 20. November: «mach das mal nur in der Stadt ZH»): dort ist er geeicht.
-    const anteil = !inStadtZuerich(e) ? 0 : a.bestandAnteil === undefined ? CALC_ANNAHMEN.bestandAnteil : a.bestandAnteil;
+    // Ältere Häuser nur in der Stadt Zürich, Häuser ab 1970 überall (flaechenAnteil).
+    const anteil = flaechenAnteil(e, haupt?.baujahr)?.anteil ?? 0;
     const jeM2 = pos(anteil) && pos(a.erloes) ? Math.round((a.erloes * anteil!) / 100) * 100 : null;
     const wertFlaeche = jeM2 && flaecheB ? flaecheB * jeM2 : null;
     bestand = {
