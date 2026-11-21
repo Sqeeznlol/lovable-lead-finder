@@ -171,9 +171,9 @@ function Nachfassen({ lead, onWeiter }: { lead: Lead; onWeiter: (l: Lead) => Pro
   );
 }
 
-export function LeadDetail({ lead, onClose, onErledigt, onNotiz, onNachfass }: {
+export function LeadDetail({ lead, onClose, onErledigt, onNotiz, onNachfass, onGeloescht }: {
   lead: Lead | null; onClose: () => void; onErledigt: (l: Lead) => void; onNotiz: (l: Lead, text: string) => Promise<void>;
-  onNachfass: (l: Lead) => Promise<void>;
+  onNachfass: (l: Lead) => Promise<void>; onGeloescht?: () => void;
 }) {
   const navigate = useNavigate();
   const [notiz, setNotiz] = useState('');
@@ -285,9 +285,44 @@ export function LeadDetail({ lead, onClose, onErledigt, onNotiz, onNachfass }: {
                 <button type="button" className={KNOPF} onClick={() => onErledigt(lead)}>{lead.bearbeitet ? 'Wieder offen' : 'Erledigt'}</button>
               </div>
             </section>
+            <Loeschen key={lead.id} id={lead.id} onGeloescht={() => { onClose(); onGeloescht?.(); }} />
           </div>
         )}
       </SheetContent>
     </Sheet>
+  );
+}
+
+/**
+ * Einen Lead löschen, nur mit Passwort (Julian, 21. November: «Option ...
+ * Leads zu löschen, aber mit dem Passwort ... darf aber keiner sehen»). Das
+ * Passwort prüft die Datenbank (anfrage_loeschen); hier steht es nirgends.
+ * Das Feld zeigt nur Punkte, und der Browser soll es sich nicht merken.
+ */
+function Loeschen({ id, onGeloescht }: { id: string; onGeloescht: () => void }) {
+  const [auf, setAuf] = useState(false);
+  const [passwort, setPasswort] = useState('');
+  const [laeuft, setLaeuft] = useState(false);
+  const [fehler, setFehler] = useState<string | null>(null);
+  const loeschen = async () => {
+    setLaeuft(true); setFehler(null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any).rpc('anfrage_loeschen', { p_id: id, p_passwort: passwort });
+    setLaeuft(false); setPasswort('');
+    if (error) { setFehler(error.message || 'Nicht gelöscht.'); return; }
+    onGeloescht();
+  };
+  if (!auf) return <button type="button" className="text-sm text-muted-foreground underline underline-offset-2" onClick={() => setAuf(true)}>Lead löschen</button>;
+  return (
+    <section className="space-y-2 rounded-[3px] border border-destructive/40 p-3">
+      <p className="text-sm">Der Lead wird ganz gelöscht und lässt sich nicht zurückholen.</p>
+      <form className="flex flex-wrap gap-2" onSubmit={e => { e.preventDefault(); if (passwort) void loeschen(); }}>
+        <input type="password" value={passwort} onChange={e => setPasswort(e.target.value)} placeholder="Passwort" aria-label="Passwort zum Löschen"
+               autoComplete="off" name="lead-loeschen-passwort" className="h-11 min-w-0 flex-1 rounded-[3px] border border-input bg-card px-3.5 text-base focus:border-foreground focus:outline-none" />
+        <button type="submit" className={`${KNOPF} text-destructive`} disabled={!passwort || laeuft}>{laeuft ? 'Löscht …' : 'Endgültig löschen'}</button>
+        <button type="button" className={KNOPF} onClick={() => { setAuf(false); setPasswort(''); setFehler(null); }}>Abbrechen</button>
+      </form>
+      {fehler && <p className="text-sm text-destructive">{fehler}</p>}
+    </section>
   );
 }

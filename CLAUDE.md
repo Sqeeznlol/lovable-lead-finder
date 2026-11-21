@@ -39,6 +39,11 @@ die Datenbank mit allen Migrationen und die Datenabläufe. Der Test
 Ausnahme seit dem 8. November (Julian: "es soll da sein"): der Reiter
 "Leads" zeigt hier die Leads und Zahlen der Check-Seiten. Er liest nur
 (`anfrage`, `check_trichter`); die Seiten selbst bleiben in der Akquise.
+Löschen lässt sich ein Lead nur mit Passwort (21. November, Julian: «darf
+aber keiner sehen das Passwort»): die Datenbank prüft es
+(`anfrage_loeschen`, nach fünf Fehlversuchen eine Stunde gesperrt); im
+Repository steht nur sein bcrypt-Prüfwert, nie das Passwort.
+`anfrage-loeschen.test.ts` wird rot, wenn es irgendwo im Klartext steht.
 
 ## Was live ist
 

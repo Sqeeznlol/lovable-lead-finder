@@ -221,7 +221,8 @@ export function Leads() {
           )}
       </Abschnitt>
 
-      <LeadDetail lead={offen} onClose={() => setOffenId(null)} onErledigt={l => void erledigt(l)} onNotiz={notiz} onNachfass={nachfass} />
+      <LeadDetail lead={offen} onClose={() => setOffenId(null)} onErledigt={l => void erledigt(l)} onNotiz={notiz} onNachfass={nachfass}
+                  onGeloescht={() => void qc.invalidateQueries({ queryKey: ['check-leads'] })} />
 
       {q.length > 0 && (
         <Abschnitt titel="Woher die Besucher kommen">
