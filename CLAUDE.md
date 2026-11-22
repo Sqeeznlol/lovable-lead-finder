@@ -80,6 +80,10 @@ Push die Migration einspielen und «Reiter prüfen» neu starten. Er spielt
 seither auch einen echten Durchgang: Adresse rechnen, Entwurf anlegen,
 Entwurf löschen.
 
+Ohne Migration «Reiter prüfen» nicht von Hand starten: er läuft nach
+«Was ist live» von selbst, und ein zweiter Start bricht den laufenden ab
+(Gruppe `reiter`, 22. November: so standen beide Läufe abgebrochen da).
+
 ### Pushes bündeln
 
 Vercel liefert höchstens hundert Mal am Tag aus, und am Repository
