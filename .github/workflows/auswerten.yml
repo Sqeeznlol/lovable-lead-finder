@@ -63,6 +63,7 @@ on:
           - fonds-zahlen # Nach dem Wegräumen der erfundenen Fonds: was übrig ist (nur Zählungen)
           - umrisse      # Wie viele Parzellen je Kanton einen Umriss und einen Punkt haben (nur Zählungen)
           - machbarkeit  # Ob machbarkeit_grundlage für echte Parzellen plausible Flächen liefert (nur Zahlen)
+          - geschaeft    # Vom Besucher zum Kaufangebot: Leads, Anrufe, Kalkulationen, Urteile, Angebote (nur Zählungen)
           - besucher     # Ob die Zahlen unter «Leads» stimmen: Besucher je Domain und Tag, Leads gegen Anfragen, Bots (nur Zählungen)
           - suche-probe  # Die Suche an echten Daten: Zonenkürzel je Gemeinde, Treffer und Tempo (nur Zählungen, keine Adressen)
           - suche-daten  # Für die Suche: wie Zonen in vier Gemeinden heissen und welche Angaben je Parzelle gefüllt sind (nur Zählungen und Zonennamen)
@@ -1051,6 +1052,44 @@ jobs:
                      round(avg(jsonb_array_length(m5->'gebaeude')), 2) as gebaeude_im_mittel,
                      round(avg((m5->>'nachbarn')::numeric), 1) as nachbarn_im_mittel
                 from r group by 1 order by 1;"
+          elif [ "$FRAGE" = "geschaeft" ]; then
+            # Julian, 22. November: «wie schaut es aus mit den Leads, die da
+            # reinkommen, Tim bewertet, und wie geht es weiter?» Der ganze Weg
+            # vom Besuch zum Angebot, nur Zählungen: Namen, Adressen und Preise
+            # einzelner Objekte gehören nicht in ein öffentliches Protokoll.
+            frage "Leads je Monat und Herkunft (ohne Testdaten)" "
+              select to_char(erstellt_am, 'YYYY-MM') as monat, coalesce(angaben->>'utm_source', case when angaben ? 'marke' then 'check-seite direkt' else 'anderes' end) as herkunft,
+                     count(*) as leads, count(*) filter (where bearbeitet) as erledigt,
+                     count(*) filter (where coalesce(nachfass_stufe, 0) > 0) as nachgefasst,
+                     count(*) filter (where angaben->>'prioritaet' = 'heiss') as heiss,
+                     count(*) filter (where egrid is not null) as mit_egrid
+              from anfrage where name !~* 'test' and coalesce(angaben->>'quelle', '') <> 'test'
+              group by 1, 2 order by 1, 2;"
+            frage "Was die Leads wollen (Absicht, Eigentümer), alle ohne Test" "
+              select coalesce(angaben->>'absicht', '–') as absicht, coalesce(angaben->>'eigentuemer', '–') as eigentuemer, count(*) as leads
+              from anfrage where name !~* 'test' and coalesce(angaben->>'quelle', '') <> 'test' group by 1, 2 order by 3 desc;"
+            frage "Wie lange ein Lead liegt, bis er erledigt ist (Tage seit Eingang, offene)" "
+              select count(*) filter (where not bearbeitet) as offen,
+                     count(*) filter (where not bearbeitet and erstellt_am < now() - interval '2 days') as offen_ueber_2_tage,
+                     count(*) filter (where not bearbeitet and erstellt_am < now() - interval '7 days') as offen_ueber_7_tage
+              from anfrage where name !~* 'test' and coalesce(angaben->>'quelle', '') <> 'test';"
+            frage "Kalkulationen je Stand (ohne Test)" "
+              select zustand, count(*) as anzahl, count(*) filter (where anfrage_id is not null) as aus_lead,
+                     count(*) filter (where erstellt_am > now() - interval '7 days') as letzte_7_tage,
+                     count(*) filter (where frist_am < now() and zustand in ('pruefung', 'freigabe', 'angebot')) as frist_vorbei
+              from kalkulation where not test group by 1 order by 1;"
+            frage "Leads mit und ohne Kalkulation" "
+              select count(*) as leads, count(*) filter (where exists (select 1 from kalkulation k where k.anfrage_id = a.id)) as mit_kalkulation
+              from anfrage a where name !~* 'test' and coalesce(angaben->>'quelle', '') <> 'test' and adresse is not null;"
+            frage "Urteile zum Preis: im Ablauf (preis_urteil) und im Gespräch (Bemerkungen)" "
+              select 'ablauf' as wo, coalesce(preis_urteil, 'ohne') as urteil, count(*) from kalkulation where not test group by 1, 2
+              union all
+              select 'gespraech', coalesce(urteil, 'nur text'), count(*) from kalkulation_bemerkung where not test group by 1, 2
+              order by 1, 2;"
+            frage "Abweichung der genannten Preise von der Empfehlung (Gespräch, in Prozent)" "
+              select count(*) as mit_preis, round(avg(preis_chf / empfehlung_chf * 100 - 100)) as mittel_prozent,
+                     round(min(preis_chf / empfehlung_chf * 100 - 100)) as tiefste, round(max(preis_chf / empfehlung_chf * 100 - 100)) as hoechste
+              from kalkulation_bemerkung where not test and preis_chf is not null and empfehlung_chf > 0;"
           elif [ "$FRAGE" = "besucher" ]; then
             # Julian, 15. November: "stimmen die analytics?" Der Reiter Leads
             # zählt Sitzungen aus check_ereignis (check_trichter) und Zeilen
