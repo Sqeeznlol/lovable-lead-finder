@@ -278,7 +278,7 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
               <a className={eben ? KNOPF_HAUPT : KNOPF} href={n.mail}><Mail className="h-4 w-4" /> E-Mail</a>
               {n.whatsapp && <a className={KNOPF} href={n.whatsapp} target={FENSTER.extern}><MessageCircle className="h-4 w-4" /> WhatsApp</a>}
             </div>
-            {!zugLeute.some(p => p.email) && <p className="text-sm text-muted-foreground">Wer welche Rolle hat, legt ein Admin unten bei «Wer was tut» fest; dann steht die Adresse schon in der Nachricht.</p>}
+            {!zugLeute.some(p => p.email) && <p className="text-sm text-muted-foreground">Wer welche Rolle hat, legt ein Admin im Reiter Admin bei «Wer was tut» fest; dann steht die Adresse schon in der Nachricht.</p>}
           </div>
         )}
 
@@ -596,7 +596,7 @@ function AngebotBearbeiten({ k, firma, setFirma, vorlage, setVorlage, felder, se
               </label>
             ))}
           </div>
-        ) : <p className="text-sm text-muted-foreground">Für {FIRMEN[firma].name} ist niemand eingetragen. Ein Admin trägt unten bei «Wer was tut» ein, wer unterschreibt.</p>}
+        ) : <p className="text-sm text-muted-foreground">Für {FIRMEN[firma].name} ist niemand eingetragen. Ein Admin trägt im Reiter Admin bei «Wer was tut» ein, wer unterschreibt.</p>}
         {felder.unterschriften.length > 0 && (
           <label className="block space-y-1.5 pt-1">
             <span className={ETIKETT}>Oben rechts als Kontakt</span>

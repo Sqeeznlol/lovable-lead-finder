@@ -22,6 +22,7 @@ export type Lead = {
   id: string; name: string; email: string | null; telefon: string | null; adresse: string | null; egrid: string | null;
   angaben: Record<string, unknown>; erstellt_am: string; bearbeitet: boolean; bemerkung: string | null;
   nachfass_stufe?: number | null; nachfass_am?: string | null;
+  art?: 'bewertung' | 'potenzial' | 'investor'; nachricht?: string | null;
 };
 
 const zeile = (titel: string, wert: unknown) =>
@@ -287,6 +288,7 @@ export function LeadDetail({ lead, onClose, onErledigt, onNotiz, onNachfass, onG
                 <button type="button" className={KNOPF} onClick={() => onErledigt(lead)}>{lead.bearbeitet ? 'Wieder offen' : 'Erledigt'}</button>
               </div>
             </section>
+            {lead.art === 'investor' && !lead.bearbeitet && <AlsInvestor lead={lead} onFertig={() => onErledigt(lead)} />}
             <Loeschen key={lead.id} id={lead.id} onGeloescht={() => { onClose(); onGeloescht?.(); }} />
           </div>
         )}
@@ -358,6 +360,45 @@ function Guete({ id }: { id: string }) {
         <button key={g} type="button" role="radio" aria-checked={q.data === g} onClick={() => void setzen(g)}
                 className={`min-h-11 rounded-[3px] border px-4 text-sm ${q.data === g ? 'border-foreground bg-foreground text-background' : 'bg-card hover:bg-secondary'}`}>{t}</button>
       ))}
+    </div>
+  );
+}
+
+/** "2 Mio.", "850'000" -> Zahl; die öffentliche Seite nimmt Freitext. */
+const betragAus = (v: unknown) => {
+  const t = String(v ?? '').toLowerCase().replace(/chf|['’\s]/g, '');
+  const n = Number(t.replace(/mio\.?$/, '').replace(',', '.'));
+  return Number.isFinite(n) && n > 0 ? Math.round(/mio/.test(t) ? n * 1e6 : n) : null;
+};
+
+/**
+ * Eine Investor-Anfrage wird mit einem Tipp zum Akteur mit Suchprofil;
+ * dann taucht sie im Investoren-Abgleich auf. Stand bis zum 22. November
+ * in der Auswertung, in einer zweiten Liste derselben Leads.
+ */
+function AlsInvestor({ lead, onFertig }: { lead: Lead; onFertig: () => void }) {
+  const [laeuft, setLaeuft] = useState(false);
+  const [fehler, setFehler] = useState<string | null>(null);
+  const uebernehmen = async () => {
+    setLaeuft(true); setFehler(null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = supabase as any;
+    const a = lead.angaben ?? {};
+    const liste = (v: unknown) => String(v ?? '').split(/[,;]/).map(x => x.trim()).filter(Boolean);
+    const ak = await db.from('akteur').insert({ name: lead.name, art: 'firma', bemerkung: 'Aus Investor-Anfrage' }).select('id').single();
+    if (ak.error) { setFehler('Nicht übernommen.'); setLaeuft(false); return; }
+    await db.from('kontakt').insert({ akteur_id: ak.data.id, name: lead.name, email: lead.email, telefon: lead.telefon });
+    await db.from('investorprofil').insert({
+      akteur_id: ak.data.id, lagen: liste(a.lagen), objekttypen: liste(a.objekttypen),
+      budget_min_chf: betragAus(a.budget_von), budget_max_chf: betragAus(a.budget_bis), kriterien: lead.nachricht ?? null, erfasst_von: 'Anfrage',
+    });
+    setLaeuft(false);
+    onFertig();
+  };
+  return (
+    <div className="space-y-1">
+      <button type="button" className={KNOPF_HAUPT} disabled={laeuft} onClick={() => void uebernehmen()}>Als Investor übernehmen</button>
+      {fehler && <p className="text-sm text-destructive">{fehler}</p>}
     </div>
   );
 }

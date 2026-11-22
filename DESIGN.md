@@ -117,6 +117,15 @@ nacheinander. Nichts blinkt, nichts läuft endlos.
 - Untere Leiste fest, deckend, ohne Weichzeichner; der Inhalt endet
   darüber.
 
+## Bühne nur im Cockpit (22. November)
+
+Das Luftbild als Bühne steht nur im Cockpit (`<Seite buehne>`). Auf den
+Arbeitsseiten beginnt die Seite mit Überzeiler, Titel als Satz mit Zahl
+und Kennzahlen: auf dem iPhone kostete die Bühne dort 170 bis 300 px.
+Kennzahlen tragen keine Pfeile und keine Etiketten, die nur wiederholen,
+was der Titel sagt; eine Marke steht nur, wo sie etwas meldet
+(«überfällig», «heiss», «2 ungeprüft»).
+
 ## Der rote Faden (22. November)
 
 Julian: «kein roter Faden ... überall Tipps ... ein bisschen Ruhe

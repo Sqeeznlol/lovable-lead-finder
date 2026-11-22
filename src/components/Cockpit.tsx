@@ -112,6 +112,17 @@ export function Cockpit({ onGehe }: { onGehe: (z: Ziel) => void }) {
   // Dieselbe kleine Abfrage wie im Reiter; fehlt sie, bleibt die Zeile weg.
   const calc = useQuery({ queryKey: ['kalkulationen'], queryFn: kalkulationenLaden, staleTime: 60 * 1000, retry: 0 });
   const wartend = (calc.data ?? []).filter(k => !k.test && UNTERWEGS.includes(k.zustand));
+  // Wer entscheidet, sieht beim Öffnen zuerst, was auf ihn wartet (22.
+  // November): angebot_darf ist nur für das eingetragene Konto wahr, sobald
+  // jemand mit Konto die Rolle hat (Tim, «Entscheidet und verschickt»).
+  const entscheider = useQuery({
+    queryKey: ['angebot-darf', 'visum'], staleTime: 10 * 60 * 1000, retry: 0,
+    queryFn: async () => {
+      const r = await db().rpc('angebot_darf', { p_rolle: 'visum' });
+      return r.error ? false : Boolean(r.data);
+    },
+  });
+  const fuerMich = entscheider.data ? wartend.filter(k => k.zustand === 'pruefung' || k.zustand === 'angebot').length : 0;
   const zuSpaet = wartend.filter(k => uhr(k)?.ueberfaellig).length;
 
   const maxPrio = Math.max(1, ...(data?.heisse ?? []).map(h => Number(h.prioritaet) || 0));
@@ -129,7 +140,7 @@ export function Cockpit({ onGehe }: { onGehe: (z: Ziel) => void }) {
   );
 
   return (
-    <Seite bild={KOPFBILD} ueber={`${gruss()}${name ? `, ${name}` : ''}`} titel={data ? satzDesTages({ ...data, kalkSpaet: zuSpaet, kalkWartend: wartend.length }) : ' '}
+    <Seite bild={KOPFBILD} buehne ueber={`${gruss()}${name ? `, ${name}` : ''}`} titel={fuerMich ? `${fuerMich} ${fuerMich === 1 ? 'Preis wartet' : 'Preise warten'} auf deine Entscheidung` : data ? satzDesTages({ ...data, kalkSpaet: zuSpaet, kalkWartend: wartend.length }) : ' '}
       aktionen={aktionen}
       seite={
         <Abschnitt titel="Grösstes Potenzial" unter={`Kanton ${current}, Eigentümer noch offen`} symbol={Sparkles} kachel="akzent">

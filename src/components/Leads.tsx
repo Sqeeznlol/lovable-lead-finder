@@ -1,7 +1,9 @@
 import { Fragment, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Abschnitt, KNOPF, Leer, LISTE, Marke, Reiter, Seite } from '@/components/rahmen';
+import { Abschnitt, KNOPF, KNOPF_HAUPT, Leer, LISTE, Marke, Reiter, Seite } from '@/components/rahmen';
+import { useNavigate } from 'react-router-dom';
+import { Calculator, Phone } from 'lucide-react';
 import { BILD } from '@/lib/luftbild';
 import { LeadDetail, type Lead } from '@/components/LeadDetail';
 import { WerbungTafel } from '@/components/WerbungTafel';
@@ -25,6 +27,7 @@ const db = supabase as any;
 const MARKEN_NAME = (id: string) => id;
 
 export function Leads() {
+  const navigate = useNavigate();
   const [tage, setTage] = useState<Zeitraum>('30');
   const [nurOffen, setNurOffen] = useState(true);
   // Nach Wert: die grössten Böden zuerst (Boden-Richtwert der Check-Seiten).
@@ -42,7 +45,7 @@ export function Leads() {
     queryKey: ['check-leads', tage],
     queryFn: async (): Promise<Lead[]> => {
       const { data, error } = await db.from('anfrage')
-        .select('id, name, email, telefon, adresse, egrid, angaben, erstellt_am, bearbeitet, bemerkung, nachfass_stufe, nachfass_am')
+        .select('id, art, name, email, telefon, adresse, egrid, angaben, nachricht, erstellt_am, bearbeitet, bemerkung, nachfass_stufe, nachfass_am')
         .gte('erstellt_am', von).order('erstellt_am', { ascending: false }).limit(500);
       if (error) throw error;
       return data ?? [];
@@ -71,7 +74,7 @@ export function Leads() {
     enabled: !!offenId && !!leads.data && !leads.data.some(l => l.id === offenId),
     queryFn: async (): Promise<Lead | null> => {
       const { data } = await db.from('anfrage')
-        .select('id, name, email, telefon, adresse, egrid, angaben, erstellt_am, bearbeitet, bemerkung, nachfass_stufe, nachfass_am')
+        .select('id, art, name, email, telefon, adresse, egrid, angaben, nachricht, erstellt_am, bearbeitet, bemerkung, nachfass_stufe, nachfass_am')
         .eq('id', offenId).maybeSingle();
       return data ?? null;
     },
@@ -151,7 +154,12 @@ export function Leads() {
                         <span className="text-muted-foreground">{new Date(l.erstellt_am).toLocaleString('de-CH', { dateStyle: 'short', timeStyle: 'short' })}</span>
                       </div>
                     </div>
-                    <button type="button" className={`${KNOPF} self-start`} onClick={() => void erledigt(l)}>{l.bearbeitet ? 'Wieder offen' : 'Erledigt'}</button>
+                    {/* Gleich aus der Liste handeln (22. November): anrufen und den Preis rechnen, ohne die Ansicht zu öffnen. */}
+                    <div className="flex shrink-0 flex-wrap gap-2 self-start">
+                      {l.telefon && <a className={KNOPF} href={`tel:${l.telefon.replace(/\s/g, '')}`}><Phone className="h-4 w-4" /> Anrufen</a>}
+                      {l.adresse && <button type="button" className={KNOPF_HAUPT} onClick={() => navigate(`/calc?anfrage=${l.id}`)}><Calculator className="h-4 w-4" /> Kalkulieren</button>}
+                      <button type="button" className={KNOPF} onClick={() => void erledigt(l)}>{l.bearbeitet ? 'Wieder offen' : 'Erledigt'}</button>
+                    </div>
                   </li>
                 );
               })}

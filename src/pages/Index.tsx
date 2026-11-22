@@ -34,6 +34,8 @@ const Protokoll = nachladen(() => import('@/components/Protokoll'), 'Protokoll')
 const Anmeldungen = nachladen(() => import('@/components/Anmeldungen'), 'Anmeldungen');
 const Teams = nachladen(() => import('@/components/Teams'), 'Teams');
 const AdminSettings = nachladen(() => import('@/components/AdminSettings'), 'AdminSettings');
+// «Wer was tut» trägt nur ein Admin ein: darum hier, nicht auf der CALC-Seite (22. November).
+const AblaufPersonen = nachladen(() => import('@/components/calc/AblaufPersonen'), 'AblaufPersonen');
 import { Parzellensuche } from '@/components/Parzellensuche';
 import { useCanton } from '@/hooks/use-canton';
 import { AdminZugang } from '@/components/AdminZugang';
@@ -270,7 +272,8 @@ export default function Index() {
                         className="hidden h-11 items-center gap-2 rounded-[3px] bg-accent px-4 text-[15px] font-medium text-accent-foreground transition-transform active:scale-[0.97] lg:inline-flex">
                   <Plus className="h-4 w-4" /> Neue Kalkulation
                 </button>
-                <ThemeToggle />
+                {/* Auf dem iPhone steht Hell/Dunkel unter «Mehr»: die Kopfzeile bleibt der Suche und dem Konto (22. November). */}
+                <span className="hidden lg:inline-flex"><ThemeToggle /></span>
                 <KontoMenu />
               </div>
             </div>
@@ -308,6 +311,8 @@ export default function Index() {
                 <Anmeldungen />
                 {/* Wer welchen Kunden sieht -- die Grenze zieht die Datenbank. */}
                 <Teams />
+                {/* Wer in CALC entscheidet, verschickt und unterschreibt. */}
+                <AblaufPersonen />
 
                 <div className="space-y-6">
                 <AdminSettings />
@@ -364,7 +369,7 @@ export default function Index() {
                 <Orbit className="h-4 w-4" /> Wohntraums · Fonds <span className="ml-auto text-xs text-muted-foreground">eigenes Programm</span>
               </button>
               <div className="flex items-center justify-between border-t px-2 pt-4">
-                <span className="text-sm text-muted-foreground">{konto}</span>
+                <span className="flex items-center gap-2 text-sm text-muted-foreground"><ThemeToggle /> {konto}</span>
                 <button type="button" onClick={() => void signOut()} className="text-sm font-semibold">Abmelden</button>
               </div>
             </div>

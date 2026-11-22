@@ -230,7 +230,6 @@ export function Kennzahlen({ werte }: { werte: { titel: string; wert: string; ma
           <>
             <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
               {w.titel}
-              {w.onClick && <span aria-hidden className="text-xs">↗</span>}
             </span>
             <span className="mt-2 flex flex-wrap items-center gap-2">
               <span className="text-[30px] font-normal leading-none tracking-tight sm:text-[34px]"><Hochzaehlen text={w.wert} /></span>
@@ -297,23 +296,32 @@ export function Hochzaehlen({ text }: { text: string }) {
  *
  * Alles steigt gestaffelt auf; das Bild zoomt langsam auf.
  */
-export function Seite({ bild, ueber, titel, unter, kennzahlen, aktionen, seite, children }: {
+export function Seite({ bild, buehne, ueber, titel, unter, kennzahlen, aktionen, seite, children }: {
   bild: string; ueber?: string; titel: string; unter?: ReactNode;
+  /**
+   * Das Luftbild als Bühne steht nur im Cockpit (22. November, Julian: «was
+   * muss weg»): auf den Arbeitsseiten kostete es auf dem iPhone 170 bis
+   * 300 px, bevor etwas Brauchbares kam. Dort beginnt die Seite mit Titel
+   * und Zahl.
+   */
+  buehne?: boolean;
   kennzahlen?: Parameters<typeof Kennzahlen>[0]['werte'];
   aktionen?: ReactNode; seite?: ReactNode; children: ReactNode;
 }) {
   return (
     <div className="relative mx-auto max-w-[1400px] space-y-6">
-      <div aria-hidden className="pointer-events-none absolute -left-4 -right-4 -top-6 h-[300px] overflow-hidden sm:-left-10 sm:-right-10 sm:-top-4 sm:h-[480px]">
-        <img src={bild} alt="" className="absolute inset-0 h-full w-full object-cover motion-safe:animate-luftbild" />
-        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/85 to-background/0 sm:via-background/60" />
-        <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-background to-background/0" />
-        <span className="absolute bottom-2 right-4 text-[10px] text-muted-foreground">Luftbild © swisstopo</span>
-      </div>
+      {buehne && (
+        <div aria-hidden className="pointer-events-none absolute -left-4 -right-4 -top-6 h-[300px] overflow-hidden sm:-left-10 sm:-right-10 sm:-top-4 sm:h-[480px]">
+          <img src={bild} alt="" className="absolute inset-0 h-full w-full object-cover motion-safe:animate-luftbild" />
+          <div className="absolute inset-0 bg-gradient-to-r from-background via-background/85 to-background/0 sm:via-background/60" />
+          <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-background to-background/0" />
+          <span className="absolute bottom-2 right-4 text-[10px] text-muted-foreground">Luftbild © swisstopo</span>
+        </div>
+      )}
       <div className={`relative grid grid-cols-1 gap-6 ${seite ? 'xl:grid-cols-[minmax(0,1fr)_380px]' : ''}`}>
         <div className="min-w-0 space-y-6">
-          <div className={`flex min-h-[170px] items-start pt-2 sm:min-h-[300px] sm:pt-8 ${AUF}`}>
-            <Kopf gross ueber={ueber} titel={titel}>{unter}</Kopf>
+          <div className={`flex items-start ${buehne ? 'min-h-[170px] pt-2 sm:min-h-[300px] sm:pt-8' : 'pt-1 sm:pt-4'} ${AUF}`}>
+            <Kopf gross={buehne} ueber={ueber} titel={titel}>{unter}</Kopf>
           </div>
           {kennzahlen && <Kennzahlen werte={kennzahlen} />}
           {aktionen && <div className={`flex gap-2 ${seite ? 'xl:hidden' : ''} [&>*]:min-w-0 [&>*]:flex-1 sm:[&>*]:flex-none ${AUF}`} style={verz(2)}>{aktionen}</div>}

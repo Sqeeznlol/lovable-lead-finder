@@ -7,7 +7,6 @@ import { Ablauf } from '@/components/calc/Ablauf';
 import { useJetzt } from '@/components/calc/name';
 import { useUrlSetzen, useUrlWert } from '@/hooks/use-url-wert';
 import { BILD } from '@/lib/luftbild';
-import { AblaufPersonen } from '@/components/calc/AblaufPersonen';
 import { betrag, kalkulationenLaden, kalkulationLaden, SCHRITT_TEXT, uhr, UNTERWEGS, ZUSTAND_TEXT, type Kalkulation, type KalkulationKurz, type Zustand } from '@/lib/calc-ablauf';
 
 /**
@@ -108,7 +107,6 @@ export function CalcYouLater() {
         </Abschnitt>
       </div>
 
-      <div className="print:hidden"><AblaufPersonen /></div>
       </>}
     </Seite>
   );
