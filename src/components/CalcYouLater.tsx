@@ -59,14 +59,14 @@ export function CalcYouLater() {
   const gezeigt = alle.filter(k => IN_WAHL[wahl].includes(k.zustand));
   const zeigen = (w: Wahl) => { setWahl(w); document.getElementById('calc-liste')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
 
-  const titel = unterwegs.length
+  const titel = offenId ? (offen.data ? ZUSTAND_TEXT[offen.data.zustand] : ' ') : unterwegs.length
     ? `${unterwegs.length} ${unterwegs.length === 1 ? 'Kalkulation' : 'Kalkulationen'} unterwegs`
     : 'Vom Lead zum Angebot in einem Tag';
 
   return (
     <Seite bild={BILD.calc} ueber="CALC YOU LATER" titel={titel}
       unter={!offenId ? <>Adresse eingeben, Kaufpreis erhalten.</> : undefined}
-      kennzahlen={[
+      kennzahlen={offenId ? undefined : [
         { titel: 'Prüfen · David', wert: String(zahl('pruefung')), marke: ueberfaellig ? <Marke art="heiss">{ueberfaellig} überfällig</Marke> : undefined, onClick: () => zeigen('offen') },
         { titel: 'Visum · Tim', wert: String(zahl('visum') + zahl('bestaetigung')), onClick: () => zeigen('offen') },
         { titel: 'Kontrolle · Julian', wert: String(zahl('kontrolle')), onClick: () => zeigen('offen') },
@@ -75,7 +75,7 @@ export function CalcYouLater() {
       <div className="space-y-4 rounded border bg-card p-4 sm:p-6">
         {offenId ? (
           <>
-            <button type="button" className={`${KNOPF} print:hidden`} onClick={zurListe}><Calculator className="h-4 w-4" /> Neue Kalkulation</button>
+            <button type="button" className={`${KNOPF} print:hidden`} onClick={zurListe}>‹ Zurück zur Liste</button>
             {offen.isLoading && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Kalkulation wird geladen …</p>}
             {offen.error && <p className="text-sm text-destructive">Die Kalkulation liess sich nicht laden. Bitte später noch einmal.</p>}
             {!offen.isLoading && !offen.error && !offen.data && <Leer titel="Diese Kalkulation gibt es nicht mehr." />}
@@ -89,6 +89,9 @@ export function CalcYouLater() {
         )}
       </div>
 
+      {/* Eine offene Kalkulation steht allein (22. November, Julian: «die
+          komplette Seite so unübersichtlich»): Liste und Rollen erst zurück. */}
+      {!offenId && <>
       <div id="calc-liste" className="scroll-mt-24 print:hidden">
         <Abschnitt titel="Kalkulationen" symbol={Calculator} kachel="schwarz" unter="In einem Tag zum Versand"
           rechts={tests > 0 ? <button type="button" className={KNOPF} onClick={() => setMitTest(!mitTest)}>{mitTest ? 'Testdaten ausblenden' : `Testdaten zeigen (${tests})`}</button> : undefined}>
@@ -106,6 +109,7 @@ export function CalcYouLater() {
       </div>
 
       <div className="print:hidden"><AblaufPersonen /></div>
+      </>}
     </Seite>
   );
 }

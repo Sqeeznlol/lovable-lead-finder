@@ -588,6 +588,9 @@ export interface Rueckmeldung {
   kanton: string | null;
   vorlage: VorlageId | null;
   am: string;
+  /** Wer geurteilt hat und zu welcher Adresse (22. November, Julian: «ist das vom System oder von Tim?»). */
+  wer?: string | null;
+  adresse?: string | null;
 }
 
 export interface Gelernt {
@@ -600,7 +603,7 @@ export interface Gelernt {
   /** Ob nur Rückmeldungen aus demselben Kanton zählen. */
   kanton: string | null;
   zuTief: number; passt: number; zuHoch: number;
-  gruende: { urteil: Urteil; grund: string; am: string }[];
+  gruende: { urteil: Urteil; grund: string; am: string; wer?: string | null; adresse?: string | null }[];
 }
 
 const quantil = (sortiert: number[], q: number) => {
@@ -630,7 +633,7 @@ export function lernen(alle: Rueckmeldung[], kanton: string | null): Gelernt | n
     passt: basis.filter(r => r.urteil === 'passt').length,
     zuHoch: basis.filter(r => r.urteil === 'zu_hoch').length,
     gruende: basis.filter(r => r.urteil && r.grund).sort((a, b) => b.am.localeCompare(a.am)).slice(0, 4)
-      .map(r => ({ urteil: r.urteil!, grund: r.grund!, am: r.am })),
+      .map(r => ({ urteil: r.urteil!, grund: r.grund!, am: r.am, wer: r.wer ?? null, adresse: r.adresse ?? null })),
   };
 }
 

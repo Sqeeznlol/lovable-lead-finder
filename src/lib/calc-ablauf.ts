@@ -131,6 +131,7 @@ export function rueckmeldungen(liste: KalkulationKurz[]): Rueckmeldung[] {
     .map(k => ({
       empfehlung: k.empfehlung_chf!, preis: k.preis_chf!, urteil: k.preis_urteil, grund: k.preis_grund, kanton: k.kanton, vorlage: k.vorlage,
       am: [...k.verlauf].reverse().find(v => v.schritt === 'pruefen')?.am ?? k.erstellt_am,
+      wer: [...k.verlauf].reverse().find(v => v.schritt === 'pruefen')?.name ?? null, adresse: k.adresse,
     }));
 }
 
@@ -175,7 +176,7 @@ export async function bemerkungLoeschen(id: string): Promise<void> {
  * mit Preis. Wo der Ablauf schon einen gebotenen Preis kennt, zählt der
  * (er ist durch vier Hände gegangen); so zählt keine Kalkulation doppelt.
  */
-export function rueckmeldungenAusBemerkungen(liste: Bemerkung[], schonGezaehlt: Set<string>): Rueckmeldung[] {
+export function rueckmeldungenAusBemerkungen(liste: Bemerkung[], schonGezaehlt: Set<string>, adressen?: Map<string, string>): Rueckmeldung[] {
   const juengste = new Map<string, Bemerkung>();
   for (const b of liste) {
     if (b.test || !b.urteil || !(b.preis_chf! > 0) || !(b.empfehlung_chf! > 0) || schonGezaehlt.has(b.kalkulation_id)) continue;
@@ -184,6 +185,7 @@ export function rueckmeldungenAusBemerkungen(liste: Bemerkung[], schonGezaehlt: 
   }
   return [...juengste.values()].map(b => ({
     empfehlung: b.empfehlung_chf!, preis: b.preis_chf!, urteil: b.urteil, grund: b.text, kanton: b.kanton, vorlage: null, am: b.erstellt_am,
+    wer: b.name, adresse: adressen?.get(b.kalkulation_id) ?? null,
   }));
 }
 
@@ -191,7 +193,7 @@ export function rueckmeldungenAusBemerkungen(liste: Bemerkung[], schonGezaehlt: 
 export function alleRueckmeldungen(kalkulationen: KalkulationKurz[], bemerkungen: Bemerkung[], ohne?: string): Rueckmeldung[] {
   const k = kalkulationen.filter(x => x.id !== ohne);
   const ablauf = k.filter(x => rueckmeldungen([x]).length > 0);
-  return [...rueckmeldungen(ablauf), ...rueckmeldungenAusBemerkungen(bemerkungen.filter(b => b.kalkulation_id !== ohne), new Set(ablauf.map(x => x.id)))];
+  return [...rueckmeldungen(ablauf), ...rueckmeldungenAusBemerkungen(bemerkungen.filter(b => b.kalkulation_id !== ohne), new Set(ablauf.map(x => x.id)), new Map(kalkulationen.map(x => [x.id, x.adresse])))];
 }
 
 /** Die jüngsten Kalkulationen. Die Tabelle ist klein: eine Zeile je Lead. */

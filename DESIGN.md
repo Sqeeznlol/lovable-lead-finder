@@ -139,6 +139,12 @@ muss».
   links Name und was zu tun ist, rechts die eine Zahl, die zählt.
 - Formulare, die selten gebraucht werden (Kosten eintragen), stehen
   hinter einem Knopf, nicht offen.
+- Eine offene Kalkulation steht allein: ohne Liste, Kennzahlen und Rollen,
+  mit «Zurück zur Liste». Der Schritt, der jetzt dran ist, steht offen und
+  nummeriert («Schritt 1 von 2: Ist der Preis richtig?», «Schritt 2 von 2:
+  Angebot»); Verlauf, Rechnung und Gespräch klappen auf, gedruckt wird
+  alles. Was Aurora rechnet («Vorschlag von Aurora») und was Menschen
+  geschrieben haben (mit Name und Adresse) stehen getrennt.
 
 ## Karte auf dem Handy
 

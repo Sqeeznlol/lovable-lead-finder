@@ -102,6 +102,13 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
   const [pdfLaeuft, setPdfLaeuft] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
   const [eben, setEben] = useState(false);
+  // Ruhe auf der Seite (22. November, Julian: «die komplette Seite so
+  // unübersichtlich»): offen steht nur der nächste Schritt. Angebot,
+  // Verlauf, Rechnung und Gespräch klappen auf; gedruckt wird alles.
+  const [angebotAuf, setAngebotAuf] = useState(false);
+  const [verlaufAuf, setVerlaufAuf] = useState(false);
+  const [rechnungAuf, setRechnungAuf] = useState(false);
+  const [gespraechAuf, setGespraechAuf] = useState(false);
   const bild = useRef<Promise<string | null> | null>(null);
 
   // Mit jedem Stand frisch vorbelegen: Preis, Felder, Wahl der Firma.
@@ -274,8 +281,9 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
           </div>
         )}
 
-        <div className="space-y-1.5">
-          <p className={ETIKETT}>Verlauf</p>
+        <div className="space-y-1.5 print:hidden">
+          <Aufklapper titel={`Verlauf · ${k.verlauf.length} ${k.verlauf.length === 1 ? 'Schritt' : 'Schritte'}`} auf={verlaufAuf} setAuf={setVerlaufAuf} />
+          {verlaufAuf && (
           <ol className="divide-y rounded-[3px] border bg-card">
             {k.verlauf.map((v, i) => (
               <li key={i} className="px-4 py-2.5 text-sm">
@@ -285,6 +293,7 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
               </li>
             ))}
           </ol>
+          )}
         </div>
 
         {/* Genau ein nächster Schritt. */}
@@ -292,16 +301,35 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
           {k.zustand === 'pruefung' && (
             <>
               <div>
-                <p className="font-medium">Kaufpreis prüfen</p>
-                <p className="text-sm text-muted-foreground">Ist die Empfehlung zu tief, richtig oder zu hoch, und warum? Aus jeder Begründung lernt die Rechnung.</p>
+                <p className={ETIKETT}>Schritt 1 von 2</p>
+                <p className="text-lg">Ist der Preis richtig?</p>
               </div>
+              {/* Was Aurora rechnet und was Menschen geschrieben haben, klar
+                  getrennt (22. November, Julian: «ist das vom System oder von
+                  Tim?»). Die Urteile zu anderen Adressen klappen auf. */}
               {g && (
-                <p className="text-sm">
-                  {lernPreis != null
-                    ? <>Aus {g.n} Rückmeldungen{g.kanton ? ` im Kanton ${g.kanton}` : ''}: am Ende geboten wurde im Mittel {Math.round(g.faktor * 100)} % der Empfehlung, hier also <span className="font-medium">{betrag(lernPreis)}</span> (die Hälfte lag zwischen {Math.round(g.von * 100)} und {Math.round(g.bis * 100)} %).</>
-                    : <>Erst {g.n} {g.n === 1 ? 'Rückmeldung' : 'Rückmeldungen'}; ab {LERNEN_AB} steht hier ein Vorschlag.</>}
-                  {g.gruende.length > 0 && <span className="mt-1 block text-muted-foreground">Zuletzt: {g.gruende.map(x => `${URTEIL_TEXT[x.urteil].replace('Empfehlung ', '')}, ${x.grund}`).join(' · ')}</span>}
-                </p>
+                <div className="space-y-2 text-sm">
+                  <p className="rounded-[3px] bg-secondary px-3 py-2.5">
+                    {lernPreis != null
+                      ? <>Vorschlag von Aurora: <span className="font-medium">{betrag(lernPreis)}</span><span className="block text-muted-foreground">Bei {g.n} geprüften Kalkulationen{g.kanton ? ` im Kanton ${g.kanton}` : ''} lag der richtige Preis im Mittel bei {Math.round(g.faktor * 100)} % der Empfehlung.</span></>
+                      : <>Erst {g.n} {g.n === 1 ? 'geprüfte Kalkulation' : 'geprüfte Kalkulationen'}; ab {LERNEN_AB} rechnet Aurora einen Vorschlag.</>}
+                  </p>
+                  {g.gruende.length > 0 && (
+                    <details className="group">
+                      <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1 text-muted-foreground [&::-webkit-details-marker]:hidden">
+                        So wurde bei anderen Adressen geurteilt ({g.gruende.length}) <span aria-hidden className="transition-transform group-open:rotate-90">›</span>
+                      </summary>
+                      <ul className="divide-y border-y">
+                        {g.gruende.map((x, i) => (
+                          <li key={i} className="py-2">
+                            <p className="text-xs text-muted-foreground">{[x.wer, x.adresse].filter(Boolean).join(' · ') || 'Ohne Namen'} · {URTEIL_TEXT[x.urteil]}</p>
+                            <p>«{x.grund}»</p>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                </div>
               )}
               <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Urteil über die Empfehlung">
                 {(['zu_tief', 'passt', 'zu_hoch'] as const).map(x => (
@@ -318,11 +346,17 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
                 <textarea value={notiz} onChange={x => setNotiz(x.target.value)} rows={3} className={TEXTFELD}
                           placeholder={urteil === 'zu_tief' ? 'Was die Rechnung unterschätzt, z. B. Seesicht, Inserate liegen höher' : urteil === 'zu_hoch' ? 'Was sie überschätzt, z. B. Altlasten, Lärm, Baurecht' : 'Woran sich zeigt, dass der Preis stimmt'} />
               </label>
+              <div className="border-t pt-4">
+                <p className={ETIKETT}>Schritt 2 von 2</p>
+                <Aufklapper titel={`Angebot: ${FIRMEN[firma].name} · ${VORLAGEN[vorlage].titel}`} unter={fehlt.length ? `${fehlt.length} ${fehlt.length === 1 ? 'Angabe fehlt' : 'Angaben fehlen'}` : 'Firma, Vorlage, Schrift und Wortlaut'} auf={angebotAuf} setAuf={setAngebotAuf} gross />
+              </div>
+              {angebotAuf && (
               <AngebotBearbeiten k={k} firma={firma} setFirma={f => { setFirma(f); setSchrift(FIRMEN[f].schrift); setFelder(x => ({ ...x, unterschriften: [], kontakt: null, ...unterschriftenFuer(personen, f) })); }}
                 vorlage={vorlage} setVorlage={v => { setVorlage(v); setFelder(x => ({ ...felderVorgabe(v), datum: x.datum, ortsteil: x.ortsteil, kontakt: x.kontakt, unterschriften: x.unterschriften })); }}
                 schrift={schrift} setSchrift={setSchrift} felder={felder} setFelder={setFelder} ktx={ktx} personen={personen} />
+              )}
               {fehlt.length > 0 && <p className="text-sm text-destructive">{fehlt.join(' ')}</p>}
-              {pdfKnoepfe}
+              {angebotAuf && pdfKnoepfe}
               <div className="flex flex-wrap gap-2">
                 <button type="button" className={KNOPF_HAUPT} disabled={laeuft || !urteil || notiz.trim().length < 10 || !betragLesen(preis) || fehlt.length > 0}
                         onClick={() => void tun('pruefen', { chf: betragLesen(preis), notiz, daten: { ...daten(), urteil: urteil! } })}>Geprüft, weiter an Tim</button>
@@ -422,12 +456,18 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
-          <h3 className="text-lg">Die eingereichte Rechnung</h3>
+          <Aufklapper titel="Die eingereichte Rechnung" unter="Flächen, Kosten, Erlös, Chancen und Risiken" auf={rechnungAuf} setAuf={setRechnungAuf} gross />
           <button type="button" className={KNOPF} onClick={() => drucken(`Kalkulation ${k.adresse}`)}><Printer className="h-4 w-4" /> Als PDF</button>
         </div>
-        <Ergebnis b={k.ergebnis} annahmen={k.eingaben.eingabe.annahmen} />
+        {/* Zugeklappt bleibt die Rechnung im Druck: das PDF ist vollständig. */}
+        <div className={rechnungAuf ? '' : 'hidden print:block'}>
+          <Ergebnis b={k.ergebnis} annahmen={k.eingaben.eingabe.annahmen} />
+        </div>
       </section>
-      <Bemerkungen kalkulationId={k.id} empfehlung={k.empfehlung_chf} kanton={k.kanton} />
+      <div className="print:hidden">
+        <Aufklapper titel="Gespräch zum Preis" unter="Bemerkungen von allen, aus denen Aurora lernt" auf={gespraechAuf} setAuf={setGespraechAuf} gross />
+        {gespraechAuf && <div className="pt-2"><Bemerkungen kalkulationId={k.id} empfehlung={k.empfehlung_chf} kanton={k.kanton} /></div>}
+      </div>
     </div>
   );
 }
@@ -574,5 +614,19 @@ function AngebotBearbeiten({ k, firma, setFirma, vorlage, setVorlage, schrift, s
         </div>
       </details>
     </div>
+  );
+}
+
+/** Eine Zeile, die einen Teil der Seite auf- und zuklappt, 44 px hoch. */
+function Aufklapper({ titel, unter, auf, setAuf, gross }: { titel: string; unter?: string; auf: boolean; setAuf: (a: boolean) => void; gross?: boolean }) {
+  return (
+    <button type="button" aria-expanded={auf} onClick={() => setAuf(!auf)}
+            className="flex min-h-11 w-full items-center justify-between gap-3 text-left">
+      <span className="min-w-0">
+        <span className={`block ${gross ? 'text-lg' : 'text-sm font-medium'}`}>{titel}</span>
+        {unter && <span className="block text-sm text-muted-foreground">{unter}</span>}
+      </span>
+      <span aria-hidden className={`shrink-0 text-xl text-muted-foreground transition-transform ${auf ? 'rotate-90' : ''}`}>›</span>
+    </button>
   );
 }
