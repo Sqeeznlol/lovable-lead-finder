@@ -41,11 +41,12 @@ jobs:
           psql "$DB" -X -q -At -v ON_ERROR_STOP=1 -c "set statement_timeout = '30s';" -c "
             select json_build_object(
               'bemerkungen', coalesce((select json_agg(json_build_object(
-                  'adresse', k.adresse, 'gemeinde', k.gemeinde, 'zustand', k.zustand, 'name', b.name, 'am', b.erstellt_am,
+                  'kalkulation', k.id, 'adresse', k.adresse, 'gemeinde', k.gemeinde, 'zustand', k.zustand, 'name', b.name, 'am', b.erstellt_am,
                   'urteil', b.urteil, 'preis', b.preis_chf, 'empfehlung', b.empfehlung_chf, 'text', b.text) order by b.erstellt_am)
                 from public.kalkulation_bemerkung b join public.kalkulation k on k.id = b.kalkulation_id), '[]'),
               'kalkulationen', coalesce((select json_agg(json_build_object(
-                  'adresse', adresse, 'gemeinde', gemeinde, 'zustand', zustand, 'test', test, 'empfehlung', empfehlung_chf,
+                  'id', id, 'erstellt', erstellt_am, 'adresse', adresse, 'gemeinde', gemeinde, 'zustand', zustand, 'test', test, 'empfehlung', empfehlung_chf,
+                  'angebot', angebot, 'firma', firma, 'vorlage', vorlage, 'ergebnis', ergebnis,
                   'preis', preis_chf, 'urteil', preis_urteil, 'grund', preis_grund, 'verlauf', verlauf,
                   'massgebend', ergebnis->'massgebend', 'bestand', ergebnis->'bestand'->'wertArt',
                   'hand', eingaben->'eingabe'->'hand', 'annahmen', eingaben->'eingabe'->'annahmen') order by erstellt_am)
