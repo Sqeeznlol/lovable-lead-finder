@@ -101,8 +101,15 @@ jobs:
           frage() {
             echo "### $1" >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
-            psql "$DB" -v ON_ERROR_STOP=1 -X -q -c "$2" \
-              >> "$GITHUB_STEP_SUMMARY"
+            # «geschaeft» zählt nur und steht auch im Protokoll, damit es sich
+            # ohne Browser lesen lässt; alle anderen bleiben in der Übersicht.
+            if [ "$FRAGE" = "geschaeft" ]; then
+              echo "### $1"
+              psql "$DB" -v ON_ERROR_STOP=1 -X -q -c "$2" | tee -a "$GITHUB_STEP_SUMMARY"
+            else
+              psql "$DB" -v ON_ERROR_STOP=1 -X -q -c "$2" \
+                >> "$GITHUB_STEP_SUMMARY"
+            fi
             echo '```' >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
           }
