@@ -418,6 +418,21 @@ in Ingenbohl; gerechnet wird die Gemeinde.
     Stand, Eigentümer und Kontakt (nur in der Datenbank); in der Filterliste
     erscheint sie nicht mehr.
 
+## Anrufen
+
+Julian, 22. November: «die welche System sagt gut und ich dann Namen
+gespeichert habe, da soll dann Tim anrufen». Im Cockpit steht die Liste
+«Anrufen»: Objekte mit gerechneter Marge, bei denen ein Mensch den
+Eigentümer eingetragen hat (`owner_name` ist die Handeingabe,
+`eigentuemer_name` die Abfrage beim Grundbuch), ohne erfasstes Gespräch
+(`anruf`) und ohne Stand «Exportiert» (alte Akquise), das zuletzt
+Bearbeitete zuerst. Mit Nummer der Knopf «Anrufen», sonst «Nummer suchen»
+(tel.search am Wohnort des Eigentümers). Wer «Entscheidet und verschickt»
+(Tim), liest die Zahl im grossen Satz des Cockpits. In der Objektansicht
+steht unter «Maps» und «Tel.search» der Knopf «… anrufen». Ist das
+Gespräch erfasst, fällt das Objekt aus der Liste (`src/lib/anrufen.ts`,
+`anrufen.test.ts`). Testdaten (TEST im Namen) stehen nie darin.
+
 ## Gestaltung
 
 Wie die Seite aussieht, steht in `DESIGN.md` -- vor jeder Arbeit an der

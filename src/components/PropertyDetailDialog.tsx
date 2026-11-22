@@ -25,6 +25,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Tables } from '@/integrations/supabase/types';
 import { FENSTER } from '@/lib/fenster';
+import { telLink } from '@/lib/anrufen';
 
 type Property = Tables<'properties'>;
 
@@ -238,6 +239,14 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
                 )}
                 {data.owner_name && <a className={KNOPF} href={`https://tel.search.ch/?was=${encodeURIComponent(data.owner_name)}`} target={FENSTER.suche}><Phone className="h-4 w-4" /> Tel.search</a>}
               </div>
+              {/* Anrufen unter «Maps» und «Tel.search» (22. November, Julian: «da muss
+                  ein Telefon-Icon sein»): wählt die rechts eingetragene Nummer. Ohne
+                  Nummer hilft «Tel.search» sie zu finden. */}
+              {data.owner_phone && (
+                <a className={`${KNOPF_HAUPT} w-full sm:w-auto`} href={telLink(data.owner_phone)}>
+                  <Phone className="h-4 w-4" /> {data.owner_name ? `${data.owner_name} anrufen` : 'Anrufen'}
+                </a>
+              )}
 
               {/* Kunde, Gelegenheit, Lead, Fonds: von hier aus erreichbar. */}
               <Bezuege parzelleId={data.id} egrid={data.egrid} />
@@ -293,7 +302,7 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
               <div className="grid grid-cols-1 gap-4 border-t pt-5">
                 <Feld titel="Vorwahl">
                   <Select value={data.preselection_status || 'Nicht geprüft'} onValueChange={v => update({ preselection_status: v })}>
-                    <SelectTrigger className="rounded-[3px]"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-11 rounded-[3px]"><SelectValue /></SelectTrigger>
                     <SelectContent>{preselectionStatuses.map(x => <SelectItem key={x} value={x}>{x}</SelectItem>)}</SelectContent>
                   </Select>
                 </Feld>

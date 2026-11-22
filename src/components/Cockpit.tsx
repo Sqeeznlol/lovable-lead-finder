@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useUrlSetzen } from '@/hooks/use-url-wert';
-import { Calculator, Flame, Inbox, Loader2, MapPin, Sparkles } from 'lucide-react';
+import { Calculator, Flame, Inbox, Loader2, MapPin, Phone, Sparkles } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { useCanton } from '@/hooks/use-canton';
@@ -10,6 +10,8 @@ import { LuftbildKarte } from '@/components/LuftbildKarte';
 import { KOPFBILD } from '@/lib/luftbild';
 import { kalkulationenLaden, uhr, UNTERWEGS } from '@/lib/calc-ablauf';
 import { zoneKurzform } from '@/lib/potential';
+import { FENSTER } from '@/lib/fenster';
+import { anrufListe, telLink, woSuchen, type Anruf } from '@/lib/anrufen';
 
 /**
  * Das Cockpit, gebaut wie das Dashboard der Vorlage (DESIGN.md):
@@ -111,6 +113,26 @@ export function Cockpit({ onGehe }: { onGehe: (z: Ziel) => void }) {
   // einem Tag durch -- darum steht es hier, wo jeder den Tag beginnt.
   // Dieselbe kleine Abfrage wie im Reiter; fehlt sie, bleibt die Zeile weg.
   const calc = useQuery({ queryKey: ['kalkulationen'], queryFn: kalkulationenLaden, staleTime: 60 * 1000, retry: 0 });
+  // Anrufen (22. November, Julian: «die welche System sagt gut und ich dann
+  // Namen gespeichert habe, da soll dann Tim anrufen»): Marge gerechnet,
+  // Eigentümer von Hand eingetragen, noch kein Gespräch (lib/anrufen.ts).
+  const anrufen = useQuery({
+    queryKey: ['anrufen'], staleTime: 60 * 1000, retry: 0,
+    queryFn: async (): Promise<Anruf[]> => {
+      // Zuletzt Bearbeitetes zuerst: so stehen die eben von der Startseite
+      // eingetragenen oben (22. November: vier Zürcher Objekte, Stand «Neu»).
+      // Ohne Stand «Exportiert»: diese gingen in der alten Akquise schon
+      // ins Verkaufsgespräch. Teilindex idx_properties_mit_eigentuemer
+      // (118 Zeilen am 22. November).
+      const r = await db().from('properties').select('id, address, gemeinde, owner_name, owner_phone, owner_address, marge_chf')
+        .not('owner_name', 'is', null).neq('status', 'Exportiert').eq('ausgeschlossen', false).neq('preselection_status', 'Ausschliessen')
+        .gt('marge_chf', 0).order('updated_at', { ascending: false }).limit(40);
+      if (r.error || !r.data?.length) return [];
+      const g = await db().from('anruf').select('parzelle_id').in('parzelle_id', r.data.map((z: Anruf) => z.id));
+      return anrufListe(r.data, (g.data ?? []).map((x: { parzelle_id: string }) => x.parzelle_id));
+    },
+  });
+  const zuRufen = anrufen.data ?? [];
   const wartend = (calc.data ?? []).filter(k => !k.test && UNTERWEGS.includes(k.zustand));
   // Wer entscheidet, sieht beim Öffnen zuerst, was auf ihn wartet (22.
   // November): angebot_darf ist nur für das eingetragene Konto wahr, sobald
@@ -140,7 +162,9 @@ export function Cockpit({ onGehe }: { onGehe: (z: Ziel) => void }) {
   );
 
   return (
-    <Seite bild={KOPFBILD} buehne ueber={`${gruss()}${name ? `, ${name}` : ''}`} titel={fuerMich ? `${fuerMich} ${fuerMich === 1 ? 'Preis wartet' : 'Preise warten'} auf deine Entscheidung` : data ? satzDesTages({ ...data, kalkSpaet: zuSpaet, kalkWartend: wartend.length }) : ' '}
+    <Seite bild={KOPFBILD} buehne ueber={`${gruss()}${name ? `, ${name}` : ''}`} titel={fuerMich ? `${fuerMich} ${fuerMich === 1 ? 'Preis wartet' : 'Preise warten'} auf deine Entscheidung`
+      : entscheider.data && zuRufen.length ? `${zuRufen.length} ${zuRufen.length === 1 ? 'Eigentümer wartet' : 'Eigentümer warten'} auf deinen Anruf`
+      : data ? satzDesTages({ ...data, kalkSpaet: zuSpaet, kalkWartend: wartend.length }) : ' '}
       aktionen={aktionen}
       seite={
         <Abschnitt titel="Grösstes Potenzial" unter={`Kanton ${current}, Eigentümer noch offen`} symbol={Sparkles} kachel="akzent">
@@ -159,6 +183,25 @@ export function Cockpit({ onGehe }: { onGehe: (z: Ziel) => void }) {
       ]} />
       {data && (
         <div className="space-y-6">
+          {zuRufen.length > 0 && (
+            <Abschnitt titel="Anrufen" zahl={zuRufen.length} unter="Marge gerechnet, Eigentümer eingetragen, noch kein Gespräch"
+                       hinweis="Ein Tipp auf den Namen öffnet das Objekt; dort unter «Gespräche» erfassen, wie es lief. Dann verschwindet es von hier.">
+              <ul className={LISTE}>
+                {zuRufen.slice(0, 8).map(o => (
+                  <li key={o.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                    <button type="button" onClick={() => setzen({ parzelle: o.id })} className="min-h-11 min-w-0 text-left">
+                      <span className="block truncate font-medium">{o.owner_name}</span>
+                      <span className="block truncate text-sm text-muted-foreground">{[o.address, o.gemeinde].filter(Boolean).join(', ')} · Marge {mio(o.marge_chf)}</span>
+                    </button>
+                    {o.owner_phone
+                      ? <a className={`${KNOPF_HAUPT} shrink-0`} href={telLink(o.owner_phone)} aria-label={`${o.owner_name} anrufen`}><Phone className="h-4 w-4" /> Anrufen</a>
+                      : <a className={`${KNOPF} shrink-0`} target={FENSTER.suche} aria-label={`Nummer von ${o.owner_name} suchen`}
+                           href={`https://tel.search.ch/?was=${encodeURIComponent(o.owner_name)}&wo=${encodeURIComponent(woSuchen(o))}`}><Phone className="h-4 w-4" /> Nummer suchen</a>}
+                  </li>
+                ))}
+              </ul>
+            </Abschnitt>
+          )}
           <Abschnitt titel="Heisse Gelegenheiten" unter="Höchste Priorität, noch offen" symbol={Flame} kachel="heiss"
                      rechts={<button type="button" className={KNOPF_LEISE} onClick={() => onGehe('gelegenheiten')}>Alle zeigen</button>}>
             {data.heisse.length === 0 ? <Leer titel="Keine offene Gelegenheit." /> : (
