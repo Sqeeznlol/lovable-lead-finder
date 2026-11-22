@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Abschnitt, FELD, KNOPF } from '@/components/rahmen';
+import { Abschnitt, FELD, KNOPF, KNOPF_HAUPT, LISTE } from '@/components/rahmen';
 import { FENSTER } from '@/lib/fenster';
 import { KAMPAGNEN, MONATSGRENZE, monat, zusammen, type WerbungTag } from '@/lib/werbung';
 
@@ -43,6 +43,7 @@ export function WerbungTafel({ tage }: { tage: number }) {
   const [kosten, setKosten] = useState('');
   const [klicks, setKlicks] = useState('');
   const [meldung, setMeldung] = useState<string | null>(null);
+  const [eintragAuf, setEintragAuf] = useState(false);
 
   if (q.data === null) return null;
   const z = zusammen(q.data ?? []);
@@ -61,14 +62,34 @@ export function WerbungTafel({ tage }: { tage: number }) {
 
   return (
     <Abschnitt titel="Google Ads" zahl={alleBesuche ? `${ch(alleBesuche)} Besuche` : undefined}
-               hinweis={`Letzte ${tage} Tage. Besuche aus Anzeigen (utm_source=google), Leads ohne Testdaten. «je Lead» zählt nur gute Leads (in der Lead-Ansicht markiert; ohne Urteil gilt er als gut). Was tun: Regeln des Werbeplans, unter CHF 150 je Lead verdoppeln, über CHF 400 stoppen.`}>
+               unter={`Je Kampagne, letzte ${tage} Tage`}
+               hinweis={`Besuche aus Anzeigen, Leads ohne Testdaten. «je Lead» zählt nur gute Leads (in der Lead-Ansicht markiert; ohne Urteil gilt er als gut). Was tun: Regeln des Werbeplans, unter CHF 150 je Lead verdoppeln, über CHF 400 stoppen.`}>
       {mo && (
         <p className={`text-sm ${mo.ueber ? 'font-medium text-destructive' : 'text-muted-foreground'}`}>
           Diesen Monat CHF {ch(mo.bisher)} an {mo.tage} {mo.tage === 1 ? 'Tag' : 'Tagen'} eingetragen, hochgerechnet CHF {ch(mo.hochgerechnet)} von höchstens CHF {MONATSGRENZE}.
           {mo.ueber ? ' Über der Grenze: Tagesbudgets in Google Ads senken.' : ''}
         </p>
       )}
-      <div className="overflow-x-auto rounded border bg-card">
+      {/* Auf dem Handy eine Zeile je Kampagne statt einer Tabelle zum Wischen:
+          was zählt, ist Leads, Preis je Lead und was zu tun ist. */}
+      <ul className={`${LISTE} sm:hidden`}>
+        {z.map(s => {
+          const k = KAMPAGNEN.find(x => x.id === s.kampagne)!;
+          return (
+            <li key={s.kampagne} className="flex items-start justify-between gap-4 px-4 py-3">
+              <span className="min-w-0">
+                <span className="block font-medium">{k.titel}</span>
+                <span className="block text-sm text-muted-foreground">{s.rat}</span>
+              </span>
+              <span className="shrink-0 text-right tabular-nums">
+                <span className="block font-medium">{ch(s.leads)} {s.leads === 1 ? 'Lead' : 'Leads'}</span>
+                <span className="block text-sm text-muted-foreground">{s.jeLead == null ? `${ch(s.besuche)} Besuche` : `CHF ${ch(s.jeLead)} je Lead`}</span>
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      <div className="hidden overflow-x-auto rounded border bg-card sm:block">
         <table className="w-full min-w-[720px] text-sm">
           <thead className="text-left text-xs uppercase tracking-wide text-muted-foreground">
             <tr>{['Kampagne', 'Besuche', 'Ergebnis', 'Kontakt', 'Leads', 'Kosten', 'je Lead', 'Was tun'].map(t => <th key={t} className="px-3 py-2 font-medium">{t}</th>)}</tr>
@@ -108,6 +129,13 @@ export function WerbungTafel({ tage }: { tage: number }) {
           </ul>
         </div>
       )}
+      {!eintragAuf ? (
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className={KNOPF} onClick={() => setEintragAuf(true)}>Kosten eintragen</button>
+          <button type="button" className={KNOPF} onClick={() => KAMPAGNEN.slice(0, 5).forEach(k => window.open(`https://www.${k.domain}/`, FENSTER.extern))}>Seiten öffnen</button>
+          {meldung && <span className="self-center text-sm text-muted-foreground">{meldung}</span>}
+        </div>
+      ) : (
       <form className="flex flex-wrap items-end gap-2" onSubmit={e => { e.preventDefault(); void eintragen(); }}>
         <label className="space-y-1 text-xs text-muted-foreground">Tag<input type="date" value={tag} onChange={e => setTag(e.target.value)} className={`${FELD} block text-base`} /></label>
         <label className="space-y-1 text-xs text-muted-foreground">Kampagne
@@ -117,10 +145,11 @@ export function WerbungTafel({ tage }: { tage: number }) {
         </label>
         <label className="space-y-1 text-xs text-muted-foreground">Kosten CHF<input inputMode="decimal" value={kosten} onChange={e => setKosten(e.target.value)} className={`${FELD} block w-28 text-base`} /></label>
         <label className="space-y-1 text-xs text-muted-foreground">Klicks<input inputMode="numeric" value={klicks} onChange={e => setKlicks(e.target.value)} className={`${FELD} block w-24 text-base`} /></label>
-        <button type="submit" className={KNOPF} disabled={!kosten}>Kosten eintragen</button>
-        <button type="button" className={KNOPF} onClick={() => KAMPAGNEN.slice(0, 5).forEach(k => window.open(`https://www.${k.domain}/`, FENSTER.extern))}>Seiten der Woche 1 öffnen</button>
+        <button type="submit" className={KNOPF_HAUPT} disabled={!kosten}>Speichern</button>
+        <button type="button" className={KNOPF} onClick={() => setEintragAuf(false)}>Fertig</button>
         {meldung && <span className="text-sm text-muted-foreground">{meldung}</span>}
       </form>
+      )}
     </Abschnitt>
   );
 }

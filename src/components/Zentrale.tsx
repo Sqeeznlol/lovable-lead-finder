@@ -97,7 +97,7 @@ export function Zentrale() {
         { titel: 'In Akquise', wert: zahl('akquise').toLocaleString('de-CH'), onClick: () => setFilter('akquise') },
         { titel: 'Frist bald', wert: bald.toLocaleString('de-CH'), marke: bald ? <Marke art="rosa">unter 30 Tagen</Marke> : <Marke art="minze">keine</Marke> },
       ] : undefined}
-      aktionen={<button type="button" className={`${KNOPF_HAUPT} lg:hidden`} onClick={() => setNeu('1')}>Neues Vorhaben</button>}>
+      aktionen={<button type="button" className={KNOPF_HAUPT} onClick={() => setNeu('1')}>Neues Vorhaben</button>}>
       <Reiter<Filter> wahl={filter} setWahl={setFilter}
               optionen={filterListe.filter(([f]) => f === 'aktiv' || zahl(f) > 0 || f === filter).map(([f, t]) => ({ wert: f, titel: t, zahl: zahl(f) }))} />
 

@@ -401,7 +401,10 @@ in Ingenbohl; gerechnet wird die Gemeinde.
 ## Gestaltung
 
 Wie die Seite aussieht, steht in `DESIGN.md` -- vor jeder Arbeit an der
-Oberfläche lesen. Das Cockpit ist das Muster für jede Seite (Julian:
+Oberfläche lesen. Seit dem 22. November gilt dort «Der rote Faden»
+(Julian: «ein bisschen Ruhe reinbringen ... ein klarer Weg»): Navigation
+nach dem Weg Lead → Kalkulation → Angebot, Erklärungen eingeklappt, auf
+dem Handy Listen statt breiter Tabellen. Das Cockpit ist das Muster für jede Seite (Julian:
 "so ist es perfekt"): Luftbild-Bühne, ein Satz mit Zahl,
 Kennzahlenleiste, Tafeln mit Grafik, rechte Spalte mit Karten, Bewegung,
 Handy-Fassung. Gebaut wird mit `<Seite>` aus `src/components/rahmen.tsx`.

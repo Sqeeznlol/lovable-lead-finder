@@ -79,6 +79,7 @@ export function Leads() {
   const offen = (leads.data ?? []).find(l => l.id === offenId) ?? einzeln.data ?? null;
   const gefiltert = alle.filter(l => !nurOffen || !l.bearbeitet);
   const liste = nachWertSortiert ? nachWert(gefiltert) : gefiltert;
+  const offeneLeads = alle.filter(l => !l.bearbeitet).length;
   const mitWert = alle.filter(l => bodenWert(l.angaben)).length;
   const faellig = alle.filter(l => naechsterSchritt(l)?.jetzt).length;
   const heiss = alle.filter(l => l.angaben?.prioritaet === 'heiss' && !l.bearbeitet).length;
@@ -97,14 +98,8 @@ export function Leads() {
   };
 
   return (
-    <Seite bild={BILD.leads} ueber="Check-Seiten" titel="Leads"
+    <Seite bild={BILD.leads} ueber="Check-Seiten" titel={offeneLeads ? `${offeneLeads} ${offeneLeads === 1 ? 'Lead wartet' : 'Leads warten'} auf einen Anruf` : 'Alle Leads sind bearbeitet'}
       unter={<>
-        <span className="block">Alle Webseiten schreiben in dieselbe Liste.</span>
-        {/* Bis zum 15. November zählten auch Programme, die die Seite nur laden
-            (Auswerten «besucher»: 795 Aufrufe, 8 Suchen, ohne Werbung). */}
-        {Date.now() - Date.parse('2026-11-15T10:00:00Z') < Number(tage) * 864e5 && (
-          <span className="mt-1 block text-sm">Besucher zählen seit dem 15. November erst, wenn jemand tippt oder scrollt. Ältere Zahlen enthalten auch Suchmaschinen.</span>
-        )}
         {/* Die Zeitwahl gehört sichtbar unter den Titel: "aktionen" erscheint
             am Computer nur mit einer Seitentafel, die diese Seite nicht hat. */}
         <span className="mt-4 block"><Reiter<Zeitraum> wahl={tage} setWahl={setTage} optionen={[{ wert: '7' as Zeitraum, titel: '7 Tage' }, { wert: '30' as Zeitraum, titel: '30 Tage' }, { wert: '90' as Zeitraum, titel: '90 Tage' }]} /></span>
@@ -114,7 +109,6 @@ export function Leads() {
         { titel: 'Nachfassen fällig', wert: String(faellig) },
         { titel: 'Besucher', wert: trichter.data ? String(summe.aufruf) : '–' },
         { titel: 'Abschluss', wert: trichter.data ? prozent(summe.aufruf ? summe.lead / summe.aufruf : null) : '–' },
-        { titel: 'Webseiten mit Besuch', wert: trichter.data ? String(t.filter(m => m.werte.aufruf).length) : '–' },
       ]}
     >
       <Abschnitt titel="Leads" zahl={liste.length}

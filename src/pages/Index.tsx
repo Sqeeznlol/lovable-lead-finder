@@ -52,34 +52,39 @@ const istTab = (x: string | undefined): x is Tab => !!x && (TABS as readonly str
 // eigenes Programm, getrennt von dieser Webseite (src/App.tsx).
 type Eintrag = { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> };
 
-// Zwei Gruppen statt einer langen Liste: was heute zu tun ist und die
-// Plattform (Karte, Gelegenheiten, Baugesuche, Auswertung). Das Cockpit steht zuerst: dort steht alles, was zu
-// prüfen ist (Julians Frage "wo steht das zur Überprüfung alles?").
+// Geordnet nach dem Weg, nicht nach Technik (Julian, 22. November: «kein
+// roter Faden ... ein klarer Weg, der zeigt, wo man durch muss»): zuerst
+// der Weg vom Lead zum Angebot, dann wo man Grundstücke findet, dann die
+// Kunden, zuletzt Zahlen und Verwaltung.
 const gruppen: { titel: string; eintraege: Eintrag[] }[] = [
-  { titel: 'Heute', eintraege: [
+  { titel: 'Der Weg', eintraege: [
+    // Was heute zu tun ist, mit dem Weg vom Lead zum Angebot.
     { id: 'cockpit', label: 'Cockpit', icon: Gauge },
-    // Ein Satz, eine Liste: «Alle W2 in Dietikon» (Julian, 16. November).
-    { id: 'suche', label: 'Suche', icon: Search },
     // Die Leads der Check-Seiten (20 Webseiten, eine Liste), mit Zahlen je Webseite.
     { id: 'leads', label: 'Leads', icon: Inbox },
     // Vom Lead zur Kaufpreisempfehlung und in einem Tag zum Angebot (16. November).
     { id: 'calc', label: 'Calc You Later', icon: Calculator },
-    // Jedes Kundenvorhaben an einem Ort: von der Adressliste bis zur
-    // Akquise in seinem Namen.
-    { id: 'zentrale', label: 'Zentrale', icon: Briefcase },
   ] },
-  { titel: 'Plattform', eintraege: [
+  { titel: 'Grundstücke finden', eintraege: [
+    // Ein Satz, eine Liste: «Alle W2 in Dietikon» (Julian, 16. November).
+    { id: 'suche', label: 'Suche', icon: Search },
     { id: 'karte', label: 'Karte', icon: Map },
+    // Feste Ordner mit Parzellen nach einem Kriterium, zuerst über 3000 m² (19. November).
+    { id: 'wunsch', label: 'Parzellen nach Wunsch', icon: FolderOpen },
     { id: 'gelegenheiten', label: 'Gelegenheiten', icon: Target },
     { id: 'baugesuche', label: 'Baugesuche', icon: HardHat },
     // Wohngebäude mit Öl oder Gas, bis 1980 gebaut, Deutschschweiz (Gebäuderegister).
     { id: 'leadlisten', label: 'Lead-Listen', icon: Flame },
-    // Feste Ordner mit Parzellen nach einem Kriterium, zuerst über 3000 m² in OW und NW (19. November).
-    { id: 'wunsch', label: 'Parzellen nach Wunsch', icon: FolderOpen },
-    { id: 'auswertung', label: 'Auswertung', icon: BarChart3 },
-    { id: 'nachbarschaft', label: 'Nachbarschaft', icon: Share },
+  ] },
+  { titel: 'Kunden', eintraege: [
+    // Jedes Kundenvorhaben an einem Ort, von der Adressliste an.
+    { id: 'zentrale', label: 'Zentrale', icon: Briefcase },
     // Nachbarparzellen der Kundenliegenschaften (Helvetica) nach Potenzial.
     { id: 'arrondierung', label: 'Mögliche Arrondierungen', icon: Combine },
+    { id: 'nachbarschaft', label: 'Nachbarschaft', icon: Share },
+  ] },
+  { titel: 'Zahlen', eintraege: [
+    { id: 'auswertung', label: 'Auswertung', icon: BarChart3 },
     // Messen und Kongresse der Branche: wann, wo, mit Adresse.
     { id: 'kalender', label: 'Immo-Kalender', icon: CalendarDays },
   ] },
@@ -89,9 +94,10 @@ const gruppen: { titel: string; eintraege: Eintrag[] }[] = [
 ];
 const tabs: Eintrag[] = gruppen.flatMap(g => g.eintraege);
 
-// Primary tabs visible in the iPhone bottom bar
-// Auf dem iPhone vier feste Ziele und "Mehr" für den Rest.
-const mobileBottomTabs: Tab[] = ['cockpit', 'leads', 'zentrale', 'karte'];
+// Auf dem iPhone der Weg (Cockpit, Leads, Calc) und die Karte fest,
+// alles andere unter «Mehr». Kurze Namen, damit nichts umbricht.
+const mobileBottomTabs: Tab[] = ['cockpit', 'leads', 'calc', 'karte'];
+const KURZ: Partial<Record<Tab, string>> = { calc: 'Calc' };
 
 /** Ein Punkt der Icon-Leiste: Symbol, aktiv als schwarzes Quadrat, Name beim Überfahren. */
 function LeistenPunkt({ t, an, onClick }: { t: Eintrag; an: boolean; onClick: () => void }) {
@@ -157,7 +163,6 @@ export default function Index() {
   };
 
   const gehe = (t: Tab, suche = '') => { navigate((t === 'cockpit' ? '/' : `/${t}`) + suche); setMehrAuf(false); window.scrollTo({ top: 0 }); };
-  const neuesVorhaben = () => gehe('zentrale', '?neu=1');
   // Wischen auf dem iPhone: links/rechts wechselt zwischen den vier
   // Zielen der unteren Leiste. Nur waagrecht und deutlich -- sonst
   // stört es das Scrollen. Auf der Karte nicht: dort wischt man die Karte.
@@ -243,9 +248,9 @@ export default function Index() {
                     <Search className="h-5 w-5" />
                   </button>
                 )}
-                <button type="button" onClick={neuesVorhaben}
+                <button type="button" onClick={() => gehe('calc')}
                         className="hidden h-11 items-center gap-2 rounded-[3px] bg-accent px-4 text-[15px] font-medium text-accent-foreground transition-transform active:scale-[0.97] lg:inline-flex">
-                  <Plus className="h-4 w-4" /> Neues Vorhaben
+                  <Plus className="h-4 w-4" /> Neue Kalkulation
                 </button>
                 <ThemeToggle />
                 <KontoMenu />
@@ -263,7 +268,7 @@ export default function Index() {
               <Skeleton className="h-64 w-full" />
             </div>
           }>
-            {active === 'cockpit' && <Cockpit onGehe={z => gehe(z)} onNeu={neuesVorhaben} />}
+            {active === 'cockpit' && <Cockpit onGehe={z => gehe(z)} />}
             {active === 'suche' && <Suche />}
             {active === 'leads' && <Leads />}
             {active === 'calc' && <CalcYouLater />}
@@ -309,7 +314,7 @@ export default function Index() {
                   <span className={`grid h-8 w-11 place-items-center rounded-[3px] transition-colors ${an ? 'bg-foreground text-background' : ''}`}>
                     <t.icon className="h-5 w-5" />
                   </span>
-                  {t.label}
+                  {KURZ[t.id as Tab] ?? t.label}
                 </button>
               );
             })}

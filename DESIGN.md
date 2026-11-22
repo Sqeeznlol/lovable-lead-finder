@@ -117,6 +117,29 @@ nacheinander. Nichts blinkt, nichts läuft endlos.
 - Untere Leiste fest, deckend, ohne Weichzeichner; der Inhalt endet
   darüber.
 
+## Der rote Faden (22. November)
+
+Julian: «kein roter Faden ... überall Tipps ... ein bisschen Ruhe
+reinbringen ... ein klarer Weg, der genau diesen Weg zeigt, wo man durch
+muss».
+
+- Die Navigation folgt dem Weg, nicht der Technik: **Der Weg** (Cockpit,
+  Leads, Calc You Later), dann **Grundstücke finden**, **Kunden**,
+  **Zahlen**, **Verwaltung**. Unten auf dem iPhone: Cockpit, Leads, Calc,
+  Karte, Mehr.
+- Das Cockpit zeigt statt vier loser Zahlen den Weg (`Weg` in
+  `rahmen.tsx`): Leads → Kalkulieren → Prüfen und freigeben → Gesendet,
+  je mit Zahl; der erste Schritt mit Arbeit ist schwarz, «Als Nächstes».
+  Der grosse Satz nennt zuerst, was auf diesem Weg liegt.
+- Die Hauptaktion oben heisst «Neue Kalkulation»: dort beginnt Geld.
+- Erklärtexte stehen nicht offen über Tafeln: `hinweis` eines
+  `Abschnitt` klappt hinter «Wie gezählt» auf. Unter dem Titel einer
+  Seite höchstens ein kurzer Satz.
+- Tabellen mit mehr als drei Spalten werden auf dem Handy zu einer Liste:
+  links Name und was zu tun ist, rechts die eine Zahl, die zählt.
+- Formulare, die selten gebraucht werden (Kosten eintragen), stehen
+  hinter einem Knopf, nicht offen.
+
 ## Karte auf dem Handy
 
 Die Karte ist der Inhalt; alles andere tritt zurück (Julian, iPhone,

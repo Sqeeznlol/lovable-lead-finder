@@ -34,7 +34,11 @@ export function CalcYouLater() {
   const setzen = useUrlSetzen();
   const qc = useQueryClient();
   const jetzt = useJetzt();
-  const [wahl, setWahl] = useState<Wahl>('offen');
+  // Das Cockpit führt mit ?liste= direkt in die passende Liste (Der Weg).
+  const [wahl, setWahl] = useState<Wahl>(() => {
+    const l = new URLSearchParams(window.location.search).get('liste');
+    return l === 'entwuerfe' ? 'entwurf' : l === 'gesendet' ? 'gesendet' : 'offen';
+  });
   const [mitTest, setMitTest] = useState(false);
 
   // Jede Minute neu: wer prüfen oder freigeben soll, sieht ohne Neuladen, was hereinkommt.
@@ -61,12 +65,12 @@ export function CalcYouLater() {
 
   return (
     <Seite bild={BILD.calc} ueber="CALC YOU LATER" titel={titel}
-      unter={!offenId ? <>Adresse eingeben. Heraus kommen Landwert, Nutzfläche, Kubatur, Baukosten, Erlös, Gewinn, Chancen und Risiken, und eine Kaufpreisempfehlung.</> : undefined}
+      unter={!offenId ? <>Adresse eingeben, Kaufpreis erhalten.</> : undefined}
       kennzahlen={[
-        { titel: 'Preis prüfen (David)', wert: String(zahl('pruefung')), marke: ueberfaellig ? <Marke art="heiss">{ueberfaellig} überfällig</Marke> : undefined, onClick: () => zeigen('offen') },
-        { titel: 'Visum und Bestätigung (Tim)', wert: String(zahl('visum') + zahl('bestaetigung')), onClick: () => zeigen('offen') },
-        { titel: 'Kontrolle (Julian)', wert: String(zahl('kontrolle')), onClick: () => zeigen('offen') },
-        { titel: 'Versand (David)', wert: String(zahl('angebot')), onClick: () => zeigen('offen') },
+        { titel: 'Prüfen · David', wert: String(zahl('pruefung')), marke: ueberfaellig ? <Marke art="heiss">{ueberfaellig} überfällig</Marke> : undefined, onClick: () => zeigen('offen') },
+        { titel: 'Visum · Tim', wert: String(zahl('visum') + zahl('bestaetigung')), onClick: () => zeigen('offen') },
+        { titel: 'Kontrolle · Julian', wert: String(zahl('kontrolle')), onClick: () => zeigen('offen') },
+        { titel: 'Versand · David', wert: String(zahl('angebot')), onClick: () => zeigen('offen') },
       ]}>
       <div className="space-y-4 rounded border bg-card p-4 sm:p-6">
         {offenId ? (
@@ -86,7 +90,7 @@ export function CalcYouLater() {
       </div>
 
       <div id="calc-liste" className="scroll-mt-24 print:hidden">
-        <Abschnitt titel="Kalkulationen" symbol={Calculator} kachel="schwarz" unter="Ein Tag vom Einreichen bis zum Versand"
+        <Abschnitt titel="Kalkulationen" symbol={Calculator} kachel="schwarz" unter="In einem Tag zum Versand"
           rechts={tests > 0 ? <button type="button" className={KNOPF} onClick={() => setMitTest(!mitTest)}>{mitTest ? 'Testdaten ausblenden' : `Testdaten zeigen (${tests})`}</button> : undefined}>
           <Reiter<Wahl> wahl={wahl} setWahl={setWahl} optionen={[
             { wert: 'offen', titel: 'Unterwegs', zahl: unterwegs.length },

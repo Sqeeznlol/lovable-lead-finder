@@ -69,7 +69,17 @@ export function Abschnitt({ titel, zahl, rechts, hinweis, children, symbol, kach
         </div>
         {rechts && <div className="ml-auto flex flex-wrap items-center gap-2">{rechts}</div>}
       </div>
-      {hinweis && <p className="max-w-2xl text-sm text-muted-foreground">{hinweis}</p>}
+      {/* Erklärungen stehen nicht mehr offen über jeder Tafel (Julian, 22.
+          November: «überall Tipps ... ein bisschen Ruhe reinbringen»):
+          wer wissen will, wie gezählt wird, tippt darauf. */}
+      {hinweis && (
+        <details className="group max-w-2xl text-sm text-muted-foreground">
+          <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1 underline-offset-2 hover:underline [&::-webkit-details-marker]:hidden">
+            Wie gezählt <span aria-hidden className="transition-transform group-open:rotate-90">›</span>
+          </summary>
+          <p className="pb-1">{hinweis}</p>
+        </details>
+      )}
       {children}
     </section>
   );
@@ -306,7 +316,7 @@ export function Seite({ bild, ueber, titel, unter, kennzahlen, aktionen, seite, 
             <Kopf gross ueber={ueber} titel={titel}>{unter}</Kopf>
           </div>
           {kennzahlen && <Kennzahlen werte={kennzahlen} />}
-          {aktionen && <div className={`flex gap-2 xl:hidden [&>*]:min-w-0 [&>*]:flex-1 ${AUF}`} style={verz(2)}>{aktionen}</div>}
+          {aktionen && <div className={`flex gap-2 ${seite ? 'xl:hidden' : ''} [&>*]:min-w-0 [&>*]:flex-1 sm:[&>*]:flex-none ${AUF}`} style={verz(2)}>{aktionen}</div>}
           <div className={`space-y-6 ${AUF}`} style={verz(2)}>{children}</div>
         </div>
         {seite && (
@@ -330,5 +340,39 @@ export function Karussell({ children }: { children: ReactNode }) {
     <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 no-scrollbar sm:mx-0 sm:flex-col sm:overflow-visible sm:px-0 [&>*]:w-[82%] [&>*]:shrink-0 [&>*]:snap-start sm:[&>*]:w-auto">
       {children}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------- Weg
+
+/**
+ * Der rote Faden (Julian, 22. November: «ein klarer Weg, der genau diesen
+ * Weg zeigt, wo man durch muss»): die Schritte vom Lead zum Angebot in
+ * ihrer Reihenfolge, je mit der Zahl, die dort wartet. Der erste Schritt,
+ * an dem etwas liegt, ist «als Nächstes» schwarz hervorgehoben; ein Tipp
+ * führt hin. Auf dem Handy untereinander wie eine Liste, am Computer
+ * nebeneinander.
+ */
+export function Weg({ schritte }: { schritte: { titel: string; unter: string; zahl: number | null; dringend?: boolean; onClick: () => void }[] }) {
+  const naechster = schritte.findIndex(s => (s.zahl ?? 0) > 0);
+  return (
+    <ol className={`grid grid-cols-1 overflow-hidden rounded border bg-card lg:grid-cols-4 ${AUF}`} style={verz(1)} aria-label="Der Weg vom Lead zum Angebot">
+      {schritte.map((s, i) => {
+        const jetzt = i === naechster;
+        return (
+          <li key={s.titel} className={`${i ? 'border-t lg:border-l lg:border-t-0' : ''}`}>
+            <button type="button" onClick={s.onClick} aria-current={jetzt ? 'step' : undefined}
+                    className={`flex h-full min-h-16 w-full items-center gap-4 px-4 py-3 text-left transition-colors lg:flex-col lg:items-start lg:gap-2 lg:p-5 ${jetzt ? 'bg-foreground text-background' : 'hover:bg-secondary/60'}`}>
+              <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full border text-sm ${jetzt ? 'border-background/40' : 'text-muted-foreground'}`}>{i + 1}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-medium">{s.titel}</span>
+                <span className={`block truncate text-sm ${jetzt ? 'opacity-70' : 'text-muted-foreground'}`}>{jetzt ? 'Als Nächstes · ' : ''}{s.unter}</span>
+              </span>
+              <span className={`shrink-0 text-[28px] leading-none tracking-tight tabular-nums ${s.dringend && !jetzt ? 'text-heiss' : ''}`}>{s.zahl == null ? '–' : <Hochzaehlen text={String(s.zahl)} />}</span>
+            </button>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
