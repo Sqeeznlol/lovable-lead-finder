@@ -8,7 +8,7 @@ import { useJetzt, useName } from '@/components/calc/name';
 import {
   adressbloecke, AM_ZUG, anrede, brief, deckblattBreite, empfaenger, felderVorgabe, FIRMEN, FIRMEN_WAHL, katNummern, lernen, LERNEN_AB, luecken, nachricht, punkteAlsText,
   SCHRIFTEN, URTEIL_TEXT, VORLAGEN, vorlageVorschlag, vorschlag, type AblaufPerson, type AngebotFelder, type FirmaId, type Kontext,
-  type SchriftId, type Unterschrift, type Urteil, type VorlageId,
+  type Unterschrift, type Urteil, type VorlageId,
 } from '@/lib/angebot';
 import {
   ablaufPersonenLaden, alleRueckmeldungen, bemerkungenLaden, betrag, kalkulationenLaden, schritt, SCHRITT_TEXT, uhr, ZUSTAND_TEXT,
@@ -22,7 +22,7 @@ import { istFehlendeFassung, neuLadenEinmal } from '@/lib/neue-fassung';
 /**
  * Der Weg einer eingereichten Kalkulation zum verschickten Kaufangebot
  * (Julian, 19. November): David prüft den Preis und begründet sein
- * Urteil, wählt Firma, Vorlage und Schrift; Tim visiert; Julian
+ * Urteil, wählt Firma und Vorlage (die Schrift gehört zur Firma); Tim visiert; Julian
  * kontrolliert; Tim bestätigt; David verschickt. Oben läuft die Uhr
  * (24 Stunden), darunter steht, wer am Zug ist, mit einem Knopf für die
  * Nachricht an ihn, und genau eine Tafel für seinen Schritt.
@@ -92,7 +92,9 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
   const startVorlage = k.vorlage ?? vorlageVorschlag({ gebaeude, massgebend: k.ergebnis.massgebend, empfaenger: empfaenger(k.personen ?? []) });
   const [firma, setFirma] = useState<FirmaId>(k.firma ?? 'stimo');
   const [vorlage, setVorlage] = useState<VorlageId>(startVorlage);
-  const [schrift, setSchrift] = useState<SchriftId>(k.schrift ?? FIRMEN[k.firma ?? 'stimo'].schrift);
+  // Die Schrift gehört zur Firma (22. November, Julian: «die Schriftart bei
+  // Studer nur für Studer, die bei stimo nur bei stimo»): keine eigene Wahl.
+  const schrift = FIRMEN[firma].schrift;
   const [felder, setFelder] = useState<AngebotFelder>(() => felderAus(k, startVorlage, [], k.firma ?? 'stimo'));
   const [urteil, setUrteil] = useState<Urteil | null>(null);
   const [preis, setPreis] = useState('');
@@ -116,7 +118,6 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
     setPreis(String(Math.round(k.preis_chf ?? k.empfehlung_chf ?? 0) || ''));
     setNotiz(''); setUrteil(null); setFehler(null);
     setFirma(k.firma ?? 'stimo');
-    setSchrift(k.schrift ?? FIRMEN[k.firma ?? 'stimo'].schrift);
     setVorlage(k.vorlage ?? startVorlage);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- nur beim Wechsel des Stands, nicht bei jedem Tastendruck
   }, [k.id, k.zustand]);
@@ -348,12 +349,12 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
               </label>
               <div className="border-t pt-4">
                 <p className={ETIKETT}>Schritt 2 von 2</p>
-                <Aufklapper titel={`Angebot: ${FIRMEN[firma].name} · ${VORLAGEN[vorlage].titel}`} unter={fehlt.length ? `${fehlt.length} ${fehlt.length === 1 ? 'Angabe fehlt' : 'Angaben fehlen'}` : 'Firma, Vorlage, Schrift und Wortlaut'} auf={angebotAuf} setAuf={setAngebotAuf} gross />
+                <Aufklapper titel={`Angebot: ${FIRMEN[firma].name} · ${VORLAGEN[vorlage].titel}`} unter={fehlt.length ? `${fehlt.length} ${fehlt.length === 1 ? 'Angabe fehlt' : 'Angaben fehlen'}` : 'Firma und Vorlage'} auf={angebotAuf} setAuf={setAngebotAuf} gross />
               </div>
               {angebotAuf && (
-              <AngebotBearbeiten k={k} firma={firma} setFirma={f => { setFirma(f); setSchrift(FIRMEN[f].schrift); setFelder(x => ({ ...x, unterschriften: [], kontakt: null, ...unterschriftenFuer(personen, f) })); }}
+              <AngebotBearbeiten k={k} firma={firma} setFirma={f => { setFirma(f); setFelder(x => ({ ...x, unterschriften: [], kontakt: null, ...unterschriftenFuer(personen, f) })); }}
                 vorlage={vorlage} setVorlage={v => { setVorlage(v); setFelder(x => ({ ...felderVorgabe(v), datum: x.datum, ortsteil: x.ortsteil, kontakt: x.kontakt, unterschriften: x.unterschriften })); }}
-                schrift={schrift} setSchrift={setSchrift} felder={felder} setFelder={setFelder} ktx={ktx} personen={personen} />
+                felder={felder} setFelder={setFelder} ktx={ktx} personen={personen} />
               )}
               {fehlt.length > 0 && <p className="text-sm text-destructive">{fehlt.join(' ')}</p>}
               {angebotAuf && pdfKnoepfe}
@@ -396,9 +397,9 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
                 <p className="font-medium">Angebot kontrollieren</p>
                 <p className="text-sm text-muted-foreground">Empfänger, Parzellen, Wortlaut und Preis. Was hier geändert wird, sieht Tim bei der Bestätigung.</p>
               </div>
-              <AngebotBearbeiten k={k} firma={firma} setFirma={f => { setFirma(f); setSchrift(FIRMEN[f].schrift); setFelder(x => ({ ...x, unterschriften: [], kontakt: null, ...unterschriftenFuer(personen, f) })); }}
+              <AngebotBearbeiten k={k} firma={firma} setFirma={f => { setFirma(f); setFelder(x => ({ ...x, unterschriften: [], kontakt: null, ...unterschriftenFuer(personen, f) })); }}
                 vorlage={vorlage} setVorlage={v => { setVorlage(v); setFelder(x => ({ ...felderVorgabe(v), datum: x.datum, ortsteil: x.ortsteil, kontakt: x.kontakt, unterschriften: x.unterschriften })); }}
-                schrift={schrift} setSchrift={setSchrift} felder={felder} setFelder={setFelder} ktx={ktx} personen={personen} />
+                felder={felder} setFelder={setFelder} ktx={ktx} personen={personen} />
               {fehlt.length > 0 && <p className="text-sm text-destructive">{fehlt.join(' ')}</p>}
               {pdfKnoepfe}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -482,11 +483,12 @@ function unterschriftenFuer(personen: AblaufPerson[], firma: FirmaId): Pick<Ange
  * Firma, Vorlage, Schrift, die Felder, die je Angebot ändern, wer
  * unterschreibt, und auf Wunsch der Wortlaut selbst.
  */
-function AngebotBearbeiten({ k, firma, setFirma, vorlage, setVorlage, schrift, setSchrift, felder, setFelder, ktx, personen }: {
+function AngebotBearbeiten({ k, firma, setFirma, vorlage, setVorlage, felder, setFelder, ktx, personen }: {
   k: Kalkulation; firma: FirmaId; setFirma: (f: FirmaId) => void; vorlage: VorlageId; setVorlage: (v: VorlageId) => void;
-  schrift: SchriftId; setSchrift: (s: SchriftId) => void; felder: AngebotFelder; setFelder: (f: AngebotFelder | ((f: AngebotFelder) => AngebotFelder)) => void;
+  felder: AngebotFelder; setFelder: (f: AngebotFelder | ((f: AngebotFelder) => AngebotFelder)) => void;
   ktx: Kontext; personen: AblaufPerson[];
 }) {
+  const [weiter, setWeiter] = useState(false);
   const setze = (teil: Partial<AngebotFelder>) => setFelder(f => ({ ...f, ...teil }));
   // Der Wortlaut der Vorlage, ohne Eigenes: das steht im Feld, bis jemand es ändert.
   const vorlageText = brief(vorlage, { ...ktx, felder: { ...felder, einleitung: undefined, punkte: undefined, schluss: undefined } });
@@ -531,17 +533,18 @@ function AngebotBearbeiten({ k, firma, setFirma, vorlage, setVorlage, schrift, s
         </div>
       </div>
 
-      <div className="space-y-1.5">
-        <p className={ETIKETT}>Schrift</p>
-        <div className="flex flex-wrap gap-2">
-          {(Object.keys(SCHRIFTEN) as SchriftId[]).map(s => (
-            <button key={s} type="button" aria-pressed={schrift === s} title={SCHRIFTEN[s].wie} className={WAHL(schrift === s)} onClick={() => setSchrift(s)}>
-              {SCHRIFTEN[s].titel}<span className={`ml-1.5 text-[12px] ${schrift === s ? 'text-background/75' : 'text-muted-foreground'}`}>{SCHRIFTEN[s].wie}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
+      {/* Alles Weitere steht vorbelegt aus Vorlage und Firma (22. November,
+          Julian: «dass man nur noch Firma wählen kann und was es ist»);
+          ändern lässt es sich hinter «Weitere Angaben». */}
+      <button type="button" aria-expanded={weiter} onClick={() => setWeiter(!weiter)}
+              className="flex min-h-11 w-full items-center justify-between gap-3 border-t pt-3 text-left">
+        <span>
+          <span className="block text-[15px] font-medium">Weitere Angaben</span>
+          <span className="block text-sm text-muted-foreground">Datum, Besitzantritt, Bindung, Anzahlung, Unterschrift, Wortlaut · Schrift {SCHRIFTEN[FIRMEN[firma].schrift].titel}</span>
+        </span>
+        <span aria-hidden className={`shrink-0 text-xl text-muted-foreground transition-transform ${weiter ? 'rotate-90' : ''}`}>›</span>
+      </button>
+      {weiter && <>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className="block space-y-1.5">
           <span className={ETIKETT}>Datum des Briefs</span>
@@ -613,6 +616,7 @@ function AngebotBearbeiten({ k, firma, setFirma, vorlage, setVorlage, schrift, s
           {textfeld('Schluss', 'schluss', vorlageText.schluss.join('\n\n'), 3)}
         </div>
       </details>
+      </>}
     </div>
   );
 }

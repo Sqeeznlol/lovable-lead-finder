@@ -18,7 +18,7 @@ const db = () => supabase as any;
 
 /**
  * Der Weg einer Kalkulation (Julian, 19. November): der Agent reicht ein,
- * David prüft den Preis und wählt Firma, Vorlage und Schrift, Tim visiert,
+ * David prüft den Preis und wählt Firma und Vorlage (die Schrift gehört zur Firma), Tim visiert,
  * Julian kontrolliert, Tim bestätigt, David verschickt. Die Übergänge
  * erzwingt die Datenbank (kalkulation_schritt, Migration 20261119120000);
  * hier stehen nur die Namen für die Seite.

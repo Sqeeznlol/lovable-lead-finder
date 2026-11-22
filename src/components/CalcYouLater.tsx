@@ -17,7 +17,7 @@ import { betrag, kalkulationenLaden, kalkulationLaden, SCHRITT_TEXT, uhr, UNTERW
  * Lead ein, und es kommt alles heraus (Landwert, Hauptnutzfläche,
  * Kubatur, Baukosten, Erlös, Gewinn, Chancen, Risiken). Dann ein Ablauf,
  * der nicht länger als einen Tag dauern darf (seit 19. November): David
- * prüft den Preis und wählt Firma, Vorlage und Schrift, Tim visiert,
+ * prüft den Preis und wählt Firma und Vorlage (die Schrift gehört zur Firma), Tim visiert,
  * Julian kontrolliert, Tim bestätigt, David verschickt das Kaufangebot.
  *
  * Oben wird gerechnet, darunter steht, was unterwegs ist. Die offene

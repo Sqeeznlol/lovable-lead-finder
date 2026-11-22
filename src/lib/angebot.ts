@@ -653,7 +653,7 @@ export interface AblaufPerson { id: string; name: string; titel: string | null; 
 /** Wer nach diesem Stand am Zug ist. */
 export const AM_ZUG: Partial<Record<string, AblaufRolle>> = { pruefung: 'preis', visum: 'visum', kontrolle: 'kontrolle', bestaetigung: 'visum', angebot: 'versand' };
 export const AUFGABE: Partial<Record<string, string>> = {
-  pruefung: 'den Kaufpreis prüfen und Firma, Vorlage und Schrift wählen',
+  pruefung: 'den Kaufpreis prüfen und Firma und Vorlage wählen',
   visum: 'den Kaufpreis visieren',
   kontrolle: 'das Angebot kontrollieren',
   bestaetigung: 'das Angebot noch einmal bestätigen',

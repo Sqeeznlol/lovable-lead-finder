@@ -219,7 +219,7 @@ senden. Alles Weitere in `docs/calc-you-later.md`.
 
   * Das Kaufangebot geht durch vier Hände (19. November, Julian):
     David prüft den Preis und begründet sein Urteil (zu tief, passt, zu
-    hoch), wählt Firma, Vorlage und Schrift; Tim visiert; Julian
+    hoch), wählt Firma und Vorlage (die Schrift gehört zur Firma); Tim visiert; Julian
     kontrolliert; Tim bestätigt; David verschickt. Hauptlayout ist die
     Arbergstrasse (stimo). Die Datenbank erzwingt Weg und Rollen
     (`20261119120000_angebot.sql`); wer was tut, steht nur in der

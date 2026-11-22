@@ -34,7 +34,7 @@ export function Empfaenger({ quelle, setQuelle, parzellen, setParzellen, persone
     <section className="space-y-5">
       <div>
         <h3 className="text-lg">Für das Angebot</h3>
-        <p className="text-sm text-muted-foreground">Welche Parzellen, wem sie gehören und an wen der Brief geht. David wählt danach Firma, Vorlage und Schrift.</p>
+        <p className="text-sm text-muted-foreground">Welche Parzellen, wem sie gehören und an wen der Brief geht. David wählt danach Firma und Vorlage (die Schrift gehört zur Firma).</p>
       </div>
 
       <div className="space-y-1.5">
