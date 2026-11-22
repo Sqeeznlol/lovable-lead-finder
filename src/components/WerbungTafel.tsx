@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Abschnitt, FELD, KNOPF } from '@/components/rahmen';
 import { FENSTER } from '@/lib/fenster';
-import { KAMPAGNEN, zusammen, type WerbungTag } from '@/lib/werbung';
+import { KAMPAGNEN, MONATSGRENZE, monat, zusammen, type WerbungTag } from '@/lib/werbung';
 
 /**
  * Google Ads je Kampagne (Julian, 21. November: «einen Tracker, der
@@ -28,6 +28,16 @@ export function WerbungTafel({ tage }: { tage: number }) {
       return data ?? [];
     },
   });
+  // Ganzer Monat für die Grenze, unabhängig vom gewählten Zeitraum.
+  const monatsAnfang = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Zurich' }).slice(0, 8) + '01';
+  const m = useQuery({
+    queryKey: ['werbung-tage', monatsAnfang],
+    queryFn: async (): Promise<WerbungTag[]> => (await db.rpc('werbung_tage', { von: monatsAnfang })).data ?? [],
+  });
+  const begriffe = useQuery({
+    queryKey: ['werbung-begriffe', von], retry: 0,
+    queryFn: async (): Promise<{ kampagne: string; begriff: string; leads: number; schlechte: number }[]> => (await db.rpc('werbung_begriffe', { von })).data ?? [],
+  });
   const [kampagne, setKampagne] = useState(KAMPAGNEN[0].id);
   const [tag, setTag] = useState(new Date(Date.now() - 864e5).toISOString().slice(0, 10));
   const [kosten, setKosten] = useState('');
@@ -37,6 +47,8 @@ export function WerbungTafel({ tage }: { tage: number }) {
   if (q.data === null) return null;
   const z = zusammen(q.data ?? []);
   const alleBesuche = z.reduce((a, x) => a + x.besuche, 0);
+  const heute = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Zurich' });
+  const mo = monat(m.data ?? [], heute);
 
   const eintragen = async () => {
     const chf = Number(kosten.replace(',', '.'));
@@ -49,7 +61,13 @@ export function WerbungTafel({ tage }: { tage: number }) {
 
   return (
     <Abschnitt titel="Google Ads" zahl={alleBesuche ? `${ch(alleBesuche)} Besuche` : undefined}
-               hinweis={`Letzte ${tage} Tage. Besuche aus Anzeigen (utm_source=google), Leads ohne Testdaten. Was tun: Regeln des Werbeplans, Kosten je Lead unter CHF 150 verdoppeln, über CHF 400 stoppen.`}>
+               hinweis={`Letzte ${tage} Tage. Besuche aus Anzeigen (utm_source=google), Leads ohne Testdaten. «je Lead» zählt nur gute Leads (in der Lead-Ansicht markiert; ohne Urteil gilt er als gut). Was tun: Regeln des Werbeplans, unter CHF 150 je Lead verdoppeln, über CHF 400 stoppen.`}>
+      {mo && (
+        <p className={`text-sm ${mo.ueber ? 'font-medium text-destructive' : 'text-muted-foreground'}`}>
+          Diesen Monat CHF {ch(mo.bisher)} an {mo.tage} {mo.tage === 1 ? 'Tag' : 'Tagen'} eingetragen, hochgerechnet CHF {ch(mo.hochgerechnet)} von höchstens CHF {MONATSGRENZE}.
+          {mo.ueber ? ' Über der Grenze: Tagesbudgets in Google Ads senken.' : ''}
+        </p>
+      )}
       <div className="overflow-x-auto rounded border bg-card">
         <table className="w-full min-w-[720px] text-sm">
           <thead className="text-left text-xs uppercase tracking-wide text-muted-foreground">
@@ -67,7 +85,7 @@ export function WerbungTafel({ tage }: { tage: number }) {
                   <td className="px-3 py-2 tabular-nums">{ch(s.besuche)}</td>
                   <td className="px-3 py-2 tabular-nums">{ch(s.ergebnisse)}</td>
                   <td className="px-3 py-2 tabular-nums">{ch(s.kontakte)}</td>
-                  <td className="px-3 py-2 tabular-nums font-medium">{ch(s.leads)}</td>
+                  <td className="px-3 py-2 tabular-nums font-medium">{ch(s.leads)}{s.gute < s.leads ? <span className="block text-xs font-normal text-muted-foreground">{ch(s.leads - s.gute)} nicht gut</span> : null}</td>
                   <td className="px-3 py-2 tabular-nums">{s.kosten == null ? '–' : `CHF ${s.kosten.toFixed(2)}`}</td>
                   <td className="px-3 py-2 tabular-nums">{s.jeLead == null ? '–' : `CHF ${ch(s.jeLead)}`}</td>
                   <td className="px-3 py-2">{s.rat}</td>
@@ -77,6 +95,19 @@ export function WerbungTafel({ tage }: { tage: number }) {
           </tbody>
         </table>
       </div>
+      {(begriffe.data?.length ?? 0) > 0 && (
+        <div className="space-y-1">
+          <p className="text-sm font-medium">Suchbegriffe mit Leads</p>
+          <ul className="divide-y rounded border bg-card text-sm">
+            {begriffe.data!.slice(0, 15).map(b => (
+              <li key={`${b.kampagne}:${b.begriff}`} className="flex items-center justify-between gap-4 px-3 py-2">
+                <span>«{b.begriff}» <span className="text-muted-foreground">· {KAMPAGNEN.find(k => k.id === b.kampagne)?.titel ?? b.kampagne}</span></span>
+                <span className="tabular-nums">{ch(Number(b.leads))}{Number(b.schlechte) ? <span className="text-muted-foreground"> ({ch(Number(b.schlechte))} nicht gut)</span> : null}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <form className="flex flex-wrap items-end gap-2" onSubmit={e => { e.preventDefault(); void eintragen(); }}>
         <label className="space-y-1 text-xs text-muted-foreground">Tag<input type="date" value={tag} onChange={e => setTag(e.target.value)} className={`${FELD} block text-base`} /></label>
         <label className="space-y-1 text-xs text-muted-foreground">Kampagne

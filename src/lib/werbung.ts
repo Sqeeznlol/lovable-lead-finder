@@ -15,21 +15,24 @@ export const KAMPAGNEN: { id: string; titel: string; domain: string }[] = [
   { id: 'steuer', titel: 'Steuer', domain: 'hauschecker.ch' },
 ];
 
-export interface WerbungTag { tag: string; kampagne: string; besuche: number; ergebnisse: number; kontakte: number; leads: number; kosten_chf: number | null; klicks: number | null }
-export interface WerbungSumme { kampagne: string; besuche: number; ergebnisse: number; kontakte: number; leads: number; kosten: number | null; klicks: number | null; jeLead: number | null; rat: string }
+export interface WerbungTag { tag: string; kampagne: string; besuche: number; ergebnisse: number; kontakte: number; leads: number; schlechte?: number; kosten_chf: number | null; klicks: number | null }
+export interface WerbungSumme { kampagne: string; besuche: number; ergebnisse: number; kontakte: number; leads: number; gute: number; kosten: number | null; klicks: number | null; jeLead: number | null; rat: string }
 
 /**
  * Die Regeln des Werbeplans: Kosten pro Lead unter CHF 150 → Budget
  * verdoppeln, 150 bis 400 → Text oder Suchbegriffe verbessern, über 400 →
  * stoppen; 150 Klicks ohne Lead → stoppen oder Zielseite ändern. Ohne
- * Kosten zählen die Besuche als Klicks.
+ * Kosten zählen die Besuche als Klicks. Der Plan rechnet mit guten Leads:
+ * wer als «kein guter Lead» markiert ist, zählt nicht (ohne Angabe zählt
+ * jeder Lead, bis jemand urteilt).
  */
-export function rat(s: Pick<WerbungSumme, 'besuche' | 'leads' | 'kosten' | 'klicks' | 'ergebnisse'>): string {
+export function rat(s: Pick<WerbungSumme, 'besuche' | 'leads' | 'kosten' | 'klicks' | 'ergebnisse'> & { gute?: number }): string {
   const klicks = s.klicks ?? s.besuche;
+  const gute = s.gute ?? s.leads;
   if (s.besuche >= 10 && s.ergebnisse === 0) return 'Seite prüfen: Besucher, aber kein Ergebnis';
-  if (!s.leads) return klicks >= 150 ? 'Stoppen oder Zielseite ändern: 150 Klicks ohne Lead' : klicks ? 'Weiter beobachten' : 'Noch keine Klicks';
+  if (!gute) return s.leads ? (klicks >= 150 ? 'Stoppen oder Zielseite ändern: kein guter Lead' : 'Weiter beobachten: noch kein guter Lead') : klicks >= 150 ? 'Stoppen oder Zielseite ändern: 150 Klicks ohne Lead' : klicks ? 'Weiter beobachten' : 'Noch keine Klicks';
   if (s.kosten == null) return 'Kosten eintragen, dann zählt der Preis je Lead';
-  const je = s.kosten / s.leads;
+  const je = s.kosten / gute;
   return je < 150 ? 'Budget verdoppeln' : je <= 400 ? 'Text oder Suchbegriffe verbessern' : 'Stoppen';
 }
 
@@ -43,8 +46,28 @@ export function zusammen(tage: WerbungTag[]): WerbungSumme[] {
     const mitKlicks = t.filter(x => x.klicks != null);
     const s = {
       kampagne: k.id, besuche: summe(x => Number(x.besuche)), ergebnisse: summe(x => Number(x.ergebnisse)), kontakte: summe(x => Number(x.kontakte)),
-      leads: summe(x => Number(x.leads)), kosten, klicks: mitKlicks.length ? mitKlicks.reduce((a, x) => a + Number(x.klicks), 0) : null,
+      leads: summe(x => Number(x.leads)), gute: summe(x => Number(x.leads) - Number(x.schlechte ?? 0)), kosten, klicks: mitKlicks.length ? mitKlicks.reduce((a, x) => a + Number(x.klicks), 0) : null,
     };
-    return { ...s, jeLead: kosten != null && s.leads ? kosten / s.leads : null, rat: rat(s) };
+    return { ...s, jeLead: kosten != null && s.gute ? kosten / s.gute : null, rat: rat(s) };
   });
+}
+
+/** Die Grenze des Werbeplans: höchstens CHF 600 im Monat (google_ads.py, MONATSBUDGET). */
+export const MONATSGRENZE = 600;
+
+/**
+ * Kosten im laufenden Monat und wohin sie bis Monatsende führen. Google darf
+ * an einem Tag bis doppelt so viel ausgeben; darum zählt der Schnitt der
+ * eingetragenen Tage, nicht der letzte Tag. Ohne Kosten keine Hochrechnung.
+ */
+export function monat(tage: WerbungTag[], heute: string): { bisher: number; tage: number; hochgerechnet: number; ueber: boolean } | null {
+  const m = heute.slice(0, 7);
+  const mit = tage.filter(t => t.tag.slice(0, 7) === m && t.kosten_chf != null);
+  if (!mit.length) return null;
+  const bisher = mit.reduce((a, t) => a + Number(t.kosten_chf), 0);
+  const eingetragen = new Set(mit.map(t => t.tag)).size;
+  const [j, mo] = m.split('-').map(Number);
+  const imMonat = new Date(Date.UTC(j, mo, 0)).getUTCDate();
+  const hochgerechnet = bisher / eingetragen * imMonat;
+  return { bisher, tage: eingetragen, hochgerechnet, ueber: hochgerechnet > MONATSGRENZE };
 }

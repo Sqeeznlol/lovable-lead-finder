@@ -49,7 +49,12 @@ jeden Tag»): unter «Leads» die Tafel «Google Ads» je Kampagne (Besuche,
 Ergebnis, Kontakt, Leads aus `werbung_tage`, Kosten aus `werbung_kosten`,
 Rat nach den Regeln des Werbeplans, `src/lib/werbung.ts`). Der Ablauf
 «Werbung täglich» prüft jeden Tag, ob die sieben Seiten antworten und den
-Messpunkt (AW-…) ausliefern, und wird sonst rot.
+Messpunkt der Conversion «Lead» (AW-18588031014 mit Label) ausliefern,
+und wird sonst rot. Gerechnet wird nach Kosten je *gutem* Lead (22.
+November): in der Lead-Ansicht «Guter Lead» oder «Kein guter Lead»
+(`anfrage.guete`, ohne Urteil gilt er als gut); dazu die Monatsgrenze
+von CHF 600, hochgerechnet aus den eingetragenen Kosten, und die
+Suchbegriffe, die Leads bringen (`werbung_begriffe`).
 
 ## Was live ist
 

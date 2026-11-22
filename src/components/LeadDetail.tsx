@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -269,7 +269,9 @@ export function LeadDetail({ lead, onClose, onErledigt, onNotiz, onNachfass, onG
               {zeile('Quelle', a.utm_source ?? (a.fbclid ? 'facebook' : a.gclid ? 'google' : null))}
               {zeile('Kampagne', a.utm_campaign)}
               {zeile('Anzeige', a.utm_content)}
+              {zeile('Suchbegriff', a.utm_term)}
               {zeile('Verweis', a.referrer)}
+              {(a.utm_source === 'google' || !!a.gclid) && <Guete key={lead.id} id={lead.id} />}
             </section>
 
             <section className="space-y-2">
@@ -324,5 +326,38 @@ function Loeschen({ id, onGeloescht }: { id: string; onGeloescht: () => void }) 
       </form>
       {fehler && <p className="text-sm text-destructive">{fehler}</p>}
     </section>
+  );
+}
+
+/**
+ * Guter Lead oder nicht: der Werbeplan entscheidet nach Kosten pro *gutem*
+ * Lead. Das Urteil lädt eigens, damit die Liste der Leads nicht davon
+ * abhängt, ob die Migration 20261122120000 schon eingespielt ist.
+ */
+function Guete({ id }: { id: string }) {
+  const qc = useQueryClient();
+  const q = useQuery({
+    queryKey: ['lead-guete', id], retry: 0,
+    queryFn: async (): Promise<string | null | undefined> => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any).from('anfrage').select('guete').eq('id', id).maybeSingle();
+      if (error) return undefined;
+      return data?.guete ?? null;
+    },
+  });
+  if (q.data === undefined) return null;
+  const setzen = async (g: 'gut' | 'schlecht') => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any).from('anfrage').update({ guete: q.data === g ? null : g }).eq('id', id);
+    await Promise.all([qc.invalidateQueries({ queryKey: ['lead-guete', id] }), qc.invalidateQueries({ queryKey: ['werbung-tage'] }), qc.invalidateQueries({ queryKey: ['werbung-begriffe'] })]);
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-2 pt-3" role="radiogroup" aria-label="Guter Lead?">
+      <span className="text-sm text-muted-foreground">Für Google Ads:</span>
+      {([['gut', 'Guter Lead'], ['schlecht', 'Kein guter Lead']] as const).map(([g, t]) => (
+        <button key={g} type="button" role="radio" aria-checked={q.data === g} onClick={() => void setzen(g)}
+                className={`min-h-11 rounded-[3px] border px-4 text-sm ${q.data === g ? 'border-foreground bg-foreground text-background' : 'bg-card hover:bg-secondary'}`}>{t}</button>
+      ))}
+    </div>
   );
 }

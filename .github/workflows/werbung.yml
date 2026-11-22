@@ -4,7 +4,8 @@
 # Julian, 21. November: «mache noch einen Tracker dafür, der permanent
 # analysiert, jeden Tag». Jeden Tag:
 #   1. Die sieben Seiten der Kampagnen antworten, und jede liefert den
-#      Messpunkt von Google Ads (AW-…) aus. Fehlt er, zählt Google keine
+#      Messpunkt der Conversion «Lead» aus (AW-18588031014 mit Label,
+#      Zweig akquise, src/lib/google-ads.ts); irgendeine AW-Nummer genügt nicht. Fehlt er, zählt Google keine
 #      Leads und «Conversions maximieren» lernt nichts.
 #   2. Je Kampagne die letzten sieben Tage: Besuche aus Anzeigen, Ergebnis,
 #      Kontakt, Leads (werbung_tage), mit dem Rat des Werbeplans.
@@ -37,7 +38,7 @@ jobs:
             code=$(curl -s -o seite.html -w '%{http_code}' -m 30 "https://www.$d/")
             js=$(grep -o 'src="/assets/index-[^"]*\.js"' seite.html | head -1 | cut -d'"' -f2)
             aw="fehlt"
-            if [ -n "$js" ] && curl -s -m 30 "https://www.$d$js" | grep -q 'AW-[0-9]\{6,14\}'; then aw="da"; fi
+            if [ -n "$js" ] && curl -s -m 30 "https://www.$d$js" | grep -q 'AW-18588031014' && curl -s -m 30 "https://www.$d$js" | grep -q 'Y3eECO-s4rwdEKawu59F'; then aw="da"; fi
             echo "| $d | $code | $aw |" >> "$GITHUB_STEP_SUMMARY"
             echo "$d $code Messpunkt $aw"
             [ "$code" = 200 ] || fehler=1
