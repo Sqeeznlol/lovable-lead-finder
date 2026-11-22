@@ -591,6 +591,8 @@ export interface Rueckmeldung {
   /** Wer geurteilt hat und zu welcher Adresse (22. November, Julian: «ist das vom System oder von Tim?»). */
   wer?: string | null;
   adresse?: string | null;
+  /** Wo im Land (22. November, Julian: «wieso, weshalb, warum und wo in der Ortschaft»). */
+  gemeinde?: string | null;
 }
 
 export interface Gelernt {
@@ -602,8 +604,10 @@ export interface Gelernt {
   bis: number;
   /** Ob nur Rückmeldungen aus demselben Kanton zählen. */
   kanton: string | null;
+  /** Ob nur Rückmeldungen aus derselben Gemeinde zählen (genauer als der Kanton). */
+  gemeinde?: string | null;
   zuTief: number; passt: number; zuHoch: number;
-  gruende: { urteil: Urteil; grund: string; am: string; wer?: string | null; adresse?: string | null }[];
+  gruende: { urteil: Urteil; grund: string; am: string; wer?: string | null; adresse?: string | null; gemeinde?: string | null }[];
 }
 
 const quantil = (sortiert: number[], q: number) => {
@@ -620,20 +624,26 @@ export const LERNEN_AB = 3;
  * nur diese. Julians Formel ändert sich dadurch nicht (CLAUDE.md: seine
  * Vorgaben nicht eigenmächtig ändern); der Vorschlag steht daneben.
  */
-export function lernen(alle: Rueckmeldung[], kanton: string | null): Gelernt | null {
+export function lernen(alle: Rueckmeldung[], kanton: string | null, gemeinde?: string | null): Gelernt | null {
   const gut = alle.filter(r => r.empfehlung > 0 && r.preis > 0 && r.preis / r.empfehlung > 0.2 && r.preis / r.empfehlung < 5);
+  // Je näher, desto besser: zuerst dieselbe Gemeinde, dann der Kanton, sonst alle.
+  const gleich = (a?: string | null, b?: string | null) => !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
+  const imOrt = gemeinde ? gut.filter(r => gleich(r.gemeinde, gemeinde)) : [];
   const hier = kanton ? gut.filter(r => r.kanton === kanton) : [];
-  const basis = hier.length >= LERNEN_AB ? hier : gut;
+  const basis = imOrt.length >= LERNEN_AB ? imOrt : hier.length >= LERNEN_AB ? hier : gut;
   if (!basis.length) return null;
   const q = basis.map(r => r.preis / r.empfehlung).sort((a, b) => a - b);
   return {
     n: basis.length, faktor: quantil(q, 0.5), von: quantil(q, 0.25), bis: quantil(q, 0.75),
-    kanton: hier.length >= LERNEN_AB ? kanton : null,
+    kanton: imOrt.length >= LERNEN_AB || hier.length >= LERNEN_AB ? kanton : null,
+    gemeinde: imOrt.length >= LERNEN_AB ? gemeinde ?? null : null,
     zuTief: basis.filter(r => r.urteil === 'zu_tief').length,
     passt: basis.filter(r => r.urteil === 'passt').length,
     zuHoch: basis.filter(r => r.urteil === 'zu_hoch').length,
-    gruende: basis.filter(r => r.urteil && r.grund).sort((a, b) => b.am.localeCompare(a.am)).slice(0, 4)
-      .map(r => ({ urteil: r.urteil!, grund: r.grund!, am: r.am, wer: r.wer ?? null, adresse: r.adresse ?? null })),
+    // Gründe aus demselben Ort zuerst, dann die jüngsten.
+    gruende: gut.filter(r => r.urteil && r.grund)
+      .sort((a, b) => Number(gleich(b.gemeinde, gemeinde)) - Number(gleich(a.gemeinde, gemeinde)) || b.am.localeCompare(a.am)).slice(0, 4)
+      .map(r => ({ urteil: r.urteil!, grund: r.grund!, am: r.am, wer: r.wer ?? null, adresse: r.adresse ?? null, gemeinde: r.gemeinde ?? null })),
   };
 }
 

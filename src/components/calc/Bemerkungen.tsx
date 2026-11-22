@@ -25,7 +25,7 @@ const prozent = (preis: number, empfehlung: number) => {
   return p === 0 ? 'gleich wie die Empfehlung' : `${p > 0 ? '+' : '\u2212'}${Math.abs(p)}\u00a0% zur Empfehlung`;
 };
 
-export function Bemerkungen({ kalkulationId, empfehlung, kanton }: { kalkulationId: string; empfehlung: number | null; kanton: string | null }) {
+export function Bemerkungen({ kalkulationId, empfehlung, kanton, gemeinde }: { kalkulationId: string; empfehlung: number | null; kanton: string | null; gemeinde?: string | null }) {
   const qc = useQueryClient();
   const { user } = useAuth();
   const [name, setName] = useName();
@@ -39,7 +39,7 @@ export function Bemerkungen({ kalkulationId, empfehlung, kanton }: { kalkulation
   const hier = useQuery({ queryKey: ['bemerkungen', kalkulationId], queryFn: () => bemerkungenLaden(kalkulationId), retry: 0 });
   const alle = useQuery({ queryKey: ['bemerkungen-alle'], queryFn: () => bemerkungenLaden(), staleTime: 60 * 1000, retry: 0 });
   const kalk = useQuery({ queryKey: ['kalkulationen'], queryFn: kalkulationenLaden, staleTime: 60 * 1000 });
-  const g = useMemo(() => lernen(alleRueckmeldungen(kalk.data ?? [], alle.data ?? [], kalkulationId), kanton), [kalk.data, alle.data, kalkulationId, kanton]);
+  const g = useMemo(() => lernen(alleRueckmeldungen(kalk.data ?? [], alle.data ?? [], kalkulationId), kanton, gemeinde), [kalk.data, alle.data, kalkulationId, kanton, gemeinde]);
   const lernPreis = vorschlag(empfehlung, g);
 
   const zahl = betragLesen(preis);
@@ -74,10 +74,10 @@ export function Bemerkungen({ kalkulationId, empfehlung, kanton }: { kalkulation
         <h3 className="text-lg">Stimmt der Preis?</h3>
         <p className="text-sm text-muted-foreground">
           {empfehlung ? <>CALC empfiehlt <span className="font-medium text-foreground">{betrag(empfehlung)}</span>. </> : null}
-          Richtig so, zu tief oder zu hoch, und warum: aus jeder Begründung lernt Aurora.
+          Richtig so, zu tief oder zu hoch, warum und wo im Ort: aus jeder Begründung lernt Aurora.
         </p>
         {g && (lernPreis != null
-          ? <p className="text-sm">Aus {g.n} Rückmeldungen{g.kanton ? ` im Kanton ${g.kanton}` : ''} lag der richtige Preis im Mittel bei {Math.round(g.faktor * 100)}{'\u00a0'}% der Empfehlung, hier also <span className="font-medium">{betrag(lernPreis)}</span>.</p>
+          ? <p className="text-sm">Aus {g.n} Rückmeldungen{g.gemeinde ? ` in ${g.gemeinde}` : g.kanton ? ` im Kanton ${g.kanton}` : ''} lag der richtige Preis im Mittel bei {Math.round(g.faktor * 100)}{'\u00a0'}% der Empfehlung, hier also <span className="font-medium">{betrag(lernPreis)}</span>.</p>
           : <p className="text-sm text-muted-foreground">Erst {g.n} {g.n === 1 ? 'Rückmeldung' : 'Rückmeldungen'} mit Preis; ab {LERNEN_AB} steht hier ein Vorschlag.</p>)}
       </div>
 

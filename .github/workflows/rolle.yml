@@ -1,0 +1,97 @@
+# =====================================================================
+# Rolle eintragen
+# =====================================================================
+# Julian, 22. November: «trag Tim ein bei Wer was tut». Seit Tim allein
+# entscheidet und verschickt (Rolle «visum»,
+# 20261122150000_tim_entscheidet_angebot.sql), darf mit hinterlegtem
+# Konto nur noch dieses Konto festlegen und verschicken.
+#
+# Das Konto wird nicht eingetippt, sondern dort gefunden, wo die Person in
+# CALC schon gearbeitet hat: im Verlauf der Kalkulationen und in den
+# Bemerkungen zum Preis, unter dem Namen aus der Eingabe. Gibt es dafür
+# nicht genau ein Konto, wird nichts eingetragen.
+#
+# Wer was tut, steht nur in der Datenbank (CLAUDE.md): ins Protokoll gehen
+# nur Zählungen, keine E-Mail-Adressen, keine Kontonummern.
+# =====================================================================
+name: Rolle eintragen
+
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: 'Name, wie er in CALC steht'
+        required: true
+        default: 'Tim'
+      schritt:
+        description: 'zeigen oder eintragen'
+        required: true
+        default: 'zeigen'
+        type: choice
+        options: [zeigen, eintragen]
+
+jobs:
+  rolle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Werkzeuge
+        run: sudo apt-get install -y -qq postgresql-client
+      - name: Rolle «Entscheidet und verschickt»
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+          NAME: ${{ inputs.name }}
+          SCHRITT: ${{ inputs.schritt }}
+        run: |
+          set -euo pipefail
+          [ -n "${DB:-}" ] || { echo "Kein Datenbankzugang."; exit 1; }
+          [[ "$NAME" =~ ^[[:alpha:][:space:]-]{2,40}$ ]] || { echo "Name nicht gültig."; exit 1; }
+          psql "$DB" -X -q -v ON_ERROR_STOP=1 -v name="$NAME" -v schritt="$SCHRITT" <<'SQL'
+          set statement_timeout = '30s';
+          create temp table konten as
+            select von::uuid as konto, count(*) as mal from (
+              select v->>'von' as von, v->>'name' as n from public.kalkulation, jsonb_array_elements(verlauf) v
+              union all
+              select user_id::text, name from public.kalkulation_bemerkung
+            ) x where lower(btrim(n)) = lower(btrim(:'name')) and von ~ '^[0-9a-f-]{36}$'
+            group by 1;
+          \echo 'Konten, die unter diesem Namen in CALC gearbeitet haben (Anzahl Einträge):'
+          select row_number() over (order by mal desc) as nr, mal as eintraege,
+                 (select lower(split_part(email, '@', 1)) like lower(:'name') || '%' from auth.users u where u.id = konto) as anmeldename_passt
+          from konten order by mal desc;
+          \echo 'Eingetragen bei «Wer was tut» (Zeilen je Rolle):'
+          select r as rolle, count(*) as personen, count(*) filter (where user_id is not null) as mit_konto
+          from public.angebot_person, unnest(rollen) r group by 1 order by 1;
+          select count(*) filter (where lower(btrim(name)) = lower(btrim(:'name'))) as zeilen_mit_diesem_namen from public.angebot_person;
+          SQL
+          if [ "$SCHRITT" = eintragen ]; then
+            psql "$DB" -X -q -v ON_ERROR_STOP=1 -v name="$NAME" <<'SQL'
+          set statement_timeout = '30s';
+          begin;
+          select set_config('rolle.name', :'name', true);
+          create temp table konten as
+            select von::uuid as konto, count(*) as mal from (
+              select v->>'von' as von, v->>'name' as n from public.kalkulation, jsonb_array_elements(verlauf) v
+              union all
+              select user_id::text, name from public.kalkulation_bemerkung
+            ) x where lower(btrim(n)) = lower(btrim(:'name')) and von ~ '^[0-9a-f-]{36}$'
+            group by 1;
+          do $$
+          declare k uuid; n int; nm text := current_setting('rolle.name');
+          begin
+            select count(*) into n from konten;
+            if n <> 1 then raise exception 'Nicht genau ein Konto (%), nichts eingetragen.', n; end if;
+            select konto into k from konten;
+            if exists (select 1 from public.angebot_person where lower(btrim(name)) = lower(btrim(nm))) then
+              update public.angebot_person set user_id = k,
+                     rollen = (select array_agg(distinct r) from unnest(rollen || array['visum']) r)
+              where lower(btrim(name)) = lower(btrim(nm));
+            else
+              insert into public.angebot_person (name, rollen, user_id) values (nm, array['visum'], k);
+            end if;
+          end $$;
+          commit;
+          \echo 'Eingetragen. Neu (Zeilen je Rolle):'
+          select r as rolle, count(*) as personen, count(*) filter (where user_id is not null) as mit_konto
+          from public.angebot_person, unnest(rollen) r group by 1 order by 1;
+          SQL
+          fi

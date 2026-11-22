@@ -127,6 +127,21 @@ describe('Angebot: aus den Rückmeldungen lernen', () => {
     expect(vorschlag(2_000_000, g)).toBe(1_900_000);
   });
 
+  it('je näher, desto besser: dieselbe Gemeinde vor dem Kanton (22. November: «wo in der Ortschaft»)', () => {
+    const o = (preis: number, gemeinde: string) => ({ ...r(100, preis), gemeinde });
+    const alle = [o(200, 'Uitikon'), o(180, 'Uitikon'), o(190, 'Uitikon'), o(100, 'Zürich'), o(100, 'Zürich'), o(100, 'Zürich'), o(100, 'Zürich')];
+    const imOrt = lernen(alle, 'ZH', 'Uitikon')!;
+    expect(imOrt.gemeinde).toBe('Uitikon');
+    expect(imOrt.n).toBe(3);
+    expect(imOrt.faktor).toBeCloseTo(1.9);
+    expect(imOrt.gruende[0].gemeinde).toBe('Uitikon');
+    // Zu wenige im Ort: dann zählt der Kanton.
+    const anderswo = lernen(alle, 'ZH', 'Schlieren')!;
+    expect(anderswo.gemeinde).toBeNull();
+    expect(anderswo.kanton).toBe('ZH');
+    expect(anderswo.n).toBe(7);
+  });
+
   it('unter drei Rückmeldungen kein Vorschlag, und Ausreisser zählen nicht', () => {
     expect(vorschlag(2_000_000, lernen([r(100, 90), r(100, 95)], 'ZH'))).toBeNull();
     expect(lernen([r(100, 1), r(100, 9000)], null)).toBeNull();

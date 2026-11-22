@@ -589,7 +589,7 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
       </section>
 
       {/* Schon zum Entwurf lässt sich sagen, ob der Preis stimmt; die Datenbank misst gegen die gespeicherte Empfehlung. */}
-      {entwurf && <Bemerkungen kalkulationId={entwurf.id} empfehlung={entwurf.empfehlung_chf} kanton={entwurf.kanton} />}
+      {entwurf && <Bemerkungen kalkulationId={entwurf.id} empfehlung={entwurf.empfehlung_chf} kanton={entwurf.kanton} gemeinde={entwurf.gemeinde} />}
     </div>
   );
 }

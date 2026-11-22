@@ -140,7 +140,7 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
   const u = uhr(k, jetzt);
   // Gelernt wird auch aus den Bemerkungen zum Preis (20. November), nicht nur aus Davids Prüfung.
   const bem = useQuery({ queryKey: ['bemerkungen-alle'], queryFn: () => bemerkungenLaden(), staleTime: 60 * 1000, retry: 0 });
-  const g = useMemo(() => lernen(alleRueckmeldungen(alle.data ?? [], bem.data ?? [], k.id), k.kanton), [alle.data, bem.data, k.id, k.kanton]);
+  const g = useMemo(() => lernen(alleRueckmeldungen(alle.data ?? [], bem.data ?? [], k.id), k.kanton, k.gemeinde), [alle.data, bem.data, k.id, k.kanton, k.gemeinde]);
   const lernPreis = vorschlag(k.empfehlung_chf, g);
   const preisJetzt = betragLesen(preis) ?? k.preis_chf ?? k.empfehlung_chf ?? 0;
   const ktx = kontextAus(k, firma, felder, preisJetzt);
@@ -304,7 +304,7 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
               <div>
                 <p className={ETIKETT}>Schritt 1 von 2</p>
                 <p className="text-lg">Ist der Preis richtig?</p>
-                <p className="text-sm text-muted-foreground">Tim entscheidet: sein Preis gilt und geht so ins Angebot.</p>
+                <p className="text-sm text-muted-foreground">Tim entscheidet: sein Preis gilt und geht so ins Angebot. Urteil und Grund lernt Aurora, auch wo im Ort es liegt.</p>
               </div>
               {/* Was Aurora rechnet und was Menschen geschrieben haben, klar
                   getrennt (22. November, Julian: «ist das vom System oder von
@@ -313,7 +313,7 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
                 <div className="space-y-2 text-sm">
                   <p className="rounded-[3px] bg-secondary px-3 py-2.5">
                     {lernPreis != null
-                      ? <>Vorschlag von Aurora: <span className="font-medium">{betrag(lernPreis)}</span><span className="block text-muted-foreground">Bei {g.n} geprüften Kalkulationen{g.kanton ? ` im Kanton ${g.kanton}` : ''} lag der richtige Preis im Mittel bei {Math.round(g.faktor * 100)} % der Empfehlung.</span></>
+                      ? <>Vorschlag von Aurora: <span className="font-medium">{betrag(lernPreis)}</span><span className="block text-muted-foreground">Bei {g.n} geprüften Kalkulationen{g.gemeinde ? ` in ${g.gemeinde}` : g.kanton ? ` im Kanton ${g.kanton}` : ''} lag der richtige Preis im Mittel bei {Math.round(g.faktor * 100)} % der Empfehlung.</span></>
                       : <>Erst {g.n} {g.n === 1 ? 'geprüfte Kalkulation' : 'geprüfte Kalkulationen'}; ab {LERNEN_AB} rechnet Aurora einen Vorschlag.</>}
                   </p>
                   {g.gruende.length > 0 && (
@@ -324,7 +324,7 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
                       <ul className="divide-y border-y">
                         {g.gruende.map((x, i) => (
                           <li key={i} className="py-2">
-                            <p className="text-xs text-muted-foreground">{[x.wer, x.adresse].filter(Boolean).join(' · ') || 'Ohne Namen'} · {URTEIL_TEXT[x.urteil]}</p>
+                            <p className="text-xs text-muted-foreground">{[x.wer, [x.adresse, x.gemeinde].filter(Boolean).join(', ')].filter(Boolean).join(' · ') || 'Ohne Namen'} · {URTEIL_TEXT[x.urteil]}</p>
                             <p>«{x.grund}»</p>
                           </li>
                         ))}
@@ -346,7 +346,7 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
               <label className="block space-y-1.5">
                 <span className={ETIKETT}>Warum (mindestens ein Satz)</span>
                 <textarea value={notiz} onChange={x => setNotiz(x.target.value)} rows={3} className={TEXTFELD}
-                          placeholder={urteil === 'zu_tief' ? 'Was die Rechnung unterschätzt, z. B. Seesicht, Inserate liegen höher' : urteil === 'zu_hoch' ? 'Was sie überschätzt, z. B. Altlasten, Lärm, Baurecht' : 'Woran sich zeigt, dass der Preis stimmt'} />
+                          placeholder={urteil === 'zu_tief' ? 'Warum, und wo im Ort? z. B. ruhige Hanglage mit Seesicht, Nachbar ist Anlagestiftung' : urteil === 'zu_hoch' ? 'Warum, und wo im Ort? z. B. an der Hauptstrasse, Altlasten, Baurecht' : 'Warum stimmt er? z. B. passt zu Verkäufen im Quartier'} />
               </label>
               <div className="border-t pt-4">
                 <p className={ETIKETT}>Schritt 2 von 2</p>
@@ -468,7 +468,7 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
       </section>
       <div className="print:hidden">
         <Aufklapper titel="Gespräch zum Preis" unter="Bemerkungen von allen, aus denen Aurora lernt" auf={gespraechAuf} setAuf={setGespraechAuf} gross />
-        {gespraechAuf && <div className="pt-2"><Bemerkungen kalkulationId={k.id} empfehlung={k.empfehlung_chf} kanton={k.kanton} /></div>}
+        {gespraechAuf && <div className="pt-2"><Bemerkungen kalkulationId={k.id} empfehlung={k.empfehlung_chf} kanton={k.kanton} gemeinde={k.gemeinde} /></div>}
       </div>
     </div>
   );
