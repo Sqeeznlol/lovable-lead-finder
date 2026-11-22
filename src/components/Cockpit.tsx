@@ -143,7 +143,7 @@ export function Cockpit({ onGehe }: { onGehe: (z: Ziel) => void }) {
       <Weg schritte={[
         { titel: 'Leads', unter: 'Anrufen und erfassen', zahl: data?.anfragen ?? null, onClick: () => onGehe('leads') },
         { titel: 'Kalkulieren', unter: 'Entwürfe fertig rechnen', zahl: calc.data ? entwuerfe : null, onClick: () => navigate('/calc?liste=entwuerfe') },
-        { titel: 'Prüfen und freigeben', unter: zuSpaet ? `${zuSpaet} überfällig` : 'David, Tim, Julian', zahl: calc.data ? wartend.length : null, dringend: zuSpaet > 0, onClick: () => navigate('/calc') },
+        { titel: 'Tim entscheidet', unter: zuSpaet ? `${zuSpaet} überfällig` : 'Preis festlegen, verschicken', zahl: calc.data ? wartend.length : null, dringend: zuSpaet > 0, onClick: () => navigate('/calc') },
         { titel: 'Gesendet', unter: 'Angebote, 30 Tage', zahl: calc.data ? gesendet : null, onClick: () => navigate('/calc?liste=gesendet') },
       ]} />
       {data && (

@@ -40,8 +40,8 @@ begin
   assert ok, '3f Urteil nur über den Ablauf';
 
   -- 4 nichts überspringen
-  begin perform public.kalkulation_schritt(kid, 'visieren', 'Tim'); ok := false; exception when others then ok := sqlerrm like 'Dieser Schritt passt nicht%'; end;
-  assert ok, '4a visieren vor einreichen';
+  begin perform public.kalkulation_schritt(kid, 'pruefen', 'Tim', 1, 'Altlasten im Kataster', null, '{"urteil":"zu_hoch"}'); ok := false; exception when others then ok := sqlerrm like 'Dieser Schritt passt nicht%'; end;
+  assert ok, '4a Preis festlegen vor einreichen';
   begin perform public.kalkulation_schritt(kid, 'senden', 'David', null, null, 'Text'); ok := false; exception when others then ok := sqlerrm like 'Dieser Schritt passt nicht%'; end;
   assert ok, '4b senden vor einreichen';
 
@@ -56,61 +56,50 @@ begin
   delete from public.kalkulation where id = kid;
   get diagnostics n = row_count; assert n = 0, '6b eingereicht löschen';
 
-  -- 7 David prüft: Urteil, Grund, Firma, Vorlage, Schrift
-  begin perform public.kalkulation_schritt(kid, 'visieren', 'Tim'); ok := false; exception when others then ok := true; end;
-  assert ok, '7a visieren vor prüfen';
-  begin perform public.kalkulation_schritt(kid, 'pruefen', 'David', -5); ok := false; exception when others then ok := sqlerrm = 'Der Betrag ist nicht gültig.'; end;
+  -- 7 Tim legt den Preis fest (22. November: «Tim entscheidet immer schlussendlich»)
+  begin perform public.kalkulation_schritt(kid, 'senden', 'Tim', null, null, 'Text'); ok := false; exception when others then ok := sqlerrm like 'Dieser Schritt passt nicht%'; end;
+  assert ok, '7a senden vor dem Preis';
+  begin perform public.kalkulation_schritt(kid, 'pruefen', 'Tim', -5); ok := false; exception when others then ok := sqlerrm = 'Der Betrag ist nicht gültig.'; end;
   assert ok, '7b Betrag unter null';
-  begin perform public.kalkulation_schritt(kid, 'pruefen', 'David', 2000000, 'Dach ist neu und gut'); ok := false; exception when others then ok := sqlerrm like 'Bitte sagen, ob die Empfehlung%'; end;
+  begin perform public.kalkulation_schritt(kid, 'pruefen', 'Tim', 2000000, 'Dach ist neu und gut'); ok := false; exception when others then ok := sqlerrm like 'Bitte sagen, ob die Empfehlung%'; end;
   assert ok, '7c ohne Urteil';
-  begin perform public.kalkulation_schritt(kid, 'pruefen', 'David', 2000000, 'zu', null, '{"urteil":"zu_hoch"}'); ok := false; exception when others then ok := sqlerrm like 'Bitte begründen%'; end;
+  begin perform public.kalkulation_schritt(kid, 'pruefen', 'Tim', 2000000, 'zu', null, '{"urteil":"zu_hoch"}'); ok := false; exception when others then ok := sqlerrm like 'Bitte begründen%'; end;
   assert ok, '7d ohne Grund';
-  begin perform public.kalkulation_schritt(kid, 'pruefen', 'David', 2500000, 'Altlasten im Kataster', null, '{"urteil":"zu_hoch"}'); ok := false; exception when others then ok := sqlerrm like 'Ist die Empfehlung zu hoch%'; end;
+  begin perform public.kalkulation_schritt(kid, 'pruefen', 'Tim', 2500000, 'Altlasten im Kataster', null, '{"urteil":"zu_hoch"}'); ok := false; exception when others then ok := sqlerrm like 'Ist die Empfehlung zu hoch%'; end;
   assert ok, '7e zu hoch, aber Preis höher';
-  begin perform public.kalkulation_schritt(kid, 'pruefen', 'David', 2000000, 'Altlasten im Kataster', null, '{"urteil":"zu_tief"}'); ok := false; exception when others then ok := sqlerrm like 'Ist die Empfehlung zu tief%'; end;
+  begin perform public.kalkulation_schritt(kid, 'pruefen', 'Tim', 2000000, 'Altlasten im Kataster', null, '{"urteil":"zu_tief"}'); ok := false; exception when others then ok := sqlerrm like 'Ist die Empfehlung zu tief%'; end;
   assert ok, '7f zu tief, aber Preis tiefer';
-  begin perform public.kalkulation_schritt(kid, 'pruefen', 'David', 2000000, 'Altlasten im Kataster', null, '{"urteil":"zu_hoch"}'); ok := false; exception when others then ok := sqlerrm = 'Bitte Firma, Vorlage und Schrift wählen.'; end;
+  begin perform public.kalkulation_schritt(kid, 'pruefen', 'Tim', 2000000, 'Altlasten im Kataster', null, '{"urteil":"zu_hoch"}'); ok := false; exception when others then ok := sqlerrm = 'Bitte Firma und Vorlage wählen.'; end;
   assert ok, '7g ohne Firma';
-  begin perform public.kalkulation_schritt(kid, 'speichern', 'David', null, null, null, '{"firma":"keine"}'); ok := false; exception when check_violation then ok := true; end;
+  begin perform public.kalkulation_schritt(kid, 'speichern', 'Tim', null, null, null, '{"firma":"keine"}'); ok := false; exception when check_violation then ok := true; end;
   assert ok, '7h unbekannte Firma';
-  k := public.kalkulation_schritt(kid, 'speichern', 'David', null, null, null, '{"firma":"stimo","vorlage":"bauland","schrift":"nunito","angebot":{"bindung":90}}');
+  k := public.kalkulation_schritt(kid, 'speichern', 'Tim', null, null, null, '{"firma":"studer","vorlage":"bauland","schrift":"serif","angebot":{"bindung":90}}');
   n := jsonb_array_length(k.verlauf);
   assert n = 1, '7i Zwischenspeichern ist kein Schritt';
-  k := public.kalkulation_schritt(kid, 'pruefen', 'David', 2000000, 'Altlasten im Kataster', null, '{"urteil":"zu_hoch"}');
-  assert k.zustand = 'visum' and k.preis_chf = 2000000 and k.preis_urteil = 'zu_hoch' and k.preis_grund = 'Altlasten im Kataster'
-     and k.firma = 'stimo' and k.vorlage = 'bauland' and k.angebot->>'bindung' = '90', '7j geprüft';
-  assert (k.verlauf->1->>'chf')::numeric = 2000000 and k.verlauf->1->>'urteil' = 'zu_hoch', '7k Verlauf mit Urteil';
-  begin perform public.kalkulation_schritt(kid, 'speichern', 'Tim', null, null, null, '{"firma":"studer"}'); ok := false; exception when others then ok := sqlerrm like 'Dieser Schritt passt nicht%'; end;
-  assert ok, '7l Tim ändert die Firma nicht';
+  k := public.kalkulation_schritt(kid, 'pruefen', 'Tim', 2000000, 'Altlasten im Kataster', null, '{"urteil":"zu_hoch"}');
+  assert k.zustand = 'angebot' and k.preis_chf = 2000000 and k.preis_urteil = 'zu_hoch' and k.preis_grund = 'Altlasten im Kataster'
+     and k.firma = 'studer' and k.vorlage = 'bauland' and k.angebot->>'bindung' = '90', '7j Tims Preis gilt, gleich zum Versand';
+  assert k.schrift = 'carlito', '7k die Schrift gehört zur Firma, gewählt wird sie nicht';
+  assert (k.verlauf->1->>'chf')::numeric = 2000000 and k.verlauf->1->>'urteil' = 'zu_hoch', '7l Verlauf mit Urteil';
 
-  -- 8 Tim visiert; zurück braucht einen Grund
+  -- 8 zurück braucht einen Grund; Tim legt neu fest
   begin perform public.kalkulation_schritt(kid, 'zurueck', 'Tim'); ok := false; exception when others then ok := sqlerrm = 'Bitte sagen, was zu ändern ist.'; end;
   assert ok, '8a zurück ohne Grund';
-  k := public.kalkulation_schritt(kid, 'zurueck', 'Tim', null, 'Firma Lebensraum');
-  assert k.zustand = 'pruefung', '8b zurück zu David';
-  k := public.kalkulation_schritt(kid, 'pruefen', 'David', 2160000, 'Empfehlung stimmt mit Inseraten', null, '{"urteil":"passt","firma":"lebensraum"}');
-  assert k.zustand = 'visum' and k.preis_chf = 2160000 and k.firma = 'lebensraum' and k.preis_urteil = 'passt', '8c passt';
-  begin perform public.kalkulation_schritt(kid, 'visieren', 'Tim', 2100000); ok := false; exception when others then ok := sqlerrm = 'Bitte sagen, warum der Preis ändert.'; end;
-  assert ok, '8d Tim ändert ohne Grund';
-  k := public.kalkulation_schritt(kid, 'visieren', 'Tim', 2100000, 'Luft für die Verhandlung');
-  assert k.zustand = 'kontrolle' and k.preis_chf = 2100000, '8e visiert';
+  k := public.kalkulation_schritt(kid, 'zurueck', 'Tim', null, 'Firma stimo');
+  assert k.zustand = 'pruefung', '8b zurück zum Preis';
+  k := public.kalkulation_schritt(kid, 'pruefen', 'Tim', 2160000, 'Empfehlung stimmt mit Inseraten', null, '{"urteil":"passt","firma":"stimo"}');
+  assert k.zustand = 'angebot' and k.preis_chf = 2160000 and k.firma = 'stimo' and k.schrift = 'nunito' and k.preis_urteil = 'passt', '8c passt';
 
-  -- 9 Julian kontrolliert, Tim bestätigt, David sendet
-  begin perform public.kalkulation_schritt(kid, 'bestaetigen', 'Tim'); ok := false; exception when others then ok := sqlerrm like 'Dieser Schritt passt nicht%'; end;
-  assert ok, '9a bestätigen vor der Kontrolle';
-  k := public.kalkulation_schritt(kid, 'kontrollieren', 'Julian', null, null, null, '{"angebot":{"bindung":60}}');
-  assert k.zustand = 'bestaetigung' and k.preis_chf = 2100000 and k.angebot->>'bindung' = '60', '9b kontrolliert, Text geändert';
-  begin perform public.kalkulation_schritt(kid, 'senden', 'David'); ok := false; exception when others then ok := sqlerrm like 'Dieser Schritt passt nicht%'; end;
-  assert ok, '9c senden vor Tims Bestätigung';
-  k := public.kalkulation_schritt(kid, 'bestaetigen', 'Tim', null, null, null, '{"angebot":{"bindung":1}}');
-  assert k.zustand = 'angebot' and k.angebot->>'bindung' = '60', '9d bestätigt, Tim ändert den Text nicht';
+  -- 9 Tim verschickt
+  k := public.kalkulation_schritt(kid, 'speichern', 'Tim', null, null, null, '{"angebot":{"bindung":60}}');
+  assert k.zustand = 'angebot' and k.angebot->>'bindung' = '60', '9a vor dem Versand noch ändern';
   n := jsonb_array_length(k.verlauf);
-  k := public.kalkulation_schritt(kid, 'senden', 'David', null, null, 'Guten Tag');
-  assert k.zustand = 'gesendet' and k.gesendet_am is not null and k.angebot_text = 'Guten Tag' and jsonb_array_length(k.verlauf) = n + 1, '9e gesendet';
+  k := public.kalkulation_schritt(kid, 'senden', 'Tim', null, null, 'Guten Tag');
+  assert k.zustand = 'gesendet' and k.gesendet_am is not null and k.angebot_text = 'Guten Tag' and jsonb_array_length(k.verlauf) = n + 1, '9b gesendet';
   assert (select array_agg(v->>'schritt' order by o) from jsonb_array_elements(k.verlauf) with ordinality x(v, o))
-       = array['einreichen','pruefen','zurueck','pruefen','visieren','kontrollieren','bestaetigen','senden'], '9f der ganze Weg im Verlauf';
-  begin perform public.kalkulation_schritt(kid, 'senden', 'David'); ok := false; exception when others then ok := true; end;
-  assert ok, '9g zweimal senden';
+       = array['einreichen','pruefen','zurueck','pruefen','senden'], '9c der ganze Weg im Verlauf';
+  begin perform public.kalkulation_schritt(kid, 'senden', 'Tim'); ok := false; exception when others then ok := true; end;
+  assert ok, '9d zweimal senden';
 
   -- 10 ablehnen und wieder öffnen
   insert into public.kalkulation (adresse, empfehlung_chf, personen) values ('TEST Teststrasse 2', 500000, '[{"name":"TEST","empfaenger":true}]') returning id into kid;
@@ -127,8 +116,7 @@ begin
   -- 10e eine für Tim, die in der nächsten Gruppe liegen bleibt
   insert into public.kalkulation (adresse, empfehlung_chf, personen) values ('TEST Teststrasse 3', 800000, '[{"name":"TEST","empfaenger":true}]') returning id into kid;
   perform public.kalkulation_schritt(kid, 'einreichen', 'Lele');
-  perform public.kalkulation_schritt(kid, 'speichern', 'David', null, null, null, '{"firma":"studer","vorlage":"unverbindlich","schrift":"carlito"}');
-  perform public.kalkulation_schritt(kid, 'pruefen', 'David', null, 'Vergleich mit Volketswil', null, '{"urteil":"passt"}');
+  perform public.kalkulation_schritt(kid, 'speichern', 'Tim', null, null, null, '{"firma":"studer","vorlage":"unverbindlich"}');
   insert into merk values (kid);
   raise notice 'Angemeldet: alle Proben bestanden';
 end $$;
@@ -143,17 +131,14 @@ begin
   insert into public.angebot_person (name, rollen, firma, user_id) values ('TEST Tim', '{visum,unterschrift}', 'stimo', '00000000-0000-0000-0000-000000000004');
   begin insert into public.angebot_person (name, rollen) values ('TEST x', '{chef}'); ok := false; exception when check_violation then ok := true; end;
   assert ok, '10g unbekannte Rolle';
-  begin perform public.kalkulation_schritt(kid, 'visieren', 'Tim'); ok := false; exception when insufficient_privilege then ok := sqlerrm like 'Diesen Schritt tut%'; end;
-  assert ok, '10h ein anderes Konto visiert nicht';
+  begin perform public.kalkulation_schritt(kid, 'pruefen', 'Tim', null, 'Vergleich mit Volketswil', null, '{"urteil":"passt"}'); ok := false; exception when insufficient_privilege then ok := sqlerrm like 'Diesen Schritt tut%'; end;
+  assert ok, '10h ein anderes Konto legt den Preis nicht fest';
   set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000004';
-  k := public.kalkulation_schritt(kid, 'visieren', 'Tim');
-  assert k.zustand = 'kontrolle' and k.preis_chf = 800000, '10i Tims Konto visiert';
-  -- Julian hat kein Konto hinterlegt: dann zählt der Name.
-  k := public.kalkulation_schritt(kid, 'kontrollieren', 'Julian');
-  assert k.zustand = 'bestaetigung', '10j Kontrolle ohne Konto';
+  k := public.kalkulation_schritt(kid, 'pruefen', 'Tim', null, 'Vergleich mit Volketswil', null, '{"urteil":"passt"}');
+  assert k.zustand = 'angebot' and k.preis_chf = 800000, '10i Tims Konto legt den Preis fest';
   set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
-  begin perform public.kalkulation_schritt(kid, 'bestaetigen', 'Tim'); ok := false; exception when insufficient_privilege then ok := true; end;
-  assert ok, '10k bestätigen nur mit Tims Konto';
+  begin perform public.kalkulation_schritt(kid, 'senden', 'Tim', null, null, 'x'); ok := false; exception when insufficient_privilege then ok := true; end;
+  assert ok, '10j verschicken nur mit Tims Konto';
   raise notice 'Rollen: alle Proben bestanden';
 end $$;
 

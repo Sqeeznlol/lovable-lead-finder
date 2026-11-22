@@ -14,9 +14,10 @@ import { ablaufPersonenLaden, ablaufPersonLoeschen, ablaufPersonSpeichern } from
  * tut nur dieses Konto den Schritt. Ändern darf nur ein Admin; das
  * prüft die Datenbank, nicht diese Seite.
  */
+// Seit dem 22. November entscheidet und verschickt Tim (Rolle «visum»);
+// die Rollen des alten Wegs bleiben in der Datenbank, wählbar sind sie nicht mehr.
 const ROLLEN: { id: AblaufRolle; titel: string }[] = [
-  { id: 'preis', titel: 'Preis prüfen' }, { id: 'visum', titel: 'Visum und Bestätigung' }, { id: 'kontrolle', titel: 'Kontrolle' },
-  { id: 'versand', titel: 'Versand' }, { id: 'unterschrift', titel: 'Unterschrift' },
+  { id: 'visum', titel: 'Entscheidet und verschickt' }, { id: 'unterschrift', titel: 'Unterschrift' },
 ];
 const ETIKETT = 'text-[11px] uppercase tracking-wide text-muted-foreground';
 const WAHL = (an: boolean) => `min-h-11 rounded-[3px] border px-3 text-sm transition-colors ${an ? 'border-foreground bg-foreground text-background' : 'bg-card hover:bg-secondary'}`;

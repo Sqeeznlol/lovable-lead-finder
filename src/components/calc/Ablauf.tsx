@@ -243,7 +243,7 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
 
         {/* Die Schritte als Weg: wo es steht, ohne zu zählen. */}
         <ol className="flex flex-wrap gap-x-1 gap-y-1 text-sm print:hidden" aria-label="Weg des Angebots">
-          {(['pruefung', 'visum', 'kontrolle', 'bestaetigung', 'angebot', 'gesendet'] as const).map((z, i, weg) => {
+          {(['pruefung', 'angebot', 'gesendet'] as const).map((z, i, weg) => {
             const hier = weg.indexOf(k.zustand as typeof z);
             return (
               <li key={z} className={`flex items-center gap-1 ${i === hier ? 'font-medium text-foreground' : i < hier ? 'text-foreground/70' : 'text-muted-foreground'}`} aria-current={i === hier ? 'step' : undefined}>
@@ -271,7 +271,7 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
         {n && (
           <div className={`space-y-2 rounded-[3px] border p-4 print:hidden ${eben ? 'border-accent' : ''}`}>
             <p className="text-[15px]">
-              <span className="font-medium">Am Zug: {zugLeute.length ? zugLeute.map(p => p.name).join(', ') : amZug === 'preis' || amZug === 'versand' ? 'David' : amZug === 'visum' ? 'Tim' : 'Julian'}</span>
+              <span className="font-medium">Am Zug: {zugLeute.length ? zugLeute.map(p => p.name).join(', ') : 'Tim'}</span>
               {eben ? ' · jetzt Bescheid geben' : ''}
             </p>
             <div className="flex flex-wrap gap-2">
@@ -304,6 +304,7 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
               <div>
                 <p className={ETIKETT}>Schritt 1 von 2</p>
                 <p className="text-lg">Ist der Preis richtig?</p>
+                <p className="text-sm text-muted-foreground">Tim entscheidet: sein Preis gilt und geht so ins Angebot.</p>
               </div>
               {/* Was Aurora rechnet und was Menschen geschrieben haben, klar
                   getrennt (22. November, Julian: «ist das vom System oder von
@@ -360,7 +361,7 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
               {angebotAuf && pdfKnoepfe}
               <div className="flex flex-wrap gap-2">
                 <button type="button" className={KNOPF_HAUPT} disabled={laeuft || !urteil || notiz.trim().length < 10 || !betragLesen(preis) || fehlt.length > 0}
-                        onClick={() => void tun('pruefen', { chf: betragLesen(preis), notiz, daten: { ...daten(), urteil: urteil! } })}>Geprüft, weiter an Tim</button>
+                        onClick={() => void tun('pruefen', { chf: betragLesen(preis), notiz, daten: { ...daten(), urteil: urteil! } })}>Preis festlegen, zum Versand</button>
                 <button type="button" className={KNOPF} disabled={laeuft} onClick={() => void tun('speichern', { daten: daten() })}>Zwischenspeichern</button>
                 <button type="button" className={KNOPF} disabled={laeuft || !notiz.trim()} onClick={() => void tun('ablehnen', { notiz })}>Ablehnen</button>
               </div>
@@ -420,7 +421,7 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
             <>
               <div>
                 <p className="font-medium">Angebot verschicken</p>
-                <p className="text-sm text-muted-foreground">Tim hat bestätigt. PDF laden, mit der Mail an {empfaenger(k.personen ?? []).map(p => [p.vorname, p.name].filter(Boolean).join(' ') || p.firma).join(', ') || 'die Eigentümerschaft'} schicken oder per Post, und den Versand hier eintragen: dann hält die Uhr an.</p>
+                <p className="text-sm text-muted-foreground">Der Preis steht. PDF laden, mit der Mail an {empfaenger(k.personen ?? []).map(p => [p.vorname, p.name].filter(Boolean).join(' ') || p.firma).join(', ') || 'die Eigentümerschaft'} schicken oder per Post, und den Versand hier eintragen: dann hält die Uhr an.</p>
               </div>
               {pdfKnoepfe}
               <label className="block space-y-1.5">

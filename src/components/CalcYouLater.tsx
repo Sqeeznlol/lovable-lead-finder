@@ -67,10 +67,10 @@ export function CalcYouLater() {
     <Seite bild={BILD.calc} ueber="CALC YOU LATER" titel={titel}
       unter={!offenId ? <>Adresse eingeben, Kaufpreis erhalten.</> : undefined}
       kennzahlen={offenId ? undefined : [
-        { titel: 'Prüfen · David', wert: String(zahl('pruefung')), marke: ueberfaellig ? <Marke art="heiss">{ueberfaellig} überfällig</Marke> : undefined, onClick: () => zeigen('offen') },
-        { titel: 'Visum · Tim', wert: String(zahl('visum') + zahl('bestaetigung')), onClick: () => zeigen('offen') },
-        { titel: 'Kontrolle · Julian', wert: String(zahl('kontrolle')), onClick: () => zeigen('offen') },
-        { titel: 'Versand · David', wert: String(zahl('angebot')), onClick: () => zeigen('offen') },
+        { titel: 'Preis · Tim', wert: String(zahl('pruefung')), marke: ueberfaellig ? <Marke art="heiss">{ueberfaellig} überfällig</Marke> : undefined, onClick: () => zeigen('offen') },
+        { titel: 'Versand · Tim', wert: String(zahl('angebot')), onClick: () => zeigen('offen') },
+        { titel: 'Entwürfe', wert: String(zahl('entwurf')), onClick: () => zeigen('entwurf') },
+        { titel: 'Gesendet', wert: String(zahl('gesendet')), onClick: () => zeigen('gesendet') },
       ]}>
       <div className="space-y-4 rounded border bg-card p-4 sm:p-6">
         {offenId ? (

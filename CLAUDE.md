@@ -217,14 +217,17 @@ senden. Alles Weitere in `docs/calc-you-later.md`.
     Publikation nur bis zu ihrem Ablauf (ein Jahr); danach führt der
     Knopf ins Register. `bauprojekt.test.ts` wacht darüber.
 
-  * Das Kaufangebot geht durch vier Hände (19. November, Julian):
-    David prüft den Preis und begründet sein Urteil (zu tief, passt, zu
-    hoch), wählt Firma und Vorlage (die Schrift gehört zur Firma); Tim visiert; Julian
-    kontrolliert; Tim bestätigt; David verschickt. Hauptlayout ist die
-    Arbergstrasse (stimo). Die Datenbank erzwingt Weg und Rollen
-    (`20261119120000_angebot.sql`); wer was tut, steht nur in der
-    Datenbank (`angebot_person`), nie im Repository, ebenso Namen und
-    Adressen von Eigentümern. Aus den Urteilen lernt die Seite einen
+  * Tim entscheidet (22. November, Julian: «es muss ein ganz simpler
+    Workflow sein, Tim entscheidet immer schlussendlich»): einreichen,
+    Tim legt den Preis fest (Urteil mit Grund, Firma und Vorlage), Tim
+    verschickt. Der Weg durch vier Hände vom 19. November (David, Tim,
+    Julian, Tim, David) gilt nicht mehr. Die Schrift gehört zur Firma
+    (stimo Nunito Sans, Studer Carlito); gewählt werden nur Firma und
+    Vorlage. Die Datenbank erzwingt Weg und Rolle
+    (`20261122150000_tim_entscheidet_angebot.sql`, Rolle «visum»); wer was
+    tut, steht nur in der Datenbank (`angebot_person`), nie im Repository,
+    ebenso Namen und Adressen von Eigentümern. Hauptlayout ist die
+    Arbergstrasse (stimo). Aus Tims Urteilen lernt die Seite einen
     Vorschlag neben der Empfehlung; Julians Formel bleibt. Vorlagen,
     Schriften und Farben in `docs/calc-you-later.md`.
     Lebensraum ist keine wählbare Vorlage mehr (20. November, Julian:

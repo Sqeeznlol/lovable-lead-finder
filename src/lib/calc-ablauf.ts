@@ -27,12 +27,12 @@ export type Zustand = 'entwurf' | 'pruefung' | 'visum' | 'kontrolle' | 'bestaeti
 export type Schritt = 'einreichen' | 'speichern' | 'pruefen' | 'visieren' | 'kontrollieren' | 'bestaetigen' | 'zurueck' | 'ablehnen' | 'senden' | 'oeffnen';
 
 export const ZUSTAND_TEXT: Record<Zustand, string> = {
-  entwurf: 'Entwurf', pruefung: 'Preis prüfen', visum: 'Visum', kontrolle: 'Kontrolle', bestaetigung: 'Bestätigung',
+  entwurf: 'Entwurf', pruefung: 'Preis festlegen', visum: 'Visum', kontrolle: 'Kontrolle', bestaetigung: 'Bestätigung',
   angebot: 'Versand', gesendet: 'Gesendet', abgelehnt: 'Abgelehnt',
 };
 /** Auch die Schritte des alten Wegs (bis 19. November), damit ältere Verläufe lesbar bleiben. */
 export const SCHRITT_TEXT: Record<string, string> = {
-  einreichen: 'eingereicht', speichern: 'gespeichert', pruefen: 'Preis geprüft', visieren: 'visiert', kontrollieren: 'kontrolliert',
+  einreichen: 'eingereicht', speichern: 'gespeichert', pruefen: 'Preis festgelegt', visieren: 'visiert', kontrollieren: 'kontrolliert',
   bestaetigen: 'bestätigt', zurueck: 'zurück zur Prüfung', ablehnen: 'abgelehnt', senden: 'Angebot verschickt', oeffnen: 'wieder geöffnet',
   freigeben: 'freigegeben', angebot: 'Angebot gespeichert',
 };

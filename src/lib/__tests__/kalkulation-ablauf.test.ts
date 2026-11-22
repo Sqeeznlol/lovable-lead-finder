@@ -47,20 +47,25 @@ describe('CALC YOU LATER: der Ablauf liegt in der Datenbank', () => {
     expect(sql).toMatch(/create policy kalkulation_loeschen[\s\S]*?using \(not public\.ist_fondsmanager\(\) and zustand = 'entwurf'\)/);
   });
 
-  it('David muss sein Urteil über die Empfehlung begründen: daraus lernt die Rechnung', () => {
+  it('Tim muss sein Urteil über die Empfehlung begründen: daraus lernt die Rechnung', () => {
     expect(neueste).toMatch(/urteil not in \('zu_tief', 'passt', 'zu_hoch'\)/);
     expect(neueste).toMatch(/if notiz is null or length\(notiz\) < 10 then\s+raise exception 'Bitte begründen/);
   });
 
-  it('der Weg geht durch David, Tim, Julian, Tim und David', () => {
+  it('Tim entscheidet und verschickt (22. November: «Tim entscheidet immer schlussendlich»)', () => {
     const weg = [...neueste.matchAll(/k\.zustand := '(\w+)';/g)].map(m => m[1]);
-    for (const z of ['pruefung', 'visum', 'angebot', 'gesendet']) expect(weg).toContain(z);
-    expect(neueste).toMatch(/'visieren' then 'kontrolle' else 'bestaetigung'/);
-    expect(neueste).toMatch(/p_schritt = 'bestaetigen' and k\.zustand = 'bestaetigung'/);
+    for (const z of ['pruefung', 'angebot', 'gesendet']) expect(weg).toContain(z);
+    // Kein Visum, keine Kontrolle, keine zweite Bestätigung mehr.
+    expect(weg).not.toContain('visum');
+    expect(weg).not.toContain('kontrolle');
+    expect(weg).not.toContain('bestaetigung');
+    expect(neueste).toMatch(/rolle := case when k\.zustand in \('pruefung', 'angebot'\) then 'visum' end;/);
     expect(neueste).toMatch(/p_schritt = 'senden' and k\.zustand = 'angebot'/);
+    // Die Schrift gehört zur Firma.
+    expect(neueste).toMatch(/k\.schrift := case k\.firma when 'studer' then 'carlito'/);
     // Wer eine Rolle mit Konto hat, tut sie allein; Rollen legt nur ein Admin fest.
     expect(neueste).toMatch(/not public\.angebot_darf\(rolle\)/);
-    expect(neueste).toMatch(/create policy angebot_person_pflegen[\s\S]*?public\.has_role\(auth\.uid\(\), 'admin'\)/);
+    expect(sql).toMatch(/create policy angebot_person_pflegen[\s\S]*?public\.has_role\(auth\.uid\(\), 'admin'\)/);
   });
 
   it('die Uhr stellt die Datenbank: ein Tag ab dem Einreichen', () => {

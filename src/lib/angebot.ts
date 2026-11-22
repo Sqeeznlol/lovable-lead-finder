@@ -651,9 +651,10 @@ export type AblaufRolle = 'preis' | 'visum' | 'kontrolle' | 'versand' | 'untersc
 export interface AblaufPerson { id: string; name: string; titel: string | null; email: string | null; telefon: string | null; firma: FirmaId | null; rollen: AblaufRolle[]; user_id: string | null; reihe: number }
 
 /** Wer nach diesem Stand am Zug ist. */
-export const AM_ZUG: Partial<Record<string, AblaufRolle>> = { pruefung: 'preis', visum: 'visum', kontrolle: 'kontrolle', bestaetigung: 'visum', angebot: 'versand' };
+// Seit dem 22. November tut Tim beides: Preis festlegen und verschicken.
+export const AM_ZUG: Partial<Record<string, AblaufRolle>> = { pruefung: 'visum', angebot: 'visum' };
 export const AUFGABE: Partial<Record<string, string>> = {
-  pruefung: 'den Kaufpreis prüfen und Firma und Vorlage wählen',
+  pruefung: 'den Kaufpreis festlegen und Firma und Vorlage wählen',
   visum: 'den Kaufpreis visieren',
   kontrolle: 'das Angebot kontrollieren',
   bestaetigung: 'das Angebot noch einmal bestätigen',
