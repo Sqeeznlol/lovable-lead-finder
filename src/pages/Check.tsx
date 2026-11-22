@@ -10,7 +10,7 @@ import type L from 'leaflet';
 import './check.css';
 import { datenbank } from '@/lib/datenbank';
 import { lv95NachWgs84 } from '@/lib/koordinaten';
-import { BETREIBER, BETREIBER_ADRESSE, BETREIBER_EMAIL, BETREIBER_UID, markeFuerHost, markeNachId, STANDARD_MARKE, type Marke } from '@/lib/check-marken';
+import { BETREIBER, BETREIBER_ADRESSE, BETREIBER_EMAIL, BETREIBER_UID, BETREIBER_UID_INHABER, markeFuerHost, markeNachId, STANDARD_MARKE, type Marke } from '@/lib/check-marken';
 import { KATASTER } from '@/lib/check-hintergrund';
 import { useImBild } from '@/lib/im-bild';
 import { zaehlen } from '@/lib/check-zaehlen';
@@ -499,7 +499,7 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
                 <p>{marke.name.join('')} ist ein Angebot von {BETREIBER}.</p>
                 <address>{BETREIBER}{BETREIBER_ADRESSE.map(z => <span key={z}>{z}</span>)}
                   {BETREIBER_EMAIL && <a href={`mailto:${BETREIBER_EMAIL}`}>{BETREIBER_EMAIL}</a>}
-                  {BETREIBER_UID && <span>UID {BETREIBER_UID}</span>}</address>
+                  {BETREIBER_UID && <span>UID {BETREIBER_UID} ({BETREIBER_UID_INHABER})</span>}</address>
               </>
             : <>
                 <p>Verantwortlich für die Bearbeitung Ihrer Daten ist {BETREIBER}, {BETREIBER_ADRESSE.join(', ')}.</p>

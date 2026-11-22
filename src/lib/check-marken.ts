@@ -24,13 +24,19 @@
 // unter jeden Ratgeber (docs/werbeplan-eigentuemer.md, Abschnitt 8).
 export const BETREIBER = 'Bauraum';
 // Die Postadresse fürs Impressum (Julian, 16. November: «die c/o adresse
-// impressum»). E-Mail und UID fehlen noch; das Gesetz verlangt auch die
-// Adresse der elektronischen Post (UWG Art. 3 Abs. 1 lit. s).
+// impressum»).
 export const BETREIBER_ADRESSE = ['c/o PROJECTA SERVICES GMBH', 'Sihleggstrasse 23', '8832 Wollerau'];
-// Hier einsetzen, sobald Julian sie nennt (18. November offen). Leer erscheinen
-// sie nirgends; gefüllt stehen sie im Impressum und im Datenschutz.
+// Keine E-Mail-Adresse (Julian, 22. November: «mail braucht man nicht»).
+// Das Lauterkeitsrecht verlangt sie bei Angeboten im elektronischen
+// Geschäftsverkehr (UWG Art. 3 Abs. 1 lit. s); entschieden hat Julian.
+// Leer erscheint sie nirgends; gefüllt stünde sie im Impressum und im Datenschutz.
 export const BETREIBER_EMAIL = '';
-export const BETREIBER_UID = '';
+// Die UID nannte Julian am 22. November. Sie gehört laut UID-Register (am
+// selben Tag nachgesehen: aktiv, Sihleggstrasse 23, 8832 Wollerau) der
+// PROJECTA SERVICES GMBH, nicht «Bauraum»; darum steht sie mit dem Namen
+// ihrer Inhaberin im Impressum.
+export const BETREIBER_UID = 'CHE-105.168.699';
+export const BETREIBER_UID_INHABER = 'PROJECTA SERVICES GMBH';
 
 export type Schwerpunkt = 'parzelle' | 'haus' | 'bauen' | 'reserve' | 'wert' | 'erbe' | 'alter' | 'mfh';
 

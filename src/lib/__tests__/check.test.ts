@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { TIPPS } from '../check-tipps';
 import { readFileSync } from 'node:fs';
-import { BETREIBER_ADRESSE, MARKEN, markeFuerHost } from '@/lib/check-marken';
+import { BETREIBER_ADRESSE, BETREIBER_UID, BETREIBER_UID_INHABER, MARKEN, markeFuerHost } from '@/lib/check-marken';
 import { FRAGEN, SCHRITTE } from '@/lib/check-inhalt';
 import { HEIZUNG_TEXT } from '@/lib/heizung-text';
 import { ARTIKEL } from '@/lib/ratgeber';
@@ -54,6 +54,16 @@ describe('Impressum', () => {
     const impressum = seite.slice(seite.indexOf("recht === 'impressum'\n"), seite.indexOf('Wir speichern die Angaben'));
     expect(impressum).toContain('BETREIBER_ADRESSE.map(');
     expect(seite).not.toContain('werden hier ergänzt');
+  });
+  it('nennt die UID mit ihrer Inhaberin, mit gültiger Prüfziffer', () => {
+    // Julian, 22. November; Inhaberin laut UID-Register.
+    expect(BETREIBER_UID).toMatch(/^CHE-\d{3}\.\d{3}\.\d{3}$/);
+    const z = BETREIBER_UID.replace(/\D/g, '').split('').map(Number);
+    const rest = z.slice(0, 8).reduce((s, d, i) => s + d * [5, 4, 3, 2, 7, 6, 5, 4][i], 0) % 11;
+    expect(rest === 0 ? 0 : 11 - rest).toBe(z[8]);
+    expect(BETREIBER_UID_INHABER).toBe('PROJECTA SERVICES GMBH');
+    const impressum = seite.slice(seite.indexOf("recht === 'impressum'\n"), seite.indexOf('Wir speichern die Angaben'));
+    expect(impressum).toContain('UID {BETREIBER_UID} ({BETREIBER_UID_INHABER})');
   });
   it('ist auch vom Ratgeber aus erreichbar', () => {
     expect(readFileSync('src/pages/Ratgeber.tsx', 'utf8')).toContain('<a href={impressum}>Impressum</a>');
