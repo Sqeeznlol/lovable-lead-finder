@@ -86,6 +86,27 @@ export function Leads() {
   const mitWert = alle.filter(l => bodenWert(l.angaben)).length;
   const faellig = alle.filter(l => naechsterSchritt(l)?.jetzt).length;
   const heiss = alle.filter(l => l.angaben?.prioritaet === 'heiss' && !l.bearbeitet).length;
+  const leadsVon = (domain: string) => alle.filter(l => String(l.angaben?.domain ?? '').replace(/^www\./, '') === domain);
+  // Die Leads einer Webseite, aufgeklappt unter ihrer Zeile: am Computer in
+  // der Tabelle, auf dem Handy in der Liste.
+  const ihreLeads = (domain: string, ihre: Lead[]) => !ihre.length
+    ? <p className="p-4 text-sm text-muted-foreground">Noch keine Leads von {domain} in diesem Zeitraum.</p>
+    : (
+      <ul className="divide-y">
+        {ihre.map(l => (
+          <li key={l.id}>
+            <button type="button" onClick={() => setOffenId(l.id)}
+                    className="flex min-h-11 w-full flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-left hover:bg-card">
+              <span className="font-medium">{l.name}</span>
+              {l.angaben?.prioritaet === 'heiss' && <Marke art="heiss">heiss</Marke>}
+              <span className="text-muted-foreground">{l.adresse ?? '–'}</span>
+              <span className="text-muted-foreground">{l.telefon}</span>
+              <span className="ml-auto text-xs text-muted-foreground">{new Date(l.erstellt_am).toLocaleDateString('de-CH')}{l.bearbeitet ? ' · erledigt' : ''}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    );
 
   const erledigt = async (l: Lead) => {
     await db.from('anfrage').update({ bearbeitet: !l.bearbeitet }).eq('id', l.id);
@@ -122,7 +143,11 @@ export function Leads() {
         </div>}>
         {leads.isLoading ? <Leer titel="Lädt …" />
           : leads.error ? <Leer titel="Leads konnten nicht geladen werden." />
-          : !liste.length ? <Leer titel="Noch keine Leads in diesem Zeitraum." />
+          : !liste.length ? (alle.length
+            ? <Leer titel="Alle Leads in diesem Zeitraum sind erledigt." aktion={{ text: 'Erledigte zeigen', onClick: () => setNurOffen(false) }} />
+            : <Leer titel="Noch keine Leads in diesem Zeitraum." aktion={tage !== '90' ? { text: 'Letzte 90 Tage zeigen', onClick: () => setTage('90') } : undefined}>
+                Leads kommen von den Check-Seiten und aus der Werbung (Tafel «Google Ads» weiter unten).
+              </Leer>)
           : (
             <ul className={LISTE}>
               {liste.map(l => {
@@ -149,7 +174,8 @@ export function Leads() {
                       {(() => { const s = naechsterSchritt(l); return s ? <div className={`text-sm ${s.jetzt ? 'font-medium' : 'text-muted-foreground'}`}>{s.kurz}: {s.titel}{s.jetzt ? ' – fällig' : ` ab ${s.faellig.toLocaleDateString('de-CH')}`}</div> : null; })()}
                       {antwort && <div className="text-sm text-muted-foreground">{antwort}</div>}
                       <div className="flex flex-wrap gap-x-4 text-sm">
-                        {l.telefon && <a className="underline underline-offset-2" href={`tel:${l.telefon.replace(/\s/g, '')}`}>{l.telefon}</a>}
+                        {/* Angerufen wird mit dem Knopf «Anrufen»; die Nummer steht nur zum Lesen da, nicht als zweiter Weg zum selben. */}
+                        {l.telefon && <span className="tabular-nums">{l.telefon}</span>}
                         {l.email && <a className="underline underline-offset-2" href={`mailto:${l.email}`}>{l.email}</a>}
                         <span className="text-muted-foreground">{new Date(l.erstellt_am).toLocaleString('de-CH', { dateStyle: 'short', timeStyle: 'short' })}</span>
                       </div>
@@ -173,7 +199,33 @@ export function Leads() {
         {trichter.data === null ? <Leer titel="Die Zählung ist noch nicht eingerichtet.">In GitHub den Ablauf «Migrationen» mit «einspielen» starten (Repository der Webseite).</Leer>
           : !t.length ? <Leer titel="Noch keine Besucher in diesem Zeitraum." />
           : (
-            <div className="overflow-x-auto rounded border bg-card">
+            <>
+            {/* Auf dem Handy eine Zeile je Webseite: Abschluss, Besucher und
+                Leads; die Schritte dazwischen stehen am Computer (DESIGN.md,
+                «Der rote Faden»: Listen statt breiter Tabellen). */}
+            <ul className="divide-y rounded border bg-card sm:hidden">
+              {t.map(m => {
+                const auf = seiteAuf === m.domain;
+                const ihre = leadsVon(m.domain);
+                return (
+                  <li key={m.domain}>
+                    <button type="button" onClick={() => setSeiteAuf(auf ? null : m.domain)} aria-expanded={auf}
+                            className="flex min-h-11 w-full items-start justify-between gap-4 px-4 py-3 text-left">
+                      <span className="min-w-0">
+                        <span className="block truncate font-medium">{m.domain}</span>
+                        <span className="block text-xs text-muted-foreground">{MARKEN_NAME(m.marke)}</span>
+                      </span>
+                      <span className="shrink-0 text-right tabular-nums">
+                        <span className="block font-medium">{prozent(m.quote)}</span>
+                        <span className="block text-xs text-muted-foreground">{m.werte.aufruf} Besucher · {m.werte.lead} Leads</span>
+                      </span>
+                    </button>
+                    {auf && <div className="border-t bg-secondary/30">{ihreLeads(m.domain, ihre)}</div>}
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="hidden overflow-x-auto rounded border bg-card sm:block">
               <table className="w-full min-w-[720px] text-sm">
                 <thead><tr className="border-b text-left text-muted-foreground">
                   <th className="p-3 font-medium">Webseite</th>
@@ -183,7 +235,7 @@ export function Leads() {
                 <tbody>
                   {t.map(m => {
                     const auf = seiteAuf === m.domain;
-                    const ihre = alle.filter(l => String(l.angaben?.domain ?? '').replace(/^www\./, '') === m.domain);
+                    const ihre = leadsVon(m.domain);
                     return (
                       <Fragment key={m.domain}>
                         <tr className={`cursor-pointer border-b last:border-0 hover:bg-secondary/60 ${auf ? 'bg-secondary/60' : ''}`}
@@ -198,22 +250,7 @@ export function Leads() {
                         {auf && (
                           <tr className="border-b bg-secondary/30">
                             <td colSpan={SCHRITTE.length + 2} className="p-0">
-                              {!ihre.length ? <p className="p-4 text-sm text-muted-foreground">Noch keine Leads von {m.domain} in diesem Zeitraum.</p> : (
-                                <ul className="divide-y">
-                                  {ihre.map(l => (
-                                    <li key={l.id}>
-                                      <button type="button" onClick={() => setOffenId(l.id)}
-                                              className="flex w-full flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-left hover:bg-card">
-                                        <span className="font-medium">{l.name}</span>
-                                        {l.angaben?.prioritaet === 'heiss' && <Marke art="heiss">heiss</Marke>}
-                                        <span className="text-muted-foreground">{l.adresse ?? '–'}</span>
-                                        <span className="text-muted-foreground">{l.telefon}</span>
-                                        <span className="ml-auto text-xs text-muted-foreground">{new Date(l.erstellt_am).toLocaleDateString('de-CH')}{l.bearbeitet ? ' · erledigt' : ''}</span>
-                                      </button>
-                                    </li>
-                                  ))}
-                                </ul>
-                              )}
+                              {ihreLeads(m.domain, ihre)}
                             </td>
                           </tr>
                         )}
@@ -223,6 +260,7 @@ export function Leads() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
       </Abschnitt>
 

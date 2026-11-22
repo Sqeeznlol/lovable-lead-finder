@@ -180,15 +180,20 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
                 <div className="min-w-0 space-y-1">
                   <p className="flex items-center gap-1.5 text-sm text-muted-foreground"><MapPin className="h-4 w-4" /> {ort || '–'}</p>
                   <h2 className="text-[28px] leading-tight">{data.address}</h2>
-                  <p className="text-2xl font-semibold text-violett">{data.marge_chf ? `CHF ${(data.marge_chf / 1e6).toFixed(1)} Mio` : 'Marge offen'}</p>
+                  {/* Ohne Zahl keine Zeile: «Marge offen» sagte nichts. */}
+                  {!!data.marge_chf && <p className="text-2xl font-semibold text-violett">Marge CHF {(data.marge_chf / 1e6).toFixed(1)} Mio</p>}
                   <p className="text-sm text-muted-foreground">{[data.parzelle && `Parzelle ${data.parzelle}`, data.egrid && `EGRID ${data.egrid}`].filter(Boolean).join(' · ')}</p>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {[[data.area, ' m²', 'Fläche'], [data.geschosse, ' Gesch.', 'Geschosse'], [data.wohnungen, ' Whg.', 'Wohnungen']]
-                    .filter(([v]) => v).map(([v, e, t]) => (
-                      <span key={t as string} title={t as string} className="inline-flex h-10 items-center rounded-[3px] border px-3 text-sm">{zahl(v as number, e as string)}</span>
-                    ))}
-                </div>
+                {/* Der nächste Schritt auf dem Weg Lead, Kalkulation, Angebot
+                    (DESIGN.md, «Der rote Faden»): oben und schwarz, nicht
+                    erst unter der Machbarkeit. Fläche, Geschosse und Wohnungen
+                    standen hier ein zweites Mal; sie stehen im Raster. */}
+                {data.address && (
+                  <button type="button" className={`${KNOPF_HAUPT} w-full sm:w-auto`}
+                          onClick={() => navigate(`/calc?neu=${encodeURIComponent([data.address, data.gemeinde].filter(Boolean).join(', '))}`)}>
+                    Kaufpreis kalkulieren
+                  </button>
+                )}
               </div>
 
               {/* Merkmal-Raster mit kleinen Grossbuchstaben wie in der Vorlage. */}
@@ -202,10 +207,14 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
                   ['Gebäude', reg ? (reg.gebaeude === 1 ? '1' : `${reg.gebaeude}${reg.baujahr_aeltestes && reg.baujahr_juengstes && reg.baujahr_aeltestes !== reg.baujahr_juengstes ? `, ${reg.baujahr_aeltestes}–${reg.baujahr_juengstes}` : ''}`) : null],
                   ['Energiebezugsfläche', reg?.energieflaeche ? zahl(reg.energieflaeche, ' m²') : null],
                   ['Heizung', heizungBeschreiben(reg, kodes)],
-                ] as [string, unknown][]).map(([t, v]) => (
+                ] as [string, unknown][])
+                  // Ein Strich je fehlender Angabe füllte auf dem iPhone halbe
+                  // Bildschirme; was fehlt, steht nicht da.
+                  .filter(([, v]) => v != null && v !== '' && v !== '–')
+                  .map(([t, v]) => (
                   <div key={t} className="min-w-0">
                     <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">{t}</dt>
-                    <dd className="mt-0.5 break-words font-medium">{v == null || v === '' ? '–' : String(v)}</dd>
+                    <dd className="mt-0.5 break-words font-medium">{String(v)}</dd>
                   </div>
                 ))}
               </dl>
@@ -256,9 +265,9 @@ export function PropertyDetailDialog({ id, onClose }: Props) {
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Eigentümer</p>
                 {/* Oben, nicht unten: die häufigste Entscheidung. */}
                 {data.preselection_status === ARCHIV_STATUS ? (
-                  <button type="button" className="text-sm text-muted-foreground hover:text-foreground" onClick={() => update({ preselection_status: 'Nicht geprüft' })}>Aus dem Archiv holen</button>
+                  <button type="button" className="inline-flex h-11 items-center text-sm text-muted-foreground hover:text-foreground" onClick={() => update({ preselection_status: 'Nicht geprüft' })}>Aus dem Archiv holen</button>
                 ) : (
-                  <button type="button" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-destructive" onClick={archivieren} disabled={saving}>
+                  <button type="button" className="inline-flex h-11 items-center gap-1 text-sm text-muted-foreground hover:text-destructive" onClick={archivieren} disabled={saving}>
                     <Archive className="h-4 w-4" /> Nicht interessant
                   </button>
                 )}

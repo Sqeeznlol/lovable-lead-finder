@@ -129,7 +129,19 @@ function ErfolgJeAnlass() {
     <div className="space-y-2">
       <h3 className="text-sm font-medium">Erfolg je Anlass</h3>
       <p className="text-xs text-muted-foreground">Abgeschlossen im Verhältnis zu abgeschlossen und verworfen. Daraus lernt die Priorisierung, sobald genug entschieden ist.</p>
-      <div className="overflow-x-auto rounded border bg-card">
+      {/* Auf dem Handy eine Zeile je Anlass statt sechs Spalten. */}
+      <ul className="divide-y rounded border bg-card sm:hidden">
+        {data.map(z => (
+          <li key={z.anlass} className="flex items-start justify-between gap-4 px-4 py-3">
+            <span className="min-w-0">
+              <span className="block text-[15px]">{ANLASS_TITEL[z.anlass] ?? z.anlass}</span>
+              <span className="block text-xs text-muted-foreground">{z.offen} offen · {z.abgeschlossen} abgeschlossen · {z.verworfen} verworfen</span>
+            </span>
+            <span className="shrink-0 font-medium tabular-nums">{quote(z)}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="hidden overflow-x-auto rounded border bg-card sm:block">
         <table className="w-full min-w-[520px] text-sm">
           <thead className="text-left text-[11px] uppercase tracking-wide text-muted-foreground">
             <tr><th className="px-4 py-2 font-medium">Anlass</th><th className="px-4 py-2 text-right font-medium">Alle</th><th className="px-4 py-2 text-right font-medium">Offen</th><th className="px-4 py-2 text-right font-medium">Abgeschlossen</th><th className="px-4 py-2 text-right font-medium">Verworfen</th><th className="px-4 py-2 text-right font-medium">Quote</th></tr>

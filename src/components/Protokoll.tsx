@@ -109,7 +109,23 @@ export function Protokoll() {
             Angemeldete eintragen.
           </p>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          {/* Auf dem Handy je Arbeitstag eine Zeile statt sechs Spalten. */}
+          <ul className="divide-y sm:hidden">
+            {(tage.data || []).map((t, i) => (
+              <li key={`${t.tag}-${t.email}-${i}`} className="flex items-start justify-between gap-4 px-4 py-3 text-sm">
+                <span className="min-w-0">
+                  <span className="block truncate">{t.email}</span>
+                  <span className="block text-xs text-muted-foreground">{datum(t.von)} · {uhr(t.von)} bis {uhr(t.bis)}</span>
+                </span>
+                <span className="shrink-0 text-right tabular-nums">
+                  <span className="block font-medium">{dauer(t.minuten)}</span>
+                  <span className="block text-xs text-muted-foreground">{t.abfragen} Abfragen</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <div className="hidden overflow-x-auto sm:block">
             <table className="w-full text-sm">
               <thead className="text-left text-xs text-muted-foreground">
                 <tr className="border-b">
@@ -137,6 +153,7 @@ export function Protokoll() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 

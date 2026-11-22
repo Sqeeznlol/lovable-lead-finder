@@ -156,6 +156,23 @@ muss».
   Angebot»); Verlauf, Rechnung und Gespräch klappen auf, gedruckt wird
   alles. Was Aurora rechnet («Vorschlag von Aurora») und was Menschen
   geschrieben haben (mit Name und Adresse) stehen getrennt.
+- Eine Kalkulation sagt immer, wo sie steht und bei wem: «Phase 2 von 3 ·
+  Preis festlegen · bei Tim» in der Liste, als Titel der offenen
+  Kalkulation, und als nummerierte Leiste darunter. Innerhalb einer
+  Phase heissen Abschnitte «Teil 1 von 2», nicht «Schritt», damit sich
+  die Zählungen nicht kreuzen.
+- Eine leere Liste nennt den nächsten Schritt als Knopf (`aktion` von
+  `Leer`): «Letzte 90 Tage zeigen», «Alle zeigen», «Neues Vorhaben».
+- Die Objektansicht beginnt mit dem nächsten Schritt: «Kaufpreis
+  kalkulieren» schwarz unter der Adresse. Merkmale ohne Wert stehen
+  nicht da, statt als Strich; nichts steht zweimal.
+- Zeilen mit einem Haus zeigen es von oben (Luftbild links, wie in der
+  Liste von CALC); auf dem iPhone stehen Betrag und Stand unter der
+  Adresse, damit sie nicht mitten im Wort bricht.
+- Jede Tippfläche ist auf dem iPhone mindestens 44 px hoch und breit,
+  jede Eingabe mindestens 16 px gross (`FELD`: `text-base md:text-[15px]`).
+  «Reiter prüfen» misst beides auf jedem Reiter und wird rot, wenn etwas
+  darunter liegt (Spalten «Tippfläche unter 44 px», «Schrift unter 16 px»).
 
 ## Karte auf dem Handy
 

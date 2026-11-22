@@ -179,7 +179,7 @@ export function ParzellenNachWunsch() {
       {(ordner.isLoading || parzellen.isLoading) && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> wird geladen …</p>}
       {(ordner.error || parzellen.error) && <p className="text-sm text-destructive">Parzellen nach Wunsch nicht lesbar. Ist die Migration eingespielt?</p>}
       {ordner.data && !ordner.data.length && <Leer titel="Noch kein Ordner angelegt." />}
-      {parzellen.data && !treffer.length && <Leer titel="Keine Parzelle in dieser Auswahl.">Andere Gemeinde oder Zone wählen.</Leer>}
+      {parzellen.data && !treffer.length && <Leer titel="Keine Parzelle in dieser Auswahl." aktion={{ text: 'Filter zurücksetzen', onClick: () => { setGemeinde(''); setZone(''); setBebaut(''); } }}>Andere Gemeinde oder Zone wählen.</Leer>}
       {treffer.length > 0 && (
         <>
           <ul className={LISTE}>

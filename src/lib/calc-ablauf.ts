@@ -117,9 +117,11 @@ export interface Kalkulation {
   preis_urteil: Urteil | null; preis_grund: string | null;
 }
 
-export type KalkulationKurz = Pick<Kalkulation, 'id' | 'erstellt_am' | 'adresse' | 'plz' | 'gemeinde' | 'kanton' | 'kontakt' | 'test' | 'empfehlung_chf' | 'zustand' | 'preis_chf' | 'eingereicht_am' | 'frist_am' | 'gesendet_am' | 'verlauf' | 'vorlage' | 'preis_urteil' | 'preis_grund'>;
+export type KalkulationKurz = Pick<Kalkulation, 'id' | 'erstellt_am' | 'adresse' | 'plz' | 'gemeinde' | 'kanton' | 'kontakt' | 'test' | 'empfehlung_chf' | 'zustand' | 'preis_chf' | 'eingereicht_am' | 'frist_am' | 'gesendet_am' | 'verlauf' | 'vorlage' | 'preis_urteil' | 'preis_grund'>
+  /** Der Ort in LV95, für das Luftbild in der Liste, und wer den Entwurf angelegt hat; aus der Eingabe, nicht die ganze Eingabe. */
+  & { e?: number | null; n?: number | null; von?: string | null };
 
-const KURZ = 'id, erstellt_am, adresse, plz, gemeinde, kanton, kontakt, test, empfehlung_chf, zustand, preis_chf, eingereicht_am, frist_am, gesendet_am, verlauf, vorlage, preis_urteil, preis_grund';
+const KURZ = 'id, erstellt_am, adresse, plz, gemeinde, kanton, kontakt, test, empfehlung_chf, zustand, preis_chf, eingereicht_am, frist_am, gesendet_am, verlauf, vorlage, preis_urteil, preis_grund, e:eingaben->adresse->e, n:eingaben->adresse->n, von:eingaben->>name';
 
 /**
  * Die Rückmeldungen, aus denen die Seite lernt: was nach Davids Prüfung
@@ -233,6 +235,42 @@ export async function schritt(id: string, was: Schritt, name: string, mehr: { ch
   const r = await db().rpc('kalkulation_schritt', { p_id: id, p_schritt: was, p_name: name, p_chf: mehr.chf ?? null, p_notiz: mehr.notiz ?? null, p_text: mehr.text ?? null, p_daten: mehr.daten ?? null });
   if (r.error) throw new Error(r.error.message || 'Der Schritt liess sich nicht ausführen.');
   return r.data;
+}
+
+// ------------------------------------------------------------- Phase
+
+/**
+ * Wo eine Kalkulation steht und bei wem (Julian, 22. November: «man muss
+ * auch sehen, in welcher Phase die Rechnung ist ... wo ist sie aktuell?»).
+ * Drei Phasen: rechnen und einreichen (wer den Entwurf angelegt hat), den
+ * Preis festlegen und verschicken (wer bei «Wer was tut» die Rolle
+ * «Entscheidet und verschickt» hat). Die Namen kommen aus der Datenbank.
+ */
+export const PHASEN = ['Rechnen und einreichen', 'Preis festlegen', 'Verschicken'] as const;
+
+export interface Phase { nr: 1 | 2 | 3 | null; titel: string; bei: string | null }
+
+export function phase(
+  k: { zustand: Zustand; verlauf: VerlaufEintrag[]; von?: string | null },
+  personen: { name: string; rollen: string[] }[],
+): Phase {
+  const entscheid = personen.filter(p => p.rollen.includes('visum')).map(p => p.name.trim()).filter(Boolean);
+  const bei = entscheid.length ? entscheid.join(' oder ') : null;
+  const zuletzt = (s: string) => [...k.verlauf].reverse().find(v => v.schritt === s)?.name?.trim() || null;
+  switch (k.zustand) {
+    case 'entwurf': return { nr: 1, titel: PHASEN[0], bei: k.von?.trim() || k.verlauf[0]?.name?.trim() || null };
+    case 'angebot': return { nr: 3, titel: PHASEN[2], bei };
+    case 'gesendet': return { nr: null, titel: 'Verschickt', bei: zuletzt('senden') };
+    case 'abgelehnt': return { nr: null, titel: 'Abgelehnt', bei: zuletzt('ablehnen') };
+    // Prüfung und die Stände des alten Wegs: dort legt jetzt wer entscheidet den Preis fest.
+    default: return { nr: 2, titel: PHASEN[1], bei };
+  }
+}
+
+/** «Phase 2 von 3 · Preis festlegen · bei Tim», «Verschickt · von Tim». */
+export function phaseText(p: Phase): string {
+  return [p.nr ? `Phase ${p.nr} von ${PHASEN.length}` : null, p.titel, p.bei ? `${p.nr ? 'bei' : 'von'} ${p.bei}` : null]
+    .filter(Boolean).join(' · ');
 }
 
 // ------------------------------------------------------------- Wer was tut

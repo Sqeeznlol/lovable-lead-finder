@@ -234,6 +234,13 @@ senden. Alles Weitere in `docs/calc-you-later.md`.
     «Lebensraum wegnehmen als Vorlage»; `FIRMEN_WAHL`). Das Luftbild des
     Deckblatts zeigt das Haus: Ausschnitt nach Grösse des Grundstücks, 80 bis
     160 m (`deckblattBreite`).
+    Jede Kalkulation zeigt ihre Phase und bei wem sie liegt (22. November,
+    Julian: «in welcher Phase ... wo ist sie aktuell?»): Phase 1 rechnen
+    und einreichen (wer sie angelegt hat), Phase 2 Preis festlegen und
+    Phase 3 verschicken (beide bei der Rolle «visum» aus «Wer was tut»),
+    in jeder Zeile der Liste, in den Kennzahlen und im Titel der offenen
+    Kalkulation. Die Namen kommen aus der Datenbank; ohne Eintrag steht
+    keiner (`phase()` in `calc-ablauf.ts`, `calc-phase.test.ts`).
 
   * Der Bestand zählt mit dem Höheren aus Ertragswert und Flächenwert
     (20. November, Tim zur Schöneggstrasse 18: «10k/m² HNF ... manchmal

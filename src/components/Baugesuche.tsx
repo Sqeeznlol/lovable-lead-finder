@@ -161,7 +161,7 @@ export function Baugesuche() {
       {isLoading && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> wird geladen …</p>}
       {error && <p className="text-sm text-destructive">Baugesuche nicht lesbar.</p>}
       {data && liste.length === 0 && (
-        <Leer titel="Kein Gesuch in dieser Auswahl.">Zeitraum vergrössern oder Filter zurücksetzen.</Leer>
+        <Leer titel="Kein Gesuch in dieser Auswahl." aktion={(tage > 0 && tage < 365) || kanton || wort ? { text: 'Letztes Jahr, alle Kantone', onClick: () => { setTage(365); setKanton(''); setWort(''); } } : undefined}>Zeitraum vergrössern oder Filter zurücksetzen.</Leer>
       )}
 
       <ul className="space-y-2">

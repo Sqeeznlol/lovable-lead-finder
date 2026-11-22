@@ -241,7 +241,7 @@ export function FondsOberflaeche() {
             {/* Messen und Kongresse der Branche -- dort trifft man die
                 Gegenseite einer Arrondierung. */}
             <Abschnitt titel="Immo-Kalender" symbol={CalendarDays} kachel="hell" unter="Messen und Kongresse, wann und wo"
-                       rechts={<button type="button" className="text-sm text-muted-foreground hover:text-foreground" onClick={() => setKalender(kalender ? null : 'alle')}>
+                       rechts={<button type="button" className="inline-flex h-11 items-center text-sm text-muted-foreground hover:text-foreground" onClick={() => setKalender(kalender ? null : 'alle')}>
                          {kalender ? 'Weniger zeigen' : 'Alle zeigen'}</button>}>
               <ImmoKalender kurz={kalender ? undefined : 4} />
             </Abschnitt>

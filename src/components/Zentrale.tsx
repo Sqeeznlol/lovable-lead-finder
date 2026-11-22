@@ -104,8 +104,9 @@ export function Zentrale() {
       {isLoading && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> wird geladen …</p>}
       {error && <p className="text-sm text-destructive">Vorhaben nicht lesbar.</p>}
       {data && liste.length === 0 && (
-        <Leer titel={alle.length ? 'Kein Vorhaben in dieser Auswahl.' : 'Noch kein Vorhaben erfasst.'}>
-          {alle.length ? 'Eine andere Auswahl oben wählen.' : 'Ein Kunde meldet ein Projekt? Mit «Neues Vorhaben» beginnt es hier.'}
+        <Leer titel={alle.length ? 'Kein Vorhaben in dieser Auswahl.' : 'Noch kein Vorhaben erfasst.'}
+              aktion={alle.length ? { text: 'Laufende zeigen', onClick: () => setFilter('aktiv') } : { text: 'Neues Vorhaben', onClick: () => setNeu('1') }}>
+          {alle.length ? undefined : 'Ein Kunde meldet ein Projekt? Hier beginnt es.'}
         </Leer>
       )}
 
@@ -231,7 +232,7 @@ function Erfassen({ onFertig, onAbbrechen }: { onFertig: (id: string) => void; o
 
         {feld('Adressen', (
           <textarea value={f.adressen} onChange={e => setze({ adressen: e.target.value })} rows={6}
-                    className="w-full rounded border bg-card px-4 py-3 text-sm" placeholder={'Bahnhofstrasse 1, 8001 Zürich\nCH123456789012\n…'} />
+                    className="w-full rounded border bg-card px-4 py-3 text-base md:text-sm" placeholder={'Bahnhofstrasse 1, 8001 Zürich\nCH123456789012\n…'} />
         ), `Eine Adresse oder EGRID je Zeile, auch aus Excel kopiert.${zeilen ? ` ${n(zeilen)} Zeilen.` : ''}`)}
         <label className="inline-flex h-11 cursor-pointer items-center text-sm font-medium text-accent">
           Datei wählen (CSV, TXT)
@@ -239,7 +240,7 @@ function Erfassen({ onFertig, onAbbrechen }: { onFertig: (id: string) => void; o
         </label>
 
         {feld('Notiz', <textarea value={f.beschreibung} onChange={e => setze({ beschreibung: e.target.value })} rows={3}
-                                  className="w-full rounded border bg-card px-4 py-3 text-sm" placeholder="Was der Kunde sagt, wer Ansprechperson ist …" />)}
+                                  className="w-full rounded border bg-card px-4 py-3 text-base md:text-sm" placeholder="Was der Kunde sagt, wer Ansprechperson ist …" />)}
 
         {fehler && <p className="text-sm text-destructive">{fehler}</p>}
         <div className="flex justify-end gap-2">
@@ -623,7 +624,7 @@ function Adressen({ v, zu, onNeu }: { v: Vorhaben; zu?: { offen: number; zugeord
       )}
       {auf && (
         <div className="space-y-3 rounded border bg-card p-5">
-          <textarea value={text} onChange={e => setText(e.target.value)} rows={5} className="w-full rounded border bg-card px-4 py-3 text-sm" placeholder="Eine Adresse oder EGRID je Zeile" />
+          <textarea value={text} onChange={e => setText(e.target.value)} rows={5} className="w-full rounded border bg-card px-4 py-3 text-base md:text-sm" placeholder="Eine Adresse oder EGRID je Zeile" />
           <div className="flex justify-end"><button type="button" className={KNOPF_HAUPT} disabled={!text.trim()} onClick={hinzu}>Hinzufügen</button></div>
         </div>
       )}

@@ -340,7 +340,7 @@ export function FondsGespraeche({ data, team }: BereichProps) {
             ...data.punkte.slice().sort((a, b) => a.adresse.localeCompare(b.adresse)).map(p => ({ wert: p.id, titel: `${p.adresse}${p.gemeinde ? `, ${p.gemeinde}` : ''}` })),
           ]} />
           <input className={`${FELD} w-full`} placeholder="Mit wem (z.B. Verwaltung Nachbarhaus)" value={f.mit} onChange={e => setF({ ...f, mit: e.target.value })} />
-          <textarea className="min-h-28 w-full rounded-[3px] border bg-card px-3.5 py-3 text-[15px]" placeholder="Worum ging es, was ist vereinbart?"
+          <textarea className="min-h-28 w-full rounded-[3px] border bg-card px-3.5 py-3 text-base md:text-[15px]" placeholder="Worum ging es, was ist vereinbart?"
                     value={f.text} onChange={e => setF({ ...f, text: e.target.value })} />
           <div className="grid grid-cols-2 gap-2">
             <label className="space-y-1 text-xs text-muted-foreground">Am<input type="date" className={`${FELD} w-full`} value={f.am} onChange={e => setF({ ...f, am: e.target.value })} /></label>

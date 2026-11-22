@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ObjektLink } from '@/components/ObjektLink';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Marke, Seite } from '@/components/rahmen';
+import { Marke, Reiter, Seite } from '@/components/rahmen';
 import { BILD } from '@/lib/luftbild';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -85,20 +85,13 @@ function Reaktivierung() {
     <section className="space-y-3">
       <h2 className="text-xl">Reaktivierung</h2>
       <p className="text-sm text-muted-foreground">Je Objekt das letzte Gespräch. Wer nicht verkauft, ist nicht verloren -- jede Gruppe hat ihren nächsten Schritt.</p>
-      <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={() => setFilter('faellig')}
-                className={`h-9 rounded-[3px] border px-3 text-sm ${filter === 'faellig' ? 'border-[#1E2433] bg-[#1E2433] text-white' : ''}`}>
-          Wiedervorlage fällig · {mitKat.filter(x => faellig(x.a)).length}
-        </button>
-        {(Object.keys(KATEGORIEN) as Kategorie[]).map(k => (
-          <button key={k} type="button" onClick={() => setFilter(k)}
-                  className={`h-9 rounded-[3px] border px-3 text-sm ${filter === k ? 'border-[#1E2433] bg-[#1E2433] text-white' : ''}`}>
-            {KATEGORIEN[k].titel} · {zahl(k)}
-          </button>
-        ))}
-        <button type="button" onClick={() => setFilter('alle')}
-                className={`h-9 rounded-[3px] border px-3 text-sm ${filter === 'alle' ? 'border-[#1E2433] bg-[#1E2433] text-white' : ''}`}>Alle</button>
-      </div>
+      {/* Eine wischbare Leiste wie überall, statt neun umbrechender Knöpfe. */}
+      <Reiter<string> wahl={filter} setWahl={w => setFilter(w as Kategorie | 'alle' | 'faellig')}
+        optionen={[
+          { wert: 'faellig', titel: 'Wiedervorlage fällig', zahl: mitKat.filter(x => faellig(x.a)).length },
+          ...(Object.keys(KATEGORIEN) as Kategorie[]).map(k => ({ wert: k, titel: KATEGORIEN[k].titel, zahl: zahl(k) })),
+          { wert: 'alle', titel: 'Alle', zahl: mitKat.length },
+        ]} />
       {isLoading && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> wird geladen …</p>}
       {error && <p className="text-sm text-destructive">Gespräche nicht lesbar.</p>}
       {data && liste.length === 0 && <p className="text-sm text-muted-foreground">Nichts in dieser Gruppe.</p>}

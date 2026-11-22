@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
 import { ExternalLink, Loader2, Printer } from 'lucide-react';
 import { FELD, KNOPF, KNOPF_HAUPT } from '@/components/rahmen';
 import { FENSTER } from '@/lib/fenster';
@@ -94,7 +93,6 @@ function NeubauTafel({ n, annahmen }: { n: Neubau; annahmen: CalcAnnahmen }) {
 }
 
 export function Machbarkeit({ parzelle }: { parzelle: Parzelle }) {
-  const navigate = useNavigate();
   const [auf, setAuf] = useState(false);
   const bfs = parzelle.bfs_nr != null ? String(Number(parzelle.bfs_nr)) : null;
   // Wo der Verkaufspreis je m² bekannt ist, gilt er statt der Annahme (wie in CALC YOU LATER).
@@ -191,16 +189,8 @@ export function Machbarkeit({ parzelle }: { parzelle: Parzelle }) {
           <h3 className="text-lg">Machbarkeit</h3>
           <p className="text-sm text-muted-foreground">Was hier Platz hat und was es wert ist, mit der Herkunft jeder Zahl.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button type="button" className={KNOPF} onClick={() => setAuf(true)}>Rechnen</button>
-          {/* CALC YOU LATER macht aus derselben Rechnung eine Kaufpreisempfehlung mit Freigabe. */}
-          {parzelle.address && (
-            <button type="button" className={KNOPF}
-                    onClick={() => navigate(`/calc?neu=${encodeURIComponent([parzelle.address, parzelle.gemeinde].filter(Boolean).join(', '))}`)}>
-              Kaufpreis kalkulieren
-            </button>
-          )}
-        </div>
+        {/* «Kaufpreis kalkulieren» steht oben in der Objektansicht, als Hauptknopf. */}
+        <button type="button" className={KNOPF} onClick={() => setAuf(true)}>Rechnen</button>
       </div>
       </div>
     );

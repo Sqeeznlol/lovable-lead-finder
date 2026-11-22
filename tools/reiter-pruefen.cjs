@@ -144,18 +144,42 @@ async function pruefen(browser, geraet, zeilen) {
     await seite.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
     const ms = Date.now() - start;
     await seite.waitForTimeout(800);
-    const stand = await seite.evaluate(() => {
+    const stand = await seite.evaluate(([handy, attrappe]) => {
       const text = document.body.innerText || '';
+      // Auf dem iPhone (22. November, Julian: «iPhone zuerst»): jede
+      // Tippfläche mindestens 44 px, jedes Eingabefeld mindestens 16 px
+      // Schrift -- darunter zoomt Safari beim Antippen in die Seite.
+      const klein = [], zoom = [];
+      if (handy) {
+        // Mit echten Daten trüge der Text eines Knopfs Namen ins öffentliche
+        // Protokoll; dort steht darum nur die Art des Elements mit seinen
+        // ersten Klassen («BUTTON.h-9.rounded-lg»), das genügt zum Finden.
+        const name = el => attrappe
+          ? (el.getAttribute('aria-label') || el.innerText || el.getAttribute('placeholder') || el.tagName).trim().replace(/\s+/g, ' ').slice(0, 30)
+          : [el.tagName, ...[...el.classList].filter(c => /^(h|w|min-h|text|px|rounded)-/.test(c)).slice(0, 3)].join('.');
+        for (const el of document.querySelectorAll('button, a[href], [role="button"], [role="tab"], [role="radio"], select, summary, input:not([type="hidden"]), textarea')) {
+          const r = el.getBoundingClientRect(), st = getComputedStyle(el);
+          if (!r.width || !r.height || st.visibility === 'hidden' || el.disabled || el.closest('[aria-hidden="true"], .leaflet-container, .cesium-viewer')) continue;
+          // Ein Link mitten im Text ist keine eigene Tippfläche; ein Kästchen
+          // in einer Beschriftung tippt man über die ganze Zeile.
+          if (el.tagName === 'A' && st.display === 'inline') continue;
+          if ((el.type === 'checkbox' || el.type === 'radio') && el.closest('label')) continue;
+          if (r.height < 43.5 || r.width < 43.5) klein.push(name(el));
+          if (['INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName) && !['checkbox', 'radio', 'range', 'color', 'file'].includes(el.type) && parseFloat(st.fontSize) < 16) zoom.push(name(el));
+        }
+      }
       return {
         breite: Math.max(0, document.documentElement.scrollWidth - window.innerWidth),
         text,
         // Eine Seite ohne Überschrift und fast ohne Text ist nicht geladen.
         leer: text.trim().length < 40,
+        klein: [...new Set(klein)], zoom: [...new Set(zoom)],
       };
-    });
+    }, [geraet.name === 'iPhone', !!ATTRAPPE]);
     zeilen.push({
       geraet: geraet.name, reiter: r || 'cockpit', ms, fehler: [...new Set(fehler)], abgelehnt: [...new Set(abgelehnt)], langsam: langsame(), spaet: spaete(),
       breite: stand.breite, merkmale: MERKMALE.filter(m => m.test(stand.text)).map(m => m.source.replace(/\\b/g, '')), leer: stand.leer,
+      klein: stand.klein, zoom: stand.zoom,
     });
   }
   // Ein Objekt öffnen und die Machbarkeit rechnen lassen: der Weg, auf
@@ -344,12 +368,16 @@ const TRAEGE_MS = 4000;
   // beim Verlassen einer Karte seit ein paar Sekunden läuft, ist keiner
   // -- Karten laden nach, solange sie offen sind.
   const zuLangsam = z => (z.langsam || []).some(l => l.ms >= ZU_LANGSAM_MS);
-  const schlecht = z => z.fehler.length || z.abgelehnt.length || z.breite > 1 || z.merkmale.length || z.leer || zuLangsam(z);
+  const schlecht = z => z.fehler.length || z.abgelehnt.length || z.breite > 1 || z.merkmale.length || z.leer || zuLangsam(z)
+    || (z.klein || []).length || (z.zoom || []).length;
   const dauer = l => `${l.name} ${(l.ms / 1000).toFixed(1)} s${l.offen ? ' (nicht fertig)' : ''}`;
   const aus = [`### Reiter von Aurora (${ATTRAPPE ? 'leere Attrappe' : 'echte Daten'}, ${ADRESSE})`, '',
-    '| Gerät | Reiter | geladen in | Fehler | abgelehnte Abfragen | langsame Abfragen (Antwort ab 3 s) | über den Rand | auffälliger Text |', '|---|---|---:|---|---|---|---:|---|'];
+    '| Gerät | Reiter | geladen in | Fehler | abgelehnte Abfragen | langsame Abfragen (Antwort ab 3 s) | über den Rand | auffälliger Text | Tippfläche unter 44 px | Schrift unter 16 px |', '|---|---|---:|---|---|---|---:|---|---|---|'];
+  // Mit der Attrappe stehen die Beschriftungen da, mit echten Daten nur
+  // die Art der Elemente (siehe oben): das Protokoll ist öffentlich.
+  const liste = l => (l || []).length ? `${l.length}: ${l.slice(0, 8).join(', ')}` : '–';
   for (const z of zeilen) {
-    aus.push(`| ${z.geraet} | ${z.reiter} | ${(z.ms / 1000).toFixed(1)} s | ${z.fehler.join('<br>') || '–'}${z.leer ? ' Seite leer' : ''} | ${z.abgelehnt.join(', ') || '–'} | ${(z.langsam || []).map(dauer).join(', ') || '–'} | ${z.breite > 1 ? z.breite + ' px' : '–'} | ${z.merkmale.join(', ') || '–'} |`);
+    aus.push(`| ${z.geraet} | ${z.reiter} | ${(z.ms / 1000).toFixed(1)} s | ${z.fehler.join('<br>') || '–'}${z.leer ? ' Seite leer' : ''} | ${z.abgelehnt.join(', ') || '–'} | ${(z.langsam || []).map(dauer).join(', ') || '–'} | ${z.breite > 1 ? z.breite + ' px' : '–'} | ${z.merkmale.join(', ') || '–'} | ${liste(z.klein)} | ${liste(z.zoom)} |`);
   }
   // Jeder Durchgang unter seinem Namen: am 16. November stand das Ergebnis
   // von CALC YOU LATER unter «Machbarkeit an einer Zürcher Parzelle».

@@ -156,7 +156,7 @@ export function Gelegenheiten() {
 
       {isLoading && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> wird geladen …</p>}
       {error && <p className="text-sm text-destructive">Gelegenheiten nicht lesbar.</p>}
-      {data && liste.length === 0 && <Leer titel="Keine Gelegenheit in dieser Auswahl." />}
+      {data && liste.length === 0 && <Leer titel="Keine Gelegenheit in dieser Auswahl." aktion={zustand !== 'alle' ? { text: 'Alle zeigen', onClick: () => setZustand('alle') } : undefined} />}
 
       {liste.length > 0 && (
         <ul className={LISTE}>
@@ -261,7 +261,7 @@ function Anrufer({ mandantId, offen }: { mandantId: string; offen: number }) {
     <Abschnitt titel="Anrufer" unter="Anweisung an die Anrufer für diesen Kunden" symbol={Phone} kachel="schwarz">
       <textarea key={m?.anweisung ?? ''} defaultValue={m?.anweisung ?? ''} rows={4} placeholder="z.B. Im Namen der Anlagestiftung anfragen; nur Verkauf, keine Vermietung; Preis nicht nennen."
                 onBlur={e => e.target.value !== (m?.anweisung ?? '') && void speichern(e.target.value)}
-                className="w-full rounded-[3px] border border-input bg-card p-3 text-sm placeholder:text-muted-foreground focus:border-foreground focus:outline-none" />
+                className="w-full rounded-[3px] border border-input bg-card p-3 text-base md:text-sm placeholder:text-muted-foreground focus:border-foreground focus:outline-none" />
       <p className="text-sm text-muted-foreground">{offen ? `${offen} offene Gelegenheiten` : 'Nichts offen'}</p>
     </Abschnitt>
   );

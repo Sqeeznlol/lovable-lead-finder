@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Auswahl } from '@/components/Auswahl';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Phone } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { nameNorm } from '@/hooks/use-eigentuemer-suche';
@@ -127,13 +127,10 @@ export function Gespraeche({ parzelleId, ownerName }: { parzelleId: string; owne
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Phone className="h-4 w-4 text-muted-foreground" />
-          <h3 className="text-sm font-medium">Gespräche</h3>
-        </div>
+        <h3 className="text-sm font-medium">Gespräche</h3>
         {!auf && (
           <button type="button" onClick={() => setAuf(true)}
-                  className="h-9 rounded-lg border px-3 text-sm font-medium hover:bg-muted/50">Gespräch erfassen</button>
+                  className="h-11 rounded-[3px] border px-4 text-sm font-medium hover:bg-muted/50">Gespräch erfassen</button>
         )}
       </div>
 

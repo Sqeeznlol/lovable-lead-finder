@@ -85,7 +85,24 @@ export function ArrondierungZusammen({ haupt, adresse, nachbarn, start, stand }:
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      {/* Auf dem Handy je Wert eine Zeile: zusammen gross, die Parzellen
+          klein darunter (DESIGN.md: Listen statt breiter Tabellen). */}
+      <ul className="divide-y rounded border bg-card text-sm tabular-nums sm:hidden">
+        {zeilen.map(r => {
+          const einzeln = summen.map((x, i) => `${spalten[i]} ${r.wert(x, teile[i])}`);
+          const zusammen = r.titel === 'Bauzone' ? null : r.wert(gesamt);
+          return (
+            <li key={r.titel} className="flex items-start justify-between gap-4 px-4 py-3">
+              <span className="min-w-0">
+                <span className="block">{r.titel} <span className="text-xs text-muted-foreground">{r.quelle}</span></span>
+                {(teile.length > 1 || r.titel === 'Bauzone') && <span className="block text-xs text-muted-foreground">{einzeln.join(' · ')}</span>}
+              </span>
+              {zusammen != null && <span className="shrink-0 text-right font-medium">{zusammen}</span>}
+            </li>
+          );
+        })}
+      </ul>
+      <div className="hidden overflow-x-auto sm:block">
         <table className="w-full min-w-[520px] text-sm tabular-nums">
           <thead className="text-xs text-muted-foreground">
             <tr>
@@ -108,7 +125,19 @@ export function ArrondierungZusammen({ haupt, adresse, nachbarn, start, stand }:
 
       <details className="text-sm">
         <summary className="flex h-11 cursor-pointer items-center font-medium">Alle {geb.length} Gebäude einzeln</summary>
-        <div className="overflow-x-auto">
+        <ul className="divide-y rounded border bg-card tabular-nums sm:hidden">
+          {geb.map(({ p, g }, i) => (
+            <li key={`${g.egid}-${i}`} className="px-4 py-3">
+              <span className="block">{g.adresse ?? `Gebäude ${g.egid ?? '?'}`} <span className="text-xs text-muted-foreground">Parzelle {p.nummer ?? '?'}</span></span>
+              <span className="block text-xs text-muted-foreground">
+                {[g.baujahr && `Baujahr ${g.baujahr}`, g.status && (GEB_STATUS[g.status] ?? g.status), g.geschosse && `${g.geschosse} Geschosse`,
+                  g.wohnungen != null && `${g.wohnungen} Wohnungen`, g.wohnflaeche != null && `${zahl(g.wohnflaeche, ' m²')} Wohnfläche`,
+                  g.grundflaeche != null && `${zahl(g.grundflaeche, ' m²')} Grundfläche`].filter(Boolean).join(' · ')}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <div className="hidden overflow-x-auto sm:block">
           <table className="w-full min-w-[760px] tabular-nums">
             <thead className="text-xs text-muted-foreground">
               <tr>{['Parzelle', 'Adresse', 'EGID', 'Baujahr', 'Status', 'Geschosse', 'Grundfläche', 'EBF', 'Volumen', 'Wohnungen', 'Wohnfläche'].map((t, i) => (

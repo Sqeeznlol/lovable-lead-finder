@@ -115,7 +115,7 @@ export function ImmoKalender({ kurz }: { kurz?: number }) {
         })}
       </div>
 
-      {monate.length === 0 ? <Leer titel="Keine Anlässe in dieser Auswahl." /> : monate.map(([m, liste]) => (
+      {monate.length === 0 ? <Leer titel="Keine Anlässe in dieser Auswahl." aktion={sicht !== 'alle' ? { text: 'Alle Anlässe', onClick: () => setSicht('alle') } : undefined} /> : monate.map(([m, liste]) => (
         <section key={m} id={`monat-${m}`} className="scroll-mt-24 space-y-2">
           <h3 className="text-lg font-semibold">{monatName(m)}</h3>
           <ul className="divide-y rounded border bg-card">{liste.map(a => <Zeile key={a.name} a={a} tag={tag} />)}</ul>

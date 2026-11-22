@@ -11,7 +11,7 @@ import {
   type Unterschrift, type Urteil, type VorlageId,
 } from '@/lib/angebot';
 import {
-  ablaufPersonenLaden, alleRueckmeldungen, bemerkungenLaden, betrag, kalkulationenLaden, schritt, SCHRITT_TEXT, uhr, ZUSTAND_TEXT,
+  ablaufPersonenLaden, alleRueckmeldungen, bemerkungenLaden, betrag, kalkulationenLaden, phase, PHASEN, schritt, SCHRITT_TEXT, uhr, ZUSTAND_TEXT,
   type Kalkulation, type Schritt, type SchrittDaten,
 } from '@/lib/calc-ablauf';
 import { drucken } from '@/lib/drucken';
@@ -145,11 +145,14 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
   const preisJetzt = betragLesen(preis) ?? k.preis_chf ?? k.empfehlung_chf ?? 0;
   const ktx = kontextAus(k, firma, felder, preisJetzt);
   const fehlt = luecken({ ...ktx, felder, firma, vorlage });
-  const bearbeitbar = k.zustand === 'pruefung' || k.zustand === 'kontrolle';
+  const bearbeitbar = k.zustand === 'pruefung';
   const daten = (): SchrittDaten => ({ firma, vorlage, schrift, angebot: felder });
 
   const amZug = AM_ZUG[k.zustand];
   const zugLeute = amZug ? personen.filter(p => p.rollen.includes(amZug)) : [];
+  const ph = phase({ ...k, von: k.eingaben?.name }, personen);
+  // Wer entscheidet, aus «Wer was tut»; ohne Eintrag kein erfundener Name.
+  const entscheider = zugLeute.map(p => p.name).join(' oder ') || null;
   const link = typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}?calc=${k.id}` : '';
   const n = nachricht({ zustand: k.zustand, adresse: k.adresse, ort, preis: k.preis_chf ?? k.empfehlung_chf, link, von: name, an: zugLeute });
 
@@ -220,7 +223,6 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
       <button type="button" className={KNOPF} disabled={pdfLaeuft} onClick={() => void pdf('laden')}><Download className="h-4 w-4" /> Als PDF laden</button>
     </div>
   );
-  const geaendert = betragLesen(preis) != null && betragLesen(preis) !== Math.round(k.preis_chf ?? 0);
 
   return (
     <div className="space-y-6">
@@ -230,7 +232,6 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
           rechts={<span className="flex flex-wrap items-center gap-2 print:hidden">
             {k.test && <Marke>Test</Marke>}
             {k.quelle === 'mail' && <Marke>per Mail</Marke>}
-            <Marke art={k.zustand === 'gesendet' ? 'minze' : k.zustand === 'abgelehnt' ? 'rosa' : 'lila'}>{ZUSTAND_TEXT[k.zustand]}</Marke>
           </span>} />
         <p className="hidden text-sm print:block">Kalkulation vom {wann(k.erstellt_am)}{k.kontakt ? ` · ${k.kontakt}` : ''}</p>
 
@@ -241,13 +242,15 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
           </div>
         )}
 
-        {/* Die Schritte als Weg: wo es steht, ohne zu zählen. */}
-        <ol className="flex flex-wrap gap-x-1 gap-y-1 text-sm print:hidden" aria-label="Weg des Angebots">
-          {(['pruefung', 'angebot', 'gesendet'] as const).map((z, i, weg) => {
-            const hier = weg.indexOf(k.zustand as typeof z);
+        {/* Die drei Phasen mit Nummer (Julian, 22. November: «in welcher
+            Phase ... wo ist sie aktuell?»); bei wem sie liegt, sagt der
+            Titel der Seite. Verschickt: alle drei erledigt. */}
+        <ol className="flex flex-wrap gap-x-1 gap-y-1 text-sm print:hidden" aria-label="Phasen der Kalkulation">
+          {PHASEN.map((titel, i) => {
+            const hier = ph.nr === i + 1, erledigt = k.zustand === 'gesendet' || (ph.nr != null && i + 1 < ph.nr);
             return (
-              <li key={z} className={`flex items-center gap-1 ${i === hier ? 'font-medium text-foreground' : i < hier ? 'text-foreground/70' : 'text-muted-foreground'}`} aria-current={i === hier ? 'step' : undefined}>
-                {i < hier && <Check className="h-3.5 w-3.5" />}{ZUSTAND_TEXT[z]}{i < weg.length - 1 && <span className="px-1 text-muted-foreground">›</span>}
+              <li key={titel} className={`flex items-center gap-1 ${hier ? 'font-medium text-foreground' : erledigt ? 'text-foreground/70' : 'text-muted-foreground'}`} aria-current={hier ? 'step' : undefined}>
+                {erledigt && <Check className="h-3.5 w-3.5" />}{i + 1} {titel}{i < PHASEN.length - 1 && <span className="px-1 text-muted-foreground">›</span>}
               </li>
             );
           })}
@@ -259,7 +262,7 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
             <dd className="mt-1 text-[22px] leading-tight tracking-tight">{k.empfehlung_chf != null ? betrag(k.empfehlung_chf) : '–'}</dd>
           </div>
           <div className="bg-card p-4">
-            <dt className={ETIKETT}>{k.zustand === 'pruefung' || k.zustand === 'abgelehnt' ? 'Kaufpreis' : k.zustand === 'visum' ? 'Geprüfter Kaufpreis' : 'Kaufpreis im Angebot'}</dt>
+            <dt className={ETIKETT}>{k.zustand === 'pruefung' || k.zustand === 'abgelehnt' ? 'Kaufpreis' : 'Kaufpreis im Angebot'}</dt>
             <dd className="mt-1 text-[22px] leading-tight tracking-tight text-violett">{k.preis_chf != null ? betrag(k.preis_chf) : 'noch offen'}</dd>
           </div>
         </dl>
@@ -271,8 +274,8 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
         {n && (
           <div className={`space-y-2 rounded-[3px] border p-4 print:hidden ${eben ? 'border-accent' : ''}`}>
             <p className="text-[15px]">
-              <span className="font-medium">Am Zug: {zugLeute.length ? zugLeute.map(p => p.name).join(', ') : 'Tim'}</span>
-              {eben ? ' · jetzt Bescheid geben' : ''}
+              <span className="font-medium">{entscheider ? `${entscheider} Bescheid geben` : 'Noch niemand eingetragen, der entscheidet'}</span>
+              {eben ? ' · jetzt' : ''}
             </p>
             <div className="flex flex-wrap gap-2">
               <a className={eben ? KNOPF_HAUPT : KNOPF} href={n.mail}><Mail className="h-4 w-4" /> E-Mail</a>
@@ -302,9 +305,9 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
           {k.zustand === 'pruefung' && (
             <>
               <div>
-                <p className={ETIKETT}>Schritt 1 von 2</p>
+                <p className={ETIKETT}>Teil 1 von 2</p>
                 <p className="text-lg">Ist der Preis richtig?</p>
-                <p className="text-sm text-muted-foreground">Tim entscheidet: sein Preis gilt und geht so ins Angebot. Urteil und Grund lernt Aurora, auch wo im Ort es liegt.</p>
+                <p className="text-sm text-muted-foreground">{entscheider ?? 'Wer entscheidet'} legt ihn fest: dieser Preis gilt und geht so ins Angebot. Urteil und Grund lernt Aurora, auch wo im Ort es liegt.</p>
               </div>
               {/* Was Aurora rechnet und was Menschen geschrieben haben, klar
                   getrennt (22. November, Julian: «ist das vom System oder von
@@ -349,7 +352,7 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
                           placeholder={urteil === 'zu_tief' ? 'Warum, und wo im Ort? z. B. ruhige Hanglage mit Seesicht, Nachbar ist Anlagestiftung' : urteil === 'zu_hoch' ? 'Warum, und wo im Ort? z. B. an der Hauptstrasse, Altlasten, Baurecht' : 'Warum stimmt er? z. B. passt zu Verkäufen im Quartier'} />
               </label>
               <div className="border-t pt-4">
-                <p className={ETIKETT}>Schritt 2 von 2</p>
+                <p className={ETIKETT}>Teil 2 von 2</p>
                 <Aufklapper titel={`Angebot: ${FIRMEN[firma].name} · ${VORLAGEN[vorlage].titel}`} unter={fehlt.length ? `${fehlt.length} ${fehlt.length === 1 ? 'Angabe fehlt' : 'Angaben fehlen'}` : 'Firma und Vorlage'} auf={angebotAuf} setAuf={setAngebotAuf} gross />
               </div>
               {angebotAuf && (
@@ -367,52 +370,19 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
               </div>
             </>
           )}
-          {(k.zustand === 'visum' || k.zustand === 'bestaetigung') && (
+          {/* Stände des Wegs bis zum 22. November (visieren, kontrollieren,
+              bestätigen) kennt die Datenbank nur noch für «zurück» und
+              «ablehnen»: dann entscheidet Tim auf dem neuen Weg. */}
+          {(k.zustand === 'visum' || k.zustand === 'kontrolle' || k.zustand === 'bestaetigung') && (
             <>
               <div>
-                <p className="font-medium">{k.zustand === 'visum' ? 'Kaufpreis visieren' : 'Angebot bestätigen'}</p>
-                <p className="text-sm text-muted-foreground">
-                  {k.zustand === 'visum'
-                    ? `${FIRMEN[k.firma ?? 'stimo'].name}, Vorlage «${VORLAGEN[k.vorlage ?? 'bauland'].titel}». Mit dem Visum geht das Angebot zur Kontrolle an Julian.`
-                    : 'Julian hat das Angebot kontrolliert. Mit der Bestätigung geht es an David, der es verschickt.'}
-                </p>
+                <p className="font-medium">Noch auf dem alten Weg</p>
+                <p className="text-sm text-muted-foreground">Seit dem 22. November legt {entscheider ?? 'wer entscheidet'} den Preis fest und verschickt selbst. Diese Kalkulation stand beim alten Schritt «{ZUSTAND_TEXT[k.zustand]}»: zurück in Phase 2, dann wird entschieden.</p>
               </div>
-              {pdfKnoepfe}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {k.zustand === 'visum' && preisfeld('Finaler Kaufpreis')}
-                {namensfeld}
-              </div>
-              {notizfeld(k.zustand === 'visum' ? 'Bemerkung; nötig bei geändertem Preis, Rückgabe oder Ablehnung' : 'Bemerkung, bei Rückgabe oder Ablehnung der Grund')}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{namensfeld}</div>
+              {notizfeld('Bei Ablehnung der Grund')}
               <div className="flex flex-wrap gap-2">
-                {k.zustand === 'visum'
-                  ? <button type="button" className={KNOPF_HAUPT} disabled={laeuft || (geaendert && !notiz.trim())} onClick={() => void tun('visieren', { chf: betragLesen(preis), notiz })}>{geaendert ? 'Geänderten Preis visieren' : 'Visieren'}</button>
-                  : <button type="button" className={KNOPF_HAUPT} disabled={laeuft} onClick={() => void tun('bestaetigen', { notiz })}>Bestätigen</button>}
-                <button type="button" className={KNOPF} disabled={laeuft || !notiz.trim()} onClick={() => void tun('zurueck', { notiz })}>Zurück an David</button>
-                <button type="button" className={KNOPF} disabled={laeuft || !notiz.trim()} onClick={() => void tun('ablehnen', { notiz })}>Ablehnen</button>
-              </div>
-            </>
-          )}
-          {k.zustand === 'kontrolle' && (
-            <>
-              <div>
-                <p className="font-medium">Angebot kontrollieren</p>
-                <p className="text-sm text-muted-foreground">Empfänger, Parzellen, Wortlaut und Preis. Was hier geändert wird, sieht Tim bei der Bestätigung.</p>
-              </div>
-              <AngebotBearbeiten k={k} firma={firma} setFirma={f => { setFirma(f); setFelder(x => ({ ...x, unterschriften: [], kontakt: null, ...unterschriftenFuer(personen, f) })); }}
-                vorlage={vorlage} setVorlage={v => { setVorlage(v); setFelder(x => ({ ...felderVorgabe(v), datum: x.datum, ortsteil: x.ortsteil, kontakt: x.kontakt, unterschriften: x.unterschriften })); }}
-                felder={felder} setFelder={setFelder} ktx={ktx} personen={personen} />
-              {fehlt.length > 0 && <p className="text-sm text-destructive">{fehlt.join(' ')}</p>}
-              {pdfKnoepfe}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {preisfeld('Kaufpreis')}
-                {namensfeld}
-              </div>
-              {notizfeld('Bemerkung; nötig bei geändertem Preis, Rückgabe oder Ablehnung')}
-              <div className="flex flex-wrap gap-2">
-                <button type="button" className={KNOPF_HAUPT} disabled={laeuft || fehlt.length > 0 || (geaendert && !notiz.trim())}
-                        onClick={() => void tun('kontrollieren', { chf: betragLesen(preis), notiz, daten: daten() })}>Kontrolliert, an Tim</button>
-                <button type="button" className={KNOPF} disabled={laeuft} onClick={() => void tun('speichern', { daten: daten() })}>Zwischenspeichern</button>
-                <button type="button" className={KNOPF} disabled={laeuft || !notiz.trim()} onClick={() => void tun('zurueck', { notiz })}>Zurück an David</button>
+                <button type="button" className={KNOPF_HAUPT} disabled={laeuft} onClick={() => void tun('zurueck', { notiz: notiz.trim() || 'Neuer Weg: Tim legt den Preis fest.' })}>Zur Prüfung</button>
                 <button type="button" className={KNOPF} disabled={laeuft || !notiz.trim()} onClick={() => void tun('ablehnen', { notiz })}>Ablehnen</button>
               </div>
             </>

@@ -74,7 +74,7 @@ export function Suche3D({ onWahl }: { onWahl: (o: Ort) => void }) {
           }}
           placeholder="Strasse, Adresse oder Parzelle" aria-label="Ort suchen" enterKeyHint="search"
           role="combobox" aria-expanded={offen} aria-controls="suche3d-liste" aria-autocomplete="list"
-          className="h-full min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-[#888]" />
+          className="h-full min-w-0 flex-1 bg-transparent text-base sm:text-[15px] outline-none placeholder:text-[#888]" />
         {text && (
           <button type="button" onClick={() => { setText(''); setErgebnis(null); feld.current?.focus(); }}
                   className="-mr-2 grid h-11 w-9 shrink-0 place-items-center text-[#666]" aria-label="Suche leeren"><X className="h-4 w-4" /></button>

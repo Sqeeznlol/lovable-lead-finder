@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Loader2, Map } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useNachbarn } from '@/hooks/use-nachbarn';
 
 /**
@@ -36,7 +36,6 @@ export function Nachbarn({
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
-        <Map className="h-4 w-4 text-muted-foreground" />
         <h3 className="text-sm font-medium">
           Angrenzende Grundstücke
           {umrissDa && (
@@ -52,17 +51,11 @@ export function Nachbarn({
           Frueher erschien in den ersten beiden Faellen gar nichts --
           dann sieht es aus, als gaebe es die Funktion nicht. */}
       {!umrissDa && (ohneUmriss ?? (
-        <p className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
-          Für dieses Grundstück ist noch kein Umriss eingelesen. Die
-          Nachbarn stehen erst da, wenn die amtliche Vermessung des
-          Kantons geladen ist.
-        </p>
+        // Eine Zeile statt eines gestrichelten Kastens: es ist ein Hinweis, keine Fläche zum Ausfüllen.
+        <p className="text-sm text-muted-foreground">Erst mit der Vermessung des Kantons.</p>
       ))}
       {umrissDa && nachbarn.length === 0 && (
-        <p className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
-          Keine angrenzenden Grundstücke im Bestand — die Nachbarn
-          liegen ausserhalb der geladenen Parzellen.
-        </p>
+        <p className="text-sm text-muted-foreground">Keine im Bestand; die Nachbarn liegen ausserhalb der geladenen Parzellen.</p>
       )}
 
       <div className={nachbarn.length ? 'divide-y rounded-lg border' : 'hidden'}>

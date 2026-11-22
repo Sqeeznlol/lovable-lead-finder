@@ -1544,7 +1544,7 @@ const STIL = `
   .gisk .tafel.stufe-klein{height:140px;overflow:hidden}
   .gisk .tafel.stufe-mittel{height:48vh}
   .gisk .tafel.stufe-gross{height:86vh}
-  .gisk .griff{display:flex;position:sticky;top:0;z-index:2;width:calc(100% + 32px);margin:0 -16px 2px;height:40px;align-items:center;justify-content:center;
+  .gisk .griff{display:flex;position:sticky;top:0;z-index:2;width:calc(100% + 32px);margin:0 -16px 2px;height:44px;align-items:center;justify-content:center;
     border:0;background:var(--weiss);cursor:pointer}
   .gisk .griff i{display:block;width:40px;height:4px;border-radius:2px;background:var(--linie)}
   .gisk .unten{bottom:144px;left:8px}

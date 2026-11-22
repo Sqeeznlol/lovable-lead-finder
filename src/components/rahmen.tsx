@@ -85,11 +85,16 @@ export function Abschnitt({ titel, zahl, rechts, hinweis, children, symbol, kach
   );
 }
 
-export function Leer({ titel, children }: { titel: string; children?: ReactNode }) {
+export function Leer({ titel, children, aktion }: {
+  titel: string; children?: ReactNode;
+  /** Der nächste Schritt als Knopf (22. November): eine leere Seite soll sagen, was jetzt hilft. */
+  aktion?: { text: string; onClick: () => void };
+}) {
   return (
     <div className="rounded border bg-card p-8 text-center">
       <p className="font-medium">{titel}</p>
       {children && <p className="mt-1 text-sm text-muted-foreground">{children}</p>}
+      {aktion && <button type="button" className={`${KNOPF} mt-4`} onClick={aktion.onClick}>{aktion.text}</button>}
     </div>
   );
 }
@@ -108,7 +113,7 @@ export const KNOPF = `${KNOPF_GRUND} border bg-card text-foreground hover:bg-sec
 export const KNOPF_HAUPT = `${KNOPF_GRUND} bg-primary text-primary-foreground hover:bg-primary/85`;
 export const KNOPF_AKZENT = `${KNOPF_GRUND} bg-accent text-accent-foreground hover:bg-accent/90`;
 export const KNOPF_LEISE = `${KNOPF_GRUND} bg-secondary text-foreground hover:bg-foreground/10`;
-export const FELD = 'h-11 min-w-0 rounded-[3px] border border-input bg-card px-3.5 text-[15px] placeholder:text-muted-foreground focus:border-foreground focus:outline-none';
+export const FELD = 'h-11 min-w-0 rounded-[3px] border border-input bg-card px-3.5 text-base md:text-[15px] placeholder:text-muted-foreground focus:border-foreground focus:outline-none';
 
 /**
  * Reiter wie "All 9 | Hot | Active | New" in der Vorlage: eine Leiste,
@@ -159,7 +164,7 @@ export function Reiter<T extends string>({ wahl, setWahl, optionen }: {
           const an = o.wert === wahl;
           return (
             <button key={o.wert} type="button" role="tab" aria-selected={an} onClick={() => setWahl(o.wert)}
-                    className={`inline-flex h-10 items-center gap-2 rounded-[2px] px-4 text-[15px] transition-colors ${an ? 'bg-[#1E2433] text-white' : 'text-foreground/80 hover:text-foreground'}`}>
+                    className={`inline-flex h-11 items-center gap-2 rounded-[2px] px-4 text-[15px] transition-colors ${an ? 'bg-[#1E2433] text-white' : 'text-foreground/80 hover:text-foreground'}`}>
               {o.titel}
               {o.zahl != null && (
                 <span className={`min-w-6 rounded-[2px] border px-1.5 text-xs leading-5 ${an ? 'border-white/30' : 'border-border text-muted-foreground'}`}>{o.zahl}</span>

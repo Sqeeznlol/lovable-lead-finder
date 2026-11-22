@@ -995,7 +995,7 @@ export function Karte3D({ ziel: zielVon, markiert: markiertVon = KEINE, legende,
   const text = (merkmal: string, code: number | null | undefined) =>
     code == null ? '–' : kodes?.get(`${merkmal}:${code}`) ?? `Code ${code}`;
   const knopf = 'grid h-11 w-11 place-items-center rounded-[3px] bg-white text-[#111] shadow-[0_2px_8px_rgba(0,0,0,0.18)] hover:bg-[#f2f2f2]';
-  const chip = (an: boolean) => `inline-flex h-9 shrink-0 items-center rounded-[3px] px-3 text-[13px] font-medium shadow-[0_1px_4px_rgba(0,0,0,0.16)] ${an ? 'bg-[#111] text-white' : 'bg-white text-[#111]'}`;
+  const chip = (an: boolean) => `inline-flex h-11 sm:h-9 shrink-0 items-center rounded-[3px] px-3 text-[13px] font-medium shadow-[0_1px_4px_rgba(0,0,0,0.16)] ${an ? 'bg-[#111] text-white' : 'bg-white text-[#111]'}`;
   const registerLeer = kodes != null && kodes.size === 0;
   const imFoto = faerbung === 'foto';
   // Im Foto steht unten der Nachweis von Google (karte3d-foto in index.css); die Legende rückt darüber.

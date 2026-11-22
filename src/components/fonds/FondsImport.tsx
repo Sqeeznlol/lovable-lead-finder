@@ -85,7 +85,7 @@ export function FondsImport({ mandant, fonds, onFertig }: { mandant: string; fon
       )}
       <textarea value={text} onChange={e => setText(e.target.value)} rows={6}
                 placeholder={'Eine Adresse oder EGRID je Zeile, z.B.\nSeestrasse 15, 8610 Uster\nCH123456789012'}
-                className="w-full rounded-[3px] border bg-card px-3.5 py-3 text-sm" />
+                className="w-full rounded-[3px] border bg-card px-3.5 py-3 text-base md:text-sm" />
       <div className="flex gap-2 [&>*]:flex-1">
         <label className={`${KNOPF} cursor-pointer`}>
           <Upload className="h-4 w-4" /> Datei (CSV, TXT)

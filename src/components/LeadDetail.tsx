@@ -279,7 +279,7 @@ export function LeadDetail({ lead, onClose, onErledigt, onNotiz, onNachfass, onG
               <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Notiz</h3>
               <textarea value={notiz} onChange={e => setNotiz(e.target.value)} rows={4} maxLength={2000}
                         placeholder="Was wurde besprochen, was ist der nächste Schritt?"
-                        className="w-full rounded-[3px] border border-input bg-card p-3 text-[15px] focus:border-foreground focus:outline-none" />
+                        className="w-full rounded-[3px] border border-input bg-card p-3 text-base md:text-[15px] focus:border-foreground focus:outline-none" />
               <div className="flex gap-2">
                 <button type="button" className={KNOPF} disabled={speichert || notiz === (lead.bemerkung ?? '')}
                         onClick={async () => { setSpeichert(true); await onNotiz(lead, notiz); setSpeichert(false); }}>
