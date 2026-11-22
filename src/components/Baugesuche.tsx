@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { FENSTER } from '@/lib/fenster';
-import { FELD, Leer, Marke, Reiter, Seite } from '@/components/rahmen';
+import { FELD, Leer, Marke, Reiter, Seite, Filterleiste } from '@/components/rahmen';
 import { BILD } from '@/lib/luftbild';
 import { BetroffeneParzellen } from '@/components/BetroffeneParzellen';
 
@@ -133,8 +133,7 @@ export function Baugesuche() {
     <Seite bild={BILD.baugesuche} ueber={`Baugesuche · ${kanton ? KANTON_NAME[kanton] ?? kanton : '13 Kantone'} · täglich`}
       titel={data ? `${data.gesamt.toLocaleString('de-CH')} Baugesuche ${zeitraum}` : ' '}
       unter={<>
-        Jedes publizierte Gesuch, beim Bund verortet. Trifft eines ein Kundenportfolio oder dessen Nachbarn, entsteht daraus eine Gelegenheit.
-        {data?.zuletzt && <span className="mt-1 block text-sm">Zuletzt geladen {zeit(data.zuletzt)}</span>}
+        {data?.zuletzt ? <>Zuletzt geladen {zeit(data.zuletzt)}</> : null}
       </>}
       kennzahlen={data ? [
         { titel: 'Publiziert', wert: data.gesamt.toLocaleString('de-CH'), marke: <Marke art="minze">{tage ? `${tage} Tage` : 'alle'}</Marke>, onClick: () => setSicht('alle') },
@@ -145,12 +144,16 @@ export function Baugesuche() {
       <div className="flex flex-wrap items-center gap-2">
         <Reiter<Sicht> wahl={sicht} setWahl={setSicht}
                        optionen={([['alle', 'Alle'], ['bestand', 'Im Bestand'], ['gelegenheit', 'Mit Gelegenheit']] as [Sicht, string][]).map(([w, t]) => ({ wert: w, titel: t, zahl: zahl(w) }))} />
+      </div>
+      <Filterleiste aktiv={[kanton, tage !== 7].filter(Boolean).length}>
         <Auswahl label="Zeitraum" wert={String(tage)} setWert={w => setTage(Number(w))} className="min-w-[170px]" optionen={[
           { wert: '3', titel: 'Letzte 3 Tage' }, { wert: '7', titel: 'Letzte 7 Tage' }, { wert: '30', titel: 'Letzte 30 Tage' },
           { wert: '90', titel: 'Letzte 90 Tage' }, { wert: '365', titel: 'Letztes Jahr' }, { wert: '0', titel: 'Alle' },
         ]} />
         <Auswahl label="Kanton" wert={kanton || 'alle'} setWert={w => setKanton(w === 'alle' ? '' : w)} className="min-w-[170px]"
                  optionen={[{ wert: 'alle', titel: 'Alle Kantone' }, ...KANTONE.map(k => ({ wert: k, titel: KANTON_NAME[k] }))]} />
+      </Filterleiste>
+      <div className="flex">
         <input value={wort} onChange={e => setWort(e.target.value)} placeholder="Adresse, Gemeinde, Vorhaben, Nummer"
                className={`${FELD} w-full sm:w-auto sm:flex-1 sm:max-w-xs`} />
       </div>

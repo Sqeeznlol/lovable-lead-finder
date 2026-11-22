@@ -7,7 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, Phone, Printer, Target } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { mandatLesen } from '@/lib/mandat';
-import { Abschnitt, FELD, KNOPF, KNOPF_HAUPT, Leer, LISTE, Marke, Reiter, Seite, Strichbalken } from '@/components/rahmen';
+import { Abschnitt, FELD, KNOPF, KNOPF_HAUPT, Leer, LISTE, Marke, Reiter, Seite, Strichbalken, Filterleiste } from '@/components/rahmen';
 import { BILD } from '@/lib/luftbild';
 import { supabase } from '@/integrations/supabase/client';
 import { portfolioParzellen, usePortfolioListe } from '@/hooks/use-portfolio';
@@ -113,7 +113,6 @@ export function Gelegenheiten() {
   return (
     <Seite bild={BILD.gelegenheiten} ueber="Gelegenheiten · erkannt, gemeldet, erreicht"
       titel={data ? `${offenAlle} ${offenAlle === 1 ? 'Gelegenheit ist' : 'Gelegenheiten sind'} offen` : ' '}
-      unter="Was das System erkannt hat, wer daran arbeitet und was daraus wurde."
       kennzahlen={data ? ([['erkannt', 'rosa', 'ungeprüft'], ['gemeldet', 'violett', 'beim Kunden'], ['in bearbeitung', 'lila', 'läuft'], ['abgeschlossen', 'minze', 'erreicht']] as [Zustand, 'rosa' | 'violett' | 'lila' | 'minze', string][])
         .map(([z, art, wort]) => ({ titel: ZUSTAENDE.find(x => x[0] === z)![1], wert: String(zahl(z)), marke: <Marke art={art}>{wort}</Marke>, onClick: () => setZustand(z) })) : undefined}
       aktionen={mandant && mandant !== 'ohne' ? <button type="button" onClick={() => setBericht(mandant)} className={KNOPF_HAUPT}><Printer className="h-4 w-4" /> Portfolio-Bericht</button> : undefined}
@@ -142,6 +141,8 @@ export function Gelegenheiten() {
         <Reiter<string> wahl={zustand} setWahl={w => setZustand(w as typeof zustand)}
           optionen={([['offen', 'Offen'], ...ZUSTAENDE, ['alle', 'Alle']] as [string, string][])
             .map(([w, t]) => ({ wert: w, titel: t, zahl: w === 'offen' ? offenAlle : w === 'alle' ? undefined : zahl(w as Zustand) }))} />
+      </div>
+      <Filterleiste aktiv={[mandant, anlass].filter(Boolean).length}>
         <Auswahl label="Kunde" wert={mandant} setWert={setMandant} className="min-w-[220px]" optionen={[
           { wert: '', titel: 'Alle Kunden' }, { wert: 'ohne', titel: 'Ohne Kunde (Nachbar baut)' },
           ...mandanten.map(([id, n]) => ({ wert: id, titel: n })),
@@ -151,7 +152,7 @@ export function Gelegenheiten() {
             { wert: '', titel: 'Alle Anlässe' }, ...anlaesse.map(a => ({ wert: a, titel: ANLAESSE[a] ?? a })),
           ]} />
         )}
-      </div>
+      </Filterleiste>
 
       {isLoading && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> wird geladen …</p>}
       {error && <p className="text-sm text-destructive">Gelegenheiten nicht lesbar.</p>}

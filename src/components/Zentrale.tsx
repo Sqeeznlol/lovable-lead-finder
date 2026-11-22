@@ -90,7 +90,7 @@ export function Zentrale() {
 
   return (
     <Seite bild={BILD.zentrale} ueber="Zentrale · Kundenprojekte" titel={satz}
-      unter="Was Kunden entwickeln, kaufen oder verkaufen wollen: Research, Potenzialanalyse und Akquise in ihrem Namen, alles off-market."
+      unter="Was Kunden entwickeln, kaufen oder verkaufen wollen."
       kennzahlen={data ? [
         { titel: 'Laufend', wert: laufend.length.toLocaleString('de-CH'), onClick: () => setFilter('aktiv') },
         { titel: 'Adressen', wert: laufend.reduce((s2, v) => s2 + (v.adressen || 0), 0).toLocaleString('de-CH'), marke: <Marke art="lila">in Arbeit</Marke> },

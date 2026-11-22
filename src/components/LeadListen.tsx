@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Auswahl } from '@/components/Auswahl';
-import { KNOPF, Leer, LISTE, Seite } from '@/components/rahmen';
+import { KNOPF, Leer, LISTE, Seite, Filterleiste } from '@/components/rahmen';
 import { BILD } from '@/lib/luftbild';
 import { FENSTER } from '@/lib/fenster';
 import { useUrlWert } from '@/hooks/use-url-wert';
@@ -86,9 +86,9 @@ export function LeadListen() {
   return (
     <Seite bild={BILD.gebaeudesuche} ueber="Gebäuderegister · Deutschschweiz"
       titel={liste.data ? `${n.toLocaleString('de-CH')} Wohngebäude mit Öl oder Gas` : ' '}
-      unter={<>Bestehende Wohngebäude, gebaut bis {bis}, aus dem Gebäude- und Wohnungsregister des Bundes. Dort steht der Heizungsersatz an. Eigentümer stehen nicht im Register.</>}
+      unter={<>Gebaut bis {bis}, aus dem Gebäuderegister des Bundes.</>}
       kennzahlen={kantone.length ? [...kantone].sort((x, y) => y[1] - x[1]).slice(0, 4).map(([k, z]) => ({ titel: `Kanton ${k}`, wert: z.toLocaleString('de-CH'), onClick: () => { setKanton(k); setBfs(''); } })) : undefined}>
-      <div className="flex flex-wrap items-center gap-2">
+      <Filterleiste aktiv={[bfs, heizung, minWhg > 1].filter(Boolean).length}>
         <Auswahl label="Kanton" wert={kanton} setWert={k => { setKanton(k); setBfs(''); }} className="min-w-[140px]"
                  optionen={kantone.map(([k]) => ({ wert: k, titel: `Kanton ${k}` }))} />
         <Auswahl label="Gemeinde" wert={bfs || 'alle'} setWert={w => setBfs(w === 'alle' ? '' : w)} className="min-w-[200px]"
@@ -102,7 +102,7 @@ export function LeadListen() {
         <button type="button" className={KNOPF} disabled={laedt || !n} onClick={() => void herunterladen()}>
           {laedt ? 'Wird erstellt …' : `Als CSV (${Math.min(n, 20000).toLocaleString('de-CH')})`}
         </button>
-      </div>
+      </Filterleiste>
 
       {(liste.isLoading || gemeinden.isLoading) && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> wird geladen …</p>}
       {(liste.error || gemeinden.error) && <p className="text-sm text-destructive">Lead-Listen nicht lesbar. Ist der Ablauf «Lead-Listen» gelaufen?</p>}

@@ -139,6 +139,8 @@ muss».
   links Name und was zu tun ist, rechts die eine Zahl, die zählt.
 - Formulare, die selten gebraucht werden (Kosten eintragen), stehen
   hinter einem Knopf, nicht offen.
+- Filter einer Liste stehen auf dem Handy hinter «Filter · n gesetzt»
+  (`Filterleiste` in `rahmen.tsx`), am Computer offen in einer Reihe.
 - Eine offene Kalkulation steht allein: ohne Liste, Kennzahlen und Rollen,
   mit «Zurück zur Liste». Der Schritt, der jetzt dran ist, steht offen und
   nummeriert («Schritt 1 von 2: Ist der Preis richtig?», «Schritt 2 von 2:

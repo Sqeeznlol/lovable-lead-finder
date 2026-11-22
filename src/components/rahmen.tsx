@@ -376,3 +376,23 @@ export function Weg({ schritte }: { schritte: { titel: string; unter: string; za
     </ol>
   );
 }
+
+/**
+ * Filter einer Liste (22. November, Julian: «mach die anderen Seiten auch so
+ * ruhig»): auf dem Handy hinter einem Knopf «Filter» mit der Zahl der
+ * gesetzten, am Computer offen in einer Reihe. Die Liste rückt so auf dem
+ * iPhone nach oben, statt unter fünf Auswahlfeldern zu verschwinden.
+ */
+export function Filterleiste({ aktiv = 0, children }: { aktiv?: number; children: ReactNode }) {
+  const [auf, setAuf] = useState(false);
+  return (
+    <div className="space-y-2">
+      <button type="button" aria-expanded={auf} onClick={() => setAuf(!auf)}
+              className={`${KNOPF} w-full justify-between sm:hidden`}>
+        <span>Filter{aktiv ? ` · ${aktiv} gesetzt` : ''}</span>
+        <span aria-hidden className={`transition-transform ${auf ? 'rotate-90' : ''}`}>›</span>
+      </button>
+      <div className={`${auf ? 'flex' : 'hidden'} flex-col gap-2 sm:flex sm:flex-row sm:flex-wrap sm:items-center [&>*]:w-full sm:[&>*]:w-auto`}>{children}</div>
+    </div>
+  );
+}

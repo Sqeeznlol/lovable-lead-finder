@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Auswahl } from '@/components/Auswahl';
-import { KNOPF, Leer, LISTE, Reiter, Seite } from '@/components/rahmen';
+import { KNOPF, Leer, LISTE, Reiter, Seite, Filterleiste } from '@/components/rahmen';
 import { WunschFavoriten } from '@/components/WunschFavoriten';
 import { useName } from '@/components/calc/name';
 import { BILD, luftbildWgs } from '@/lib/luftbild';
@@ -152,7 +152,7 @@ export function ParzellenNachWunsch() {
       unter={o && <>{o.quelle} Stand {o.stand}.</>}
       kennzahlen={parzellen.data ? KENNZAHLEN.map(k => ({ titel: k.titel, wert: ch(inGemeinde.filter(k.passt).length), onClick: () => setZone(zone === k.zone ? '' : k.zone) })) : undefined}>
       {reiter}
-      <div className="flex flex-wrap items-center gap-2">
+      <Filterleiste aktiv={[kanton, gemeinde, zone, bebaut].filter(Boolean).length}>
         {(ordner.data?.length ?? 0) > 1 && (
           <Auswahl label="Ordner" wert={o?.id ?? ''} setWert={w => { setOrdnerId(w); setKanton(''); setGemeinde(''); setZone(''); setBebaut(''); }} className="min-w-[220px]"
                    optionen={(ordner.data ?? []).map(x => ({ wert: x.id, titel: x.name }))} />
@@ -173,7 +173,7 @@ export function ParzellenNachWunsch() {
                    { wert: 'nein', titel: `Unbebaut · ${ch(inGemeinde.filter(p => p.bebaut === false).length)}` },
                    { wert: 'ja', titel: `Bebaut · ${ch(inGemeinde.filter(p => p.bebaut === true).length)}` }]} />
         <button type="button" className={KNOPF} disabled={!treffer.length} onClick={herunterladen}>Als CSV ({ch(treffer.length)})</button>
-      </div>
+      </Filterleiste>
 
       {fehler && <p className="text-sm text-destructive">{fehler}</p>}
       {(ordner.isLoading || parzellen.isLoading) && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> wird geladen …</p>}
