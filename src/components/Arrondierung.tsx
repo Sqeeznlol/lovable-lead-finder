@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Abschnitt, Leer, LISTE, Marke, Reiter, Seite, Strichbalken } from '@/components/rahmen';
@@ -8,6 +8,8 @@ import { ArrondierungZusammen } from '@/components/ArrondierungZusammen';
 import type { Gebaeude, Parzelle, Ring } from '@/lib/arrondierung-zusammen';
 import { ObjektLink } from '@/components/ObjektLink';
 import { imBestand } from '@/lib/egrid';
+import { useUrlWert } from '@/hooks/use-url-wert';
+import { NachbarnSuche } from '@/components/Nachbarschaft';
 
 /**
  * Mögliche Arrondierungen im Kundenportfolio (Julian, 10. November: "mit dem
@@ -28,6 +30,10 @@ import { imBestand } from '@/lib/egrid';
  * Manager-Ansicht nur für das Bauraum-Team (Julian: "nur für uns ... damit
  * wir die selektionieren können"): je Parzelle ein Stand, gespeichert in
  * nachbar_auswahl. Fondsleitungen sehen weder Seite noch Daten (RLS).
+ *
+ * Seit dem 22. November steht hier auch die frühere «Nachbarschaft»
+ * (Julian: «mach Nachbarschaft und Arrondierung zusammen»): oben die
+ * Nachbarn jeder beliebigen Parzelle, darunter die Kundenfonds.
  */
 type Nachbar = {
   umriss: Ring[] | null; geb_liste: Gebaeude[] | null; baujahr: number | null; wohnungen: number | null;
@@ -60,10 +66,6 @@ const GEFAESS_KURZ: Record<string, string> = { hsl: 'Helvetica Swiss Living Fund
 type Kurz = { portfolio: string; gefaess: string | null; haupt_egrid: string; nachbar_egrid: string; punkte: number; gebaeude: number | null };
 const fondsSchluessel = (portfolio: string, gefaess: string | null) => gefaess ?? portfolio;
 
-function fondsAusAdresse(): string | null {
-  try { return new URLSearchParams(window.location.search).get('fonds'); } catch { return null; }
-}
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
 
@@ -75,19 +77,9 @@ async function inStuecken<T>(egrids: string[], frage: (teil: string[]) => Promis
 
 export function Arrondierung() {
   const [filter, setFilter] = useState<Filter>('potenzial');
-  const [fonds, setFondsRoh] = useState<string | null>(fondsAusAdresse);
-  const setFonds = (f: string | null) => {
-    const u = new URL(window.location.href);
-    if (f) u.searchParams.set('fonds', f); else u.searchParams.delete('fonds');
-    window.history.pushState(null, '', u);
-    setFondsRoh(f);
-    window.scrollTo({ top: 0 });
-  };
-  useEffect(() => {
-    const zurueck = () => setFondsRoh(fondsAusAdresse());
-    window.addEventListener('popstate', zurueck);
-    return () => window.removeEventListener('popstate', zurueck);
-  }, []);
+  // Wie überall über die Adresse (?fonds=hsl): «Zurück» und Links gehen.
+  const [fonds, setFondsWert] = useUrlWert('fonds');
+  const setFonds = (f: string | null) => { setFondsWert(f); window.scrollTo({ top: 0 }); };
   const [offen, setOffen] = useState<string | null>(null);
   const qc = useQueryClient();
   // Übersicht ohne Umrisse: je Zeile nur, was die Fondsliste zählt.
@@ -185,19 +177,24 @@ export function Arrondierung() {
   if (!gewaehlt) {
     const summe = (f: (x: typeof fondsListe[number]) => number) => fondsListe.reduce((s, x) => s + f(x), 0);
     return (
-      <Seite bild={BILD.gelegenheiten} ueber="Manager-Ansicht" titel="Mögliche Arrondierungen"
-        unter={<>Zuerst den Fonds wählen, dann seine Liegenschaften und ihre Nachbarparzellen mit Potenzial.</>}
+      <Seite bild={BILD.gelegenheiten} ueber="Arrondierung"
+        titel={uebersicht.data ? `${summe(x => x.potenzial).toLocaleString('de-CH')} Nachbarparzellen mit Potenzial` : 'Arrondierung'}
+        unter={<>Wer angrenzt und wo ein Zukauf am meisten bringt: für jede Parzelle und für die Liegenschaften der Kundenfonds.</>}
         kennzahlen={[
           { titel: 'Fonds', wert: String(fondsListe.length) },
           { titel: 'Liegenschaften', wert: String(summe(x => x.liegenschaften)) },
           { titel: 'Nachbarparzellen', wert: String(summe(x => x.zeilen.length)) },
           { titel: 'Mit Potenzial', wert: String(summe(x => x.potenzial)) },
         ]}>
+        <Abschnitt titel="Nachbarn einer Parzelle"
+          hinweis="Für jede Parzelle im Bestand: was angrenzt, wie lang die gemeinsame Grenze ist und wem es gehört. Wer arrondieren will, interessiert sich für den Nachbarn mit der längsten Grenze, nicht für den, der die Ecke berührt.">
+          <NachbarnSuche />
+        </Abschnitt>
         {uebersicht.isLoading ? <Leer titel="Lädt …" />
           : uebersicht.data === null ? <Leer titel="Die Nachbarparzellen sind noch nicht gerechnet.">Ablauf «Migrationen» mit «einspielen» starten.</Leer>
           : !fondsListe.length ? <Leer titel="Noch kein Fonds gerechnet." />
           : (
-          <Abschnitt titel="Fonds" zahl={fondsListe.length}>
+          <Abschnitt titel="Kundenfonds" zahl={fondsListe.length} hinweis="Zuerst den Fonds wählen, dann seine Liegenschaften und ihre Nachbarparzellen mit Potenzial.">
             <ul className={LISTE}>
               {fondsListe.map(f => (
                 <li key={f.schluessel}>
@@ -224,7 +221,7 @@ export function Arrondierung() {
   }
 
   return (
-    <Seite bild={BILD.gelegenheiten} ueber={`Mögliche Arrondierungen · ${FONDSLEITUNG[gewaehlt.portfolio] ?? gewaehlt.portfolio}`}
+    <Seite bild={BILD.gelegenheiten} ueber={`Arrondierung · ${FONDSLEITUNG[gewaehlt.portfolio] ?? gewaehlt.portfolio}`}
       titel={GEFAESS_KURZ[gewaehlt.schluessel] ?? GEFAESS_NAME[gewaehlt.schluessel] ?? gewaehlt.schluessel}
       unter={<>Nachbarparzellen der {positionen ? `${positionen} ` : ''}Liegenschaften, wo ein Zukauf am meisten bringt. Davon {unbebaut} unbebaut in der Bauzone.</>}
       kennzahlen={[

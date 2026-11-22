@@ -33,8 +33,9 @@ const OBJEKT = process.env.OBJEKT_EGRID || 'CH958799779192';
 // Eine öffentliche Adresse für CALC YOU LATER (ein Bürohaus in Zürich, keine Angabe zu einer Person).
 const CALC_ADRESSE = process.env.CALC_ADRESSE || 'Dufourstrasse 90, Zürich';
 // Die Suche mit Julians Beispiel: so läuft auch die Abfrage dahinter einmal echt.
+// «Nachbarschaft» steht seit dem 22. November oben in «Arrondierung».
 const REITER = ['', 'suche?q=Alle%20W2%20in%20Dietikon', 'leads', 'calc', 'zentrale', 'karte', 'gelegenheiten', 'baugesuche', 'leadlisten', 'wunsch', 'auswertung',
-  'nachbarschaft', 'arrondierung', 'kalender', 'karte3d', 'admin', 'fonds'];
+  'arrondierung', 'kalender', 'karte3d', 'admin', 'fonds'];
 const GERAETE = [
   { name: 'iPhone', einstellung: devices['iPhone 13'] },
   { name: 'Computer', einstellung: { viewport: { width: 1440, height: 900 } } },

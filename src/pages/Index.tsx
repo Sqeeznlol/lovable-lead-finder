@@ -20,7 +20,6 @@ const Baugesuche = nachladen(() => import('@/components/Baugesuche'), 'Baugesuch
 const Gelegenheiten = nachladen(() => import('@/components/Gelegenheiten'), 'Gelegenheiten');
 const Karte3DSeite = nachladen(() => import('@/components/karte3d/Karte3DSeite'), 'Karte3DSeite');
 const Kalender = nachladen(() => import('@/components/Kalender'), 'Kalender');
-const Nachbarschaft = nachladen(() => import('@/components/Nachbarschaft'), 'Nachbarschaft');
 const Suche = nachladen(() => import('@/components/Suche'), 'Suche');
 const CalcYouLater = nachladen(() => import('@/components/CalcYouLater'), 'CalcYouLater');
 const ParzellenNachWunsch = nachladen(() => import('@/components/ParzellenNachWunsch'), 'ParzellenNachWunsch');
@@ -45,7 +44,11 @@ import { usePlatform } from '@/hooks/use-platform';
 
 // Jeder Bereich ist eine Adresse: /zentrale, /baugesuche ... ("/" ist
 // das Cockpit). So führt "Zurück" im Browser in den vorigen Bereich.
-const TABS = ['cockpit', 'suche', 'leads', 'calc', 'zentrale', 'baugesuche', 'leadlisten', 'wunsch', 'karte', 'nachbarschaft', 'arrondierung', 'gelegenheiten', 'auswertung', 'kalender', 'karte3d', 'admin'] as const;
+const TABS = ['cockpit', 'suche', 'leads', 'calc', 'zentrale', 'baugesuche', 'leadlisten', 'wunsch', 'karte', 'arrondierung', 'gelegenheiten', 'auswertung', 'kalender', 'karte3d', 'admin'] as const;
+// Frühere Reiter, deren Links weiter gelten: «Nachbarschaft» steht seit dem
+// 22. November oben in «Arrondierung» (Julian: «mach Nachbarschaft und
+// Arrondierung zusammen»).
+const FRUEHER: Record<string, (typeof TABS)[number]> = { nachbarschaft: 'arrondierung' };
 type Tab = typeof TABS[number];
 const istTab = (x: string | undefined): x is Tab => !!x && (TABS as readonly string[]).includes(x);
 
@@ -81,9 +84,8 @@ const gruppen: { titel: string; eintraege: Eintrag[] }[] = [
   { titel: 'Kunden', eintraege: [
     // Jedes Kundenvorhaben an einem Ort, von der Adressliste an.
     { id: 'zentrale', label: 'Zentrale', icon: Briefcase },
-    // Nachbarparzellen der Kundenliegenschaften (Helvetica) nach Potenzial.
-    { id: 'arrondierung', label: 'Mögliche Arrondierungen', icon: Combine },
-    { id: 'nachbarschaft', label: 'Nachbarschaft', icon: Share },
+    // Nachbarn jeder Parzelle und die Nachbarparzellen der Kundenfonds nach Potenzial.
+    { id: 'arrondierung', label: 'Arrondierung', icon: Combine },
   ] },
   { titel: 'Zahlen', eintraege: [
     { id: 'auswertung', label: 'Auswertung', icon: BarChart3 },
@@ -119,7 +121,11 @@ function LeistenPunkt({ t, an, onClick, imRollbereich }: { t: Eintrag; an: boole
 export default function Index() {
   const { bereich } = useParams();
   const navigate = useNavigate();
-  const active: Tab = istTab(bereich) ? bereich : 'cockpit';
+  const active: Tab = istTab(bereich) ? bereich : (bereich && FRUEHER[bereich]) || 'cockpit';
+  // Ein alter Link zeigt gleich den neuen Ort, auch in der Adresszeile.
+  useEffect(() => {
+    if (bereich && FRUEHER[bereich]) navigate(`/${FRUEHER[bereich]}${window.location.search}`, { replace: true });
+  }, [bereich, navigate]);
   // Ein Fondsmanager-Konto gehört nach Wohntraums (/fonds) und sieht
   // die interne Oberfläche nie.
   const { data: fondsmanager } = useQuery({
@@ -298,7 +304,6 @@ export default function Index() {
             {active === 'leadlisten' && <LeadListen />}
             {active === 'wunsch' && <ParzellenNachWunsch />}
             {active === 'karte' && <Karte onSchliessen={() => gehe('cockpit')} />}
-            {active === 'nachbarschaft' && <Nachbarschaft />}
             {active === 'arrondierung' && <Arrondierung />}
             {active === 'gelegenheiten' && <Gelegenheiten />}
             {active === 'kalender' && <Kalender />}
