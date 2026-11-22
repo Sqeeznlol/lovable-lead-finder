@@ -171,7 +171,7 @@ function Zeile({ t }: { t: Treffer }) {
       </ObjektLink>
 
       <div className="min-w-0 space-y-1 pt-0.5">
-        <ObjektLink id={t.id} className="block text-[16px] font-medium leading-snug">{t.adresse ?? 'Ohne Adresse'}</ObjektLink>
+        <ObjektLink id={t.id} className="relative -my-[11px] block py-[11px] text-[16px] font-medium leading-snug">{t.adresse ?? 'Ohne Adresse'}</ObjektLink>
         <p className="text-sm text-muted-foreground">{ort}{t.parzelle ? ` · Parzelle ${t.parzelle}` : ''}</p>
         <p className={`text-sm ${t.eigentuemer ? '' : 'text-muted-foreground'}`}>{t.eigentuemer ?? 'Eigentümer unbekannt'}</p>
       </div>

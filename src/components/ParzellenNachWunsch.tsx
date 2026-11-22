@@ -199,7 +199,7 @@ export function ParzellenNachWunsch() {
                   <button type="button" className={KNOPF} disabled={legtAn === p.egrid} onClick={() => void ausfindig(p)}>
                     {legtAn === p.egrid ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Ausfindig machen
                   </button>
-                  <a className="inline-flex h-11 items-center text-sm underline underline-offset-2" target={FENSTER.karte} href={geoAdminLink(p)}>Karte</a>
+                  <a className="inline-flex h-11 min-w-11 items-center justify-end text-sm underline underline-offset-2" target={FENSTER.karte} href={geoAdminLink(p)}>Karte</a>
                 </span>
               </li>
             ))}

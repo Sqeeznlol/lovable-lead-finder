@@ -113,13 +113,13 @@ export function LeadListen() {
             {liste.data.zeilen.map(g => (
               <li key={g.egid} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 p-4">
                 <span className="min-w-0">
-                  <ObjektLink egrid={imBestand(g.kanton) ? g.egrid : null} className="block font-medium">{g.strasse ?? 'Ohne Adresse'}, {g.plz} {g.ort ?? g.gemeinde}</ObjektLink>
+                  <ObjektLink egrid={imBestand(g.kanton) ? g.egrid : null} className="relative -my-2.5 block py-2.5 font-medium">{g.strasse ?? 'Ohne Adresse'}, {g.plz} {g.ort ?? g.gemeinde}</ObjektLink>
                   <span className="block text-sm text-muted-foreground">
                     {bauzeit(g)} · {g.klasse ? KLASSE_TEXT[g.klasse] ?? 'Wohngebäude' : 'Wohngebäude'}{g.wohnungen ? ` · ${g.wohnungen} ${g.wohnungen === 1 ? 'Wohnung' : 'Wohnungen'}` : ''} · {g.heizung ? HEIZUNG_TEXT[g.heizung] : ''}
                   </span>
                 </span>
                 {g.e && g.n && (
-                  <a className="text-sm underline underline-offset-2" target={FENSTER.karte}
+                  <a className="inline-flex h-11 min-w-11 items-center justify-end text-sm underline underline-offset-2" target={FENSTER.karte}
                      href={`https://map.geo.admin.ch/?lang=de&E=${g.e}&N=${g.n}&zoom=12&bgLayer=ch.swisstopo.swissimage`}>Karte</a>
                 )}
               </li>

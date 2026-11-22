@@ -60,7 +60,7 @@ function Blatt({ f, speichern, entfernen }: { f: WunschFavorit; speichern: (egri
           <span className="block text-sm text-muted-foreground">{ch(f.flaeche)}{' '}m² · {ZONE_KURZ[f.zone] ?? f.zone}</span>
           <span className="block truncate text-xs text-muted-foreground">{f.egrid}{f.von ? ` · von ${f.von}` : ''}</span>
         </span>
-        <a className="inline-flex h-11 shrink-0 items-center text-sm underline underline-offset-2" target={FENSTER.karte} href={geoAdminLink(f)}>Karte</a>
+        <a className="inline-flex h-11 min-w-11 shrink-0 items-center justify-end text-sm underline underline-offset-2" target={FENSTER.karte} href={geoAdminLink(f)}>Karte</a>
       </div>
       <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Stand">
         {STAND.map(([w, t]) => (
