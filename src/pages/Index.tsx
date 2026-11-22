@@ -100,14 +100,16 @@ const mobileBottomTabs: Tab[] = ['cockpit', 'leads', 'calc', 'karte'];
 const KURZ: Partial<Record<Tab, string>> = { calc: 'Calc' };
 
 /** Ein Punkt der Icon-Leiste: Symbol, aktiv als schwarzes Quadrat, Name beim Überfahren. */
-function LeistenPunkt({ t, an, onClick }: { t: Eintrag; an: boolean; onClick: () => void }) {
+function LeistenPunkt({ t, an, onClick, imRollbereich }: { t: Eintrag; an: boolean; onClick: () => void; imRollbereich?: boolean }) {
+  // Im rollbaren Teil der Leiste schneidet der Rand das eigene Namensschild
+  // ab; dort zeigt der Browser den Namen.
   return (
-    <button type="button" onClick={onClick} aria-label={t.label} aria-current={an ? 'page' : undefined}
+    <button type="button" onClick={onClick} aria-label={t.label} aria-current={an ? 'page' : undefined} title={imRollbereich ? t.label : undefined}
             className={`group relative grid h-11 w-11 place-items-center rounded-[3px] transition-colors ${an ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'}`}>
       <t.icon className="h-5 w-5" />
-      <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap rounded-[3px] bg-foreground px-2.5 py-1.5 text-xs font-medium text-background opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+      {!imRollbereich && <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap rounded-[3px] bg-foreground px-2.5 py-1.5 text-xs font-medium text-background opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
         {t.label}
-      </span>
+      </span>}
     </button>
   );
 }
@@ -197,11 +199,15 @@ export default function Index() {
                 className="mb-6 grid h-11 w-11 place-items-center rounded-[3px] text-foreground">
           <Building2 className="h-7 w-7" strokeWidth={2.2} />
         </button>
-        <nav className="flex flex-1 flex-col items-center gap-1 overflow-y-auto no-scrollbar" aria-label="Hauptnavigation">
+        {/* Nur senkrecht rollbar: die Namensschilder ragten seitlich hinaus,
+            und ein schräges Wischen auf dem Trackpad schob alle Symbole
+            165 px aus dem Bild (22. November, Julian: «manchmal verschwindet
+            das links beim Scrollen»). */}
+        <nav className="flex flex-1 flex-col items-center gap-1 overflow-y-auto overflow-x-hidden overscroll-contain no-scrollbar" aria-label="Hauptnavigation">
           {gruppen.filter(g => g.titel !== 'Verwaltung').map((g, gi) => (
             <div key={g.titel} className={`flex flex-col items-center gap-1 ${gi > 0 ? 'mt-3 border-t pt-3' : ''}`}>
               {g.eintraege.map(t => (
-                <LeistenPunkt key={t.id} t={t} an={active === t.id} onClick={() => gehe(t.id)} />
+                <LeistenPunkt key={t.id} t={t} an={active === t.id} onClick={() => gehe(t.id)} imRollbereich />
               ))}
             </div>
           ))}
