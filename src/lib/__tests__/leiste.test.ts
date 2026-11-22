@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 describe('Linke Leiste', () => {
   const index = readFileSync('src/pages/Index.tsx', 'utf8');
   it('rollt nur senkrecht', () => {
-    const nav = index.match(/<nav className="([^"]*)" aria-label="Hauptnavigation">/)![1];
+    const nav = index.match(/<nav (?:ref=\{\w+\} )?className="([^"]*)" aria-label="Hauptnavigation">/)![1];
     expect(nav).toContain('overflow-y-auto');
     expect(nav).toContain('overflow-x-hidden');
   });

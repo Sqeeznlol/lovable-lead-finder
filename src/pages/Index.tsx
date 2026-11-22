@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { nachladen } from '@/lib/neue-fassung';
 import { Building2, X, Shield, Share, Plus, Map, Target, BarChart3, Gauge, HardHat, MoreHorizontal, Briefcase, LogOut, Orbit, CalendarDays, Inbox, Combine, Flame, Search, Calculator, FolderOpen } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -181,6 +181,18 @@ export default function Index() {
   };
   // Die Karten füllen den Bildschirm: ohne Kopfzeile und Ränder.
   const karteAktiv = active === 'karte' || active === 'karte3d';
+  // Der gewählte Punkt steht nie halb am Rand der Leiste (22. November,
+  // Julian: «abgehackt»): ist die Leiste niedriger als ihr Inhalt, rollt
+  // sie ihn ganz ins Bild. Nur die Leiste rollt, nicht die Seite.
+  const leiste = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const n = leiste.current, el = n?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!n || !el) return;
+    const r = el.getBoundingClientRect(), l = n.getBoundingClientRect();
+    const oben = n.scrollTop + r.top - l.top - 8, unten = oben + r.height + 16 - n.clientHeight;
+    if (n.scrollTop > oben) n.scrollTop = oben;
+    else if (n.scrollTop < unten) n.scrollTop = unten;
+  }, [active]);
   const titel = tabs.find(t => t.id === active)?.label ?? '';
 
   return (
@@ -196,16 +208,16 @@ export default function Index() {
           Überfahren daneben und für Screenreader im Knopf. */}
       <aside className="sticky top-0 hidden h-screen w-[76px] shrink-0 flex-col items-center border-r bg-card py-5 lg:flex">
         <button type="button" onClick={() => gehe('cockpit')} aria-label="Cockpit"
-                className="mb-6 grid h-11 w-11 place-items-center rounded-[3px] text-foreground">
+                className="mb-3 grid h-11 w-11 shrink-0 place-items-center rounded-[3px] text-foreground">
           <Building2 className="h-7 w-7" strokeWidth={2.2} />
         </button>
         {/* Nur senkrecht rollbar: die Namensschilder ragten seitlich hinaus,
             und ein schräges Wischen auf dem Trackpad schob alle Symbole
             165 px aus dem Bild (22. November, Julian: «manchmal verschwindet
             das links beim Scrollen»). */}
-        <nav className="flex flex-1 flex-col items-center gap-1 overflow-y-auto overflow-x-hidden overscroll-contain no-scrollbar" aria-label="Hauptnavigation">
+        <nav ref={leiste} className="relative flex min-h-0 flex-1 flex-col items-center gap-1 overflow-y-auto overflow-x-hidden overscroll-contain py-1 no-scrollbar" aria-label="Hauptnavigation">
           {gruppen.filter(g => g.titel !== 'Verwaltung').map((g, gi) => (
-            <div key={g.titel} className={`flex flex-col items-center gap-1 ${gi > 0 ? 'mt-3 border-t pt-3' : ''}`}>
+            <div key={g.titel} className={`flex flex-col items-center gap-1 ${gi > 0 ? 'mt-2 border-t pt-2' : ''}`}>
               {g.eintraege.map(t => (
                 <LeistenPunkt key={t.id} t={t} an={active === t.id} onClick={() => gehe(t.id)} imRollbereich />
               ))}
