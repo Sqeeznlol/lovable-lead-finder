@@ -255,6 +255,12 @@ senden. Alles Weitere in `docs/calc-you-later.md`.
     (21. November, Julian: «Quartierpreise in Zürich nehmen»); im Browser
     der Prüfung war der Dienst der Stadt gesperrt, darum standen Entwürfe
     mit dem Preis der ganzen Stadt da.
+    Toplage (22. November, Julian: «mach den Lagezuschlag für Toplagen»):
+    der Knopf «Toplage» unter «Annahmen» hebt den Verkaufspreis je m² um
+    20 % (`TOPLAGE`, aus Tims Mutschellenstrasse 49: 5.4 gegen 4.53 Mio.,
+    +19 %); Neubau, Baukostenstufe und Flächenwert folgen, der Ertragswert
+    nicht. Ein Mensch setzt ihn, Aurora rät nicht; er steht als Annahme
+    unter den Chancen.
     Ändert sich die Rechnung, rechnet der Ablauf «Kalkulationen neu rechnen»
     alle Entwürfe neu («zeigen», dann «schreiben»); Eingereichtes bleibt.
 

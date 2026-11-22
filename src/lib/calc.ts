@@ -56,7 +56,23 @@ export interface CalcAnnahmen extends Annahmen {
   bestandAnteil?: number;
   /** Dasselbe für Häuser ab Baujahr 1970 (Tim, 20. November), überall, nicht nur in der Stadt Zürich. */
   bestandAnteilJung?: number;
+  /**
+   * Lagezuschlag auf den Verkaufspreis je m² (0 bis 1) für eine Toplage
+   * innerhalb des Orts: Seesicht, Hanglage, gesuchte Strasse. Der Preis des
+   * Quartiers oder der Gemeinde kennt solche Lagen nicht. Leer oder 0:
+   * keine Toplage. Ein Mensch setzt ihn, Aurora rät nicht.
+   */
+  lage?: number;
 }
+
+/**
+ * Der Zuschlag, den der Knopf «Toplage» setzt (Julian, 22. November: «mach
+ * den Lagezuschlag für Toplagen»). Aus Tims Urteil zur Mutschellenstrasse 49
+ * in Wollishofen («an dieser prestigeträchtigen Lage ... würde auch 6 Mio.
+ * bezahlen»): sein Preis 5.4 Mio. gegen 4.53 Mio. der Rechnung, +19 %,
+ * gerundet 20 %. Ein Urteil ist wenig: unter «Annahmen» änderbar.
+ */
+export const TOPLAGE = 0.2;
 /**
  * Julian, 16. November: «Wir brauchen eine Gewinnmarge von 20 %», und
  * «bei Miete rechnest du 6500/m² Baukosten». In den Baukosten sind die
@@ -493,7 +509,11 @@ export function zoneMitHand(zone: ZonenRegeln | null, hand: VonHand): ZonenRegel
 }
 
 export function bewerten(e: CalcEingabe): Bewertung {
-  const a = e.annahmen, u = e.umfeld, g = e.grundlage;
+  // Eine Toplage hebt den Verkaufspreis je m²; alles, was daran hängt
+  // (Neubau, Baukostenstufe, Flächenwert des Bestands), folgt.
+  const lage = pos(e.annahmen.lage) ? Math.min(1, e.annahmen.lage!) : 0;
+  const a = lage ? { ...e.annahmen, erloes: Math.round((e.annahmen.erloes * (1 + lage)) / 100) * 100 } : e.annahmen;
+  const u = e.umfeld, g = e.grundlage;
   const zone = zoneMitHand(g.zone, e.hand);
   const studie = studieRechnen({ ...g, zone, annahmen: a });
   const flaeche = studie.flaeche;
@@ -682,6 +702,7 @@ export function bewerten(e: CalcEingabe): Bewertung {
 
   // ---- Chancen und Risiken: jeder Satz mit seiner Zahl
   const chancen: string[] = [], risiken: string[] = [];
+  if (lage) chancen.push(`Toplage: Verkaufspreis ${Math.round(lage * 100)} % über dem des Orts, CHF ${de(a.erloes)} statt ${de(e.annahmen.erloes)} je m² (Annahme).`);
   const jahr = e.jahr ?? new Date().getFullYear();
   const registerStand = e.projekt?.stand ? `, Stand ${e.projekt.stand}` : '';
   if (handHnf) {

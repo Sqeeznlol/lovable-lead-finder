@@ -13,7 +13,7 @@ import { adresseWaehlen, suchtext } from '@/lib/adresswahl';
 import type { Projekt } from '@/lib/bauprojekt';
 import { ProjektHinweis } from '@/components/ProjektHinweis';
 import { aufParzelle, useGesucheParzelle } from '@/components/BaugesucheParzelle';
-import { bewerten, CALC_ANNAHMEN, flaechenAnteil, ERLOES_ANNAHME, median, nachbarArt, type CalcAnnahmen, type CalcEingabe, type ErloesQuelle, type Kauf, type NachbarTeil, type Umfeld, type Vergleich, type VonHand } from '@/lib/calc';
+import { bewerten, CALC_ANNAHMEN, TOPLAGE, flaechenAnteil, ERLOES_ANNAHME, median, nachbarArt, type CalcAnnahmen, type CalcEingabe, type ErloesQuelle, type Kauf, type NachbarTeil, type Umfeld, type Vergleich, type VonHand } from '@/lib/calc';
 import { ERLOES_AMTLICH } from '@/lib/erloes-daten';
 import { ERLOES_ANGABEN } from '@/lib/erloes-angaben';
 import { angabePruefen, erloesHerleiten, quartierLaden, reihenLaden } from '@/lib/preis-herleitung';
@@ -411,6 +411,8 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
         </div>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Zahl titel="Erlös je m² Nutzfläche" wert={annahmen.erloes} einheit="CHF" min={2000} max={60000} schritt={100} setWert={n => erloesSetzen(n, { art: 'hand', text: 'von Hand eingegeben' })} />
+          {/* Toplage im Ort (22. November): ein Mensch entscheidet, Aurora rät nicht. */}
+          <Zahl titel="Lagezuschlag Toplage" wert={Math.round((annahmen.lage ?? 0) * 1000) / 10} einheit="%" min={0} max={100} schritt={5} setWert={n => setze({ lage: n / 100 })} />
           <Offen titel="Baukosten je m² Nutzfläche" wert={annahmen.baukostenHnf} einheit="CHF" platz={b.neubau ? de(b.neubau.baukostenJeM2) : undefined} setWert={n => setze({ baukostenHnf: n })} />
           {/* Sind Pläne oder Zahlen des Bauherrn bekannt, gehen sie der Formel vor (YOMORI, 18. November). */}
           <Offen titel="Nutzfläche laut Projekt" wert={hand.projektHnf} einheit="m²" platz={b.neubau && !b.neubau.projektHand ? de(Math.round(b.neubau.hnf)) : undefined} setWert={n => vonHand({ projektHnf: n })} />
@@ -424,6 +426,13 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
           <Zahl titel="Abbruch je m² Bestand" wert={annahmen.abbruch} einheit="CHF" min={0} max={2000} schritt={10} setWert={n => setze({ abbruch: n })} />
           <Zahl titel="Rendite des Käufers" wert={Math.round(annahmen.rendite * 1000) / 10} einheit="%" min={1} max={12} schritt={0.1} setWert={n => setze({ rendite: n / 100 })} />
           {flaechenWert && <Zahl titel={flaechenWert.feld === 'bestandAnteilJung' ? 'Bestand je m² (ab 1970), Anteil am Erlös' : 'Bestand je m², Anteil am Erlös'} wert={Math.round(flaechenWert.anteil * 1000) / 10} einheit="%" min={0} max={100} schritt={0.1} setWert={n => setze({ [flaechenWert.feld]: n / 100 })} />}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" aria-pressed={(annahmen.lage ?? 0) > 0} onClick={() => setze({ lage: (annahmen.lage ?? 0) > 0 ? 0 : TOPLAGE })}
+                  className={`min-h-11 rounded-[3px] border px-4 text-sm ${(annahmen.lage ?? 0) > 0 ? 'border-foreground bg-foreground text-background' : 'bg-card hover:bg-secondary'}`}>
+            Toplage{(annahmen.lage ?? 0) > 0 ? ` · +${Math.round((annahmen.lage ?? 0) * 100)} %` : ` (+${Math.round(TOPLAGE * 100)} %)`}
+          </button>
+          <span className="text-sm text-muted-foreground">Seesicht, Hanglage, gesuchte Strasse: der Verkaufspreis des Orts reicht hier nicht.</span>
         </div>
         {/* Woraus die Baukosten bestehen: die Stufe nach Verkaufspreis und die Zuschläge. */}
         {b.neubau && (

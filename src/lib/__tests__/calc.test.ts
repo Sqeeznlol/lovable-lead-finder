@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { vi } from 'vitest';
 vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
-import { baukostenNachErloes, bewerten, CALC_ANNAHMEN, flaechenAnteil, hangZuschlag, kleinZuschlag, hnfPraxis, median, mieteStatistik, nachbarArt, zoneMitHand, zuerichKm, zuerichZuschlag, type CalcEingabe } from '@/lib/calc';
+import { baukostenNachErloes, bewerten, CALC_ANNAHMEN, TOPLAGE, flaechenAnteil, hangZuschlag, kleinZuschlag, hnfPraxis, median, mieteStatistik, nachbarArt, zoneMitHand, zuerichKm, zuerichZuschlag, type CalcEingabe } from '@/lib/calc';
 import { angebotEntwurf, betrag, uhr } from '@/lib/calc-ablauf';
 import { gebaeudeAusRegister } from '@/lib/calc-daten';
 import { REGISTER_MFH_2019 } from './register-beispiel';
@@ -692,5 +692,26 @@ describe('CALC YOU LATER: Bestand ab 1970 (Tim)', () => {
     expect(flaechenAnteil(e, 2019)).toEqual({ anteil: 0.719, feld: 'bestandAnteilJung' });
     expect(flaechenAnteil(e, 1911)).toBeNull();
     expect(flaechenAnteil({ ...e, umfeld: { gemeinde: 'Zürich' } }, 1908)).toEqual({ anteil: 0.569, feld: 'bestandAnteil' });
+  });
+});
+
+/**
+ * Lagezuschlag für Toplagen (Julian, 22. November). Aus Tims Urteil zur
+ * Mutschellenstrasse 49: +19 % auf die Rechnung, gerundet 20 %.
+ */
+describe('CALC YOU LATER: Toplage', () => {
+  // Unbebaut: der Neubau zählt. Bei einem Altbau, der über die Miete zählt,
+  // ändert die Toplage nichts; dort hebt sie den Flächenwert, wo er gilt.
+  const e: CalcEingabe = leer;
+  it('hebt den Verkaufspreis je m², und damit Neubau und Empfehlung', () => {
+    const ohne = bewerten(e), mit = bewerten({ ...e, annahmen: { ...e.annahmen, lage: TOPLAGE } });
+    expect(TOPLAGE).toBe(0.2);
+    expect(mit.neubau!.erloes / ohne.neubau!.erloes).toBeCloseTo(1.2, 2);
+    expect(mit.empfehlung).toBeGreaterThan(ohne.empfehlung!);
+    expect(mit.chancen.some(c => c.startsWith('Toplage: Verkaufspreis 20 %'))).toBe(true);
+    expect(ohne.chancen.some(c => c.startsWith('Toplage'))).toBe(false);
+  });
+  it('ohne Angabe keine Toplage: Aurora rät nicht', () => {
+    expect(CALC_ANNAHMEN.lage).toBeUndefined();
   });
 });
