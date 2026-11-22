@@ -205,8 +205,31 @@ export function KennzahlenTim() {
       </div>
       {zieleFehler && <p className="text-xs text-muted-foreground">Ausgangswerte und Ziele brauchen die Migration 20261103230000; die heutigen Werte stehen trotzdem.</p>}
       {isLoading && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> wird gezählt …</p>}
+      {/* Auf dem Handy eine Zeile je Kennzahl: was sie misst und wo sie heute
+          steht. Ausgangswert und Ziel setzt man am Computer (22. November:
+          auf dem Handy Listen statt breiter Tabellen, DESIGN.md). */}
       {data && (
-        <div className="overflow-x-auto rounded border bg-card">
+        <ul className="divide-y rounded border bg-card sm:hidden">
+          {data.liste.map(k => {
+            const zi = ziel(k.id);
+            const erreicht = zi?.ziel != null && k.wert != null && k.wert >= zi.ziel;
+            return (
+              <li key={k.id} className="flex items-start justify-between gap-4 px-4 py-3">
+                <span className="min-w-0">
+                  <span className="block text-[15px]">{k.titel}</span>
+                  <span className="block text-xs text-muted-foreground">{k.bereich}</span>
+                </span>
+                <span className="shrink-0 text-right tabular-nums">
+                  <span className="block font-medium">{k.messbar === false ? '–' : z(k.wert, k.einheit)}</span>
+                  {zi?.ziel != null && <span className={`block text-xs ${erreicht ? 'text-gruen' : 'text-muted-foreground'}`}>Ziel {z(zi.ziel, k.einheit)}</span>}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {data && (
+        <div className="hidden overflow-x-auto rounded border bg-card sm:block">
           <table className="w-full min-w-[640px] text-sm">
             <thead className="text-left text-[11px] uppercase tracking-wide text-muted-foreground">
               <tr><th className="px-4 py-2 font-medium">Bereich</th><th className="px-4 py-2 font-medium">Kennzahl</th><th className="px-4 py-2 text-right font-medium">Ausgangswert</th><th className="px-4 py-2 text-right font-medium">Heute</th><th className="px-4 py-2 text-right font-medium">Ziel</th></tr>

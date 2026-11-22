@@ -291,7 +291,6 @@ export function Auswertung() {
   return (
     <Seite bild={BILD.auswertung} ueber="Auswertung · Gespräche, Anfragen, Investoren"
       titel={data && data.anrufe != null ? `${z(data.anrufe)} Gespräche, ${z(data.profile ?? 0)} Suchprofile` : 'Gespräche und Suchprofile'}
-      unter="Reaktivierung, Investoren und Kennzahlen, aus den erfassten Gesprächen und Gelegenheiten."
       kennzahlen={data ? [
         { titel: 'Gespräche', wert: z(data.anrufe), marke: <Marke art="lila">{pct(data.erreicht, data.anrufe) ?? 0} % erreicht</Marke> },
         { titel: 'Suchprofile', wert: z(data.profile), marke: <Marke art="violett">Investoren</Marke> },
