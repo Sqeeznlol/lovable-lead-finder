@@ -89,6 +89,7 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
   // Leer heisst: noch nichts von Hand, dann gelten Parzellen und Eigentümer der Rechnung.
   const [parzellenHand, setParzellen] = useState<Parzelle[] | null>(entwurf?.parzellen?.length ? entwurf.parzellen : null);
   const [personenHand, setPersonen] = useState<Person[] | null>(entwurf?.personen?.length ? entwurf.personen : null);
+  const [empfaengerFehlt, setEmpfaengerFehlt] = useState(false);
   const [name, setName] = useName();
   const [laeuft, setLaeuft] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
@@ -214,6 +215,9 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
     ...(b?.zusammen?.lohnt && b.empfehlung === b.zusammen.empfehlung ? b.zusammen.teile.map(t => ({ nummer: t.nummer ?? '', flaeche: Math.round(t.flaeche), egrid: t.egrid })) : []),
   ] : []);
   const personen: Person[] = personenHand ?? personenAusEigentuemer(basis?.eigentuemer);
+  // Ist der Empfänger angekreuzt, verschwindet auch die Meldung unten beim Knopf.
+  const mitEmpfaenger = empfaenger(personen).length > 0;
+  useEffect(() => { if (empfaengerFehlt && mitEmpfaenger) { setEmpfaengerFehlt(false); setFehler(null); } }, [empfaengerFehlt, mitEmpfaenger]);
 
   const andere = () => { setGewaehlt(null); setText(''); setGesucht(''); setHand({}); setAnnahmen(CALC_ANNAHMEN); setErloesQuelle(ERLOES_ANNAHME); setNachbarn([]); setNachbarnAuf(false); setFehler(null); };
   const erloesSetzen = (erloes: number, quelle: ErloesQuelle) => { setAnnahmen(a => ({ ...a, erloes })); setErloesQuelle(quelle); };
@@ -221,7 +225,13 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
   const speichern = async (einreichen: boolean) => {
     if (!basis || !eingabe || !b) return;
     if (einreichen && !name.trim()) { setFehler('Bitte deinen Namen angeben: er steht im Verlauf.'); return; }
-    if (einreichen && !empfaenger(personen).length) { setFehler('Bitte wählen, an wen das Angebot geht: bei einer Person «Bekommt das Angebot» ankreuzen.'); return; }
+    if (einreichen && !empfaenger(personen).length) {
+      // Das Kästchen steht weiter oben unter «Für das Angebot»: dorthin, mit dem Hinweis beim Kästchen.
+      setEmpfaengerFehlt(true);
+      setFehler('Bitte wählen, an wen das Angebot geht: oben unter «Für das Angebot» bei einer Person «Bekommt das Angebot» ankreuzen.');
+      document.getElementById('calc-empfaenger')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
     setLaeuft(true); setFehler(null);
     try {
       let k = await entwurfSpeichern({
@@ -572,7 +582,7 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
         </div>
       </section>
 
-      <Empfaenger quelle={quelle} setQuelle={setQuelle} parzellen={parzellen} setParzellen={setParzellen} personen={personen} setPersonen={setPersonen} />
+      <Empfaenger quelle={quelle} setQuelle={setQuelle} parzellen={parzellen} setParzellen={setParzellen} personen={personen} setPersonen={setPersonen} fehlt={empfaengerFehlt} />
 
       <section className="space-y-3 rounded-[3px] border bg-card p-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -594,7 +604,7 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
           <button type="button" className={KNOPF} disabled={laeuft} onClick={() => void speichern(false)}>Als Entwurf speichern</button>
           {entwurf && <button type="button" className={KNOPF} disabled={laeuft} onClick={() => void verwerfen()}>Entwurf löschen</button>}
         </div>
-        <p className="text-sm text-muted-foreground">Mit dem Einreichen läuft die Uhr: David prüft den Preis, Tim visiert, Julian kontrolliert, Tim bestätigt, David verschickt, alles in 24 Stunden.</p>
+        <p className="text-sm text-muted-foreground">Mit dem Einreichen läuft die Uhr: Phase 2 Preis festlegen, Phase 3 verschicken, beides in 24 Stunden.</p>
       </section>
 
       {/* Schon zum Entwurf lässt sich sagen, ob der Preis stimmt; die Datenbank misst gegen die gespeicherte Empfehlung. */}

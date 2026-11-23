@@ -54,6 +54,12 @@ describe('Angebot: Empfänger und Anrede', () => {
   it('aus dem Grundbuch-Feld wird ein Vorschlag: Name zuerst, Firmen als Firma', () => {
     const p = personenAusEigentuemer('Muster Anna; TEST Bau AG');
     expect(p.map(x => [x.vorname, x.name, x.firma])).toEqual([['Anna', 'Muster', ''], ['', '', 'TEST Bau AG']]);
+    // Bei mehreren entscheidet ein Mensch, wer das Angebot bekommt.
+    expect(p.some(x => x.empfaenger)).toBe(false);
+  });
+
+  it('ein einziger Eigentümer bekommt das Angebot von selbst (23. November)', () => {
+    expect(personenAusEigentuemer('Muster Anna').map(x => x.empfaenger)).toEqual([true]);
   });
 });
 

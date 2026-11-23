@@ -52,7 +52,7 @@ export function AblaufPersonen() {
       rechts={isAdmin && !offen ? <button type="button" className={KNOPF} onClick={() => setOffen({ ...LEER })}><Plus className="h-4 w-4" /> Person</button> : undefined}>
       {liste.isLoading ? <Leer titel="Lädt …" />
         : liste.error ? <Leer titel="Die Rollen liessen sich nicht laden.">Ist die Migration vom 19. November eingespielt?</Leer>
-        : !liste.data?.length && !offen ? <Leer titel="Noch niemand eingetragen.">{isAdmin ? 'Mit «Person» eintragen, wer prüft, visiert, kontrolliert, versendet und für welche Firma unterschreibt.' : 'Das trägt ein Admin ein.'}</Leer>
+        : !liste.data?.length && !offen ? <Leer titel="Noch niemand eingetragen.">{isAdmin ? 'Mit «Person» eintragen, wer den Preis festlegt und verschickt und für welche Firma unterschreibt.' : 'Das trägt ein Admin ein.'}</Leer>
         : (
           <ul className={LISTE}>
             {(liste.data ?? []).map(p => (

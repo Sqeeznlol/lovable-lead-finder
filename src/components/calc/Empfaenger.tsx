@@ -21,20 +21,22 @@ function Feld({ titel, wert, setWert, platz, art = 'text', breit }: { titel: str
   );
 }
 
-export function Empfaenger({ quelle, setQuelle, parzellen, setParzellen, personen, setPersonen }: {
+export function Empfaenger({ quelle, setQuelle, parzellen, setParzellen, personen, setPersonen, fehlt }: {
   quelle: 'aurora' | 'mail'; setQuelle: (q: 'aurora' | 'mail') => void;
   parzellen: Parzelle[]; setParzellen: (p: Parzelle[]) => void;
   personen: Person[]; setPersonen: (p: Person[]) => void;
+  /** Einreichen scheiterte am fehlenden Empfänger: hier steht, was zu tun ist. */
+  fehlt?: boolean;
 }) {
   const person = (i: number, teil: Partial<Person>) => setPersonen(personen.map((p, j) => (j === i ? { ...p, ...teil } : p)));
   const parzelle = (i: number, teil: Partial<Parzelle>) => setParzellen(parzellen.map((p, j) => (j === i ? { ...p, ...teil } : p)));
   const an = personen.filter(p => p.empfaenger).length;
 
   return (
-    <section className="space-y-5">
+    <section id="calc-empfaenger" className="scroll-mt-24 space-y-5">
       <div>
         <h3 className="text-lg">Für das Angebot</h3>
-        <p className="text-sm text-muted-foreground">Welche Parzellen, wem sie gehören und an wen der Brief geht. David wählt danach Firma und Vorlage (die Schrift gehört zur Firma).</p>
+        <p className="text-sm text-muted-foreground">Welche Parzellen, wem sie gehören und an wen der Brief geht. Firma und Vorlage wählt danach, wer den Preis festlegt (Phase 2).</p>
       </div>
 
       <div className="space-y-1.5">
@@ -63,6 +65,13 @@ export function Empfaenger({ quelle, setQuelle, parzellen, setParzellen, persone
 
       <div className="space-y-2">
         <p className={ETIKETT}>Eigentümer und Vertretung {an ? `· ${an} Empfänger` : '· noch kein Empfänger'}</p>
+        {/* Die Meldung steht hier, beim Kästchen, nicht nur unten beim Knopf
+            (23. November, Julian: «wo muss ich das eingeben?»). */}
+        {fehlt && !an && (
+          <p className="text-[15px] font-medium text-destructive" role="alert">
+            {personen.length ? 'Bei der Person, die den Brief bekommt, «Bekommt das Angebot» ankreuzen.' : 'Mit «Person» den Eigentümer erfassen: er bekommt das Angebot.'}
+          </p>
+        )}
         <ul className="space-y-3">
           {personen.map((p, i) => (
             <li key={i} className={`space-y-3 rounded-[3px] border p-3 ${p.empfaenger ? 'border-foreground' : ''}`}>

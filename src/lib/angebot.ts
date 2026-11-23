@@ -148,13 +148,17 @@ export interface Parzelle {
  */
 export function personenAusEigentuemer(text: string | null | undefined): Person[] {
   if (!text?.trim()) return [];
-  return text.split(/\s*(?:;|\n|\s\/\s)\s*/).map(t => t.trim()).filter(Boolean).slice(0, 10).map(t => {
+  const liste = text.split(/\s*(?:;|\n|\s\/\s)\s*/).map(t => t.trim()).filter(Boolean).slice(0, 10).map(t => {
     const firma = /\b(AG|GmbH|Genossenschaft|Stiftung|Erbengemeinschaft|Verein|SA|Sàrl|Gemeinde|Kanton|Stadt)\b/i.test(t);
     if (firma) return leerePerson({ firma: t });
     const teile = t.replace(/,.*$/, '').split(/\s+/);
     // Das Grundbuch schreibt «Muster Hans»: Name zuerst.
     return leerePerson({ name: teile[0] ?? t, vorname: teile.slice(1).join(' ') });
   });
+  // Gibt es nur einen Eigentümer, ist nichts zu entscheiden: er bekommt das
+  // Angebot (23. November, Julian fand das Kästchen nicht: «wo muss ich das
+  // eingeben?»). Bei mehreren entscheidet ein Mensch.
+  return liste.length === 1 ? [{ ...liste[0], empfaenger: true }] : liste;
 }
 
 // ------------------------------------------------------------- Felder je Angebot

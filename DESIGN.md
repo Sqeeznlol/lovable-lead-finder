@@ -163,6 +163,11 @@ muss».
   die Zählungen nicht kreuzen.
 - Eine leere Liste nennt den nächsten Schritt als Knopf (`aktion` von
   `Leer`): «Letzte 90 Tage zeigen», «Alle zeigen», «Neues Vorhaben».
+- Eine Meldung steht dort, wo man sie behebt (23. November, Julian zum
+  Einreichen in CALC: «wo muss ich das eingeben?»): fehlt eine Angabe,
+  springt die Seite zum Feld und sagt dort rot, was zu tun ist; unten beim
+  Knopf steht nur, wo. Gibt es nur eine Wahl, ist sie getroffen: ein
+  einziger Eigentümer bekommt das Angebot von selbst.
 - Die Objektansicht beginnt mit dem nächsten Schritt: «Kaufpreis
   kalkulieren» schwarz unter der Adresse. Merkmale ohne Wert stehen
   nicht da, statt als Strich; nichts steht zweimal.

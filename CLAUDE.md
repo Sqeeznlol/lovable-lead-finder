@@ -245,6 +245,12 @@ senden. Alles Weitere in `docs/calc-you-later.md`.
     in jeder Zeile der Liste, in den Kennzahlen und im Titel der offenen
     Kalkulation. Die Namen kommen aus der Datenbank; ohne Eintrag steht
     keiner (`phase()` in `calc-ablauf.ts`, `calc-phase.test.ts`).
+    Wer den Brief bekommt, kreuzt man in Phase 1 unter «Für das Angebot»
+    an («Bekommt das Angebot» bei der Person). Seit dem 23. November
+    (Julian: «wo muss ich das eingeben?») ist ein einziger Eigentümer aus
+    dem Grundbuch vorgewählt, und «Zur Prüfung einreichen» ohne Empfänger
+    springt dorthin und zeigt den Hinweis beim Kästchen
+    (`calc-empfaenger.test.ts`).
 
   * Der Bestand zählt mit dem Höheren aus Ertragswert und Flächenwert
     (20. November, Tim zur Schöneggstrasse 18: «10k/m² HNF ... manchmal
