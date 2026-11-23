@@ -226,7 +226,7 @@ senden. Alles Weitere in `docs/calc-you-later.md`.
     Tim legt den Preis fest (Urteil mit Grund, Firma und Vorlage), Tim
     verschickt. Der Weg durch vier Hände vom 19. November (David, Tim,
     Julian, Tim, David) gilt nicht mehr. Die Schrift gehört zur Firma
-    (stimo Nunito Sans, Studer Carlito); gewählt werden nur Firma und
+    (stimo Nunito Sans, Studer Helvetica wie Arial); gewählt werden nur Firma und
     Vorlage. Die Datenbank erzwingt Weg und Rolle
     (`20261122150000_tim_entscheidet_angebot.sql`, Rolle «visum»); wer was
     tut, steht nur in der Datenbank (`angebot_person`), nie im Repository,
@@ -251,6 +251,21 @@ senden. Alles Weitere in `docs/calc-you-later.md`.
     dem Grundbuch vorgewählt, und «Zur Prüfung einreichen» ohne Empfänger
     springt dorthin und zeigt den Hinweis beim Kästchen
     (`calc-empfaenger.test.ts`).
+    Studer schreibt genau wie seine Word-Vorlage (23. November, Julian:
+    «die Studer Immobilien Vorlage muss genau so sein wie ich geschickt
+    habe mit dem Layout, da ändert sich Besitzer, Preis und die
+    Parzellen-Infos»): Logo oben rechts (`public/marken`), Arial 11
+    (Helvetica, gleich breit), Leerzeilen in Times 10, die Eckpunkte mit
+    1.5 Zeilen, das Datum eingerückt, der Fuss wörtlich. Es ändern nur
+    Eigentümer («Familie …» bei gleichem Namen), Preis in Zahlen und
+    Worten, Parzellen, dazu Datum, Eigentumsübertragung (leer: ein Jahr
+    nach dem Brief) und Gültigkeit (sechs Wochen). Vorlagenwahl und
+    eigener Wortlaut gelten bei Studer nicht (`studerBrief`). Wie Word
+    setzt, ist nachgesehen, nicht geraten: den Mehrraum von 1.5 Zeilen
+    legt Word unter den Text (an PDF gemessen, die Word schrieb).
+    `studer-angebot.test.ts` prüft Wortlaut und Lage jedes Elements gegen
+    die Masse der Vorlage. Die Vorlage selbst nennt echte Eigentümer und
+    gehört nie ins Repository.
 
   * Der Bestand zählt mit dem Höheren aus Ertragswert und Flächenwert
     (20. November, Tim zur Schöneggstrasse 18: «10k/m² HNF ... manchmal

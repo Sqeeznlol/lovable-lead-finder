@@ -23,7 +23,7 @@ const ehepaar: Person[] = [
 
 function kontext(vorlage: VorlageId, o: Partial<Kontext> = {}): Kontext {
   return {
-    firma: FIRMEN.stimo, felder: { ...felderVorgabe(vorlage, new Date('2026-12-10T10:00:00')), unterschriften: [{ name: 'TEST Unterschrift', titel: 'CEO' }] },
+    firma: FIRMEN.stimo, felder: { ...felderVorgabe(vorlage, new Date('2026-12-10T10:00:00'), o.firma?.id), unterschriften: [{ name: 'TEST Unterschrift', titel: 'CEO' }] },
     preis: 3_450_000, adresse: 'Musterweg 12', plzOrt: '8400 Winterthur', gemeinde: 'Winterthur', kanton: 'ZH',
     zone: 'Wohnzone W2/1.6', parzellen: [{ nummer: 'SE9999', flaeche: 2112 }], personen: ehepaar, ...o,
   };
@@ -82,7 +82,8 @@ describe('Angebot: Zahlen und Parzellen', () => {
 describe('Angebot: die fünf Vorlagen', () => {
   it('jede Vorlage nennt Adresse, Parzelle und die Kosten und hat keine offenen Platzhalter', () => {
     for (const v of Object.keys(VORLAGEN) as VorlageId[]) {
-      const b = brief(v, kontext(v, { firma: v === 'unverbindlich' ? FIRMEN.studer : v === 'bedingt' || v === 'bieterverfahren' ? FIRMEN.lebensraum : FIRMEN.stimo }));
+      // Studer schreibt seit dem 23. November seinen eigenen Brief (studer-angebot.test.ts); die Vorlagen hier mit stimo und Lebensraum.
+      const b = brief(v, kontext(v, { firma: v === 'bedingt' || v === 'bieterverfahren' ? FIRMEN.lebensraum : FIRMEN.stimo }));
       const alles = [b.betreff, ...b.einleitung, b.betragZeile, b.betragUnter, ...b.punkte.map(p => `${p.titel ?? ''} ${p.text}`), ...b.schluss].join(' ');
       expect(alles, v).toMatch(/SE9999/);
       expect(alles, v).toMatch(/Musterweg 12/);
@@ -166,7 +167,7 @@ describe('Angebot: Nachricht an die nächste Hand', () => {
 });
 
 // Das PDF, gelesen wie von einem Menschen.
-const schriften = async (datei: string) => { const b = readFileSync(join('public/schriften', datei)); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength); };
+const schriften = async (pfad: string) => { const b = readFileSync(join('public', pfad)); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength); };
 const pdftotext = !spawnSync('pdftotext', ['-v']).error;
 
 async function lesen(vorlage: VorlageId, firma: keyof typeof FIRMEN, schrift: 'nunito' | 'helvetica' | 'carlito' | 'dmsans' | 'serif') {
@@ -192,11 +193,12 @@ describe.skipIf(!pdftotext)('Angebot: das PDF', () => {
     }
   }, 30_000);
 
-  it('Lebensraum mit nummerierten Bedingungen und Zahlung, Studer als Brief mit Preis in Worten', async () => {
+  it('Lebensraum mit nummerierten Bedingungen und Zahlung, Studer wie seine Vorlage mit Preis in Worten', async () => {
     const l = (await lesen('bedingt', 'lebensraum', 'helvetica')).text.replace(/\s+/g, ' ');
     for (const s of ['Lebensraum Schweiz AG', 'B E D I N G U N G E N', '01 Kaufobjekt', 'Anzahlung', 'Restkaufpreis', 'CHF 3’200’000', 'Seite 1']) expect(l, s).toContain(s);
-    const st = (await lesen('unverbindlich', 'studer', 'carlito')).text.replace(/\s+/g, ' ');
-    for (const s of ['Studer Immobilien Schweiz AG', 'Wollerau, 10. Dezember 2026', 'Unverbindliches Kaufangebot', 'Kaufpreis: CHF 3’450’000 (drei Millionen vierhundertfünfzigtausend Franken)', 'Reservationszahlung']) {
+    const st = (await lesen('unverbindlich', 'studer', 'helvetica')).text.replace(/\s+/g, ' ');
+    for (const s of ['Studer Immobilien Schweiz AG | Sihleggstrasse 23', 'Wollerau, 10. Dezember 2026', 'Unverbindliches Kaufangebot', "CHF 3'450'000.- (drei Millionen vierhundertfünfzigtausend)",
+      "Kaufpreis: CHF 3'450'000.-, umfassend das Grundstück mit der Parzellennummer SE9999.", 'Gültigkeit: Dieses Angebot ist gültig bis zum 21. Januar 2027.', 'Freundliche Grüsse']) {
       expect(st, s).toContain(s);
     }
   }, 30_000);

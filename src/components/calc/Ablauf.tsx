@@ -6,8 +6,8 @@ import { Bemerkungen } from '@/components/calc/Bemerkungen';
 import { Ergebnis, Objektkopf } from '@/components/calc/Ergebnis';
 import { useJetzt, useName } from '@/components/calc/name';
 import {
-  adressbloecke, AM_ZUG, anrede, brief, deckblattBreite, empfaenger, felderVorgabe, FIRMEN, FIRMEN_WAHL, katNummern, lernen, LERNEN_AB, luecken, nachricht, punkteAlsText,
-  SCHRIFTEN, URTEIL_TEXT, VORLAGEN, vorlageVorschlag, vorschlag, type AblaufPerson, type AngebotFelder, type FirmaId, type Kontext,
+  adressbloecke, AM_ZUG, anrede, brief, datumLang, deckblattBreite, empfaenger, felderVorgabe, FIRMEN, FIRMEN_WAHL, katNummern, lernen, LERNEN_AB, luecken, monatJahr, nachricht, punkteAlsText,
+  SCHRIFTEN, spaeter, URTEIL_TEXT, VORLAGEN, vorlageVorschlag, vorschlag, type AblaufPerson, type AngebotFelder, type FirmaId, type Kontext,
   type Unterschrift, type Urteil, type VorlageId,
 } from '@/lib/angebot';
 import {
@@ -42,7 +42,7 @@ const betragLesen = (t: string): number | null => {
 
 /** Die Felder des Briefs: was gespeichert ist, über den Vorgaben der Vorlage. */
 function felderAus(k: Kalkulation, vorlage: VorlageId, personen: AblaufPerson[], firma: FirmaId): AngebotFelder {
-  const vorgabe = felderVorgabe(vorlage);
+  const vorgabe = felderVorgabe(vorlage, new Date(), firma);
   const unterschreiben = personen.filter(p => p.rollen.includes('unterschrift') && p.firma === firma)
     .map<Unterschrift>(p => ({ name: p.name, titel: p.titel ?? '', telefon: p.telefon, email: p.email }));
   return {
@@ -128,7 +128,7 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
   }, [k.id, k.zustand, leute.data]);
   useEffect(() => {
     setMailText(k.angebot_text ?? [
-      `${anrede(k.personen ?? [])}`,
+      `${anrede(k.personen ?? [], k.firma === 'studer')}`,
       `Im Anhang erhalten Sie unser Kaufangebot für ${k.adresse} in ${k.gemeinde ?? ''}.`.replace(/ in \.$/, '.'),
       'Für Fragen stehen wir Ihnen gerne zur Verfügung.',
       `Freundliche Grüsse\n${name}`,
@@ -146,7 +146,15 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
   const ktx = kontextAus(k, firma, felder, preisJetzt);
   const fehlt = luecken({ ...ktx, felder, firma, vorlage });
   const bearbeitbar = k.zustand === 'pruefung';
-  const daten = (): SchrittDaten => ({ firma, vorlage, schrift, angebot: felder });
+  const daten = (): SchrittDaten => ({ firma, vorlage: firma === 'studer' ? 'unverbindlich' : vorlage, schrift, angebot: felder });
+  // Studer schreibt immer seinen Brief (23. November, Julian: «genau so wie ich geschickt habe»):
+  // beim Wechsel zu Studer oder weg davon gelten die Vorgaben neu, sonst bleibt, was eingetragen ist.
+  const firmaWaehlen = (f: FirmaId) => {
+    const wechsel = (f === 'studer') !== (firma === 'studer');
+    const v: VorlageId = f === 'studer' ? 'unverbindlich' : wechsel ? vorlageVorschlag({ gebaeude, massgebend: k.ergebnis.massgebend, empfaenger: empfaenger(k.personen ?? []) }) : vorlage;
+    setFirma(f); setVorlage(v);
+    setFelder(x => ({ ...(wechsel ? { ...felderVorgabe(v, new Date(), f), datum: x.datum, ortsteil: x.ortsteil } : x), unterschriften: [], kontakt: null, ...unterschriftenFuer(personen, f) }));
+  };
 
   const amZug = AM_ZUG[k.zustand];
   const zugLeute = amZug ? personen.filter(p => p.rollen.includes(amZug)) : [];
@@ -174,7 +182,7 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
       bild.current ??= luftbild(k);
       const doc = await angebotPdf({
         firma: FIRMEN[firma], schrift, brief: brief(vorlage, ktx), preis: preisJetzt, felder,
-        adressbloecke: adressbloecke(k.personen ?? []), anrede: anrede(k.personen ?? []),
+        adressbloecke: adressbloecke(k.personen ?? [], firma === 'studer'), anrede: anrede(k.personen ?? [], firma === 'studer'),
         titel: k.adresse, untertitel: [k.plz, felder.ortsteil.trim() || k.gemeinde].filter(Boolean).join(' '),
         kat: [katNummern(k.parzellen ?? []).length ? `Kat.-Nr. ${katNummern(k.parzellen ?? []).join(' / ')}` : '', ort].filter(Boolean).join(' · '),
         luftbild: await bild.current, test: k.test,
@@ -353,11 +361,11 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
               </label>
               <div className="border-t pt-4">
                 <p className={ETIKETT}>Teil 2 von 2</p>
-                <Aufklapper titel={`Angebot: ${FIRMEN[firma].name} · ${VORLAGEN[vorlage].titel}`} unter={fehlt.length ? `${fehlt.length} ${fehlt.length === 1 ? 'Angabe fehlt' : 'Angaben fehlen'}` : 'Firma und Vorlage'} auf={angebotAuf} setAuf={setAngebotAuf} gross />
+                <Aufklapper titel={`Angebot: ${FIRMEN[firma].name} · ${firma === 'studer' ? VORLAGEN.unverbindlich.art : VORLAGEN[vorlage].titel}`} unter={fehlt.length ? `${fehlt.length} ${fehlt.length === 1 ? 'Angabe fehlt' : 'Angaben fehlen'}` : 'Firma und Vorlage'} auf={angebotAuf} setAuf={setAngebotAuf} gross />
               </div>
               {angebotAuf && (
-              <AngebotBearbeiten k={k} firma={firma} setFirma={f => { setFirma(f); setFelder(x => ({ ...x, unterschriften: [], kontakt: null, ...unterschriftenFuer(personen, f) })); }}
-                vorlage={vorlage} setVorlage={v => { setVorlage(v); setFelder(x => ({ ...felderVorgabe(v), datum: x.datum, ortsteil: x.ortsteil, kontakt: x.kontakt, unterschriften: x.unterschriften })); }}
+              <AngebotBearbeiten k={k} firma={firma} setFirma={firmaWaehlen}
+                vorlage={vorlage} setVorlage={v => { setVorlage(v); setFelder(x => ({ ...felderVorgabe(v, new Date(), firma), datum: x.datum, ortsteil: x.ortsteil, kontakt: x.kontakt, unterschriften: x.unterschriften })); }}
                 felder={felder} setFelder={setFelder} ktx={ktx} personen={personen} />
               )}
               {fehlt.length > 0 && <p className="text-sm text-destructive">{fehlt.join(' ')}</p>}
@@ -401,7 +409,7 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{namensfeld}</div>
               {notizfeld('Bemerkung, bei Rückgabe der Grund')}
               <div className="flex flex-wrap gap-2">
-                <a className={KNOPF} href={`mailto:${empfaenger(k.personen ?? []).map(p => p.email).filter(Boolean).join(',')}?subject=${encodeURIComponent(`${VORLAGEN[k.vorlage ?? 'bauland'].art} ${k.adresse}`)}&body=${encodeURIComponent(mailText)}`}>
+                <a className={KNOPF} href={`mailto:${empfaenger(k.personen ?? []).map(p => p.email).filter(Boolean).join(',')}?subject=${encodeURIComponent(`${(k.firma === 'studer' ? VORLAGEN.unverbindlich : VORLAGEN[k.vorlage ?? 'bauland']).art} ${k.adresse}`)}&body=${encodeURIComponent(mailText)}`}>
                   <Mail className="h-4 w-4" /> Mail öffnen
                 </a>
                 <button type="button" className={KNOPF_HAUPT} disabled={laeuft} onClick={() => void tun('senden', { text: mailText })}>Als verschickt eintragen</button>
@@ -466,6 +474,8 @@ function AngebotBearbeiten({ k, firma, setFirma, vorlage, setVorlage, felder, se
   const kandidaten = personen.filter(p => p.rollen.includes('unterschrift') && (!p.firma || p.firma === firma));
   const unterschreibt = (name: string) => felder.unterschriften.some(u => u.name === name);
   const an = empfaenger(k.personen ?? []);
+  // Bei Studer ist der Brief fest: es ändern nur Eigentümer, Preis, Parzellen, Datum, Übertragung und Gültigkeit.
+  const studer = firma === 'studer';
   const textfeld = (titel: string, feld: 'einleitung' | 'punkte' | 'schluss', vorgabe: string, zeilen: number) => (
     <label className="block space-y-1.5">
       <span className="flex items-center justify-between gap-2">
@@ -480,9 +490,9 @@ function AngebotBearbeiten({ k, firma, setFirma, vorlage, setVorlage, felder, se
   return (
     <div className="space-y-5 border-t pt-4">
       <p className="text-[15px]">
-        An: <span className="font-medium">{adressbloecke(k.personen ?? []).map(b => b.join(', ')).join(' · ')}</span>
+        An: <span className="font-medium">{adressbloecke(k.personen ?? [], studer).map(b => b.join(', ')).join(' · ')}</span>
         {!an.length && <span className="text-destructive"> (kein Empfänger: zurück an den Agenten)</span>}
-        <span className="block text-muted-foreground">{anrede(k.personen ?? [])} · {(k.parzellen ?? []).length ? `Kat.-Nr. ${katNummern(k.parzellen ?? []).join(', ')}` : 'keine Kataster-Nummer'}</span>
+        <span className="block text-muted-foreground">{anrede(k.personen ?? [], studer)} · {(k.parzellen ?? []).length ? `Kat.-Nr. ${katNummern(k.parzellen ?? []).join(', ')}` : 'keine Kataster-Nummer'}</span>
       </p>
 
       <div className="space-y-1.5">
@@ -494,14 +504,18 @@ function AngebotBearbeiten({ k, firma, setFirma, vorlage, setVorlage, felder, se
 
       <div className="space-y-1.5">
         <p className={ETIKETT}>Vorlage</p>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {(Object.keys(VORLAGEN) as VorlageId[]).map(v => (
-            <button key={v} type="button" aria-pressed={vorlage === v} className={`${WAHL(vorlage === v)} py-2`} onClick={() => setVorlage(v)}>
-              <span className="block font-medium">{VORLAGEN[v].titel}</span>
-              <span className={`block text-[13px] ${vorlage === v ? 'text-background/75' : 'text-muted-foreground'}`}>{VORLAGEN[v].wann}</span>
-            </button>
-          ))}
-        </div>
+        {studer ? (
+          <p className="text-[15px]">Der Brief von Studer, genau wie die Vorlage: es ändern Eigentümer, Preis und Parzellen.</p>
+        ) : (
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {(Object.keys(VORLAGEN) as VorlageId[]).map(v => (
+              <button key={v} type="button" aria-pressed={vorlage === v} className={`${WAHL(vorlage === v)} py-2`} onClick={() => setVorlage(v)}>
+                <span className="block font-medium">{VORLAGEN[v].titel}</span>
+                <span className={`block text-[13px] ${vorlage === v ? 'text-background/75' : 'text-muted-foreground'}`}>{VORLAGEN[v].wann}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Alles Weitere steht vorbelegt aus Vorlage und Firma (22. November,
@@ -511,7 +525,7 @@ function AngebotBearbeiten({ k, firma, setFirma, vorlage, setVorlage, felder, se
               className="flex min-h-11 w-full items-center justify-between gap-3 border-t pt-3 text-left">
         <span>
           <span className="block text-[15px] font-medium">Weitere Angaben</span>
-          <span className="block text-sm text-muted-foreground">Datum, Besitzantritt, Bindung, Anzahlung, Unterschrift, Wortlaut · Schrift {SCHRIFTEN[FIRMEN[firma].schrift].titel}</span>
+          <span className="block text-sm text-muted-foreground">{studer ? 'Datum, Eigentumsübertragung, Gültigkeit, Unterschrift' : 'Datum, Besitzantritt, Bindung, Anzahlung, Unterschrift, Wortlaut'} · Schrift {SCHRIFTEN[FIRMEN[firma].schrift].titel}</span>
         </span>
         <span aria-hidden className={`shrink-0 text-xl text-muted-foreground transition-transform ${weiter ? 'rotate-90' : ''}`}>›</span>
       </button>
@@ -521,6 +535,7 @@ function AngebotBearbeiten({ k, firma, setFirma, vorlage, setVorlage, felder, se
           <span className={ETIKETT}>Datum des Briefs</span>
           <input type="date" value={felder.datum} onChange={e => setze({ datum: e.target.value })} className={`${FELD} w-full text-base`} />
         </label>
+        {!studer && <>
         <label className="block space-y-1.5">
           <span className={ETIKETT}>Ortsteil auf dem Deckblatt</span>
           <input value={felder.ortsteil} placeholder={k.gemeinde ?? ''} onChange={e => setze({ ortsteil: e.target.value })} className={`${FELD} w-full text-base`} />
@@ -533,24 +548,32 @@ function AngebotBearbeiten({ k, firma, setFirma, vorlage, setVorlage, felder, se
           <span className={ETIKETT}>Was entstehen soll</span>
           <input value={felder.nutzung} onChange={e => setze({ nutzung: e.target.value })} className={`${FELD} w-full text-base`} />
         </label>
+        </>}
         <label className="block space-y-1.5">
-          <span className={ETIKETT}>Besitzantritt spätestens</span>
+          <span className={ETIKETT}>{studer ? 'Eigentumsübertragung' : 'Besitzantritt spätestens'}</span>
           <input type="date" value={felder.besitzantritt} onChange={e => setze({ besitzantritt: e.target.value })} className={`${FELD} w-full text-base`} />
+          {/* Im Brief steht nur Monat und Jahr; leer ist es ein Jahr nach dem Brief, wie in der Vorlage. */}
+          {studer && <span className="block text-sm text-muted-foreground">Im Brief: {monatJahr(felder.besitzantritt || spaeter(felder.datum, { jahre: 1 }))}{felder.besitzantritt ? '' : ' (ein Jahr nach dem Brief)'}</span>}
         </label>
         <label className="block space-y-1.5">
-          <span className={ETIKETT}>Gebunden (Tage, 0 = ohne)</span>
+          <span className={ETIKETT}>{studer ? 'Gültig (Tage, 0 = ohne)' : 'Gebunden (Tage, 0 = ohne)'}</span>
           <input inputMode="numeric" value={String(felder.bindungTage)} onChange={e => setze({ bindungTage: Math.max(0, Math.min(365, Number(e.target.value.replace(/\D/g, '')) || 0)) })} className={`${FELD} w-full text-base`} />
+          {studer && felder.bindungTage > 0 && <span className="block text-sm text-muted-foreground">Gültig bis zum {datumLang(spaeter(felder.datum, { tage: felder.bindungTage }))}</span>}
         </label>
+        {!studer && (
         <label className="block space-y-1.5">
           <span className={ETIKETT}>Anzahlung oder Reservation, CHF</span>
           <input inputMode="numeric" value={felder.anzahlung != null ? String(felder.anzahlung) : ''} placeholder="keine"
                  onChange={e => setze({ anzahlung: betragLesen(e.target.value) })} className={`${FELD} w-full text-base`} />
         </label>
+        )}
       </div>
+      {!studer && (
       <div className="flex flex-col gap-1">
         <label className="flex min-h-11 items-center gap-3 text-[15px]"><input type="checkbox" checked={felder.finanzierungBeilage} onChange={e => setze({ finanzierungBeilage: e.target.checked })} className="h-5 w-5 accent-foreground" /> Finanzierungsbestätigung der Bank liegt bei</label>
         <label className="flex min-h-11 items-center gap-3 text-[15px]"><input type="checkbox" checked={felder.ersatz} onChange={e => setze({ ersatz: e.target.checked })} className="h-5 w-5 accent-foreground" /> Ersatzliegenschaft anbieten</label>
       </div>
+      )}
 
       <div className="space-y-1.5">
         <p className={ETIKETT}>Unterschrift</p>
@@ -567,7 +590,7 @@ function AngebotBearbeiten({ k, firma, setFirma, vorlage, setVorlage, felder, se
             ))}
           </div>
         ) : <p className="text-sm text-muted-foreground">Für {FIRMEN[firma].name} ist niemand eingetragen. Ein Admin trägt im Reiter Admin bei «Wer was tut» ein, wer unterschreibt.</p>}
-        {felder.unterschriften.length > 0 && (
+        {felder.unterschriften.length > 0 && !studer && (
           <label className="block space-y-1.5 pt-1">
             <span className={ETIKETT}>Oben rechts als Kontakt</span>
             <select value={felder.kontakt?.name ?? ''} className={`${FELD} w-full text-base sm:w-auto`}
@@ -579,6 +602,7 @@ function AngebotBearbeiten({ k, firma, setFirma, vorlage, setVorlage, felder, se
         )}
       </div>
 
+      {!studer && (
       <details className="group space-y-3">
         <summary className="flex min-h-11 cursor-pointer items-center text-[15px] font-medium">Wortlaut ändern</summary>
         <div className="space-y-3 pt-2">
@@ -587,6 +611,7 @@ function AngebotBearbeiten({ k, firma, setFirma, vorlage, setVorlage, felder, se
           {textfeld('Schluss', 'schluss', vorlageText.schluss.join('\n\n'), 3)}
         </div>
       </details>
+      )}
       </>}
     </div>
   );

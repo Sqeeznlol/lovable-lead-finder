@@ -13,7 +13,11 @@
  *   bestand          Glattalstrasse, Oberhasli (stimo): Liegenschaft im heutigen Zustand
  *   bedingt          Meilen Bergstrasse (Lebensraum): unter der Bedingung einer Baubewilligung
  *   bieterverfahren  Niederglatt (Lebensraum): unverbindlich an den Makler, mit Eckwerten
- *   unverbindlich    Volketswil (Studer): unverbindlich, mit Reservationszahlung
+ *   unverbindlich    Volketswil: unverbindlich, mit Reservationszahlung
+ *
+ * Studer hat seit dem 23. November seinen eigenen Brief, genau wie die
+ * Word-Vorlage, die Julian geschickt hat (studerBrief): es ändern nur
+ * Eigentümer, Preis und Parzellen, dazu Datum, Gültigkeit und Übertragung.
  *
  * Personen (Namen, Telefon, E-Mail) stehen nur in der Datenbank: an der
  * Kalkulation (Empfänger) und in angebot_person (wer unterschreibt). Hier
@@ -57,6 +61,10 @@ export interface Firma {
   vorstellung: string;
   ueberUns?: { satz: string; text: string[]; referenzenTitel: string; referenzen: Referenz[]; fuss: string };
   leitsatz?: { titel: string; text: string };
+  /** Das Logo (unter public/) und wo es auf der ersten Seite steht, in mm wie in der Vorlage. */
+  logo?: { datei: string; x: number; y: number; breite: number; hoehe: number };
+  /** Die Fusszeile wörtlich wie in der Vorlage, samt ihren Abständen. */
+  fusszeile?: string;
 }
 
 export const FIRMEN: Record<FirmaId, Firma> = {
@@ -92,21 +100,31 @@ export const FIRMEN: Record<FirmaId, Firma> = {
     gesellschaften: [],
     vorstellung: 'Die Lebensraum Schweiz AG ist spezialisiert auf die Entwicklung von Wohnbaugrundstücken, sowohl erschlossen als auch unerschlossen. Im Grossraum Zürich sind und waren wir bereits in mehreren Entwicklungsprojekten tätig, unter anderem in Oberglatt (zwei Projekte mit rund 14’000 m² und 10’600 m²) sowie in Niederhasli (ca. 8’900 m²). Diese Referenzen geben wir gerne bekannt, damit Sie sich direkt mit diesen Eigentümern austauschen können. Wir pflegen eine Partnerschaft mit der Stimo GU AG aus Kloten, welche an genannten Projekten ebenfalls Partner ist.',
   },
+  // Studer schreibt genau wie die Word-Vorlage vom 23. November (Julian:
+  // «genau so wie ich geschickt habe mit dem Layout, da ändert sich Besitzer,
+  // Preis und die Parzellen-Infos»): Arial, Logo oben rechts, Fuss wörtlich.
+  // Das Logo ist das öffentliche Firmenzeichen; Unterschriften als Bild,
+  // Namen und Adressen von Eigentümern bleiben aus dem Repository.
   studer: {
     id: 'studer', name: 'Studer Immobilien Schweiz AG', strasse: 'Sihleggstrasse 23', plzOrt: '8832 Wollerau', ort: 'Wollerau',
-    telefon: '+41 44 240 16 62', web: 'www.studer-immo.ch', gestaltung: 'brief', schrift: 'carlito',
-    farbe: { grund: [33, 37, 41], akzent: [33, 37, 41] },
+    telefon: '+41 44 240 16 62', web: 'www.studer-immobilien.ch', gestaltung: 'brief', schrift: 'helvetica',
+    farbe: { grund: [0, 0, 0], akzent: [0, 0, 0] },
     kaeuferin: 'die Studer Immobilien Schweiz AG',
     gesellschaften: [],
     vorstellung: '',
+    // Frei verankert, vom Satzspiegel aus (EMU: 36'000 je mm): 3'535'680 nach
+    // rechts, 178'323 über den oberen Rand, 2'228'850 × 685'800 gross.
+    logo: { datei: 'marken/studer-immobilien.jpg', x: 25.4 + 3_535_680 / 36_000, y: 25.4 - 178_323 / 36_000, breite: 2_228_850 / 36_000, hoehe: 685_800 / 36_000 },
+    fusszeile: 'Studer Immobilien Schweiz AG | Sihleggstrasse 23    | 8832 Wollerau  | 044 240 16 62  | www.studer-immobilien.ch',
   },
 };
 
 export const SCHRIFTEN: Record<SchriftId, { titel: string; datei: string | null; wie: string }> = {
   nunito: { titel: 'Nunito Sans', datei: 'NunitoSans', wie: 'wie Avenir (Arbergstrasse)' },
   dmsans: { titel: 'DM Sans', datei: 'DMSans', wie: 'wie Glattalstrasse' },
-  helvetica: { titel: 'Helvetica', datei: null, wie: 'wie Arial (Lebensraum)' },
-  carlito: { titel: 'Carlito', datei: 'Carlito', wie: 'wie Calibri (Studer)' },
+  // Gleich breit wie Arial, also dieselben Zeilenumbrüche wie in Word; Windows zeigt sie als Arial.
+  helvetica: { titel: 'Helvetica', datei: null, wie: 'wie Arial (Studer, Lebensraum)' },
+  carlito: { titel: 'Carlito', datei: 'Carlito', wie: 'wie Calibri' },
   serif: { titel: 'Source Serif', datei: 'SourceSerif4', wie: 'mit Serifen, klassisch' },
 };
 
@@ -194,15 +212,21 @@ export interface AngebotFelder {
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-export function felderVorgabe(vorlage: VorlageId, heute = new Date()): AngebotFelder {
+/** Wie lange ein Angebot von Studer gilt, wenn niemand etwas anderes einträgt: sechs Wochen. */
+export const STUDER_GUELTIG_TAGE = 42;
+
+export function felderVorgabe(vorlage: VorlageId, heute = new Date(), firma?: FirmaId): AngebotFelder {
   const inDreiJahren = new Date(heute.getFullYear() + 3, 11, 31);
+  // Studer: gültig sechs Wochen ab dem Brief; die Eigentumsübertragung leer
+  // heisst ein Jahr nach dem Brief, wie in der Vorlage (Juli auf Juli).
+  const studer = firma === 'studer';
   return {
     datum: iso(heute), ortsteil: '',
     anlass: VORLAGEN[vorlage].anlass,
     nutzung: vorlage === 'bestand' ? 'ein attraktives Wohnbauprojekt' : 'eine hochwertige Wohnüberbauung im Stockwerkeigentum',
-    besitzantritt: vorlage === 'bauland' ? iso(inDreiJahren) : '',
-    bindungTage: vorlage === 'bauland' ? 90 : vorlage === 'bieterverfahren' ? 0 : 60,
-    anzahlung: vorlage === 'bedingt' || vorlage === 'unverbindlich' ? 250_000 : vorlage === 'bieterverfahren' ? 1_000_000 : null,
+    besitzantritt: vorlage === 'bauland' && !studer ? iso(inDreiJahren) : '',
+    bindungTage: studer ? STUDER_GUELTIG_TAGE : vorlage === 'bauland' ? 90 : vorlage === 'bieterverfahren' ? 0 : 60,
+    anzahlung: studer ? null : vorlage === 'bedingt' || vorlage === 'unverbindlich' ? 250_000 : vorlage === 'bieterverfahren' ? 1_000_000 : null,
     finanzierungBeilage: vorlage === 'bauland',
     ersatz: false,
     kontakt: null, unterschriften: [],
@@ -224,6 +248,22 @@ export function datumKurz(isoDatum: string): string {
   const m = isoDatum.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   return m ? `${m[3]}.${m[2]}.${m[1]}` : isoDatum;
 }
+/** «Juli 2027», wie die Eigentumsübertragung bei Studer. */
+export function monatJahr(isoDatum: string): string {
+  const d = new Date(`${isoDatum}T12:00:00`);
+  return Number.isFinite(d.getTime()) ? d.toLocaleDateString('de-CH', { month: 'long', year: 'numeric' }) : isoDatum;
+}
+/** Ein Datum um Tage oder Jahre weiter, wieder als JJJJ-MM-TT. */
+export function spaeter(isoDatum: string, o: { tage?: number; jahre?: number }): string {
+  const d = new Date(`${isoDatum}T12:00:00`);
+  if (!Number.isFinite(d.getTime())) return isoDatum;
+  d.setFullYear(d.getFullYear() + (o.jahre ?? 0));
+  d.setDate(d.getDate() + (o.tage ?? 0));
+  return iso(d);
+}
+/** 1'250'000.- wie bei Studer: gerades Hochkomma, «.-» für ganze Franken. */
+export const chfStuder = (n: number) => `CHF ${Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, "'")}.-`;
+const undListe = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} und ${xs[xs.length - 1]}` : xs[0] ?? '');
 
 const EINER = ['', 'ein', 'zwei', 'drei', 'vier', 'fünf', 'sechs', 'sieben', 'acht', 'neun', 'zehn', 'elf', 'zwölf', 'dreizehn', 'vierzehn', 'fünfzehn', 'sechzehn', 'siebzehn', 'achtzehn', 'neunzehn'];
 const ZEHNER = ['', '', 'zwanzig', 'dreissig', 'vierzig', 'fünfzig', 'sechzig', 'siebzig', 'achtzig', 'neunzig'];
@@ -255,11 +295,22 @@ const voll = (p: Person) => [p.vorname.trim(), p.name.trim()].filter(Boolean).jo
 /** Wer das Angebot bekommt, in der Reihenfolge, in der der Agent sie erfasst hat. */
 export const empfaenger = (personen: Person[]) => personen.filter(p => p.empfaenger);
 
+/** Der gemeinsame Name, wenn zwei oder mehr Eigentümer ohne Firma gleich heissen; sonst null. */
+function familienName(leute: Person[]): string | null {
+  const menschen = leute.filter(p => p.name.trim() && !p.firma.trim() && p.rolle === 'eigentuemer');
+  if (menschen.length < 2 || menschen.length !== leute.length) return null;
+  const name = menschen[0].name.trim();
+  return menschen.every(p => p.name.trim().toLowerCase() === name.toLowerCase()) ? name : null;
+}
+
 /**
  * Die Anrede aus den Empfängern: «Sehr geehrte Frau Muster, sehr geehrter
  * Herr Muster». Ohne Namen mit Anrede «Sehr geehrte Damen und Herren».
  */
-export function anrede(personen: Person[]): string {
+export function anrede(personen: Person[], familie = false): string {
+  // Studer schreibt einem Ehepaar mit gleichem Namen «Sehr geehrte Familie …» (Vorlage vom 23. November).
+  const name = familie ? familienName(empfaenger(personen)) : null;
+  if (name) return `Sehr geehrte Familie ${name}`;
   const an = empfaenger(personen).filter(p => p.art !== 'keine' && p.name.trim());
   if (!an.length) return 'Sehr geehrte Damen und Herren';
   return an.map((p, i) => {
@@ -274,7 +325,7 @@ export function anrede(personen: Person[]): string {
  * ein Makler bekommt den Brief über die Firma («Z. Hd. Herrn ...»), eine
  * Vertretung mit ihrer Kanzlei darunter, eine Erbengemeinschaft zuerst.
  */
-export function adressbloecke(personen: Person[]): string[][] {
+export function adressbloecke(personen: Person[], familie = false): string[][] {
   const an = empfaenger(personen);
   if (!an.length) return [['An die Eigentümerschaft']];
   const bloecke: { schluessel: string; leute: Person[] }[] = [];
@@ -287,6 +338,9 @@ export function adressbloecke(personen: Person[]): string[][] {
     const p = leute[0];
     const zeilen: string[] = [];
     const namen = leute.filter(x => voll(x));
+    // «Familie Muster», darunter «Anna Muster und Peter Muster», wie bei Studer.
+    const fam = familie ? familienName(leute) : null;
+    if (fam) return [`Familie ${fam}`, namen.map(voll).join(' und '), p.strasse.trim(), p.plzOrt.trim()].filter(Boolean);
     const gleicherName = namen.length > 1 && namen.every(x => x.name.trim() === namen[0].name.trim());
     const personZeile = gleicherName
       ? `${namen.map(x => x.vorname.trim()).filter(Boolean).join(' & ')} ${namen[0].name.trim()}`
@@ -542,8 +596,47 @@ export function vorlageVorschlag(o: { gebaeude: number; massgebend: 'neubau' | '
   return o.gebaeude > 0 ? 'bestand' : 'bauland';
 }
 
-/** Der fertige Wortlaut: die Vorlage, wo nichts Eigenes steht, sonst das Eigene. */
+/**
+ * Der Brief von Studer, Wort für Wort wie die Word-Vorlage vom 23. November
+ * (Julian: «da ändert sich Besitzer, Preis und die Parzellen-Infos»). Fett
+ * steht zwischen «**», ein «\n» bricht die Zeile dort, wo die Vorlage sie
+ * von Hand bricht. Eigener Wortlaut gilt hier nicht: der Brief ist fest.
+ */
+export function studerBrief(k: Kontext): Brief {
+  const kat = katNummern(k.parzellen);
+  const mehrere = kat.length > 1;
+  const grundstueck = mehrere ? 'die Grundstücke' : 'das Grundstück';
+  const wo = `${k.adresse} in ${k.plzOrt}`.trim();
+  const worte = inWorten(k.preis);
+  const uebertragung = k.felder.besitzantritt || spaeter(k.felder.datum, { jahre: 1 });
+  const gueltig = k.felder.bindungTage > 0 ? spaeter(k.felder.datum, { tage: k.felder.bindungTage }) : null;
+  return {
+    art: 'Unverbindliches Kaufangebot',
+    betreff: 'Unverbindliches Kaufangebot',
+    einleitung: [`Für ${grundstueck}${kat.length ? ` Kat. **${undListe(kat)}**` : ''} ${wo} unterbreiten wir folgendes Angebot:`],
+    betragZeile: `**${chfStuder(k.preis)}${worte ? ` (${worte})` : ''}**`,
+    betragUnter: '',
+    punkteTitel: '',
+    nummeriert: false,
+    punkte: [
+      { titel: 'Kaufpreis', text: `${chfStuder(k.preis)}, umfassend ${kat.length ? `${grundstueck} mit ${mehrere ? 'den Parzellennummern' : 'der Parzellennummer'} ${undListe(kat)}` : `${grundstueck} ${wo}`}.` },
+      { titel: 'Beurkundung', text: 'Nach Vereinbarung, so rasch als möglich.' },
+      { titel: 'Eigentumsübertragung', text: `${monatJahr(uebertragung)}, gemäss Wunsch der Verkäuferschaft.` },
+      { titel: 'Besichtigung', text: 'Dieses Angebot steht unter dem Vorbehalt einer noch durchzuführenden\nBesichtigung der Liegenschaft durch den Käufer.' },
+      ...(gueltig ? [{ titel: 'Gültigkeit', text: `Dieses Angebot ist gültig bis zum **${datumLang(gueltig)}.**` }] : []),
+    ],
+    zahlung: null,
+    schluss: [
+      'Die mit dem Eigentumsübergang verbundenen Kosten, insbesondere Notariats- und\nGrundbuchgebühren, werden von Käufer und Verkäufer zu gleichen Teilen getragen. Eine\nallfällige Grundstückgewinnsteuer geht zulasten des Verkäufers.',
+      'Vor Abschluss des Kaufvertrags wird eine umfassende Prüfung sämtlicher im Grundbuch\neingetragener Dienstbarkeiten vorgenommen. Der Zeitpunkt des Übergangs von Nutzen und\nGefahr wird einvernehmlich zwischen den Parteien festgelegt.',
+      'Ich bin überzeugt, dass mein Angebot für Sie von Interesse sein könnte, und würde mich\nsehr freuen, wenn wir einen Termin für ein persönliches Gespräch vereinbaren könnten.',
+    ],
+  };
+}
+
+/** Der fertige Wortlaut: die Vorlage, wo nichts Eigenes steht, sonst das Eigene. Studer schreibt immer seinen Brief. */
 export function brief(vorlage: VorlageId, k: Kontext): Brief {
+  if (k.firma.id === 'studer') return studerBrief(k);
   const v = VORLAGEN[vorlage];
   const b = v.brief(k);
   const eigen = (t: string | undefined) => (t?.trim() ? absaetze(t) : null);

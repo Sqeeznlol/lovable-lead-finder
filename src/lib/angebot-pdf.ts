@@ -7,15 +7,17 @@
  *                «Wir suchen Bauland»
  *   Lebensraum   wie Meilen und Niederglatt: dunkles Deckblatt mit Mint,
  *                Brief mit nummerierten Bedingungen, Preis im dunklen Feld
- *   Studer       wie Volketswil: ein schlichter Brief
+ *   Studer       genau wie die Word-Vorlage vom 23. November: Logo oben
+ *                rechts, Arial, Abstände, Fuss, alles aus dem Dokument gemessen
  *
  * Die Farben sind an den Vorlagen gemessen (#292f78 zu #18ad90; #222a2b
  * mit #9fd6b4). Die Schriften sind freie Schriften (SIL Open Font
  * License, public/schriften): Avenir, Arial und Calibri dürfen nicht
  * mitgeliefert werden; Nunito Sans, Helvetica und Carlito stehen ihnen am
- * nächsten. Logos, Fotos und Unterschriften fehlen mit Absicht: sie
- * gehören nicht in ein öffentliches Repository. Der Name der Firma steht
- * als Schrift.
+ * nächsten. Fotos und Unterschriften als Bild fehlen mit Absicht: sie
+ * gehören nicht in ein öffentliches Repository. Das Logo von Studer steht
+ * darin (public/marken), weil die Vorlage es verlangt und es ohnehin
+ * öffentlich ist; bei stimo und Lebensraum steht der Name als Schrift.
  *
  * Gesetzt wird mit jsPDF, damit jede Zeile echter Text bleibt: der Test
  * liest das PDF mit pdftotext wie ein Mensch.
@@ -41,10 +43,11 @@ export interface AngebotPdfDaten {
   test?: boolean;
 }
 
-export type SchriftLaden = (datei: string) => Promise<ArrayBuffer>;
-const ausDemNetz: SchriftLaden = async datei => {
-  const r = await fetch(`/schriften/${datei}`);
-  if (!r.ok) throw new Error(`Schrift ${datei}: ${r.status}`);
+/** Lädt eine Datei aus public/, z. B. «schriften/Carlito-Regular.ttf» oder «marken/studer-immobilien.jpg». */
+export type DateiLaden = (pfad: string) => Promise<ArrayBuffer>;
+const ausDemNetz: DateiLaden = async pfad => {
+  const r = await fetch(`/${pfad}`);
+  if (!r.ok) throw new Error(`${pfad}: ${r.status}`);
   return r.arrayBuffer();
 };
 
@@ -72,6 +75,8 @@ class Setzer {
   doc: jsPDF;
   y = 0;
   familie = 'helvetica';
+  /** Das Logo der Firma als JPEG, falls sie eines hat und es sich laden liess. */
+  logo: Uint8Array | null = null;
   /** Bis hierhin darf Text stehen; darunter liegt der Fuss der Firma. */
   unten = A4.h - 30;
   constructor(readonly d: AngebotPdfDaten, readonly fuss: (s: Setzer) => void, readonly kopf: (s: Setzer) => number) {
@@ -136,13 +141,13 @@ class Setzer {
   }
 }
 
-async function schriftenLaden(s: Setzer, id: SchriftId, laden: SchriftLaden) {
+async function schriftenLaden(s: Setzer, id: SchriftId, laden: DateiLaden) {
   const datei = SCHRIFTEN[id].datei;
   if (!datei) return;
   try {
     for (const stil of ['Regular', 'Bold'] as const) {
       const name = `${datei}-${stil}.ttf`;
-      s.doc.addFileToVFS(name, base64(await laden(name)));
+      s.doc.addFileToVFS(name, base64(await laden(`schriften/${name}`)));
       s.doc.addFont(name, datei, stil === 'Bold' ? 'bold' : 'normal');
     }
     s.familie = datei;
@@ -456,59 +461,201 @@ function lebensraumFuss(s: Setzer) {
   s.doc.text(`Seite ${seite - 1}`, A4.b - RAND, A4.h - 11, { align: 'right' });
 }
 
-// ------------------------------------------------------------- schlichter Brief (Studer)
+// ------------------------------------------------------------- Studer (Word-Vorlage vom 23. November)
 
-function brief(s: Setzer) {
-  const { firma, brief: b, felder } = s.d;
-  s.schrift('bold', 13, TEXT); s.doc.text(firma.name, RAND, 24);
-  s.schrift('normal', 8.5, GRAU);
-  s.doc.text(`${firma.strasse} · ${firma.plzOrt} · ${firma.telefon} · ${firma.web}`, RAND, 29);
-  const unten = adresse(s, RAND, 55);
-  s.y = Math.max(unten, 75) + 6;
-  s.schrift('normal', 10); s.doc.text(`${firma.ort}, ${datumLang(felder.datum)}`, RAND, s.y);
-  s.y += 12;
-  s.absatz(b.art, { stil: 'bold', groesse: 13, nach: 5 });
-  s.absatz(s.d.anrede, { nach: 3 });
-  b.einleitung.forEach(t => s.absatz(t, { nach: 3 }));
-  if (b.betragZeile) s.absatz(b.betragZeile);
-  s.platz(14);
-  s.absatz(`Kaufpreis: ${chfText(s.d.preis)}${b.betragUnter ? ` ${b.betragUnter}` : ''}`, { stil: 'bold', groesse: 11, nach: 4 });
-  if (b.punkteTitel) s.absatz(b.punkteTitel, { stil: 'bold', nach: 2 });
-  punkte(s, { ...b, punkteTitel: '' }, TEXT, false);
-  zahlung(s, b, TEXT);
-  b.schluss.forEach(t => s.absatz(t, { nach: 3 }));
-  s.y += 2;
-  s.platz(30);
-  s.absatz('Freundliche Grüsse', { nach: 14 });
-  for (const p of felder.unterschriften) {
-    s.platz(14);
-    if (p.titel) { s.schrift('normal', 10); s.doc.text(sauber(p.titel), RAND, s.y); s.y += 4.8; }
-    s.schrift('bold', 10); s.doc.text(sauber(p.name), RAND, s.y); s.y += 12;
-  }
+/*
+ * Studer, gesetzt wie Word die Vorlage setzt (Julian, 23. November: «genau
+ * so wie ich geschickt habe mit dem Layout»). Jedes Mass kommt aus dem
+ * Dokument: Ränder 1440 Twips, Arial 11 (Helvetica ist gleich breit, also
+ * bricht jede Zeile wie in Word), die Abstände sind leere Absätze in der
+ * Vorgabeschrift des Dokuments (Times New Roman 10), die Eckpunkte stehen
+ * mit 1.5 Zeilen, das Datum ist 6372 Twips eingerückt, der Fuss steht 708
+ * Twips über dem Blattrand, ohne Linie und ohne Seitenzahl. Bei 1.5 Zeilen
+ * legt Word den Mehrraum unter den Text, und er darf über den unteren Rand
+ * ragen (an PDF gemessen, die Word selbst schrieb: docxodus #908 und #1571;
+ * die Zeilenhöhen dort: Times 10 229.98 Twips, Arial 11 252.97).
+ */
+const twip = (n: number) => (n / 1440) * 25.4;
+/** Arial (gleich wie Liberation Sans): über und unter der Grundlinie und die einfache Zeile, je Punkt Schriftgrösse. */
+const ARIAL = { ueber: (1854 + 67) / 2048, unter: 434 / 2048, zeile: (1854 + 434 + 67) / 2048 };
+/** Ein leerer Absatz in Times New Roman 10: (1825 + 443 + 87) / 2048 × 10 pt. */
+const LEER = pt(10) * ((1825 + 443 + 87) / 2048);
+/** Unterstrich unter dem fetten Titel (Arial 12): so tief und so dick, wie er in der Vorlage liegt. */
+const UNTERSTRICH = { tiefer: 0.457, dicke: pt(0.6) };
+const SCHWARZ: Rgb = [0, 0, 0];
+
+/**
+ * Helvetica und Helvetica-Bold, Breite je Zeichen in 1/1000 Geviert: U+0020
+ * bis U+007E, dann U+00A0 bis U+00FF, dazu einzelne Satzzeichen. Es sind die
+ * Werte aus Adobes Masstabelle, gleich wie Arial (aus Liberation Sans 2.1.5
+ * gelesen). jsPDF rundet sie auf Zehner (550 statt 556) und misst mit
+ * Unterschneidung, zeichnet aber ohne: die Fusszeile stand so 0.4 mm neben
+ * der Mitte, und eine Zeile hätte anders brechen können als in Word.
+ */
+const HELVETICA_TABELLE = {
+  normal: '278 278 355 556 556 889 667 191 333 333 389 584 278 333 278 278 556 556 556 556 556 556 556 556 556 556 278 278 584 584 584 556 1015 667 667 722 722 667 611 778 722 278 500 667 556 833 722 778 667 778 722 667 611 722 667 944 667 667 611 278 278 278 469 556 333 556 556 500 556 556 278 556 556 222 222 500 222 833 556 556 556 556 333 500 278 556 500 722 500 500 500 334 260 334 584 278 333 556 556 556 556 260 556 333 737 370 556 584 333 737 552 400 549 333 333 333 576 537 333 333 333 365 556 834 834 834 611 667 667 667 667 667 667 1000 722 667 667 667 667 278 278 278 278 722 722 778 778 778 778 778 584 778 722 722 722 722 667 667 611 556 556 556 556 556 556 889 500 556 556 556 556 278 278 278 278 556 556 556 556 556 556 556 549 611 556 556 556 556 500 556 500',
+  bold: '278 333 474 556 556 889 722 238 333 333 389 584 278 333 278 278 556 556 556 556 556 556 556 556 556 556 333 333 584 584 584 611 975 722 722 722 722 667 611 778 722 278 556 722 611 833 722 778 667 778 722 667 611 722 667 944 667 667 611 333 278 333 584 556 333 556 611 556 611 556 333 611 611 278 278 556 278 889 611 611 611 611 389 556 333 611 556 778 556 556 500 389 280 389 584 278 333 556 556 556 556 280 556 333 737 370 556 584 333 737 552 400 549 333 333 333 576 556 333 333 333 365 556 834 834 834 611 722 722 722 722 722 722 1000 722 667 667 667 667 278 278 278 278 722 722 778 778 778 778 778 584 778 722 722 722 722 667 667 611 556 556 556 556 556 556 889 556 556 556 556 556 278 278 278 278 611 611 611 611 611 611 611 549 611 611 611 611 611 556 611 556',
+};
+const HELVETICA_SATZZEICHEN = {
+  normal: { 0x2013: 556, 0x2014: 1000, 0x2018: 222, 0x2019: 222, 0x201a: 222, 0x201c: 333, 0x201d: 333, 0x201e: 333, 0x2022: 350, 0x2026: 1000, 0x2039: 333, 0x203a: 333, 0x20ac: 556 },
+  bold: { 0x2013: 556, 0x2014: 1000, 0x2018: 278, 0x2019: 278, 0x201a: 278, 0x201c: 500, 0x201d: 500, 0x201e: 500, 0x2022: 350, 0x2026: 1000, 0x2039: 333, 0x203a: 333, 0x20ac: 556 },
+};
+const helveticaBreiten = (stil: 'normal' | 'bold') => {
+  const m = new Map<number, number>();
+  HELVETICA_TABELLE[stil].split(' ').map(Number).forEach((b, i) => m.set(i < 95 ? 32 + i : 160 + i - 95, b));
+  for (const [z, b] of Object.entries(HELVETICA_SATZZEICHEN[stil])) m.set(Number(z), b);
+  return m;
+};
+const HELVETICA = { normal: helveticaBreiten('normal'), bold: helveticaBreiten('bold') };
+
+/** Breite in mm, so wie der Betrachter den Text zeichnet. */
+function breiteMm(doc: jsPDF, text: string): number {
+  const f = doc.getFont();
+  if (f.fontName !== 'helvetica') return doc.getTextWidth(text); // eigene Schriften misst jsPDF genau
+  const tabelle = HELVETICA[f.fontStyle === 'bold' ? 'bold' : 'normal'];
+  let tausendstel = 0;
+  for (const z of text) tausendstel += tabelle.get(z.codePointAt(0)!) ?? 556;
+  return (tausendstel / 1000) * doc.getFontSize() * (25.4 / 72);
 }
 
-function briefFuss(s: Setzer) {
-  const seite = s.doc.getCurrentPageInfo().pageNumber, n = s.doc.getNumberOfPages();
-  s.schrift('normal', 7, GRAU);
-  if (n > 1) s.doc.text(`Seite ${seite} von ${n}`, A4.b - RAND, A4.h - 11, { align: 'right' });
+type Teil = { text: string; fett: boolean };
+/** «**fett**» wird zu Teilen, wie die Vorlage einzelne Wörter fett setzt. */
+const teile = (t: string, fett = false): Teil[] =>
+  sauber(t).split('**').map((text, i) => ({ text, fett: i % 2 === 1 ? !fett : fett })).filter(x => x.text);
+
+function studer(s: Setzer) {
+  const { doc, d } = s;
+  const { firma, brief: b, felder } = d;
+  const rand = twip(1440);
+  const unten = A4.h - twip(1440);
+  const zeileH = (g: number) => pt(g) * ARIAL.zeile;
+  const anderthalb = 1.5 * zeileH(11);
+  let y = twip(1440); // Oberkante der nächsten Zeile
+
+  const neueSeite = () => { doc.addPage(); y = twip(1440); };
+  // Auch ein leerer Absatz, der nicht mehr passt, steht in Word oben auf der
+  // nächsten Seite. Passen muss nur der Text selbst, nicht der Mehrraum darunter.
+  const leer = (n = 1, h = LEER, text = h) => { for (let i = 0; i < n; i++) { if (y + text > unten) neueSeite(); y += h; } };
+  const breite = (t: Teil, g: number) => { doc.setFont(s.familie, t.fett ? 'bold' : 'normal'); doc.setFontSize(g); return breiteMm(doc, t.text); };
+
+  /** Bricht wie Word: nach Leerraum und nach einem Bindestrich vor einem Buchstaben, sonst nie. */
+  const umbrechen = (zeile: Teil[], g: number, max: number): Teil[][] => {
+    type Stueck = { teile: Teil[]; b: number; raum: Teil | null; rb: number };
+    const stuecke: Stueck[] = [];
+    let st: Stueck = { teile: [], b: 0, raum: null, rb: 0 };
+    const fertig = () => { if (st.teile.length || st.raum) stuecke.push(st); st = { teile: [], b: 0, raum: null, rb: 0 }; };
+    for (const t of zeile) {
+      for (const wort of t.text.split(/(\s+)/)) {
+        if (!wort) continue;
+        if (/^\s+$/.test(wort)) { st.raum = { text: wort, fett: t.fett }; st.rb = breite(st.raum, g); fertig(); continue; }
+        const silben = wort.split(/(?<=-)(?=\p{L})/u);
+        silben.forEach((silbe, i) => {
+          const tt = { text: silbe, fett: t.fett };
+          st.teile.push(tt); st.b += breite(tt, g);
+          if (i < silben.length - 1) fertig();
+        });
+      }
+    }
+    fertig();
+    const zeilen: Stueck[][] = [];
+    let jetzt: Stueck[] = [], w = 0;
+    for (const x of stuecke) {
+      const davor = jetzt.length ? jetzt[jetzt.length - 1].rb : 0;
+      // Zwei Zehntelmillimeter Spiel: Rundung, nicht ein Wort mehr.
+      if (jetzt.length && w + davor + x.b > max + 0.2) { zeilen.push(jetzt); jetzt = []; w = 0; }
+      w += (jetzt.length ? davor : 0) + x.b;
+      jetzt.push(x);
+    }
+    if (jetzt.length) zeilen.push(jetzt);
+    // Leerraum am Zeilenende fällt weg; gleiche Schnitte nacheinander werden ein Text.
+    return zeilen.map(z => z.flatMap((x, i) => (i < z.length - 1 && x.raum ? [...x.teile, x.raum] : x.teile))
+      .reduce<Teil[]>((a, t) => { const l = a[a.length - 1]; if (l && l.fett === t.fett) l.text += t.text; else a.push({ ...t }); return a; }, []));
+  };
+
+  /** Eine Zeile der Höhe h; Word setzt den Text oben hinein, der Mehrraum bleibt darunter. */
+  const setzen = (zeile: Teil[], x: number, g: number, h: number, unterstrichen: boolean) => {
+    if (y + zeileH(g) > unten) neueSeite();
+    const grund = y + pt(g) * ARIAL.ueber;
+    let xx = x;
+    doc.setTextColor(...SCHWARZ);
+    for (const t of zeile) {
+      const w = breite(t, g);
+      doc.text(t.text, xx, grund);
+      xx += w;
+    }
+    if (unterstrichen) {
+      doc.setDrawColor(...SCHWARZ); doc.setLineWidth(UNTERSTRICH.dicke);
+      doc.line(x, grund + UNTERSTRICH.tiefer, xx, grund + UNTERSTRICH.tiefer);
+    }
+    y += h;
+  };
+  const absatz = (text: string, o: { x?: number; g?: number; h?: number; fett?: boolean; unterstrichen?: boolean } = {}) => {
+    const g = o.g ?? 11, x = o.x ?? rand;
+    // Ein «\n» bricht wie die harten Umbrüche der Vorlage.
+    for (const harte of text.split('\n')) {
+      for (const z of umbrechen(teile(harte, o.fett), g, A4.b - rand - x)) setzen(z, x, g, o.h ?? zeileH(g), !!o.unterstrichen);
+    }
+  };
+
+  if (s.logo && firma.logo) doc.addImage(s.logo, 'JPEG', firma.logo.x, firma.logo.y, firma.logo.breite, firma.logo.hoehe);
+  leer(4); // der Absatz mit dem Logo und drei leere
+  d.adressbloecke.forEach((block, i) => { if (i) leer(); block.forEach(z => absatz(z)); });
+  leer(3);
+  // Das Datum steht 6372 Twips eingerückt. «Wollerau, 23. November 2026» ist
+  // dafür zu lang und bräche in Word um; es endet dann bündig am rechten Rand.
+  const datum = `${firma.ort}, ${datumLang(felder.datum)}`;
+  absatz(datum, { x: Math.min(rand + twip(6372), A4.b - rand - breite({ text: datum, fett: false }, 11)) });
+  leer(2);
+  absatz(b.art, { g: 12, fett: true, unterstrichen: true });
+  leer();
+  absatz(d.anrede);
+  leer();
+  b.einleitung.forEach((t, i) => { if (i) leer(); absatz(t); });
+  leer();
+  if (b.betragZeile) absatz(b.betragZeile);
+  leer(1, anderthalb, zeileH(11));
+  for (const p of b.punkte) absatz(p.titel ? `**${p.titel}**: ${p.text}` : p.text, { h: anderthalb });
+  // Zwischen den drei Absätzen am Schluss steht eine leere Zeile in Arial 11.
+  b.schluss.forEach((t, i) => { if (i) leer(1, zeileH(11)); absatz(t); });
+  leer(2);
+  absatz('Freundliche Grüsse');
+  leer();
+  felder.unterschriften.forEach((u, i) => {
+    if (i) leer();
+    if (u.titel) absatz(u.titel);
+    absatz(`**${u.name}**`);
+  });
+}
+
+function studerFuss(s: Setzer) {
+  const t = s.d.firma.fusszeile;
+  if (!t) return;
+  const text = sauber(t);
+  s.doc.setFont(s.familie, 'normal'); s.doc.setFontSize(8); s.doc.setTextColor(...SCHWARZ);
+  // Mittig zwischen den Rändern; selbst gerechnet, weil «align: center» mit Unterschneidung misst.
+  s.doc.text(text, A4.b / 2 - breiteMm(s.doc, text) / 2, A4.h - twip(708) - pt(8) * ARIAL.unter);
 }
 
 // ------------------------------------------------------------- Einstieg
 
-export async function angebotPdf(d: AngebotPdfDaten, laden: SchriftLaden = ausDemNetz): Promise<jsPDF> {
+export async function angebotPdf(d: AngebotPdfDaten, laden: DateiLaden = ausDemNetz): Promise<jsPDF> {
   const art = d.firma.gestaltung;
   const s = new Setzer(d,
-    art === 'stimo' ? stimoFuss : art === 'lebensraum' ? lebensraumFuss : briefFuss,
-    art === 'stimo' ? stimoKopf : art === 'lebensraum' ? lebensraumKopf : () => 30);
-  s.unten = art === 'stimo' ? A4.h - 28 : art === 'lebensraum' ? A4.h - 24 : A4.h - 20;
+    art === 'stimo' ? stimoFuss : art === 'lebensraum' ? lebensraumFuss : studerFuss,
+    art === 'stimo' ? stimoKopf : art === 'lebensraum' ? lebensraumKopf : () => twip(1440));
+  s.unten = art === 'stimo' ? A4.h - 28 : art === 'lebensraum' ? A4.h - 24 : A4.h - twip(1440);
   await schriftenLaden(s, d.schrift, laden);
+  if (d.firma.logo) {
+    // Ohne Netz kommt das Angebot ohne Logo: besser als keines, wie bei der Schrift.
+    try { s.logo = new Uint8Array(await laden(d.firma.logo.datei)); } catch { s.logo = null; }
+  }
   s.doc.setProperties({
     title: `${d.brief.art} ${d.titel}, ${d.untertitel}`,
     subject: `${d.brief.art} über ${chfText(d.preis)}`,
     author: d.firma.name,
     creator: 'CALC YOU LATER',
   });
-  if (art === 'stimo') stimo(s); else if (art === 'lebensraum') lebensraum(s); else brief(s);
+  if (art === 'stimo') stimo(s); else if (art === 'lebensraum') lebensraum(s); else studer(s);
   return s.fertig();
 }
 

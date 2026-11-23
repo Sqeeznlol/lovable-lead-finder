@@ -333,8 +333,17 @@ gemessen:
   * **Lebensraum Schweiz AG** wie Meilen und Niederglatt: dunkles
     Deckblatt (#222a2b, Mint #9fd6b4), Brief mit nummerierten
     Bedingungen, Preis im dunklen Feld, Anzahlung und Rest.
-  * **Studer Immobilien Schweiz AG** wie Volketswil: ein schlichter
-    Brief, Preis in Worten.
+  * **Studer Immobilien Schweiz AG** genau wie die Word-Vorlage vom
+    23. November: Logo oben rechts, Empfänger, Datum eingerückt,
+    «Unverbindliches Kaufangebot» fett und unterstrichen, Preis in
+    Zahlen und Worten, die Eckpunkte Kaufpreis, Beurkundung,
+    Eigentumsübertragung, Besichtigung und Gültigkeit mit 1.5 Zeilen,
+    drei feste Absätze, «Inhaber» und Name, Fuss mit Adresse und
+    www.studer-immobilien.ch. Alle Masse aus dem Dokument (Ränder 1440
+    Twips, Datum 6372 Twips eingerückt, Logo in EMU); verglichen Zeile
+    für Zeile, innerhalb von 0.1 mm. Es ändern Eigentümer, Preis und
+    Parzellen, dazu Datum, Eigentumsübertragung und Gültigkeit; die
+    Vorlagen unten gelten für Studer nicht.
 
 Fünf Vorlagen, aus den Briefen auf ihr Gerüst zurückgeführt
 (`src/lib/angebot.ts`): Bauland (Arbergstrasse), Bestandsliegenschaft
@@ -349,9 +358,13 @@ Schriften: Avenir, Arial und Calibri dürfen nicht mitgeliefert werden.
 Freie Schriften (SIL Open Font License, `public/schriften`, je Normal
 und Fett, auf Latein beschnitten): Nunito Sans statt Avenir, DM Sans
 (wie Glattalstrasse), Carlito statt Calibri, Source Serif; dazu
-Helvetica statt Arial. Logos, Fotos und Unterschriften als Bild fehlen
-mit Absicht: das Repository ist öffentlich. Der Name der Firma steht als
-Schrift.
+Helvetica statt Arial (Studer). Helvetica ist so breit wie Arial, also
+bricht jede Zeile wie in Word; jsPDF rundet ihre Breiten, darum misst
+`angebot-pdf.ts` mit der genauen Tabelle. Fotos und Unterschriften als
+Bild fehlen mit Absicht: das Repository ist öffentlich. Das Logo von
+Studer liegt in `public/marken` (ohne Angaben aus Kamera und Photoshop),
+weil die Vorlage es zeigt und es ohnehin öffentlich ist; bei stimo steht
+der Name der Firma als Schrift.
 
 ## Prüfen
 
