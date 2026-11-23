@@ -88,7 +88,7 @@ describe('Gutachten in der Rechnung', () => {
 
   it('die Datei bleibt auf dem Gerät: CALC speichert nur die Zahlen', () => {
     const r = readFileSync('src/components/calc/Rechnung.tsx', 'utf8');
-    expect(r).toContain('gutachten },');
+    expect(r).toContain('gutachten, oereb },');
     expect(r).not.toMatch(/storage\.from|\.upload\(/);
   });
 });

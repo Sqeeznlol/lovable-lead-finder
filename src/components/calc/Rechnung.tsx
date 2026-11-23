@@ -9,6 +9,7 @@ import { useName } from '@/components/calc/name';
 import { Empfaenger } from '@/components/calc/Empfaenger';
 import { GutachtenTafel } from '@/components/calc/GutachtenTafel';
 import { gutachtenBrauchbar, gutachtenHand, gutachtenLesen, type Gutachten } from '@/lib/gutachten';
+import { istOereb, oerebLesen, type Oereb } from '@/lib/oereb';
 import { empfaenger, personenAusEigentuemer, type Parzelle, type Person } from '@/lib/angebot';
 import { FENSTER } from '@/lib/fenster';
 import { adresseWaehlen, suchtext } from '@/lib/adresswahl';
@@ -81,6 +82,7 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
   const [annahmen, setAnnahmen] = useState<CalcAnnahmen>(alt?.eingabe.annahmen ?? CALC_ANNAHMEN);
   const [hand, setHand] = useState<VonHand>(alt?.eingabe.hand ?? {});
   const [gutachten, setGutachten] = useState<Gutachten | null>(alt?.gutachten ?? null);
+  const [oereb, setOereb] = useState<Oereb | null>(alt?.oereb ?? null);
   const [gutachtenLiest, setGutachtenLiest] = useState(false);
   const [gutachtenFehler, setGutachtenFehler] = useState<string | null>(null);
   const [erloesQuelle, setErloesQuelle] = useState<ErloesQuelle>(alt?.eingabe.erloesQuelle ?? ERLOES_ANNAHME);
@@ -106,7 +108,14 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
     setGutachtenLiest(true); setGutachtenFehler(null);
     try {
       const { gutachtenText } = await import('@/lib/gutachten-pdf');
-      const g = gutachtenLesen(await gutachtenText(datei), datei.name);
+      const text = await gutachtenText(datei);
+      // Derselbe Knopf nimmt beides: ein ÖREB-Auszug nennt sich selbst so.
+      if (istOereb(text)) {
+        const o = oerebLesen(text, datei.name);
+        if (!o.themen.length && o.flaeche == null) { setGutachtenFehler('In diesem ÖREB-Auszug steht nichts, das Aurora lesen kann.'); return; }
+        setOereb(o); return;
+      }
+      const g = gutachtenLesen(text, datei.name);
       if (!gutachtenBrauchbar(g)) { setGutachtenFehler('In diesem PDF stehen weder Marktwert noch Mietwert noch Nutzfläche so, dass Aurora sie lesen kann.'); return; }
       setGutachten(g);
       setHand(h => ({ ...h, ...gutachtenHand(g, h) }));
@@ -238,7 +247,7 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
   const mitEmpfaenger = empfaenger(personen).length > 0;
   useEffect(() => { if (empfaengerFehlt && mitEmpfaenger) { setEmpfaengerFehlt(false); setFehler(null); } }, [empfaengerFehlt, mitEmpfaenger]);
 
-  const andere = () => { setGewaehlt(null); setText(''); setGesucht(''); setHand({}); setAnnahmen(CALC_ANNAHMEN); setErloesQuelle(ERLOES_ANNAHME); setNachbarn([]); setNachbarnAuf(false); setFehler(null); setGutachten(null); setGutachtenFehler(null); };
+  const andere = () => { setGewaehlt(null); setText(''); setGesucht(''); setHand({}); setAnnahmen(CALC_ANNAHMEN); setErloesQuelle(ERLOES_ANNAHME); setNachbarn([]); setNachbarnAuf(false); setFehler(null); setGutachten(null); setOereb(null); setGutachtenFehler(null); };
   const erloesSetzen = (erloes: number, quelle: ErloesQuelle) => { setAnnahmen(a => ({ ...a, erloes })); setErloesQuelle(quelle); };
 
   const speichern = async (einreichen: boolean) => {
@@ -258,7 +267,7 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
         kanton: basis.kanton && /^[A-Z]{2}$/.test(basis.kanton) ? basis.kanton : null,
         egrid: basis.egrid, parzelle_id: basis.parzelleId, anfrage_id: entwurf?.anfrage_id ?? anfrageId ?? null,
         kontakt: kontakt.trim() || null, test: test || /\bTEST\b/.test(kontakt),
-        eingaben: { eingabe, adresse: basis.adresse, parzelleNr: basis.parzelleNr, eigentuemer: basis.eigentuemer, luecken: basis.luecken, name: name.trim() || null, gutachten },
+        eingaben: { eingabe, adresse: basis.adresse, parzelleNr: basis.parzelleNr, eigentuemer: basis.eigentuemer, luecken: basis.luecken, name: name.trim() || null, gutachten, oereb },
         ergebnis: b, empfehlung_chf: b.empfehlung,
         quelle, parzellen: parzellen.filter(p => p.nummer.trim() || p.flaeche), personen,
       }, entwurf?.id);
@@ -518,7 +527,7 @@ export function Rechnung({ start, anfrageId, entwurf, onGespeichert, onVerworfen
           <h3 className="text-lg">Bestand und Mieten</h3>
           <p className="text-sm text-muted-foreground">Was der Eigentümer sagt, geht jeder Annahme vor. Leer heisst: nicht bekannt.</p>
         </div>
-        <GutachtenTafel g={gutachten} empfehlung={b.empfehlung} liest={gutachtenLiest} fehler={gutachtenFehler} laden={d => void gutachtenLaden(d)} entfernen={() => setGutachten(null)} />
+        <GutachtenTafel g={gutachten} oereb={oereb} flaecheCalc={eingabe?.grundlage.flaeche ?? null} oerebEntfernen={() => setOereb(null)} empfehlung={b.empfehlung} liest={gutachtenLiest} fehler={gutachtenFehler} laden={d => void gutachtenLaden(d)} entfernen={() => setGutachten(null)} />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Offen titel="Mietertrag im Jahr, netto" wert={hand.mietertragJahr} einheit="CHF" setWert={n => vonHand({ mietertragJahr: n })} />
           <Offen titel="Miete heute je m² und Monat" wert={hand.mieteHeute} einheit="CHF" platz={b.bestand?.mieteArt === 'statistik' && b.bestand.mieteHeute ? de(b.bestand.mieteHeute, 2) : undefined} setWert={n => vonHand({ mieteHeute: n })} />

@@ -320,6 +320,13 @@ senden. Alles Weitere in `docs/calc-you-later.md`.
     Phase 2, Julians Formel bleibt (`src/lib/gutachten.ts`,
     `gutachten.test.ts`). Ein Gutachten nennt echte Eigentümer und gehört
     nie ins Repository, auch nicht als Testdatei.
+    Derselbe Knopf nimmt einen ÖREB-Auszug (23. November, Julian zum
+    Auszug eines Grundstücks in Langnau am Albis: «das auch einpflegen»):
+    Grundstück, E-GRID, Fläche und je betroffenes Thema die Tafel «Typ,
+    Anteil» (Zone mit Kürzel, Wald, Gewässerraum, Baulinien, Lärmstufe,
+    überlagernde Nutzungen), rechtskräftig oder mit Vorwirkung
+    (`src/lib/oereb.ts`, `oereb.test.ts`). Die Rechnung ändert er nicht;
+    weicht seine Fläche von der der Kalkulation ab, steht es dabei.
 
   * Mieterspiegel aus dem Gebäuderegister (20. November, Tim: «Anzahl
     Wohnungen, deren Grösse und die inserierten Preise»): CALC liest jede

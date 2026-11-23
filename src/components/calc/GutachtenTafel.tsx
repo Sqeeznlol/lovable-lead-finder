@@ -2,6 +2,7 @@ import { Loader2 } from 'lucide-react';
 import { KNOPF, KNOPF_LEISE } from '@/components/rahmen';
 import { datumLang } from '@/lib/angebot';
 import type { Gutachten } from '@/lib/gutachten';
+import { eintragKurz, type Oereb } from '@/lib/oereb';
 
 /**
  * Ein Gutachten in CALC (23. November, Julian: «Bitte in CALC einpflegen ...
@@ -43,27 +44,51 @@ export function GutachtenVergleich({ g, empfehlung }: { g: Gutachten; empfehlung
   );
 }
 
-export function GutachtenTafel({ g, empfehlung, liest, fehler, laden, entfernen }: {
-  g: Gutachten | null; empfehlung: number | null | undefined; liest: boolean; fehler: string | null;
-  laden: (datei: File | undefined) => void; entfernen: () => void;
+/** Der ÖREB-Auszug: je betroffenes Thema, was mit welcher Fläche gilt; Änderungen mit Vorwirkung als solche. */
+export function OerebTeil({ o, flaecheCalc, entfernen }: { o: Oereb; flaecheCalc?: number | null; entfernen?: () => void }) {
+  return (
+    <div className="space-y-2">
+      <div>
+        <p className="text-[15px] font-medium">ÖREB-Auszug{o.datum ? ` vom ${datumLang(o.datum)}` : ''}</p>
+        <p className="text-sm text-muted-foreground">
+          {[o.grundstueckNr && `Grundstück ${o.grundstueckNr}`, o.gemeinde, o.flaeche != null && `${de(o.flaeche)} m²`, o.egrid].filter(Boolean).join(' · ')}
+          {flaecheCalc && o.flaeche && Math.abs(flaecheCalc - o.flaeche) > 1 ? ` (CALC rechnet mit ${de(Math.round(flaecheCalc))} m²)` : ''}
+        </p>
+      </div>
+      <dl className="space-y-1 text-sm">
+        {o.themen.map((th, i) => (
+          <div key={i} className="border-b border-border/60 py-1.5">
+            <dt className="text-muted-foreground">{th.thema.replace(/^Nutzungsplanung \(kantonal\/kommunal\): /, '')}{th.stand !== 'Rechtskräftig' ? ` · ${th.stand}` : ''}</dt>
+            <dd>{th.eintraege.map(e => `${eintragKurz(e)} ${de(e.wert)} ${e.einheit}${e.anteil != null ? ` (${de(e.anteil)} %)` : ''}`).join(' · ')}</dd>
+          </div>
+        ))}
+      </dl>
+      {entfernen && <button type="button" className={KNOPF_LEISE} onClick={entfernen}>ÖREB-Auszug entfernen</button>}
+    </div>
+  );
+}
+
+export function GutachtenTafel({ g, oereb, flaecheCalc, empfehlung, liest, fehler, laden, entfernen, oerebEntfernen }: {
+  g: Gutachten | null; oereb: Oereb | null; flaecheCalc?: number | null; empfehlung: number | null | undefined; liest: boolean; fehler: string | null;
+  laden: (datei: File | undefined) => void; entfernen: () => void; oerebEntfernen: () => void;
 }) {
   const knopf = (text: string) => (
     <label className={`${KNOPF} cursor-pointer`}>
       {liest ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-      {liest ? 'Gutachten wird gelesen …' : text}
+      {liest ? 'Wird gelesen …' : text}
       <input type="file" accept="application/pdf,.pdf" className="sr-only" disabled={liest}
              onChange={e => { laden(e.target.files?.[0]); e.target.value = ''; }} />
     </label>
   );
   return (
     <div className="space-y-3 rounded-[3px] border bg-card p-4">
-      {!g ? (
+      {!g && oereb ? knopf('Gutachten dazu hochladen') : !g ? (
         <>
           <div>
-            <p className="text-[15px] font-medium">Gutachten</p>
-            <p className="text-sm text-muted-foreground">Liegt ein Markt- oder Mietwertgutachten vor, liest Aurora Marktwert, Flächen, Mieten und Baujahr daraus. Die Datei bleibt auf diesem Gerät.</p>
+            <p className="text-[15px] font-medium">Gutachten und ÖREB-Auszug</p>
+            <p className="text-sm text-muted-foreground">Aus einem Gutachten liest Aurora Marktwert, Flächen, Mieten und Baujahr, aus einem ÖREB-Auszug Zonen, Gewässerraum, Wald und Baulinien. Die Datei bleibt auf diesem Gerät.</p>
           </div>
-          {knopf('Gutachten hochladen (PDF)')}
+          {knopf('Gutachten oder ÖREB-Auszug hochladen (PDF)')}
         </>
       ) : (
         <>
@@ -86,6 +111,8 @@ export function GutachtenTafel({ g, empfehlung, liest, fehler, laden, entfernen 
           </div>
         </>
       )}
+      {oereb && <div className={g ? 'border-t pt-3' : ''}><OerebTeil o={oereb} flaecheCalc={flaecheCalc} entfernen={oerebEntfernen} /></div>}
+      {g && !oereb && knopf('ÖREB-Auszug dazu hochladen')}
       {fehler && <p className="text-sm text-destructive" role="alert">{fehler}</p>}
     </div>
   );
