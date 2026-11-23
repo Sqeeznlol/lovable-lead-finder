@@ -7,6 +7,7 @@
  * (calc-daten.ts): das Cockpit zeigt, was wartet, und soll dafür nicht
  * die ganze Rechnung ins erste Bündel ziehen.
  */
+import type { Gutachten } from '@/lib/gutachten';
 import { supabase } from '@/integrations/supabase/client';
 import type { Bewertung, CalcEingabe } from '@/lib/calc';
 import type { Adresse } from '@/lib/calc-daten';
@@ -97,6 +98,8 @@ export interface Eingaben {
   luecken: string[];
   /** Wer die Kalkulation angelegt hat. */
   name: string | null;
+  /** Die Zahlen eines hochgeladenen Gutachtens; die Datei selbst bleibt beim Menschen. */
+  gutachten?: Gutachten | null;
 }
 
 export interface Kalkulation {

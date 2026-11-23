@@ -305,6 +305,22 @@ senden. Alles Weitere in `docs/calc-you-later.md`.
     Urteilen steht neben der Empfehlung, Julians Formel bleibt.
     `calc-bemerkung.test.ts` und `tools/kalkulation-probe.sh` wachen darüber.
 
+  * Gutachten (23. November, Julian zum Markt- und Mietwertgutachten
+    einer Liegenschaft: «Bitte in CALC einpflegen. Wenn wir Daten haben
+    wie hier anbei ... bitte hochladen bzw. extrahieren»): in CALC unter
+    «Bestand und Mieten» der Knopf «Gutachten hochladen (PDF)». Gelesen
+    wird im Browser (pdf.js, erst beim Hochladen geladen); die Datei geht
+    an keinen Server, gespeichert werden nur die Zahlen
+    (`eingaben.gutachten`). Gelesen werden nur Zahlen mit Bezeichnung:
+    Marktwert (der gerundete), Stichtag, Kataster, Grundstück, Zone,
+    Baujahr, Volumen, Nutzfläche, Mietzins, Mietwert, Kapitalisierung,
+    Ertragswert. Namen von Eigentümern liest der Leser nicht. Nutzfläche
+    und Mietzins gehen in die Rechnung, wo nichts von Hand steht; der
+    Marktwert steht als Vergleich neben der Empfehlung, auch bei Tim in
+    Phase 2, Julians Formel bleibt (`src/lib/gutachten.ts`,
+    `gutachten.test.ts`). Ein Gutachten nennt echte Eigentümer und gehört
+    nie ins Repository, auch nicht als Testdatei.
+
   * Mieterspiegel aus dem Gebäuderegister (20. November, Tim: «Anzahl
     Wohnungen, deren Grösse und die inserierten Preise»): CALC liest jede
     bestehende Wohnung mit Nummer, Stockwerk (WSTWK laut Merkmalskatalog:

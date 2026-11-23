@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Check, Download, FileText, Loader2, Mail, MessageCircle, Printer, RotateCcw } from 'lucide-react';
 import { FELD, KNOPF, KNOPF_HAUPT, Marke, Strichbalken } from '@/components/rahmen';
 import { Bemerkungen } from '@/components/calc/Bemerkungen';
+import { GutachtenVergleich } from '@/components/calc/GutachtenTafel';
 import { Ergebnis, Objektkopf } from '@/components/calc/Ergebnis';
 import { useJetzt, useName } from '@/components/calc/name';
 import {
@@ -350,6 +351,7 @@ export function Ablauf({ k, onGeaendert }: { k: Kalkulation; onGeaendert: (k: Ka
                           onClick={() => { setUrteil(x); if (x === 'passt') setPreis(String(Math.round(k.empfehlung_chf ?? 0))); }}>{URTEIL_TEXT[x]}</button>
                 ))}
               </div>
+              {k.eingaben.gutachten && <GutachtenVergleich g={k.eingaben.gutachten} empfehlung={k.empfehlung_chf} />}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {preisfeld('Kaufpreis im Angebot')}
                 {namensfeld}

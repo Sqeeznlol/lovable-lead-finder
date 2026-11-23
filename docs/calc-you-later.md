@@ -320,6 +320,19 @@ X % der Empfehlung, hier also CHF ...», mit den letzten Gründen.
 Julians Formel ändert sich dadurch nicht; der Vorschlag steht daneben.
 Testdaten zählen nie.
 
+## Gutachten
+
+Liegt ein Markt- und Mietwertgutachten vor, lädt man es in CALC unter
+«Bestand und Mieten» hoch. Aurora liest es im Browser (pdf.js) und
+behält nur die Zahlen: Marktwert, Stichtag, Kataster-Nr., Grundstück,
+Zone, Baujahr, Gebäudevolumen, Nutzfläche, Mietzins heute, Mietwert
+(heutiger Zustand und neuwertig), Kapitalisierungssatz, Ertragswert,
+Versicherungswert. Nutzfläche und Mietzins gehen in die Rechnung, wo
+nichts von Hand steht. Den Marktwert rechnet CALC nicht um: er steht
+als Vergleich neben der Empfehlung («sind 99 % davon»). Am ersten
+echten Gutachten (23. November) wurden alle Angaben so
+gelesen, wie sie im Dokument stehen, mit pdf.js und mit pdftotext gleich.
+
 ## Das Kaufangebot
 
 Das PDF entsteht im Browser (`src/lib/angebot-pdf.ts`, jsPDF), jede
