@@ -1147,6 +1147,13 @@ jobs:
                      coalesce(anfragen, 0) as anfragen, coalesce(davon_test, 0) as davon_test,
                      coalesce(von_check_seiten, 0) as von_check_seiten
               from z full join a on a.tag = z.tag order by 1;"
+            # 24. November: drei gezählte Leads, keine Zeile in anfrage. Gelöscht
+            # wird nur über anfrage_loeschen, und das schreibt mit (ohne Namen).
+            frage "Gelöschte Leads (anfrage_geloescht, ohne Namen)" "
+              select g.geloescht_am::timestamp(0) as geloescht_am, g.art, g.test,
+                     left(md5(coalesce(g.user_id::text, '')), 6) as konto
+              from anfrage_geloescht g
+              order by 1;"
           elif [ "$FRAGE" = "gelegenheiten-tempo" ]; then
             # Julian (1. November): die Seite blieb bei "wird geladen" mit
             # lauter Nullen. Gemessen wird die Abfrage der Seite so, wie
