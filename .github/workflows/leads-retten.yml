@@ -26,7 +26,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      ALT: ${{ secrets.SICHERUNG_DB_URL }}
+      TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      HAUPT: wwoeaysppiusdjntogxi
       DB: ${{ secrets.SUPABASE_DB_URL }}
       MODUS: ${{ inputs.modus }}
     steps:
@@ -35,22 +36,30 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client jq > /dev/null
       - name: Leads aus der Kopie lesen
         run: |
-          # Die Sicherungen sind physisch: herunterladen lässt sich keine, nur
-          # im Dashboard in ein neues Projekt einspielen («Restore to a new
-          # project»). Dessen Datenbank-Adresse liegt als Secret SICHERUNG_DB_URL.
-          [ -n "$ALT" ] || { echo "Secret SICHERUNG_DB_URL fehlt."; exit 1; }
-          psql "$ALT" -v ON_ERROR_STOP=1 -v VERBOSITY=terse -q \
-            -c "\\copy (select * from public.anfrage) to 'alt.csv' with (format csv, header)"
-          echo "Leads in der Kopie: $(( $(python3 -c "import csv;print(sum(1 for _ in csv.reader(open('alt.csv'))))") - 1 ))"
+          # Die Kopie ist ein eigenes Projekt im selben Konto; abgefragt wird
+          # sie über den Schlüssel (Management-API), ohne Passwort. Gelesen
+          # wird nur die Tabelle anfrage, in eine Datei, nie ins Protokoll.
+          curl -sS -H "Authorization: Bearer $TOKEN" https://api.supabase.com/v1/projects -o projekte.json
+          echo "### Projekte im Konto"
+          jq -r '.[] | "\(.name)  \(.id)  \(.status)  \(.created_at)"' projekte.json
+          kopie=$(jq -r --arg haupt "$HAUPT" '[.[] | select(.id != $haupt)] | sort_by(.created_at) | last | .id // empty' projekte.json)
+          echo "Kopie: $kopie"
+          [ -n "$kopie" ] || { echo "Keine Kopie gefunden."; exit 1; }
+          code=$(curl -sS -o alt.json -w '%{http_code}' -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+            --data '{"query": "select coalesce(json_agg(a), '"'"'[]'"'"'::json) as d from public.anfrage a"}' \
+            "https://api.supabase.com/v1/projects/$kopie/database/query")
+          echo "Abfrage der Kopie: HTTP $code"
+          [ "$code" = 200 ] || [ "$code" = 201 ] || { head -c 300 alt.json; exit 1; }
+          jq -c '.[0].d' alt.json > daten.json
+          echo "Leads in der Kopie: $(jq length daten.json)"
       - name: Abgleichen und zurückschreiben
         run: |
           set -o pipefail
-          spalten=$(head -1 alt.csv)
           {
             echo "set statement_timeout = '60s';"
             echo "begin;"
-            echo "create temp table alt as select * from public.anfrage with no data;"
-            echo "\\copy alt ($spalten) from 'alt.csv' with (format csv, header)"
+            echo "\\set daten \`cat daten.json\`"
+            echo "create temp table alt as select * from json_populate_recordset(null::public.anfrage, :'daten'::json);"
             cat <<'SQL'
           \echo '### Kopie gegen heute (nur Tage, Webseiten, Quellen)'
           select erstellt_am::date as tag, coalesce(angaben->>'domain', '') as webseite,
@@ -74,4 +83,4 @@ jobs:
           } > laden.sql
           # Knapp melden: eine Fehlermeldung von COPY zitierte sonst die Zeile, mit Namen.
           psql "$DB" -v ON_ERROR_STOP=1 -v VERBOSITY=terse -q -f laden.sql 2>&1 | { grep -vE '^COPY|CONTEXT|line [0-9]' || true; }
-          rm -f alt.csv laden.sql
+          rm -f alt.json daten.json laden.sql
