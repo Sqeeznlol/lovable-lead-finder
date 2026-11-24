@@ -65,3 +65,12 @@ describe('Boden-Richtwert der Leads', () => {
     expect(nachWert(l).map(x => x.id)).toEqual(['c', 'b', 'a']);
   });
 });
+
+describe('leere Zeile unter einer Webseite', () => {
+  it('sagt, warum ein gezählter Lead fehlt', async () => {
+    const { leerGrund } = await import('@/lib/lead-auswertung');
+    expect(leerGrund('x.ch', 0, 0)).toMatch(/Noch keine Leads/);
+    expect(leerGrund('x.ch', 1, 1)).toMatch(/als Test ausgeblendet/);
+    expect(leerGrund('x.ch', 1, 0)).toMatch(/gelöscht/);
+  });
+});

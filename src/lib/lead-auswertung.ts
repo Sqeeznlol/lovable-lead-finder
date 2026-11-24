@@ -92,3 +92,15 @@ export function bodenText(a: Record<string, unknown> | null | undefined): string
 export function nachWert<T extends { angaben?: Record<string, unknown> | null; erstellt_am: string }>(l: T[]): T[] {
   return [...l].sort((x, y) => (bodenWert(y.angaben) ?? -1) - (bodenWert(x.angaben) ?? -1) || y.erstellt_am.localeCompare(x.erstellt_am));
 }
+
+/**
+ * Warum unter einer Webseite kein Lead steht, obwohl sie welche zählt: Der
+ * Schritt «Lead» wird erst nach dem Speichern gezählt, der Lead war also da.
+ * Fehlt er, ist er als Test ausgeblendet oder wurde gelöscht (die Zählung
+ * bleibt, der Lead nicht).
+ */
+export function leerGrund(domain: string, gezaehlt: number, tests: number): string {
+  if (!gezaehlt) return `Noch keine Leads von ${domain} in diesem Zeitraum.`;
+  if (tests) return `${tests === 1 ? 'Ein Lead ist' : `${tests} Leads sind`} als Test ausgeblendet (Name mit «Test»). Oben «Testdaten zeigen».`;
+  return `Gezählt ${gezaehlt === 1 ? 'ist ein Lead' : `sind ${gezaehlt} Leads`}, in der Liste steht keiner mehr: gelöscht.`;
+}

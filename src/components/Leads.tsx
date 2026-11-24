@@ -9,7 +9,7 @@ import { LeadDetail, type Lead } from '@/components/LeadDetail';
 import { WerbungTafel } from '@/components/WerbungTafel';
 import { naechsterSchritt } from '@/lib/nachfass';
 import { useUrlWert } from '@/hooks/use-url-wert';
-import { ANTWORT_TEXT, bodenText, bodenWert, gesamt, istTest, nachWert, wohnungText, prozent, quellen, SCHRITT_TEXT, SCHRITTE, trichterJeSeite, type TrichterZeile } from '@/lib/lead-auswertung';
+import { ANTWORT_TEXT, bodenText, bodenWert, gesamt, istTest, leerGrund, nachWert, wohnungText, prozent, quellen, SCHRITT_TEXT, SCHRITTE, trichterJeSeite, type TrichterZeile } from '@/lib/lead-auswertung';
 
 /**
  * Alle Leads der Check-Seiten in einer Liste, dazu die Zahlen je Webseite
@@ -89,8 +89,11 @@ export function Leads() {
   const leadsVon = (domain: string) => alle.filter(l => String(l.angaben?.domain ?? '').replace(/^www\./, '') === domain);
   // Die Leads einer Webseite, aufgeklappt unter ihrer Zeile: am Computer in
   // der Tabelle, auf dem Handy in der Liste.
-  const ihreLeads = (domain: string, ihre: Lead[]) => !ihre.length
-    ? <p className="p-4 text-sm text-muted-foreground">Noch keine Leads von {domain} in diesem Zeitraum.</p>
+  // Zählt die Webseite einen Lead, die Liste aber keinen (24. November, Julian:
+  // «welcher Lead»), sagt die leere Zeile warum: als Test ausgeblendet oder gelöscht.
+  const testsVon = (domain: string) => (leads.data ?? []).filter(l => istTest(l) && String(l.angaben?.domain ?? '').replace(/^www\./, '') === domain).length;
+  const ihreLeads = (domain: string, ihre: Lead[], gezaehlt = 0) => !ihre.length
+    ? <p className="p-4 text-sm text-muted-foreground">{leerGrund(domain, gezaehlt, mitTest ? 0 : testsVon(domain))}</p>
     : (
       <ul className="divide-y">
         {ihre.map(l => (
@@ -220,7 +223,7 @@ export function Leads() {
                         <span className="block text-xs text-muted-foreground">{m.werte.aufruf} Besucher · {m.werte.lead} Leads</span>
                       </span>
                     </button>
-                    {auf && <div className="border-t bg-secondary/30">{ihreLeads(m.domain, ihre)}</div>}
+                    {auf && <div className="border-t bg-secondary/30">{ihreLeads(m.domain, ihre, m.werte.lead)}</div>}
                   </li>
                 );
               })}
@@ -250,7 +253,7 @@ export function Leads() {
                         {auf && (
                           <tr className="border-b bg-secondary/30">
                             <td colSpan={SCHRITTE.length + 2} className="p-0">
-                              {ihreLeads(m.domain, ihre)}
+                              {ihreLeads(m.domain, ihre, m.werte.lead)}
                             </td>
                           </tr>
                         )}
