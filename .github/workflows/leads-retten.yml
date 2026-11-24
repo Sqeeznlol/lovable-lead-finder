@@ -1,0 +1,111 @@
+name: Leads retten
+
+# 24. November: Am 21. November wurden mit dem Passwort sieben Leads
+# gelöscht, drei davon echt (einer über Google auf hauschecker.ch).
+# Julian: «alles Leads, was je eingetragen worden sind». Die tägliche
+# Sicherung von Supabase hält sie noch sieben Tage. Dieser Ablauf lädt eine
+# Sicherung, nimmt daraus nur die Tabelle anfrage und schreibt zurück, was
+# heute fehlt. Die Protokolle sind öffentlich: ausgegeben werden nur
+# Zählungen, Tage und Webseiten, nie Namen, Nummern oder Adressen.
+
+on:
+  workflow_dispatch:
+    inputs:
+      modus:
+        description: 'zeigen (nur zählen) oder schreiben (fehlende Leads zurück)'
+        required: true
+        default: zeigen
+        type: choice
+        options: [zeigen, schreiben]
+      sicherung:
+        description: 'Nummer der Sicherung (leer: die jüngste vor dem 21. November, 18:51 UTC)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  retten:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      DB: ${{ secrets.SUPABASE_DB_URL }}
+      MODUS: ${{ inputs.modus }}
+      WAHL: ${{ inputs.sicherung }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Werkzeuge
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client jq > /dev/null
+      - name: Sicherungen auflisten
+        id: liste
+        run: |
+          ref=$(grep -E '^VITE_SUPABASE_URL=' .env | sed -E 's#.*https://([a-z0-9]+)\.supabase\.co.*#\1#')
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+          code=$(curl -sS -o liste.json -w '%{http_code}' -H "Authorization: Bearer $TOKEN" \
+            "https://api.supabase.com/v1/projects/$ref/database/backups")
+          echo "Liste: HTTP $code"
+          jq '{region, pitr_enabled, walg_enabled, physical_backup_data, backups: [.backups[]? | del(.project_id?)]}' liste.json || head -c 500 liste.json
+          code=$(curl -sS -o laden.json -w '%{http_code}' -H "Authorization: Bearer $TOKEN" \
+            "https://api.supabase.com/platform/database/$ref/backups/downloadable-backups")
+          echo "Ladbar: HTTP $code"
+          jq . laden.json 2>/dev/null | head -60 || true
+      - name: Sicherung laden und anfrage herauslösen
+        run: |
+          ref='${{ steps.liste.outputs.ref }}'
+          # Die jüngste Sicherung vor dem Löschen (21.11., 18:51 UTC).
+          id="$WAHL"
+          if [ -z "$id" ]; then
+            id=$(jq -r '[ (.backups // .)[]? | select((.inserted_at // .created_at // "") < "2026-11-21T18:51") ]
+                        | sort_by(.inserted_at // .created_at) | last | .id // empty' laden.json liste.json | grep -v '^$' | head -1)
+          fi
+          echo "Gewählt: Sicherung $id"
+          [ -n "$id" ] || { echo "Keine Sicherung vor dem Löschen gefunden."; exit 1; }
+          code=$(curl -sS -o url.json -w '%{http_code}' -X POST -H "Authorization: Bearer $TOKEN" \
+            -H 'Content-Type: application/json' --data "{\"id\": $id}" \
+            "https://api.supabase.com/platform/database/$ref/backups/download")
+          echo "Herunterladen: HTTP $code"
+          url=$(jq -r '.fileUrl // empty' url.json)
+          [ -n "$url" ] || { jq 'del(.fileUrl?)' url.json 2>/dev/null || head -c 300 url.json; exit 1; }
+          curl -sS -o sicherung.gz "$url"
+          ls -la sicherung.gz | awk '{print "Grösse:", $5}'
+          # Nur der Block der Tabelle anfrage; der Rest der Sicherung bleibt ungelesen.
+          gzip -dc sicherung.gz | awk '/^COPY public\.anfrage \(/{p=1} p{print} p&&/^\\\.$/{exit}' > anfrage.sql
+          echo "Zeilen der Tabelle anfrage in der Sicherung: $(( $(wc -l < anfrage.sql) - 2 ))"
+          rm -f sicherung.gz
+      - name: Abgleichen und zurückschreiben
+        run: |
+          [ -s anfrage.sql ] || { echo "Kein Block anfrage in der Sicherung."; exit 1; }
+          kopf=$(head -1 anfrage.sql | sed -E 's/^COPY public\.anfrage /COPY alt /')
+          {
+            echo "set statement_timeout = '60s';"
+            echo "begin;"
+            echo "create temp table alt as select * from public.anfrage with no data;"
+            echo "$kopf"
+            tail -n +2 anfrage.sql
+            cat <<'SQL'
+          \echo '### Sicherung gegen heute (nur Zählungen)'
+          select erstellt_am::date as tag, coalesce(angaben->>'domain', '') as webseite,
+                 coalesce(angaben->>'utm_source', angaben->>'quelle', '') as quelle,
+                 (name ~* 'test' or angaben->>'quelle' = 'test') as test,
+                 exists (select 1 from public.anfrage a where a.id = alt.id) as heute_da
+          from alt order by erstellt_am;
+          SQL
+            if [ "$MODUS" = "schreiben" ]; then
+              cat <<'SQL'
+          insert into public.anfrage select * from alt
+           where not exists (select 1 from public.anfrage a where a.id = alt.id)
+             and not (name ~* 'test' or coalesce(angaben->>'quelle', '') = 'test');
+          \echo '### Nach dem Zurückschreiben'
+          select count(*) as leads_heute from public.anfrage;
+          commit;
+          SQL
+            else
+              echo "rollback;"
+            fi
+          } > laden.sql
+          # Knapp melden: eine Fehlermeldung von COPY zitierte sonst die Zeile, mit Namen.
+          set -o pipefail
+          psql "$DB" -v ON_ERROR_STOP=1 -v VERBOSITY=terse -q -f laden.sql 2>&1 | { grep -vE '^COPY|CONTEXT|line [0-9]' || true; }
+          rm -f anfrage.sql laden.sql
