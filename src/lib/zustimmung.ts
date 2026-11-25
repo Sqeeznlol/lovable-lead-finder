@@ -1,8 +1,9 @@
 // Die Wahl im Cookie-Hinweis der Check-Seiten.
 //
 // Heute setzen die Seiten keine Cookies: gezählt wird anonym im Speicher
-// des Tabs (check-zaehlen.ts). Werbemessung (Meta-Pixel, Google Ads) darf
-// erst laden, wenn darfWerben() wahr ist. Nach einem Jahr wird neu gefragt,
+// des Tabs (check-zaehlen.ts). Werbe-Cookies (Google Ads) gibt es erst,
+// wenn darfWerben() wahr ist; ohne steht Googles Einwilligungsmodus auf
+// «denied» (google-ads.ts). Nach einem Jahr wird neu gefragt,
 // damit eine alte Zustimmung nicht für neue Messpunkte gilt.
 export type Wahl = 'alle' | 'noetig';
 const SCHLUESSEL = 'pc-zustimmung';

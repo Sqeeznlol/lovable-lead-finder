@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 /**
- * Der Messpunkt von Google Ads meldet nur den Lead, nur nach Zustimmung
- * und nur mit gültiger Conversion-ID und Label (Werbeplan, November 2026).
+ * Der Messpunkt von Google Ads meldet nur den Lead, nur mit gültiger
+ * Conversion-ID und Label (Werbeplan, November 2026). Ohne Zustimmung lädt
+ * er im Einwilligungsmodus «denied»: kein Cookie, nur ein Ping ohne Kennung
+ * (25. November: sonst fehlten Leads ohne «Einverstanden» im Konto).
  */
 const skripte = () => [...document.querySelectorAll('script')].map(s => s.src).filter(s => s.includes('googletagmanager'));
 
@@ -29,10 +31,13 @@ describe('Google Ads: Lead melden', () => {
     expect(skripte()).toEqual([]);
   });
 
-  it('ohne Zustimmung lädt nichts', async () => {
+  it('ohne Zustimmung: Lead als Ping, alles «denied», persönliche Werbung nie', async () => {
     const g = await frisch('AW-1234567890', 'AbC-dEf_123', 'noetig');
     g.googleLead();
-    expect(skripte()).toEqual([]);
+    expect(skripte()).toEqual(['https://www.googletagmanager.com/gtag/js?id=AW-1234567890']);
+    const eintraege = ((window as unknown as { dataLayer: IArguments[] }).dataLayer).map(a => [...a]);
+    expect(eintraege[0]).toEqual(['consent', 'default', { ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied', analytics_storage: 'denied' }]);
+    expect(eintraege.filter(e => e[0] === 'event')).toEqual([['event', 'conversion', { send_to: 'AW-1234567890/AbC-dEf_123' }]]);
   });
 
   it('eine falsch eingetragene ID lädt keine fremde Adresse', async () => {
@@ -42,20 +47,20 @@ describe('Google Ads: Lead melden', () => {
     expect(skripte()).toEqual([]);
   });
 
-  it('lädt gleich nach «Einverstanden», nicht erst beim Lead', async () => {
+  it('lädt beim Start und folgt jeder Wahl im Hinweis', async () => {
     const g = await frisch('AW-1234567890', 'AbC-dEf_123', null);
     g.googleBeobachten();
-    expect(skripte()).toEqual([]);
+    expect(skripte()).toEqual(['https://www.googletagmanager.com/gtag/js?id=AW-1234567890']);
+    const daten = () => ((window as unknown as { dataLayer: IArguments[] }).dataLayer).map(a => [...a]);
+    expect(daten()[0]).toEqual(['consent', 'default', { ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied', analytics_storage: 'denied' }]);
     const { setzeZustimmung } = await import('@/lib/zustimmung');
     setzeZustimmung('alle');
-    expect(skripte()).toEqual(['https://www.googletagmanager.com/gtag/js?id=AW-1234567890']);
-    const eintraege = ((window as unknown as { dataLayer: IArguments[] }).dataLayer).map(a => [...a]);
     // Messung ja, persönliche Werbung nein.
-    expect(eintraege[0]).toEqual(['consent', 'default', { ad_storage: 'granted', ad_user_data: 'granted', ad_personalization: 'denied', analytics_storage: 'denied' }]);
+    expect(daten().at(-1)).toEqual(['consent', 'update', { ad_storage: 'granted', ad_user_data: 'granted', ad_personalization: 'denied', analytics_storage: 'denied' }]);
     // Wer später «Nur nötige» wählt, nimmt die Messung zurück.
     setzeZustimmung('noetig');
-    const zuletzt = ((window as unknown as { dataLayer: IArguments[] }).dataLayer).map(a => [...a]).at(-1);
-    expect(zuletzt).toEqual(['consent', 'update', { ad_storage: 'denied', ad_user_data: 'denied' }]);
+    expect(daten().at(-1)).toEqual(['consent', 'update', { ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied', analytics_storage: 'denied' }]);
+    expect(skripte()).toHaveLength(1);
   });
 
   it('mit Konto und Zustimmung: einmal laden, Lead als Conversion melden', async () => {

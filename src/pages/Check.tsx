@@ -520,7 +520,7 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
                 <h3>Daten im Ausland</h3>
                 <p>Deutschland gewährleistet einen angemessenen Datenschutz. In den USA gilt das für Unternehmen, die im Datenschutzrahmen Schweiz–USA (Swiss-U.S. Data Privacy Framework) zertifiziert sind; der Bundesrat anerkennt ihn seit dem 15. September 2024. Vercel Inc. und Google LLC sind dort eingetragen. Supabase überträgt Daten nach Singapur und in die USA mit den Standardvertragsklauseln.</p>
                 <h3>Besuche und Werbung</h3>
-                <p>Besuche zählen wir anonym und ohne Cookie: mit einer zufälligen Nummer im Speicher dieses Browserfensters, die beim Schliessen verfällt. Den Messpunkt von Google Ads (Werbe-Cookies) laden wir nur, wenn Sie im Cookie-Hinweis zustimmen. Er meldet Google, dass nach dem Klick auf eine Anzeige eine Anfrage eingegangen ist, ohne Name, Adresse oder Nummer; für persönliche Werbung nutzen wir ihn nicht. Ihre Wahl ändern Sie jederzeit unten unter «Cookie-Einstellungen».</p>
+                <p>Besuche zählen wir anonym und ohne Cookie: mit einer zufälligen Nummer im Speicher dieses Browserfensters, die beim Schliessen verfällt. Der Messpunkt von Google Ads meldet Google, dass nach dem Klick auf eine Anzeige eine Anfrage eingegangen ist, ohne Name, Adresse oder Nummer; für persönliche Werbung nutzen wir ihn nicht. Werbe-Cookies setzt er nur, wenn Sie im Cookie-Hinweis zustimmen. Ohne Zustimmung sendet er nur eine Meldung ohne Cookie und ohne Kennung (Einwilligungsmodus von Google), dabei sieht Google Ihre IP-Adresse. Ihre Wahl ändern Sie jederzeit unten unter «Cookie-Einstellungen».</p>
                 <h3>Ihre Rechte</h3>
                 <p>Sie können verlangen, dass wir Ihnen sagen, welche Daten wir über Sie bearbeiten, und dass wir sie berichtigen oder löschen (Art. 25 und 32 des Datenschutzgesetzes). Schreiben Sie dafür an die Adresse oben{BETREIBER_EMAIL ? ` oder an ${BETREIBER_EMAIL}` : ''}.</p>
               </>}
@@ -574,7 +574,9 @@ export default function Check({ marke: vorgabe, modus }: { marke?: Marke; modus?
                   <p className="vorschlaege hinweis-nummer" role="status">Bitte mit Hausnummer, zum Beispiel «{text.trim().split(/\s+/)[0]} 12»</p>
                 )}
               </form>
-              <ul className="haken"><li>Kostenlos und unverbindlich</li><li>Amtliche Daten von Bund und Kantonen</li><li>Keine Weitergabe an Dritte</li></ul>
+              {/* Die Anzeige «Verkäufer Zürich» (25. November) verspricht ein unverbindliches Kaufangebot:
+                  darum steht es schon oben, nicht erst unter «Angebot». */}
+              <ul className="haken"><li>Kostenlos und unverbindlich</li><li>Auf Wunsch ein unverbindliches Kaufangebot, ohne Makler</li><li>Amtliche Daten von Bund und Kantonen</li><li>Keine Weitergabe an Dritte</li></ul>
             </div>
             <aside className="beispiel" aria-label="Beispiel einer Auswertung">
               <div className="oben"><span>Beispiel einer Auswertung</span></div>

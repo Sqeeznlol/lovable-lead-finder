@@ -11,8 +11,12 @@ import { KLICK, sitzungsHerkunft } from '@/lib/werbe-herkunft';
  * öffentlich: sie stehen in jeder Seite, die den Messpunkt nutzt. Fehlt die
  * ID, lädt nichts.
  *
- * Geladen wird gleich nach «Einverstanden», nicht erst beim Lead: der Tag
- * muss den Klick der Anzeige (gclid) sehen, und die Check-Seite schreibt
+ * Geladen wird beim Start, mit Googles Einwilligungsmodus (Consent Mode v2):
+ * ohne «Einverstanden» steht alles auf «denied», der Tag setzt kein Cookie
+ * und meldet einen Lead nur als Ping ohne Kennung, den Google hochrechnet.
+ * Vorher lud er erst nach «Einverstanden», und ein Lead ohne Zustimmung
+ * fehlte im Konto ganz (25. November, Einrichtung der Kampagne «Verkäufer
+ * Zürich»). Er muss den Klick der Anzeige (gclid) sehen, und die Check-Seite schreibt
  * ihren Link um, sobald eine Adresse gewählt ist. Fehlt die Kennung im
  * Link, reicht sie page_location aus dem Gemerkten nach (werbe-herkunft.ts).
  *
@@ -56,8 +60,8 @@ function laden(konto: string): void {
     // eslint-disable-next-line prefer-rest-params
     w.dataLayer!.push(arguments);
   };
-  // Die Wahl im Cookie-Hinweis, ausdrücklich: Messung ja, persönliche Werbung nein.
-  gtag('consent', 'default', { ad_storage: 'granted', ad_user_data: 'granted', ad_personalization: 'denied', analytics_storage: 'denied' });
+  // Die Wahl im Cookie-Hinweis: Messung nur mit «Einverstanden», persönliche Werbung nie.
+  gtag('consent', 'default', einwilligung(darfWerben()));
   gtag('js', new Date());
   const link = seitenLink(window.location.href, sitzungsHerkunft());
   gtag('config', konto, link ? { page_location: link } : {});
@@ -67,9 +71,15 @@ function laden(konto: string): void {
   document.head.appendChild(s);
 }
 
-/** Lädt den Messpunkt, sobald zugestimmt ist; ohne Konto oder ohne Zustimmung tut es nichts. */
+/** Was der Tag darf: mit Zustimmung messen (Cookie), sonst nur Pings ohne Kennung. */
+export function einwilligung(ja: boolean): Record<string, 'granted' | 'denied'> {
+  const m = ja ? 'granted' : 'denied';
+  return { ad_storage: m, ad_user_data: m, ad_personalization: 'denied', analytics_storage: 'denied' };
+}
+
+/** Lädt den Messpunkt beim Start; ohne Konto tut es nichts. */
 export function googleStart(): void {
-  if (!ADS_ID || typeof window === 'undefined' || !darfWerben()) return;
+  if (!ADS_ID || typeof window === 'undefined') return;
   laden(ADS_ID);
 }
 
@@ -77,16 +87,13 @@ export function googleStart(): void {
 export function googleBeobachten(): void {
   if (typeof window === 'undefined') return;
   googleStart();
-  window.addEventListener(EREIGNIS, () => {
-    if (darfWerben()) googleStart();
-    // Wer später «Nur nötige» wählt, nimmt die Zustimmung zurück: der geladene Tag misst nicht mehr.
-    else if (geladen) gtag('consent', 'update', { ad_storage: 'denied', ad_user_data: 'denied' });
-  });
+  // Jede Wahl im Hinweis, auch eine spätere Rücknahme, gilt sofort.
+  window.addEventListener(EREIGNIS, () => { if (geladen) gtag('consent', 'update', einwilligung(darfWerben())); });
 }
 
-/** Meldet einen Lead an Google Ads; ohne Konto, Label oder Zustimmung tut es nichts. */
+/** Meldet einen Lead an Google Ads; ohne Zustimmung nur als Ping ohne Kennung. */
 export function googleLead(): void {
-  if (!ADS_ID || !ADS_LABEL || typeof window === 'undefined' || !darfWerben()) return;
+  if (!ADS_ID || !ADS_LABEL || typeof window === 'undefined') return;
   laden(ADS_ID);
   gtag('event', 'conversion', { send_to: `${ADS_ID}/${ADS_LABEL}` });
 }
