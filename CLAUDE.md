@@ -62,6 +62,9 @@ Ziel hauschecker.ch) mit Suchbegriffen, die «verkaufen» enthalten; Begriffe
 für Neugierige (Zone, EGRID, Baugesuch) bringen keine Verkäufer. Der
 Messpunkt lädt mit Googles Einwilligungsmodus (ohne Zustimmung «denied»,
 Lead als Ping ohne Cookie; Zweig `akquise`, `google-ads.ts`).
+Die Anzeigen werben ohne Telefonnummer (25. November, Julian: «korrekt ohne
+Nummer»): Leads kommen nur über das Formular; Bauraum hat keine eigene
+Nummer, die von Studer gehört nicht in diese Anzeigen.
 
 ## Was live ist
 
