@@ -9,6 +9,11 @@ name: Leads retten
 # Zählungen, Tage und Webseiten, nie Namen, Nummern oder Adressen.
 
 on:
+  # Ein Push dieser Datei startet «zeigen» (ohne zu schreiben), auch wenn
+  # niemand den Lauf von Hand auslösen kann.
+  push:
+    branches: [main]
+    paths: ['.github/ausloesen/leads-retten']
   workflow_dispatch:
     inputs:
       modus:
@@ -29,7 +34,7 @@ jobs:
       TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       HAUPT: wwoeaysppiusdjntogxi
       DB: ${{ secrets.SUPABASE_DB_URL }}
-      MODUS: ${{ inputs.modus }}
+      MODUS: ${{ inputs.modus || 'zeigen' }}
     steps:
       - uses: actions/checkout@v4
       - name: Werkzeuge
