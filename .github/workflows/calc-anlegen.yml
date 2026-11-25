@@ -1,0 +1,44 @@
+name: CALC anlegen
+
+# Legt in CALC YOU LATER einen Entwurf zu einer Adresse an (25. November,
+# Julian: «kannst du das nicht selber machen?»). Die Adresse steht in
+# .github/ausloesen/calc-anlegen; ein Push dieser Datei startet den Lauf,
+# von Hand geht es mit der Eingabe «adresse».
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/ausloesen/calc-anlegen']
+  workflow_dispatch:
+    inputs:
+      adresse:
+        description: 'Strasse Nr., PLZ Ort'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  anlegen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Browser einrichten
+        run: |
+          set -euo pipefail
+          chrome=$(command -v google-chrome || command -v chromium-browser || command -v chromium || true)
+          [ -n "$chrome" ] || { echo "Kein Chrome auf dem Runner."; exit 1; }
+          echo "CHROMIUM=$chrome" >> "$GITHUB_ENV"
+          mkdir -p /tmp/pruefung && cd /tmp/pruefung
+          npm init -y >/dev/null
+          npm install --silent playwright-core@1.57.0
+      - name: Entwurf anlegen
+        env:
+          KONTO_AUI: ${{ secrets.KONTO_AUI }}
+          NODE_PATH: /tmp/pruefung/node_modules
+          EINGABE: ${{ inputs.adresse }}
+        run: |
+          set -euo pipefail
+          adresse="${EINGABE:-$(head -1 .github/ausloesen/calc-anlegen)}"
+          CALC_ADRESSE="$adresse" node tools/calc-anlegen.cjs | tee -a "$GITHUB_STEP_SUMMARY"
