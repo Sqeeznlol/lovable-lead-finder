@@ -192,6 +192,11 @@ Kubatur, Baukosten, Erlös, Gewinn, Chancen, Risiken und eine
 Kaufpreisempfehlung (Neubau und Bestand, die höhere Bewertung zählt).
 Danach in 24 Stunden: Kaufpreis prüfen, freigeben, Angebot schreiben,
 senden. Alles Weitere in `docs/calc-you-later.md`.
+Schickt Julian eine Adresse oder einen Maps-Link «bitte in CALC einpflegen»,
+legt Claude den Entwurf selbst an (25. November: «kannst du das nicht
+selber machen?»): Adresse in `.github/ausloesen/calc-anlegen` schreiben und
+pushen; der Ablauf «CALC anlegen» meldet sich mit dem Arbeitskonto an,
+rechnet und speichert, und nennt im Protokoll nur den Link, keine Preise.
 
   * Comparis und Homegate werden nicht automatisch ausgelesen: beide
     verbieten es und sperren Programme aus (Wortlaut und Sperren am
