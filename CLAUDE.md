@@ -55,6 +55,13 @@ November): in der Lead-Ansicht «Guter Lead» oder «Kein guter Lead»
 (`anfrage.guete`, ohne Urteil gilt er als gut); dazu die Monatsgrenze
 von CHF 600, hochgerechnet aus den eingetragenen Kosten, und die
 Suchbegriffe, die Leads bringen (`werbung_begriffe`).
+Bis zum 25. November lief keine einzige Anzeige: die Datei für den Editor
+war nie veröffentlicht (Ads Transparency Center: 0 Anzeigen für alle
+Domains). Seither läuft nur «Verkäufer Zürich» (`utm_campaign=verkaeufer`,
+Ziel hauschecker.ch) mit Suchbegriffen, die «verkaufen» enthalten; Begriffe
+für Neugierige (Zone, EGRID, Baugesuch) bringen keine Verkäufer. Der
+Messpunkt lädt mit Googles Einwilligungsmodus (ohne Zustimmung «denied»,
+Lead als Ping ohne Cookie; Zweig `akquise`, `google-ads.ts`).
 
 ## Was live ist
 
